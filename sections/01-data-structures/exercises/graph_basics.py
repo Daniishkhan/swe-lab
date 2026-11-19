@@ -33,8 +33,10 @@ adj[u] is the list of vertices u has an edge to.
 Requirements
 ------------
 - All three in O(V + E) time: one pass over the edges, plus one over the
-  vertices.
-- find_judge reads each trust pair once; it doesn't need a set or a dict.
+  vertices. Never build a V x V matrix: at 200,000 vertices that's
+  40 billion cells.
+- find_judge makes at most two passes over trust (one is enough); it
+  doesn't need a set or a dict.
 
 What the tests measure
 ----------------------

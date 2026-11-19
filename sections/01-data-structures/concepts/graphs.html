@@ -58,7 +58,7 @@
    │  /  │
    C     D ─── E     (where the dots sit on the page means nothing)</code></pre>
 
-<p>You've already met two special graphs. A <b>linked list</b> is a graph where each node has one edge to the next. A <b>tree</b> is a graph with no loops, where there's exactly one path between any two nodes. A general graph drops both limits: any node can connect to any other, and following edges can bring you back where you started (a <b>cycle</b>).</p>
+<p>You've already met two special graphs. A <b>linked list</b> is a graph where each node has one edge to the next. A <b>tree</b> is a graph with no cycles (paths that come back to where they started), where there's exactly one path between any two nodes. A general graph drops both limits: any node can connect to any other, and following edges can bring you back where you started (a <b>cycle</b>).</p>
 
 <p>Once you look for graphs, they're everywhere in interview problems:</p>
 <ul>
@@ -156,20 +156,38 @@ roads = [("A", "B", 7), ("A", "C", 3)]     # weighted: (from, to, weight)</code>
 <div class="keyidea"><p>An adjacency matrix is a V × V grid: O(1) to check one edge, O(V) to list a vertex's neighbors, and V² memory regardless of E. Use it for small or dense graphs; for big sparse ones it's almost all empty cells.</p></div>
 
 <div class="check" id="check-matrix">
-  <p class="q">A road network has 10 million intersections and about 25 million road segments. Roughly how big is its adjacency matrix at 1 byte per cell?</p>
+  <p class="q">A road network has 10 million intersections and about 13 million road segments. Roughly how big is its adjacency matrix at 1 byte per cell?</p>
   <div class="opts">
     <button>About 25 MB, one byte per road</button>
     <button>About 10 MB, one byte per intersection</button>
     <button data-correct>About 100 TB</button>
   </div>
-  <div class="fb right"><p>Right: (10⁷)² = 10¹⁴ cells, 100 terabytes, to store 25 million roads. The same graph as adjacency lists is about 50 million entries, a few hundred MB.</p></div>
-  <div class="fb wrong"><p>The matrix doesn't care how many roads exist. It has a cell for every <em>pair</em> of intersections, road or not: 10 million rows × 10 million columns = 10¹⁴ cells. At a byte each that's 10¹⁴ bytes, 100 TB. Picture the mileage chart for 10 million towns: a page 10 million boxes wide and 10 million tall, nearly every box blank, because each town only has roads to two or three neighbors.</p></div>
+  <div class="fb right"><p>Right: (10⁷)² = 10¹⁴ cells, 100 terabytes, to store 13 million roads. The same graph as adjacency lists is about 26 million entries (each road in two lists), about 200 MB.</p></div>
+  <div class="fb wrong"><p>The matrix doesn't care how many roads exist. It has a cell for every <em>pair</em> of intersections, road or not: 10 million rows × 10 million columns = 10¹⁴ cells. At a byte each that's 10¹⁴ bytes, 100 TB. Picture the mileage chart for 10 million towns: a page 10 million boxes wide and 10 million tall, nearly every box blank, because each town only has roads to two or three neighbors (13 million roads × 2 ends ÷ 10 million towns ≈ 2.6).</p></div>
 </div>
 
 <!-- ============================================================ -->
 <h2 id="s6"><span class="sec-num">6</span>Store each vertex's neighbors: the adjacency list</h2>
 
 <p>Back to the phone contacts. Nobody keeps a chart of the whole world's friendships; each person keeps a list of their own contacts. An <b>adjacency list</b> does the same: for each vertex, a list of the vertices it has an edge to.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <label class="small">vertex <select id="rep-v"></select></label>
+      <label class="small"><input type="checkbox" id="rep-dir"> directed</label>
+    </div>
+    <svg class="viz" id="rep-svg" style="margin-top:6px"></svg>
+    <div class="cols" style="margin-top:8px">
+      <div><div class="small muted">adjacency list</div><div id="rep-list"></div></div>
+      <div><div class="small muted">adjacency matrix</div><div id="rep-mat" class="table-wrap"></div></div>
+    </div>
+    <div class="viz-caption" id="rep-msg"></div>
+  </div>
+  <div class="cap">One graph, two ways to store it. Pick a vertex: its neighbors light up in the drawing, its list and its matrix row. Count the cells each one reads to answer "who are its neighbors?". Tick "directed" and watch the matrix lose its mirror symmetry and each edge appear in only one list.</div>
+</div>
+
+<p>In Python, the usual way to build one from an edge list:</p>
 
 <pre><code>from collections import defaultdict
 
@@ -190,26 +208,11 @@ def build(edges, directed=False):
   <li><b>Memory:</b> O(V + E): one list per vertex, one entry per edge (two for undirected).</li>
 </ul>
 
-<div class="figure">
-  <div class="viz-stage">
-    <div class="viz-controls" style="margin-top:0">
-      <label class="small">vertex <select id="rep-v"></select></label>
-      <label class="small"><input type="checkbox" id="rep-dir"> directed</label>
-    </div>
-    <svg class="viz" id="rep-svg" style="margin-top:6px"></svg>
-    <div class="cols" style="margin-top:8px">
-      <div><div class="small muted">adjacency list</div><div id="rep-list"></div></div>
-      <div><div class="small muted">adjacency matrix</div><div id="rep-mat" class="table-wrap"></div></div>
-    </div>
-    <div class="viz-caption" id="rep-msg"></div>
-  </div>
-  <div class="cap">One graph, two ways to store it. Pick a vertex: its neighbors light up in the drawing, its list and its matrix row. Count the cells each one reads to answer "who are its neighbors?". Tick "directed" and watch the matrix lose its mirror symmetry and each edge appear in only one list.</div>
-</div>
 
 <h3>The handshake fact: why a full walk is O(V + E)</h3>
 <p>Here's the fact that makes adjacency lists the default. Add up the lengths of every list. Each undirected edge u–v appears exactly twice: once in u's list and once in v's. So the total of all the degrees is exactly 2E. (At a party, if you add up how many hands each person shook, you count every handshake twice, once per hand.) For a directed graph, each edge is in one list, so the total is E.</p>
 
-<p>Now picture any algorithm that visits every vertex once and, at each one, looks through its neighbors. With adjacency lists the total work is V (visiting) + 2E (all the lists, added up): <b>O(V + E)</b>. With a matrix, each "look through the neighbors" reads a whole row of V cells, so it's V × V: <b>O(V²)</b>, however sparse the graph. For the road network above, that's about 60 million steps versus 10¹⁴.</p>
+<p>Now picture any algorithm that visits every vertex once and, at each one, looks through its neighbors. With adjacency lists the total work is V (visiting) + 2E (all the lists, added up): <b>O(V + E)</b>. With a matrix, each "look through the neighbors" reads a whole row of V cells, so it's V × V: <b>O(V²)</b>, however sparse the graph. For the road network above, that's about 36 million steps (10 million + 2 × 13 million) versus 10¹⁴.</p>
 
 <div class="keyidea"><p>An adjacency list stores, for each vertex, its neighbors: O(degree) to list them, O(V + E) memory. Because all the lists together hold 2E entries (E if directed), visiting every vertex and every edge costs O(V + E). That's why it's the default for sparse graphs.</p></div>
 
@@ -247,10 +250,17 @@ def build(edges, directed=False):
     <div class="viz-controls"><span class="small">average degree =</span><input type="range" id="mem-d" min="0" max="7" value="2" style="width:160px"><b id="mem-dval"></b></div>
     <div id="mem-out" style="margin-top:10px"></div>
   </div>
-  <div class="cap">Memory for a graph with V vertices and the chosen average degree: a matrix at 1 bit per cell (the most compact it can be) versus adjacency lists at 8 bytes per entry (each undirected edge stored twice). Raise V and watch the matrix explode while the lists grow in step with the edges.</div>
+  <div class="cap">Memory for a graph with V vertices and the chosen average degree: a matrix at 1 bit per cell versus adjacency lists at 8 bytes per entry (each undirected edge stored twice) plus 8 bytes per vertex for its list. Raise V and watch the matrix explode while the lists grow in step with the edges.</div>
 </div>
 
 <p>A rule of thumb: <b>default to adjacency lists</b>. Switch to a matrix when V is at most a few thousand <em>and</em> either the graph is dense or you need lots of O(1) edge checks. Keep the edge list when the algorithm wants edges sorted or processed one at a time.</p>
+
+<p>Three follow-ups interviewers like here:</p>
+<ul>
+  <li><b>Both directions.</b> A directed adjacency list answers "who does v follow?" in O(degree). "Who follows v?" would mean scanning every list. If you need both, store both: out-lists and in-lists (the transpose, exercise 4). Twice the memory, and every new edge is written twice.</li>
+  <li><b>Averages hide supernodes.</b> "200 friends on average" is true, but follower counts follow a power law: most people have a few hundred, a celebrity has 100 million. "List my followers" is O(degree), so for that one vertex it's 10⁸, and the machine holding that list becomes a hot spot. Real systems shard by user (each user's lists live on the machine that owns that user) and give supernodes special treatment, such as splitting their lists across machines or precomputing results.</li>
+  <li><b>Python's real cost.</b> The 8 bytes per entry is a pointer. In CPython each list also has a header of about 56 bytes, and an int above 256 is its own 28-byte object unless it's shared, so a list of lists costs several times the estimate. Exercise 6 measures it.</li>
+</ul>
 
 <h3>In Python</h3>
 <ul>
@@ -288,7 +298,7 @@ def build(edges, directed=False):
   <li><b>Word ladders:</b> the neighbors of "cold" are the dictionary words one letter away. (Tip: generate patterns like "c*ld" instead of comparing every pair of words.)</li>
   <li><b>Puzzle states:</b> the vertices of a sliding puzzle or a lock with 4 dials are its states; the edges are single moves. The lock has 10⁴ = 10,000 states, each with 8 neighbors (each dial one step up or down). You'd never write those down.</li>
 </ul>
-<p>Sometimes there are too many vertices to even count: a chess game's positions form a graph with more vertices than atoms in the universe. Search only ever touches the part it explores, which is the only reason such problems can be solved at all.</p>
+<p>Sometimes there are too many vertices to even count: the positions of the board game Go form a graph with about 2 × 10¹⁷⁰ vertices, far more than the 10⁸⁰ atoms in the universe. Search only ever touches the part it explores, which is the only reason such problems can be solved at all.</p>
 
 <div class="keyidea"><p>If you can compute a vertex's neighbors from the vertex itself (a grid cell, a word, a puzzle state), don't build the graph. Generate neighbors on demand: no memory for edges, no build time, and it works even when the graph is too big to write down.</p></div>
 
@@ -308,12 +318,12 @@ def build(edges, directed=False):
 
 <p>Chapter 2 covers searching graphs properly (breadth-first and depth-first search). Here's the one idea that comes with the data structure itself. In a tree, walking down from the root never revisits a node. In a graph, edges can lead back to where you've been, and a walk that doesn't notice will go round a cycle forever.</p>
 
-<p>So every graph walk keeps a <b>visited</b> set (or an array of booleans, for vertices 0 to n − 1). Before stepping to a neighbor, check it; when you arrive somewhere new, mark it. Each vertex is then entered once, and each of its edges is looked at once from that end: O(V + E) with adjacency lists, exactly the handshake count.</p>
+<p>So every graph walk keeps a <b>visited</b> set (or an array of booleans, for vertices 0 to n − 1). Before stepping to a neighbor, check it; if it's new, mark it at once, as you push it onto the to-do list. (Marking only when you later take it off the list lets the same vertex be pushed once per arrow into it, so the list can grow to O(E).) Each vertex is then entered once, and each of its edges is looked at once from that end: O(V + E) with adjacency lists, exactly the handshake count.</p>
 
 <div class="figure">
   <div class="viz-stage" style="padding-bottom:0"><div class="viz-controls" style="margin-top:0"><label class="small"><input type="checkbox" id="walk-novis"> forget the visited set</label></div></div>
   <div id="walk-player"></div>
-  <div class="cap">Find everything reachable from 0 in a directed graph that contains a cycle (0 → 1 → 2 → 0). The walk keeps a to-do stack. Count how many times each arrow is looked at. Then tick "forget the visited set" and watch it go round the cycle with no end.</div>
+  <div class="cap">Find everything reachable from 0 in a directed graph that contains a cycle (0 → 1 → 2 → 0). The walk keeps a to-do stack. Watch the total of arrow looks. Then tick "forget the visited set" and watch it go round the cycle with no end.</div>
 </div>
 
 <details class="aside deeper">
@@ -327,13 +337,13 @@ def build(edges, directed=False):
 </details>
 
 <div class="check" id="check-visited">
-  <p class="q">You walk a graph with a matrix, visiting each vertex once and scanning its row for neighbors. The graph has 10,000 vertices and 20,000 edges. Roughly how many cells do you read?</p>
+  <p class="q">You walk a directed graph with a matrix, visiting each vertex once and scanning its row for neighbors. The graph has 10,000 vertices and 20,000 edges. Roughly how many cells do you read?</p>
   <div class="opts">
     <button>About 30,000: V + E</button>
     <button>About 40,000: twice the edges</button>
     <button data-correct>About 100 million</button>
   </div>
-  <div class="fb right"><p>Right. Each of 10⁴ vertices scans a row of 10⁴ cells: 10⁸, even though only 40,000 cells contain a 1. Adjacency lists would do about 30,000 steps.</p></div>
+  <div class="fb right"><p>Right. Each of 10⁴ vertices scans a row of 10⁴ cells: 10⁸, even though only 20,000 cells contain a 1. Adjacency lists would do about 30,000 steps.</p></div>
   <div class="fb wrong"><p>V + E is the cost with adjacency lists, where each vertex's list holds only its real neighbors. A matrix row has a cell for every possible neighbor, all 10,000 of them, and you have to read every cell to find the few 1s. Once per vertex: 10,000 × 10,000 = 100 million reads. The matrix makes a walk O(V²) whatever E is.</p></div>
 </div>
 
@@ -402,7 +412,7 @@ def build(edges, directed=False):
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>4. Graph basics in O(V + E)</h4>
-  <p>In <code>exercises/graph_basics.py</code>: <code>transpose</code> (reverse every edge of a directed graph), <code>find_judge</code> (the person everyone trusts who trusts nobody, from a list of trust pairs, using in- and out-degrees), and <code>to_csr</code> (pack adjacency lists into the two flat arrays from section 9's aside). The tests pass edge lists that count reads, and time-cap graphs with 200,000 vertices, so anything that scans all edges or all vertices once per vertex fails.</p>
+  <p>In <code>exercises/graph_basics.py</code>: <code>transpose</code> (reverse every edge of a directed graph), <code>find_judge</code> (the person everyone trusts who trusts nobody, from a list of trust pairs, using in- and out-degrees), and <code>to_csr</code> (pack adjacency lists into the two flat arrays from section 9's aside). <code>find_judge</code>'s trust list counts reads, and all three are time-capped on graphs with 200,000 vertices and up to 1,000,000 edges, so anything that scans all edges or all vertices once per vertex fails.</p>
 </div>
 
 <div class="exercise">
@@ -477,7 +487,7 @@ def build(edges, directed=False):
       const max = Math.log10(Math.max(mat, lst));
       const bar = (label, v, c) => V.el("div", { style: "margin:8px 0" }, V.el("div", { class: "small" }, V.el("b", {}, label), " · " + bytes(v)),
         V.el("div", { class: "bar", style: "height:9px" }, V.el("span", { style: `width:${Math.max(1, (Math.log10(Math.max(v, 1)) / max) * 100)}%;background:${c}` })));
-      $("mem-out").replaceChildren(V.el("div", { class: "small muted" }, `${edges.toLocaleString()} undirected edges. Bars use a log scale: each notch is 10× more.`),
+      $("mem-out").replaceChildren(V.el("div", { class: "small muted" }, `${edges.toLocaleString()} undirected edges. Bars use a log scale (bar length follows the number of digits), so a bar a little longer can mean many times more bytes.`),
         bar("adjacency matrix (1 bit per cell)", mat, "var(--bad)"), bar("adjacency lists (8 bytes per entry)", lst, "var(--ok)"),
         V.el("div", { class: "small" }, mat > lst ? `The matrix is ${Math.round(mat / lst).toLocaleString()}× bigger.` : `The lists are ${(lst / mat).toFixed(1)}× bigger: at this size and density the matrix is fine.`));
     }
@@ -490,9 +500,9 @@ def build(edges, directed=False):
     const E = [[0, 1], [1, 2], [2, 0], [1, 3], [3, 4], [2, 3]];
     const adj = nodes.map(() => []); E.forEach(([a, b]) => adj[a].push(b));
     const build = (useVisited) => {
-      const frames = [], visited = new Set([0]), stack = [0], looked = new Map();
+      const frames = [], visited = new Set(useVisited ? [0] : []), stack = [0], looked = new Map();
       let steps = 0;
-      frames.push({ visited: [...visited], cur: null, edge: null, stack: stack.slice(), msg: `Start at 0: mark it visited and put it on the to-do stack.${useVisited ? "" : " (This time nothing is ever marked.)"}`, looked: new Map(looked) });
+      frames.push({ visited: [...visited], cur: null, edge: null, stack: stack.slice(), msg: useVisited ? "Start at 0: mark it visited and put it on the to-do stack." : "Start at 0: put it on the to-do stack. This time nothing is ever marked visited.", looked: new Map(looked) });
       while (stack.length && frames.length < 40) {
         const u = stack.pop();
         frames.push({ visited: [...visited], cur: u, edge: null, stack: stack.slice(), msg: `Take <b>${u}</b> from the stack. Its arrows: ${adj[u].length ? adj[u].map((v) => `${u}→${v}`).join(", ") : "none"}.`, looked: new Map(looked) });
@@ -503,7 +513,7 @@ def build(edges, directed=False):
         }
       }
       const last = frames[frames.length - 1];
-      last.msg += useVisited ? ` Done. Reached ${visited.size} of 6 vertices (5 can't be reached: no arrow points to it from here). Every arrow out of a reached vertex was looked at exactly once: ${steps} looks for 6 arrows.` : ` …and so on forever: the walk keeps going round 0 → 1 → 2 → 0, and the stack keeps growing. Without a visited set, a cycle never ends.`;
+      last.msg += useVisited ? ` Done. Reached ${visited.size} of 6 vertices (5 can't be reached: no arrow points to it at all). Every arrow out of a reached vertex was looked at exactly once: ${steps} looks for 6 arrows.` : ` …and so on forever: the walk keeps going round 0 → 1 → 2 → 0, and the count of arrow looks keeps climbing, lap after lap. Without a visited set, a cycle never ends.`;
       return frames;
     };
     const pl = V.player($("walk-player"), {

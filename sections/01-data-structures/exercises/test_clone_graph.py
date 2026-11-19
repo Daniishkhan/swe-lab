@@ -1,6 +1,6 @@
+import ast
 import inspect
 import random
-import re
 import signal
 
 import pytest
@@ -87,7 +87,7 @@ def check_copy(start, got):
 
 
 def snapshot(nodes):
-    return [(n.val, [id(x) for x in n.neighbors]) for n in nodes]
+    return [(n.val, [id(x) for x in n.neighbors], sorted(vars(n))) for n in nodes]
 
 
 def test_example(made):
@@ -158,6 +158,10 @@ def test_long_chain_with_back_edges(made):
     assert check_copy(nodes[0], got) == n
 
 
-def test_no_deepcopy():
-    src = re.sub(r'""".*?"""', "", inspect.getsource(cg), flags=re.S)
-    assert "deepcopy" not in src, "copy.deepcopy is the answer: build the copy yourself"
+def test_no_deepcopy_and_no_recursion_limit_tricks():
+    tree = ast.parse(inspect.getsource(cg))
+    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    names |= {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    names |= {a.name.split(".")[-1] for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names}
+    assert "deepcopy" not in names, "copy.deepcopy is the answer: build the copy yourself"
+    assert "setrecursionlimit" not in names, "raising the recursion limit hides the problem: walk with your own stack"
