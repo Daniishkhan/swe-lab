@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.05">
+  <title>BFS, DFS, topological sort and components</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.05 · BFS/DFS, topological sort, cycle detection, connected components</p>
+  <h1>BFS, DFS, topological sort and components</h1>
+  <p class="lede">Graph algorithms mostly come down to one loop: take a node from a container, visit it, and put its unvisited neighbors back in. Whether that container is a queue or a stack decides almost everything about how the search behaves.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">BFS uses a queue and explores in rings of increasing distance, so it finds shortest paths in unweighted graphs. DFS uses a stack (or recursion) and goes deep first, which is what you want for cycles, orderings and exhaustive search. Both are O(V + E).</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>1. The generic search</h3>
+      <pre><code>seen = {start}
+frontier = [start]
+while frontier:
+    node = frontier.take()          # queue → BFS, stack → DFS
+    for nxt in neighbors(node):
+        if nxt not in seen:
+            seen.add(nxt)           # mark when you ADD, not when you take
+            frontier.put(nxt)</code></pre>
+      <p>Every node enters the frontier once and every edge is examined once (twice if undirected): O(V + E). The <code>seen</code> set is what stops you looping forever on cycles.</p>
+      <h3>2. BFS: rings around the start</h3>
+      <p>A FIFO queue finishes everything at distance d before touching distance d + 1. So the first time BFS reaches a node, it got there by a shortest path (in edge count). Use it for: shortest path in a grid or maze, minimum moves, word ladder, level-order traversal, and multi-source BFS (rotting oranges, distance to the nearest exit).</p>
+      <h3>3. DFS: go deep, backtrack</h3>
+      <p>A stack (or the call stack) follows one path to its end before trying alternatives. DFS gives you a notion of <em>entering</em> and <em>leaving</em> a node, and that's what makes these possible:</p>
+      <ul>
+        <li><b>Cycle detection (directed):</b> three colors: white (unvisited), gray (on the current path), black (finished). Meeting a gray node means you found a back edge, which means a cycle.</li>
+        <li><b>Topological sort:</b> list nodes in reverse finishing order. A node finishes only after everything it points to has finished.</li>
+        <li><b>Connected components:</b> run DFS from every unvisited node; each run is one component. (Union-find does the same incrementally.)</li>
+      </ul>
+      <h3>4. Topological sort, the BFS way (Kahn's algorithm)</h3>
+      <p>Repeatedly take a node with no remaining prerequisites (in-degree 0), output it, and remove its outgoing edges. If you output fewer than V nodes, the leftover nodes form a cycle. It's often easier to explain than the DFS version, and it detects cycles for free.</p>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogies</span></summary>
+    <div class="box-body">
+      <div class="cols">
+        <div class="panel"><h4>BFS: a ripple in a pond</h4><p class="small">The wave reaches everything at distance 1, then 2, then 3. Whatever the ripple touches first, it reached by the shortest route.</p></div>
+        <div class="panel"><h4>DFS: exploring a maze with one hand on the wall</h4><p class="small">Walk until you hit a dead end, then back up to the last junction with an unexplored corridor. Thorough, but the first time you reach the exit isn't necessarily the shortest way.</p></div>
+        <div class="panel"><h4>Topological sort: getting dressed</h4><p class="small">Socks before shoes, shirt before jacket. Any order that respects every "before" rule works. A cycle (shoes before socks before shoes) means there is no valid order.</p></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: BFS vs DFS on a grid</span></summary>
+    <div class="box-body">
+      <p class="small muted">Numbers show visit order. Click cells to toggle walls. BFS spreads in rings; DFS snakes down one corridor first. The yellow cells are the frontier (what's in the queue or stack).</p>
+      <div class="viz-controls">
+        <select id="gr-algo"><option value="bfs">BFS (queue)</option><option value="dfs">DFS (stack)</option></select>
+        <button class="btn" id="gr-go">Run</button>
+        <button class="btn" id="gr-walls">Random walls</button>
+        <button class="btn" id="gr-clear">Clear walls</button>
+      </div>
+      <div id="gr-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it-2">
+    <summary><span class="kicker">See it</span><span class="label">Playground: topological sort with Kahn's algorithm</span></summary>
+    <div class="box-body">
+      <p class="small muted">A course prerequisite graph. Arrows mean "take this before that". Numbers in brackets are remaining in-degrees.</p>
+      <div class="viz-controls"><label class="small"><input type="checkbox" id="tp-cycle"> add a cycle (F → B)</label></div>
+      <div id="tp-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Choose deliberately:</b> "shortest" plus unweighted means BFS. Need all paths, an ordering, or cycle structure? DFS. Weighted edges mean Dijkstra (a BFS whose queue is a heap).</li>
+        <li><b>Recursion limits:</b> recursive DFS on a 10⁶-cell grid crashes Python. Offer the iterative version, or <code>sys.setrecursionlimit</code> with a caveat about stack memory.</li>
+        <li><b>Real-world graphs:</b> build systems and package managers (topological sort plus cycle errors), deadlock detection (cycles in a wait-for graph), web crawlers (BFS with politeness limits), garbage collectors (mark phase = graph traversal from roots).</li>
+        <li><b>Bidirectional BFS</b> from both ends meets in the middle and explores roughly 2·b^(d/2) nodes instead of b^d. That's a good follow-up for word ladder.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Marking visited when you <em>pop</em> instead of when you <em>push</em> in BFS: nodes get queued many times, and on dense grids that blows up.</li>
+        <li>Using <code>list.pop(0)</code> as a queue (O(n)). Use <code>deque.popleft()</code>.</li>
+        <li>Directed cycle detection with a single visited set. You need the gray/black distinction: reaching a black node isn't a cycle.</li>
+        <li>Forgetting disconnected parts: loop over all nodes as possible starting points.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>Why does BFS give shortest paths but DFS doesn't?</summary><p>The FIFO queue processes nodes in non-decreasing distance order, so the first discovery of a node uses a minimum-edge path. DFS's order depends on which branch it happened to try first.</p></details>
+      <details class="qa"><summary>Grid with 0/1 edge weights: BFS or Dijkstra?</summary><p>0-1 BFS: a deque where 0-cost edges go on the front and 1-cost edges on the back. O(V + E), no heap needed.</p></details>
+      <details class="qa"><summary>How do you detect a cycle in an undirected graph?</summary><p>DFS that ignores the edge back to the immediate parent; any other visited neighbor means a cycle. Or union-find: an edge whose endpoints are already connected closes a cycle.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Exercise:</b> <code>exercises/graphs.py</code>: topological sort with cycle detection, and connected components. Write it with BFS and with DFS.</p>
+      <p><b>Classic problems:</b> Number of Islands · Rotting Oranges · Course Schedule I &amp; II · Word Ladder · Pacific Atlantic Water Flow · Alien Dictionary.</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const R = 9, C = 13, S = [4, 1];
+  let walls = new Set();
+  const key = (r, c) => r * C + c;
+  const presetWalls = () => { walls = new Set(); for (let r = 1; r < 8; r++) if (r !== 4) walls.add(key(r, 5)); for (let c = 7; c < 12; c++) walls.add(key(2, c)); for (let c = 7; c < 12; c++) walls.add(key(6, c)); };
+  function frames(algo) {
+    const fr = [], order = new Map(), seen = new Set([key(...S)]), front = [S];
+    let n = 0;
+    while (front.length) {
+      const [r, c] = algo === "bfs" ? front.shift() : front.pop();
+      order.set(key(r, c), n++);
+      for (const [dr, dc] of [[-1, 0], [0, 1], [1, 0], [0, -1]]) {
+        const nr = r + dr, nc = c + dc, k = key(nr, nc);
+        if (nr < 0 || nc < 0 || nr >= R || nc >= C || walls.has(k) || seen.has(k)) continue;
+        seen.add(k); front.push([nr, nc]);
+      }
+      fr.push({ order: new Map(order), cur: key(r, c), front: new Set(front.map(([a, b]) => key(a, b))),
+        msg: `${algo === "bfs" ? "Dequeue" : "Pop"} (${r}, ${c}) as visit #${n - 1}. Frontier size: ${front.length}.` });
+    }
+    fr.push({ order, front: new Set(), msg: `Visited ${n} cells. ${algo === "bfs" ? "Each number grows with distance from the start: BFS order is distance order." : "DFS went deep down one route first. Its numbers say nothing about distance."}` });
+    return fr;
+  }
+  const player = V.player($("gr-player"), {
+    speed: 160,
+    draw(f, stage) {
+      const board = V.el("div", { class: "grid-board", style: `grid-template-columns:repeat(${C}, 30px)` });
+      for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+        const k = key(r, c), o = f.order.get(k);
+        board.append(V.el("div", {
+          class: walls.has(k) ? "wall" : k === f.cur ? "cur" : f.front.has(k) ? "frontier" : o != null ? "seen" : "",
+          style: (r === S[0] && c === S[1] ? "outline:2px solid var(--ok);" : "") + "cursor:pointer",
+          onclick: () => { if (r === S[0] && c === S[1]) return; walls.has(k) ? walls.delete(k) : walls.add(k); run(); },
+        }, o != null ? o : ""));
+      }
+      stage.append(board);
+    },
+  });
+  const run = () => player.load(frames($("gr-algo").value));
+  $("gr-go").onclick = run; $("gr-algo").onchange = run;
+  $("gr-walls").onclick = () => { walls = new Set(); for (let i = 0; i < 30; i++) { const k = key(Math.floor(Math.random() * R), Math.floor(Math.random() * C)); if (k !== key(...S)) walls.add(k); } run(); };
+  $("gr-clear").onclick = () => { walls = new Set(); run(); };
+  presetWalls(); run();
+
+  const nodes = [{ id: "A", x: 50, y: 60 }, { id: "B", x: 50, y: 170 }, { id: "C", x: 170, y: 40 }, { id: "D", x: 170, y: 140 }, { id: "E", x: 300, y: 90 }, { id: "F", x: 300, y: 200 }];
+  const baseEdges = [["A", "C"], ["A", "D"], ["B", "D"], ["C", "E"], ["D", "E"], ["D", "F"]];
+  function topo(edges) {
+    const indeg = Object.fromEntries(nodes.map((n) => [n.id, 0])), adj = Object.fromEntries(nodes.map((n) => [n.id, []]));
+    edges.forEach(([a, b]) => { adj[a].push(b); indeg[b]++; });
+    const q = nodes.map((n) => n.id).filter((id) => indeg[id] === 0), out = [], fr = [];
+    fr.push({ indeg: { ...indeg }, out: [], q: [...q], edges, msg: `Start with every node of in-degree 0 in the queue: [${q.join(", ")}].` });
+    while (q.length) {
+      const u = q.shift(); out.push(u);
+      const freed = [];
+      for (const v of adj[u]) { if (--indeg[v] === 0) { q.push(v); freed.push(v); } }
+      fr.push({ indeg: { ...indeg }, out: [...out], q: [...q], cur: u, edges, msg: `Take <b>${u}</b>, remove its outgoing edges.${freed.length ? ` Now free: ${freed.join(", ")}.` : ""}` });
+    }
+    const stuck = nodes.map((n) => n.id).filter((id) => !out.includes(id));
+    fr.push({ indeg: { ...indeg }, out, q: [], edges, stuck, msg: stuck.length ? `Queue empty but ${stuck.join(", ")} still have prerequisites: they're in a <b>cycle</b>. No valid order exists.` : `Valid order: <b>${out.join(" → ")}</b>.` });
+    return fr;
+  }
+  const tp = V.player($("tp-player"), {
+    draw(f, stage) {
+      const svg = V.s("svg", { class: "viz" });
+      V.graph(svg, nodes.map((n) => ({ ...n, label: `${n.id}` })), f.edges, {
+        directed: true, width: 360, height: 240,
+        nodeCls: (id) => (id === f.cur ? "hl" : f.out.includes(id) ? "done" : f.stuck && f.stuck.includes(id) ? "bad" : f.q.includes(id) ? "warn" : ""),
+        edgeCls: (a) => (f.out.includes(a) ? "" : ""),
+      });
+      nodes.forEach((n) => svg.append(V.s("text", { class: "label", x: n.x + 20, y: n.y - 16, text: `[${f.indeg[n.id]}]` })));
+      stage.append(svg, V.el("div", { class: "small muted" }, "queue: [", f.q.join(", "), "]   output: ", f.out.join(" → ") || "∅"));
+    },
+  });
+  const tpRun = () => tp.load(topo($("tp-cycle").checked ? [...baseEdges, ["F", "B"]] : baseEdges));
+  $("tp-cycle").onchange = tpRun; tpRun();
+})();
+</script>
+</body>
+</html>

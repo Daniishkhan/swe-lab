@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.07">
+  <title>Dynamic programming</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.07 · Dynamic programming: 1D/2D, knapsack family, LIS, edit distance, interval DP</p>
+  <h1>Dynamic programming</h1>
+  <p class="lede">DP has a reputation for being clever. It's really bookkeeping: name the subproblem, write how a big one is built from smaller ones, and never solve the same one twice.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">DP is recursion plus a cache. When a problem breaks into overlapping subproblems with optimal substructure, solve each distinct subproblem once and store it. Time becomes (number of states) × (work per state).</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles: the four questions</span></summary>
+    <div class="box-body">
+      <p>Answer these in words <em>before</em> any code. In interviews, say them out loud.</p>
+      <ol>
+        <li><b>State:</b> what does <code>dp[i]</code> (or <code>dp[i][j]</code>) mean, in one sentence? "dp[i][j] = the edit distance between the first i chars of a and the first j chars of b."</li>
+        <li><b>Transition:</b> how is a state built from smaller states? Think about the <em>last decision</em>: what happened to the last character, item, or step?</li>
+        <li><b>Base cases:</b> the smallest states you can answer directly (empty string, zero capacity).</li>
+        <li><b>Order and answer:</b> fill states so dependencies are computed first; say which cell holds the final answer.</li>
+      </ol>
+      <h3>Top-down vs bottom-up</h3>
+      <div class="cols">
+        <div class="panel"><h4>Top-down (memoization)</h4><p class="small">Write the natural recursion and add <code>@functools.cache</code>. Only computes the states you actually reach. Easy to get right; recursion depth can be an issue.</p></div>
+        <div class="panel"><h4>Bottom-up (tabulation)</h4><p class="small">Fill a table in dependency order. No recursion, and you can often shrink space to one or two rows because each row only depends on the previous one.</p></div>
+      </div>
+      <h3>The families worth recognizing</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Family</th><th>State</th><th>Examples</th></tr></thead>
+        <tbody>
+          <tr><td>1D linear</td><td>dp[i] = best answer for prefix i</td><td>climbing stairs, house robber, decode ways</td></tr>
+          <tr><td>Two sequences</td><td>dp[i][j] over prefixes of both</td><td>edit distance, LCS, regex/wildcard matching</td></tr>
+          <tr><td>Knapsack</td><td>dp[i][c] = best using first i items, capacity c</td><td>0/1 knapsack, subset sum, coin change, partition</td></tr>
+          <tr><td>LIS</td><td>dp[i] = best subsequence ending at i</td><td>longest increasing subsequence, Russian dolls</td></tr>
+          <tr><td>Interval</td><td>dp[l][r] over a range, fill by length</td><td>burst balloons, matrix chain, palindrome partitioning</td></tr>
+          <tr><td>Grid</td><td>dp[r][c] from up/left</td><td>unique paths, minimum path sum</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogy: a filled-in crossword</span></summary>
+    <div class="box-body">
+      <p>Recursion without memoization is answering the same crossword clue every time it intersects another word. DP is writing the answer in the grid once, so every later clue just reads it.</p>
+      <p class="muted small">Physical picture for a 2D table: water flowing from the top-left corner. Each cell's value depends only on cells water has already reached: up, left, and up-left. Fill in the direction of the flow.</p>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: edit distance table</span></summary>
+    <div class="box-body">
+      <p class="small muted">Cell (i, j) = edits to turn the first i letters of <b>a</b> into the first j letters of <b>b</b>. Yellow cells are the three dependencies: up = delete, left = insert, diagonal = replace (or free if the letters match). At the end, green traces one optimal edit path back from the answer.</p>
+      <div class="viz-controls"><span class="small">a</span><input id="ed-a" type="text" value="horse" maxlength="9" style="width:7em"><span class="small">b</span><input id="ed-b" type="text" value="ros" maxlength="9" style="width:7em"><button class="btn" id="ed-go">Run</button></div>
+      <div id="ed-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box" open id="recurrences">
+    <summary><span class="kicker">Reference</span><span class="label">Recurrences for the exercise</span></summary>
+    <div class="box-body">
+      <pre><code># Edit distance
+dp[i][j] = dp[i-1][j-1]                         if a[i-1] == b[j-1]
+         = 1 + min(dp[i-1][j],    # delete a[i-1]
+                   dp[i][j-1],    # insert b[j-1]
+                   dp[i-1][j-1])  # replace
+dp[i][0] = i,  dp[0][j] = j
+
+# 0/1 knapsack (1D, iterate capacity DOWNWARD so each item is used once)
+for w, v in items:
+    for c in range(cap, w - 1, -1):
+        dp[c] = max(dp[c], dp[c - w] + v)
+
+# LIS in O(n log n): tails[k] = smallest tail of an increasing subsequence of length k+1
+for x in nums:
+    k = bisect_left(tails, x)
+    tails[k:k+1] = [x]</code></pre>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Start from brute-force recursion</b>, point out the repeated subproblems, add memoization, then optionally convert to a table and compress space. That progression is exactly what interviewers want to hear.</li>
+        <li><b>Name the state space size</b> to justify complexity: "n × capacity states, O(1) each."</li>
+        <li><b>Reconstruct the solution,</b> not just the number: keep parent pointers or walk back through the table.</li>
+        <li><b>DP in real systems:</b> diff tools and spell checkers (edit distance), sequence alignment in genomics, query optimizers choosing join orders, Viterbi decoding in speech and early NLP, and line breaking in text layout (TeX).</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>An off-by-one between "first i characters" (table size n + 1) and "index i" (size n). Pick one and write it down.</li>
+        <li>0/1 knapsack in 1D iterating capacity upward, which silently turns it into unbounded knapsack.</li>
+        <li>A state that doesn't capture everything the future depends on (e.g. forgetting "holding a stock or not").</li>
+        <li><code>@cache</code> on a function taking lists (unhashable). Pass indexes, or convert to tuples.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>Greedy vs DP for coin change: when does greedy fail?</summary><p>With coins {1, 3, 4} and amount 6, greedy takes 4 + 1 + 1 (3 coins), but 3 + 3 is 2. Greedy works for "canonical" systems like US coins; DP works for all.</p></details>
+      <details class="qa"><summary>Why does edit distance only need the previous row?</summary><p>Each cell depends on (i−1, j), (i, j−1) and (i−1, j−1): the current and previous rows only. Keep two rows: O(min(m, n)) space.</p></details>
+      <details class="qa"><summary>How do you know a problem is DP rather than greedy or backtracking?</summary><p>You're asked for an optimum or a count over many choices, the choices form overlapping subproblems (the same smaller state reached many ways), and the optimal answer is built from optimal answers to substates.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Exercise:</b> <code>exercises/dp.py</code>: edit distance, LIS (O(n²), then O(n log n)), 0/1 knapsack.</p>
+      <p><b>Classic problems:</b> Climbing Stairs · House Robber · Coin Change · Longest Common Subsequence · Word Break · Partition Equal Subset Sum · Burst Balloons (interval DP).</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  function frames(a, b) {
+    const m = a.length, n = b.length, dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(null)), fr = [];
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    fr.push({ dp: dp.map((r) => [...r]), msg: "Base cases: turning i letters into the empty string takes i deletions (first column), and the reverse takes j insertions (first row)." });
+    for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+      const same = a[i - 1] === b[j - 1];
+      dp[i][j] = same ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      fr.push({ dp: dp.map((r) => [...r]), cur: [i, j], dep: same ? [[i - 1, j - 1]] : [[i - 1, j], [i, j - 1], [i - 1, j - 1]],
+        msg: same ? `'${a[i - 1]}' == '${b[j - 1]}': free, copy the diagonal → <b>${dp[i][j]}</b>.` : `'${a[i - 1]}' ≠ '${b[j - 1]}': 1 + min(delete ${dp[i - 1][j]}, insert ${dp[i][j - 1]}, replace ${dp[i - 1][j - 1]}) = <b>${dp[i][j]}</b>.` });
+    }
+    const path = []; let i = m, j = n; const ops = [];
+    while (i > 0 || j > 0) {
+      path.push([i, j]);
+      if (i > 0 && j > 0 && a[i - 1] === b[j - 1] && dp[i][j] === dp[i - 1][j - 1]) { i--; j--; }
+      else if (i > 0 && j > 0 && dp[i][j] === dp[i - 1][j - 1] + 1) { ops.push(`replace '${a[i - 1]}'→'${b[j - 1]}'`); i--; j--; }
+      else if (i > 0 && dp[i][j] === dp[i - 1][j] + 1) { ops.push(`delete '${a[i - 1]}'`); i--; }
+      else { ops.push(`insert '${b[j - 1]}'`); j--; }
+    }
+    path.push([0, 0]);
+    fr.push({ dp, path, msg: `Answer in the bottom-right corner: <b>${dp[m][n]}</b>. Walking back: ${ops.reverse().join(", ") || "no edits"}. ${(m + 1) * (n + 1)} cells, O(1) each.` });
+    return { fr, a, b };
+  }
+  let A = "", B = "";
+  const player = V.player($("ed-player"), {
+    speed: 380,
+    draw(f, stage) {
+      const has = (list, i, j) => list && list.some(([x, y]) => x === i && y === j);
+      stage.append(V.el("div", { class: "table-wrap" }, V.el("table", { class: "dp-table" },
+        V.el("tr", {}, V.el("th", {}), V.el("th", {}, "ε"), [...B].map((c, j) => V.el("th", { style: f.cur && f.cur[1] === j + 1 ? "color:var(--warn)" : "" }, c))),
+        f.dp.map((row, i) => V.el("tr", {}, V.el("th", { style: f.cur && f.cur[0] === i ? "color:var(--warn)" : "" }, i ? A[i - 1] : "ε"),
+          row.map((v, j) => V.el("td", { class: f.cur && f.cur[0] === i && f.cur[1] === j ? "cur" : has(f.dep, i, j) ? "dep" : has(f.path, i, j) ? "path" : "" }, v == null ? "" : v)))))));
+    },
+  });
+  const run = () => { A = $("ed-a").value || "a"; B = $("ed-b").value || "b"; player.load(frames(A, B).fr); };
+  $("ed-go").onclick = run; run();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+[project]
+name = "swe-prep"
+version = "0.1.0"
+description = "Senior software engineer interview prep: concept pages + exercises"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+# Exercises live next to their tests in sections/<NN>/exercises/.
+# pytest puts each test file's folder on sys.path, so tests import modules by
+# bare name. That's why every exercise module name must be unique repo-wide.
+testpaths = ["sections"]
+python_files = ["test_*.py"]
+addopts = "-q --no-header"

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="{{TOPIC_ID}}">
+  <title>{{TITLE}}</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="{{SECTION_ID}}" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge {{TAG}}">{{TAG}}</span> &nbsp;{{TOPIC_ID}} · {{TOPIC_TEXT}}</p>
+  <h1>{{TITLE}}</h1>
+  <p class="lede">One or two sentences: what this page will give you.</p>
+
+  <!-- Every pane is a collapsible group box. Keep the order; delete panes that don't apply. -->
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body"><p class="one-liner">…</p></div>
+  </details>
+
+  <details class="box" open id="why">
+    <summary><span class="kicker">Why</span><span class="label">The problem it solves</span></summary>
+    <div class="box-body"><p>Start from the pain. What breaks, or is slow, without it?</p></div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body"><p>Derive it from the simplest thing that could work; each step fixes the previous step's flaw.</p></div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogy and physical picture</span></summary>
+    <div class="box-body"><p>The analogy, and where it breaks down.</p></div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground</span></summary>
+    <div class="box-body"><div id="viz"></div></div>
+  </details>
+
+  <details class="box" open id="costs">
+    <summary><span class="kicker">Costs</span><span class="label">Complexity and trade-offs</span></summary>
+    <div class="box-body">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Operation</th><th>Cost</th><th>Why</th></tr></thead>
+        <tbody><tr><td>…</td><td>…</td><td>…</td></tr></tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body"><p>Typical prompts, and the trade-offs / failure modes / real-world context a senior candidate brings.</p></div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body"><ul><li>…</li></ul></div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>Question?</summary><p>Answer.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body"><p>Exercises in <code>../exercises/</code> and suggested problems.</p></div>
+  </details>
+</main>
+<script>
+  // Visualization for this page. See assets/viz.js for helpers (V.player, V.cells, V.binaryTree, V.graph).
+</script>
+</body>
+</html>

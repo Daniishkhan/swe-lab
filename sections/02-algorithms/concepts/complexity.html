@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.01">
+  <title>Complexity analysis</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.01 · Complexity analysis: time, space, amortized; knowing when constants matter</p>
+  <h1>Complexity analysis</h1>
+  <p class="lede">Big-O is a way to predict how code behaves when the input gets 1000× bigger, without running it. It's also the first thing you say out loud in every coding round.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">Big-O counts how the number of basic steps grows with input size and ignores constant factors. That's why it predicts scaling well, and why it can lie about speed at the sizes you actually run.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>1. Count steps, not seconds</h3>
+      <p>Seconds depend on the machine, the language and the cache. Steps depend only on the algorithm. So we count primitive operations (a comparison, an arithmetic op, an array read) as a function of input size n.</p>
+      <h3>2. Keep only the dominant term</h3>
+      <p>3n² + 50n + 7: at n = 1,000,000 the n² term is 99.998% of the work. Drop the lower terms and the constant, and you get O(n²). The constant matters for speed but not for <em>shape</em>.</p>
+      <h3>3. Read the shape from the code</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Code shape</th><th>Complexity</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td>fixed number of steps</td><td>O(1)</td><td>hash lookup, array index</td></tr>
+          <tr><td>halve the problem each step</td><td>O(log n)</td><td>binary search, balanced tree walk</td></tr>
+          <tr><td>one pass</td><td>O(n)</td><td>sum, max, sliding window</td></tr>
+          <tr><td>halve, solve both halves, merge in linear time</td><td>O(n log n)</td><td>merge sort, heap of n pushes</td></tr>
+          <tr><td>loop inside a loop over the same data</td><td>O(n²)</td><td>all pairs, naive dedupe</td></tr>
+          <tr><td>every subset / every ordering</td><td>O(2ⁿ) / O(n!)</td><td>backtracking without pruning</td></tr>
+        </tbody>
+      </table></div>
+      <h3>4. Space counts too</h3>
+      <p>Extra memory as a function of n: the hash set you built, the recursion stack (depth × frame), the DP table. "O(1) extra space" means you only used a few variables beyond the input.</p>
+      <h3>5. Amortized: averaging over a sequence</h3>
+      <p>Some operations are usually cheap and occasionally expensive. A dynamic array append is O(1) until it fills, then O(n) to copy. Since capacity doubles, the expensive copies are exponentially rare, and the total over n appends is under 3n. Amortized O(1) is a guarantee about the sequence, not a probability.</p>
+      <h3>6. Best, average, worst</h3>
+      <p>Quicksort is O(n log n) on average but O(n²) worst case. A hash map is O(1) average, O(n) worst case. In interviews, say which one you mean. In production, the worst case is what pages you at 3am.</p>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Physical picture: doubling the input</span></summary>
+    <div class="box-body">
+      <p>The fastest way to feel a complexity class is to ask: <b>what happens when n doubles?</b></p>
+      <ul>
+        <li>O(1): nothing. O(log n): one more step. O(n): twice the time.</li>
+        <li>O(n log n): a bit more than twice. O(n²): four times. O(2ⁿ): <em>squared</em>. Going from n = 30 to n = 60 takes you from a second to 30 years.</li>
+      </ul>
+      <p>Rule of thumb for interview constraints. Python does about 10⁷ simple operations per second; compiled languages about 10⁸–10⁹. So the input size in a problem statement tells you which complexity they want:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>n up to</th><th>target complexity</th></tr></thead>
+        <tbody><tr><td>10–12</td><td>O(n!) permutations</td></tr><tr><td>20–25</td><td>O(2ⁿ) subsets / bitmask DP</td></tr><tr><td>500</td><td>O(n³)</td></tr><tr><td>5,000</td><td>O(n²)</td></tr><tr><td>10⁵–10⁶</td><td>O(n log n) or O(n)</td></tr><tr><td>10⁹+</td><td>O(log n) or O(1): math, binary search on the answer</td></tr></tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: growth curves</span></summary>
+    <div class="box-body">
+      <p class="small muted">Drag n. The y-axis is log-scaled, because otherwise 2ⁿ makes every other curve look flat. The dashed line is about one second of Python.</p>
+      <div class="viz-controls"><span class="small">n =</span><input type="range" id="cx-n" min="1" max="60" value="20" style="width:240px"><b id="cx-nval"></b></div>
+      <div class="viz-stage" style="margin-top:10px"><svg class="viz" id="cx-svg" viewBox="0 0 640 300"></svg></div>
+      <div id="cx-table" class="table-wrap" style="margin-top:10px"></div>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it-2">
+    <summary><span class="kicker">See it</span><span class="label">Playground: amortized cost of appending</span></summary>
+    <div class="box-body">
+      <p class="small muted">Each bar is the cost of one append to a dynamic array that starts at capacity 1. The spikes are resizes. The line is the running average, and it flattens toward a constant.</p>
+      <div class="viz-controls"><label class="small">growth factor <select id="am-g"><option value="2">×2 (doubling)</option><option value="1.5">×1.5</option><option value="add4">+4 slots (constant)</option></select></label></div>
+      <div class="viz-stage" style="margin-top:10px"><svg class="viz" id="am-svg" viewBox="0 0 640 220"></svg></div>
+      <div class="viz-caption" id="am-msg"></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds: when constants matter</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>State complexity without being asked</b>, for time and space, right after the brute force and again after each improvement. It's the backbone of "talk through it".</li>
+        <li><b>Name your variables.</b> O(n·m) or O(V + E) or O(n log k) is more precise and more senior than forcing everything into "n".</li>
+        <li><b>Constants and memory layout matter at real sizes.</b> An O(n) linked-list walk can lose to an O(n log n) sort of an array because of cache misses. Insertion sort beats merge sort below ~16 elements, which is why real sorts (Timsort, introsort) switch to it for small runs.</li>
+        <li><b>Python specifics:</b> built-ins run in C. <code>sorted()</code> on 10⁶ items is fast; a Python-level O(n) loop doing the same work can be slower. Know the hidden costs: slicing copies (O(k)), <code>in list</code> is O(n), string <code>+=</code> in a loop is O(n²).</li>
+        <li><b>Tail latency is a complexity question too:</b> amortized O(1) still means the occasional O(n) request. At the p99.9 level, those spikes are what users notice.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Calling a nested loop O(n²) when the inner loop is amortized (two pointers, monotonic stack: each element is processed a constant number of times, so it's O(n)).</li>
+        <li>Forgetting the recursion stack in space complexity.</li>
+        <li>Forgetting that string or list building inside a loop can hide another factor of n.</li>
+        <li>Saying "O(n) where n is the number…" and then mixing up which n: string length vs number of strings.</li>
+        <li>Saying hash maps are O(1) without "average".</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>What is the complexity of <code>for i in range(n): for j in range(i, n, i or 1)</code>-style harmonic loops?</summary><p>n/1 + n/2 + n/3 + … = n·Hₙ ≈ n ln n, so O(n log n). This is the sieve of Eratosthenes shape.</p></details>
+      <details class="qa"><summary>Recursive Fibonacci without memoization?</summary><p>About O(φⁿ) ≈ O(1.618ⁿ) time, because each call branches twice and subproblems repeat. O(n) stack space. Memoization makes it O(n) time.</p></details>
+      <details class="qa"><summary>Is O(n log n) always slower than O(n)?</summary><p>No. Big-O says nothing about constants. log₂(10⁶) ≈ 20, so a tight O(n log n) can beat a sloppy O(n) with a 50× constant (hashing, allocation, cache misses) at every size you'll ever run.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p>For every exercise in this repo, write the brute force complexity and the target complexity in a comment <em>before</em> you write the solution. Then time both with <code>python -m timeit</code> at n = 10³, 10⁴, 10⁵ and check the ratio matches your prediction.</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const fns = [
+    { name: "1", f: () => 1, c: "#8fa3c8" },
+    { name: "log n", f: (n) => Math.max(1, Math.log2(n)), c: "#5fd39a" },
+    { name: "n", f: (n) => n, c: "#7aa2ff" },
+    { name: "n log n", f: (n) => n * Math.max(1, Math.log2(n)), c: "#b48cff" },
+    { name: "n²", f: (n) => n * n, c: "#f2c14e" },
+    { name: "2ⁿ", f: (n) => 2 ** n, c: "#ff7a7a" },
+  ];
+  const W = 640, H = 300, L = 50, B = 30, T = 10, R = 80, maxN = 60, maxLog = 18;
+  const x = (n) => L + ((n - 1) / (maxN - 1)) * (W - L - R);
+  const y = (v) => H - B - (Math.min(Math.log10(Math.max(v, 1)), maxLog) / maxLog) * (H - B - T);
+  function draw() {
+    const n = Number($("cx-n").value); $("cx-nval").textContent = n;
+    const svg = $("cx-svg"); svg.replaceChildren();
+    for (let e = 0; e <= maxLog; e += 3) { svg.append(V.s("line", { class: "grid-line", x1: L, x2: W - R, y1: y(10 ** e), y2: y(10 ** e) }), V.s("text", { class: "label", x: L - 8, y: y(10 ** e) + 4, "text-anchor": "end", text: "10^" + e })); }
+    svg.append(V.s("line", { x1: L, x2: W - R, y1: y(1e7), y2: y(1e7), stroke: "var(--bad)", "stroke-dasharray": "6 4", "stroke-width": 1.2 }), V.s("text", { class: "label", x: W - R + 4, y: y(1e7) + 4, text: "~1s Python", fill: "var(--bad)" }));
+    svg.append(V.s("line", { class: "axis", x1: L, x2: W - R, y1: H - B, y2: H - B }), V.s("text", { class: "label", x: (L + W - R) / 2, y: H - 6, "text-anchor": "middle", text: "n (1 to 60)" }));
+    for (const fn of fns) {
+      let d = ""; for (let k = 1; k <= maxN; k++) d += (k === 1 ? "M" : "L") + x(k).toFixed(1) + "," + y(fn.f(k)).toFixed(1);
+      svg.append(V.s("path", { d, fill: "none", stroke: fn.c, "stroke-width": 2.2 }), V.s("text", { x: W - R + 4, y: y(fn.f(maxN)) + 4, fill: fn.c, "font-size": 12, text: fn.name }));
+      svg.append(V.s("circle", { cx: x(n), cy: y(fn.f(n)), r: 4, fill: fn.c }));
+    }
+    svg.append(V.s("line", { x1: x(n), x2: x(n), y1: T, y2: H - B, stroke: "var(--muted)", "stroke-width": 1, "stroke-dasharray": "2 3" }));
+    const fmt = (v) => (v < 1e6 ? Math.round(v).toLocaleString() : v.toExponential(1).replace("e+", "×10^"));
+    const time = (v) => { const s = v / 1e7; return s < 1e-3 ? "instant" : s < 1 ? (s * 1000).toFixed(1) + " ms" : s < 3600 ? s.toFixed(1) + " s" : s < 3.15e7 ? (s / 3600).toFixed(1) + " h" : (s / 3.15e7).toExponential(1) + " years"; };
+    $("cx-table").replaceChildren(V.el("table", {}, V.el("tr", {}, V.el("th", {}, "complexity"), fns.map((f) => V.el("th", { style: `color:${f.c}` }, f.name))),
+      V.el("tr", {}, V.el("td", {}, `steps at n=${n}`), fns.map((f) => V.el("td", {}, fmt(f.f(n))))),
+      V.el("tr", {}, V.el("td", {}, "≈ Python time"), fns.map((f) => V.el("td", {}, time(f.f(n)))))));
+  }
+  $("cx-n").oninput = draw; draw();
+
+  function amort() {
+    const g = $("am-g").value, N = 64, costs = [];
+    let cap = 1, size = 0, copies = 0;
+    for (let i = 0; i < N; i++) {
+      let c = 1;
+      if (size === cap) { c += size; copies += size; cap = g === "add4" ? cap + 4 : Math.max(cap + 1, Math.floor(cap * Number(g))); }
+      size++; costs.push(c);
+    }
+    const svg = $("am-svg"); svg.replaceChildren();
+    const max = Math.max(...costs), bw = (W - 60) / N, hy = (v) => 190 - (v / max) * 170;
+    costs.forEach((c, i) => svg.append(V.s("rect", { x: 40 + i * bw, y: hy(c), width: bw - 2, height: 190 - hy(c), rx: 2, fill: c > 1 ? "var(--warn)" : "var(--surface-3)" })));
+    let sum = 0, d = "";
+    costs.forEach((c, i) => { sum += c; d += (i ? "L" : "M") + (40 + i * bw + bw / 2).toFixed(1) + "," + hy(sum / (i + 1)).toFixed(1); });
+    svg.append(V.s("path", { d, fill: "none", stroke: "var(--accent)", "stroke-width": 2.4 }), V.s("line", { class: "axis", x1: 40, x2: W - 20, y1: 190, y2: 190 }), V.s("text", { class: "label", x: 40, y: 210, text: "append #1 … #64" }));
+    const total = costs.reduce((a, b) => a + b, 0);
+    $("am-msg").innerHTML = `64 appends cost <b>${total}</b> steps in total (${copies} of them copying), so <b>${(total / N).toFixed(2)}</b> per append on average. ` +
+      (g === "add4" ? "With constant growth, resizes keep coming every 4 appends and each one is bigger, so the average keeps climbing: O(n) per append." : "With geometric growth the average stays bounded by a constant: amortized O(1).");
+  }
+  $("am-g").onchange = amort; amort();
+})();
+</script>
+</body>
+</html>

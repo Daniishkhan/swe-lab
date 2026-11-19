@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="01.01">
+  <title>Hash maps, arrays and strings</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;01.01 · Arrays, strings, hash maps/sets: collision handling, load factor, resizing cost</p>
+  <h1>Hash maps, arrays and strings</h1>
+  <p class="lede">Arrays are fast because memory is a numbered street. Hash maps borrow that speed for keys that aren't numbers. Everything else on this page is about what it costs to pretend.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">A hash map turns a key into an array index, so finding a value costs one jump instead of a search. Collisions and resizing are the price, and both are paid in a way that averages out to O(1).</p>
+    </div>
+  </details>
+
+  <details class="box" open id="arrays">
+    <summary><span class="kicker">Foundation</span><span class="label">Arrays and strings: the memory underneath</span></summary>
+    <div class="box-body">
+      <p>Memory is one long row of numbered bytes. An array is a contiguous run of equal-sized slots, so the address of slot <code>i</code> is pure arithmetic:</p>
+      <pre><code>address(i) = base + i × slot_size        # one multiply, one add: O(1)</code></pre>
+      <p>That arithmetic is the whole reason arrays are fast. It is also why inserting in the middle is slow: to keep the slots contiguous, everything after the insertion point shifts one place, which is O(n).</p>
+      <div class="cols">
+        <div class="panel"><h4>Dynamic arrays (Python <code>list</code>)</h4>
+          <p class="small">When full, allocate a bigger block (roughly 1.125× to 2×), copy everything over, free the old one. A single append can be O(n), but the copies get rarer as the array grows, so append is <b>O(1) amortized</b>.</p></div>
+        <div class="panel"><h4>Strings</h4>
+          <p class="small">In Python, Java, Go and JS, strings are immutable arrays of characters. <code>s += c</code> in a loop builds a new string every time, so the loop is O(n²). Collect the parts in a list and <code>"".join(parts)</code> once.</p></div>
+        <div class="panel"><h4>Cache friendliness</h4>
+          <p class="small">The CPU fetches memory in 64-byte cache lines. Walking an array uses every byte of each line; chasing pointers (linked lists, chained buckets) wastes most of each fetch. Same big-O, very different constant.</p></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="box" open id="why">
+    <summary><span class="kicker">Why</span><span class="label">The problem a hash map solves</span></summary>
+    <div class="box-body">
+      <p>You have a million users and you want to look one up by email. Your options without hashing:</p>
+      <ul>
+        <li><b>Unsorted list:</b> scan everything. O(n) per lookup.</li>
+        <li><b>Sorted list + binary search:</b> O(log n) lookups, but every insert shifts elements. O(n) per insert.</li>
+        <li><b>Balanced tree:</b> O(log n) for both. Good, and it keeps keys ordered, but ~20 pointer hops for a million keys.</li>
+      </ul>
+      <p>Arrays already give O(1) access, but only by integer position. The question a hash map answers is: <em>can we turn an email into a position?</em></p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles, in five steps</span></summary>
+    <div class="box-body">
+      <h3>1. Direct addressing</h3>
+      <p>If keys are small integers, use them as indexes. Counting letters in a word? An array of 26 counters, indexed by <code>ord(c) - ord('a')</code>. Perfect O(1), no collisions. It falls apart when the key space is huge (all possible emails), because you can't allocate an array that big.</p>
+      <h3>2. Squash the key space with a hash function</h3>
+      <p>A hash function maps any key to a big integer, deterministically. Then <code>index = hash(key) % m</code> squashes it into an array of <code>m</code> buckets. Good hash functions spread keys evenly, so every bucket is equally likely.</p>
+      <h3>3. Accept that collisions will happen</h3>
+      <p>More possible keys than buckets means two keys must share a bucket sometimes (pigeonhole principle). It happens sooner than intuition says: with 365 buckets, 23 random keys give a 50% chance of at least one collision. That is the birthday paradox, and it means collision handling is not an edge case, it is the main case.</p>
+      <div class="cols">
+        <div class="panel"><h4>Separate chaining</h4><p class="small">Each bucket holds a small list. Colliding keys go in the same list. Simple; deletion is easy. Java's <code>HashMap</code> does this and even turns long chains into small trees.</p></div>
+        <div class="panel"><h4>Open addressing</h4><p class="small">One key per slot. On collision, probe other slots (next one over, or a pseudo-random sequence) until you find a free one. Better cache behavior, but deletion needs "tombstones". Python's <code>dict</code> does this.</p></div>
+      </div>
+      <h3>4. Keep buckets short: load factor and resizing</h3>
+      <p>The <b>load factor</b> α = n / m is the average number of keys per bucket. Expected lookup cost is about 1 + α. So when α passes a threshold (0.75 in Java, about 2/3 in Python), allocate an array twice as big and <b>rehash</b> every key, because <code>hash % m</code> changes when <code>m</code> changes.</p>
+      <h3>5. Why doubling makes resizing "free"</h3>
+      <p>A resize costs O(n), but if you double each time, the total copying across all resizes up to n items is n/2 + n/4 + n/8 + … &lt; n. Spread over n inserts, that is O(1) extra per insert. Grow by a constant (say +10 slots) instead and you resize every 10 inserts: O(n²) total. Geometric growth is the trick behind every amortized O(1) container.</p>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogy: the coat check</span></summary>
+    <div class="box-body">
+      <p>A coat check has numbered hooks. The attendant doesn't search for your coat; your ticket number <em>is</em> the hook number. That's the hash.</p>
+      <ul>
+        <li><b>Collision:</b> two tickets map to the same hook. Either hang both coats on that hook (chaining) or walk to the next free hook (open addressing).</li>
+        <li><b>Load factor:</b> when the room is 75% full, the attendant spends more time walking past occupied hooks.</li>
+        <li><b>Resize:</b> move to a room with twice the hooks. Every coat must be re-hung, because hook numbers depend on the room size. It's a painful afternoon, but it happens rarely.</li>
+      </ul>
+      <p class="muted small">Where it breaks down: a real attendant can see the whole room. A hash map only "sees" the one bucket the hash points to, which is exactly why lookups stay O(1).</p>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: build a hash table</span></summary>
+    <div class="box-body">
+      <p class="small muted">Insert keys and watch where they land. Switch strategies to compare chaining and linear probing. The table doubles when the load factor would pass the threshold.</p>
+      <div class="viz-controls">
+        <input id="hm-key" type="text" placeholder="key, e.g. cat" maxlength="12">
+        <button class="btn primary" id="hm-put">Insert</button>
+        <button class="btn" id="hm-del">Delete</button>
+        <button class="btn" id="hm-rand">+5 random</button>
+        <button class="btn" id="hm-reset">Reset</button>
+        <select id="hm-mode"><option value="chain">Separate chaining</option><option value="probe">Linear probing</option></select>
+        <label class="small">max load <select id="hm-lf"><option>0.5</option><option selected>0.75</option><option>1.0</option><option value="99">never resize</option></select></label>
+      </div>
+      <div class="viz-stage" style="margin-top:12px"><div id="hm-table"></div></div>
+      <div class="viz-caption" id="hm-msg">Try inserting <b>cat</b>, <b>dog</b>, <b>act</b>, then +5 random a few times.</div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>last touched</span><span><i style="background:var(--warn)"></i>probed / walked past</span><span><i style="background:var(--bad)"></i>tombstone</span></div>
+    </div>
+  </details>
+
+  <details class="box" open id="costs">
+    <summary><span class="kicker">Costs</span><span class="label">Complexity and trade-offs</span></summary>
+    <div class="box-body">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Operation</th><th>Average</th><th>Worst</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>get / put / delete</td><td>O(1)</td><td>O(n)</td><td>Worst case: every key lands in one bucket (bad hash, or an attacker choosing keys).</td></tr>
+          <tr><td>resize</td><td>O(1) amortized</td><td>O(n) for that one insert</td><td>Doubling makes the total copying linear. The single slow insert is a latency spike.</td></tr>
+          <tr><td>iterate</td><td>O(n + m)</td><td>O(n + m)</td><td>You walk empty buckets too. A table that grew huge then shrank iterates slowly.</td></tr>
+          <tr><td>ordered / range query</td><td colspan="2">not supported</td><td>Hashing destroys order. Need "all keys between a and f"? Use a sorted structure (tree, skip list).</td></tr>
+          <tr><td>array index</td><td>O(1)</td><td>O(1)</td><td>Address arithmetic.</td></tr>
+          <tr><td>array insert in middle</td><td>O(n)</td><td>O(n)</td><td>Shift everything after it.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <p>Almost every coding round uses a hash map somewhere. Nobody gets credit for using one. The credit goes to saying precisely what it costs. When someone asks "why is a dict lookup O(1)?", a senior answer covers:</p>
+      <ul>
+        <li><b>"Average, not worst case."</b> Name the assumption: the hash spreads keys evenly.</li>
+        <li><b>Amortized resizing</b> and its operational cost: a resize stalls one request. Redis avoids that with <em>incremental rehashing</em>: it keeps two tables and moves a few buckets on each operation.</li>
+        <li><b>Hash flooding:</b> if attackers can choose keys and your hash is predictable, they can force O(n²) behavior and take down a server. That is why Python randomizes string hashes per process (SipHash, <code>PYTHONHASHSEED</code>).</li>
+        <li><b>The key contract:</b> keys must be immutable, and equal objects must have equal hashes. Break it and entries become unfindable.</li>
+        <li><b>When not to use one:</b> you need ordering or range scans, memory is tight (each entry carries real overhead), or the key space is tiny and dense (use an array).</li>
+        <li><b>Concurrency:</b> a shared map needs a lock. Java's <code>ConcurrentHashMap</code> splits it into independently locked segments, so writers rarely contend.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Using a mutable object (a list) as a key, or mutating a key object after inserting it.</li>
+        <li>Overriding <code>__eq__</code> without <code>__hash__</code>. Python then makes the class unhashable; in Java you silently get broken lookups.</li>
+        <li><code>x in some_list</code> inside a loop. That's O(n) per check. Build a set first.</li>
+        <li>String concatenation in a loop (O(n²)). Use <code>join</code>.</li>
+        <li>Relying on iteration order. Python dicts keep insertion order (since 3.7); Java's HashMap and Go maps don't (Go deliberately randomizes it).</li>
+        <li>Forgetting that <code>float('nan') != float('nan')</code>, so NaN keys behave strangely.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>Why double the table instead of adding a fixed number of buckets?</summary><p>Doubling makes total resize work a geometric series bounded by about 2n, so it's O(1) amortized per insert. Adding a constant k resizes every k inserts, and each resize copies everything, so the total is O(n²/k).</p></details>
+      <details class="qa"><summary>In linear probing, why can't you just empty the slot on delete?</summary><p>A later key may have probed <em>past</em> that slot to find its home. Emptying the slot breaks its probe chain, so lookups would stop early and miss it. A tombstone says "keep probing, but this slot can be reused on insert".</p></details>
+      <details class="qa"><summary>Why does the hash map have to rehash every key when it grows?</summary><p>The bucket is <code>hash(key) % m</code>. Change <code>m</code> and almost every key's bucket changes. (Consistent hashing in chapter 2 is the trick for when moving keys is expensive, like across servers.)</p></details>
+      <details class="qa"><summary>You need "top 10 keys by value, updated live" and "lookup by key". Is a hash map enough?</summary><p>No. Lookup by key is the hash map; ordering by value needs a second structure (a heap or a sorted structure) kept in sync. Combining structures like this is the core move behind LRU caches (hash map + linked list).</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Exercise:</b> <code>exercises/hash_map.py</code>: build a chaining hash map with resizing, without using <code>dict</code>. Run <code>pytest -k hash_map</code>.</p>
+      <p><b>Classic problems</b> (hash map as the key insight): Two Sum · Group Anagrams · Longest Consecutive Sequence · Subarray Sum Equals K · First Unique Character.</p>
+      <p class="small muted">Stretch: add open addressing with tombstones as a second class and compare the two with <code>timeit</code>.</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  // A small, visible hash (FNV-1a 32-bit) so the numbers are reproducible.
+  const hash = (s) => { let h = 0x811c9dc5; for (const c of s) { h ^= c.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h; };
+  const TOMB = { tomb: true };
+  let m = 8, mode = "chain", maxLf = 0.75, buckets, n = 0, touched = new Set(), walked = new Set();
+  const reset = () => { m = 8; n = 0; buckets = Array.from({ length: m }, () => (mode === "chain" ? [] : null)); touched.clear(); walked.clear(); };
+
+  function rawInsert(key) { // returns probes count
+    const i0 = hash(key) % m;
+    if (mode === "chain") { buckets[i0].push(key); return 1; }
+    let i = i0, probes = 1;
+    while (buckets[i] !== null && buckets[i] !== TOMB) { i = (i + 1) % m; probes++; }
+    buckets[i] = key; return probes;
+  }
+  function find(key) { // returns {i, j} or null, records walked slots
+    const i0 = hash(key) % m;
+    if (mode === "chain") { const j = buckets[i0].indexOf(key); return j < 0 ? null : { i: i0, j }; }
+    let i = i0;
+    for (let k = 0; k < m && buckets[i] !== null; k++) {
+      if (buckets[i] === key) return { i };
+      walked.add(i); i = (i + 1) % m;
+    }
+    return null;
+  }
+  function resize() {
+    const keys = mode === "chain" ? buckets.flat() : buckets.filter((k) => k !== null && k !== TOMB);
+    m *= 2; buckets = Array.from({ length: m }, () => (mode === "chain" ? [] : null));
+    keys.forEach(rawInsert);
+    return keys.length;
+  }
+  function put(key) {
+    touched.clear(); walked.clear();
+    if (!key) return "Type a key first.";
+    if (find(key)) { walked.clear(); return `<b>${key}</b> is already in the table (a real map would overwrite its value).`; }
+    let note = "";
+    if (mode === "probe" && n + 1 >= m) note = " Table is full, so it must grow regardless of the threshold.";
+    if ((n + 1) / m > maxLf || (mode === "probe" && n + 1 >= m)) { const k = resize(); note = ` Load factor would pass ${maxLf}, so the table doubled to ${m} buckets and rehashed ${k} keys (that one insert cost O(n)).` + note; }
+    const h = hash(key), i0 = h % m;
+    if (mode === "probe") { let i = i0; while (buckets[i] !== null && buckets[i] !== TOMB) { walked.add(i); i = (i + 1) % m; } }
+    const probes = rawInsert(key); n++;
+    const at = find(key); walked.forEach(() => {}); touched.add(at.i + (at.j != null ? ":" + at.j : ""));
+    return `hash("<b>${key}</b>") = ${h} → ${h} mod ${m} = <b>${i0}</b>.` + (mode === "probe" && probes > 1 ? ` Collided, probed ${probes} slots.` : mode === "chain" && buckets[i0].length > 1 ? ` Collision: chain length is now ${buckets[i0].length}.` : " No collision.") + note;
+  }
+  function del(key) {
+    touched.clear(); walked.clear();
+    const at = find(key);
+    if (!at) return `<b>${key || "?"}</b> isn't in the table.`;
+    if (mode === "chain") buckets[at.i].splice(at.j, 1); else buckets[at.i] = TOMB;
+    n--;
+    return mode === "chain" ? `Removed <b>${key}</b> from its chain.` : `Slot ${at.i} becomes a <b>tombstone</b>, not empty, so keys that probed past it can still be found.`;
+  }
+  function render() {
+    const host = $("hm-table");
+    const lf = n / m;
+    const meter = V.el("div", { class: "small", style: "margin-bottom:10px" },
+      `n = ${n}, buckets = ${m}, load factor = `, V.el("b", {}, lf.toFixed(2)),
+      V.el("div", { class: "bar", style: "max-width:320px" }, V.el("span", { style: `width:${Math.min(100, (lf / Math.max(maxLf, 1)) * 100)}%` })));
+    let rows;
+    if (mode === "chain") {
+      rows = buckets.map((chain, i) => V.el("div", { style: "display:flex;gap:10px;align-items:center;margin:4px 0" },
+        V.el("span", { class: "small muted", style: "width:28px;text-align:right;font-family:var(--mono)" }, i),
+        V.el("div", { class: "cells", style: "padding:0" }, chain.length ? chain.map((k, j) => V.el("div", { class: "cell " + (touched.has(i + ":" + j) ? "hl" : "") }, k)) : V.el("div", { class: "cell empty" }, "·"))));
+    } else {
+      rows = [V.cells(buckets.map((k) => (k === TOMB ? "✝" : k)), { cls: (i, v) => (touched.has(String(i)) ? "hl" : walked.has(i) ? "warn" : buckets[i] === TOMB ? "bad" : "") })];
+    }
+    host.replaceChildren(meter, mode === "chain" ? V.el("div", { style: "display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));column-gap:16px" }, rows) : rows[0]);
+  }
+  const say = (html) => { $("hm-msg").innerHTML = html; render(); };
+  const words = ["cat", "dog", "act", "tac", "owl", "emu", "yak", "eel", "ant", "bee", "cow", "elk", "fox", "gnu", "hen", "jay", "koi", "pig", "ram", "rat", "bat", "ape", "asp", "cod"];
+  $("hm-put").onclick = () => { say(put($("hm-key").value.trim())); $("hm-key").select(); };
+  $("hm-key").addEventListener("keydown", (e) => { if (e.key === "Enter") $("hm-put").click(); });
+  $("hm-del").onclick = () => say(del($("hm-key").value.trim()));
+  $("hm-rand").onclick = () => { let msg = ""; for (let k = 0; k < 5; k++) { const pool = words.filter((w) => !find(w)); if (!pool.length) break; msg = put(pool[Math.floor(Math.random() * pool.length)]); } say("Last insert: " + msg); };
+  $("hm-reset").onclick = () => { reset(); say("Empty table with 8 buckets."); };
+  $("hm-mode").onchange = (e) => { mode = e.target.value; reset(); say(mode === "chain" ? "Separate chaining: colliding keys share a bucket's list." : "Linear probing: one key per slot; on collision, try the next slot."); };
+  $("hm-lf").onchange = (e) => { maxLf = Number(e.target.value); say(`Max load factor set to ${maxLf === 99 ? "never resize" : maxLf}. Watch chain lengths grow without resizing.`); };
+  reset(); render();
+})();
+</script>
+</body>
+</html>

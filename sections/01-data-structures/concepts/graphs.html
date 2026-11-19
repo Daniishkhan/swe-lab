@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="01.05">
+  <title>Graphs and how to store them</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;01.05 · Graphs: adjacency list vs matrix, directed/undirected, weighted</p>
+  <h1>Graphs and how to store them</h1>
+  <p class="lede">Roads, friendships, package dependencies, network links: anything made of things and connections between them is a graph. Before you can run any graph algorithm, you have to decide how the graph sits in memory.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">A graph is a set of nodes and edges. An adjacency list stores, for each node, who it connects to, in O(V + E) space. An adjacency matrix stores every possible pair in O(V²). Most real graphs are sparse, so the list is the default.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>1. The vocabulary, minimal version</h3>
+      <ul>
+        <li><b>Directed vs undirected:</b> follows on social media (directed) vs friendship (undirected = an edge in both directions).</li>
+        <li><b>Weighted:</b> edges carry a cost: distance, latency, price.</li>
+        <li><b>Sparse vs dense:</b> E close to V (road networks, dependency graphs) vs E close to V² (rare: small complete graphs).</li>
+        <li><b>Cycle, DAG, tree:</b> a tree is a connected graph with no cycles and exactly V−1 edges. A DAG is a directed graph with no cycles, which means you can order it (topological sort, chapter 2).</li>
+        <li><b>Implicit graphs:</b> often nobody hands you the edges. A grid, a word ladder, or the states of a puzzle are graphs whose neighbors you compute on the fly.</li>
+      </ul>
+      <h3>2. Representation decides cost</h3>
+      <div class="cols">
+        <div class="panel"><h4>Adjacency list</h4><p class="small"><code>graph[u] = [v1, v2, …]</code>, a dict or list of lists. Space O(V + E). Iterating a node's neighbors costs O(degree). "Is u–v an edge?" costs O(degree), or O(1) if you use sets.</p></div>
+        <div class="panel"><h4>Adjacency matrix</h4><p class="small"><code>M[u][v] = 1</code> or a weight. Space O(V²). Edge check O(1). Iterating neighbors O(V), even for a node with one edge. Good for small dense graphs and some DP problems (Floyd–Warshall).</p></div>
+        <div class="panel"><h4>Edge list</h4><p class="small"><code>[(u, v, w), …]</code>. The simplest form. It's what problems hand you, and it's exactly what Kruskal's MST and Bellman-Ford iterate over.</p></div>
+      </div>
+      <h3>3. The first five lines of almost every graph solution</h3>
+      <pre><code>from collections import defaultdict
+graph = defaultdict(list)
+for u, v in edges:
+    graph[u].append(v)
+    graph[v].append(u)      # only if undirected</code></pre>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogy: a contacts list vs a seating chart</span></summary>
+    <div class="box-body">
+      <p>An <b>adjacency list</b> is everyone's phone contacts: each person lists only the people they actually know. It's cheap even with a billion people. An <b>adjacency matrix</b> is a giant seating chart with one cell for every possible pair. With a billion people that's 10¹⁸ cells, almost all of them "no".</p>
+      <p class="muted small">Back-of-envelope: a social graph with 10⁹ users and 200 friends each has 2×10¹¹ edges. As lists, that's a few TB, which is big but shardable. As a bit matrix, it's about 125 PB.</p>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: one graph, three representations</span></summary>
+    <div class="box-body">
+      <div class="viz-controls">
+        <label class="small"><input type="checkbox" id="g-dir"> directed</label>
+        <label class="small"><input type="checkbox" id="g-w"> weighted</label>
+        <span class="small muted">focus node:</span>
+        <select id="g-focus"></select>
+        <button class="btn" id="g-add">Add random edge</button>
+        <button class="btn" id="g-reset">Reset</button>
+      </div>
+      <div class="cols" style="margin-top:12px">
+        <div class="viz-stage"><svg class="viz" id="g-svg"></svg></div>
+        <div class="viz-stage">
+          <div class="small muted">adjacency list</div><pre id="g-list" style="margin:6px 0 12px;background:none;border:0;padding:0"></pre>
+          <div class="small muted">adjacency matrix</div><div id="g-matrix" class="table-wrap"></div>
+        </div>
+      </div>
+      <div class="viz-caption" id="g-msg"></div>
+    </div>
+  </details>
+
+  <details class="box" open id="costs">
+    <summary><span class="kicker">Costs</span><span class="label">Representation trade-offs</span></summary>
+    <div class="box-body">
+      <div class="table-wrap"><table>
+        <thead><tr><th></th><th>Adjacency list</th><th>Adjacency matrix</th><th>Edge list</th></tr></thead>
+        <tbody>
+          <tr><td>space</td><td>O(V + E)</td><td>O(V²)</td><td>O(E)</td></tr>
+          <tr><td>is (u, v) an edge?</td><td>O(deg u), O(1) with sets</td><td>O(1)</td><td>O(E)</td></tr>
+          <tr><td>neighbors of u</td><td>O(deg u)</td><td>O(V)</td><td>O(E)</td></tr>
+          <tr><td>add edge</td><td>O(1)</td><td>O(1)</td><td>O(1)</td></tr>
+          <tr><td>BFS / DFS whole graph</td><td>O(V + E)</td><td>O(V²)</td><td>build a list first</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Recognize hidden graphs.</b> Many "non-graph" problems are graphs: course prerequisites (DAG, topological sort), word ladder (implicit edges between words one letter apart), islands in a grid (connected components), currency exchange (weighted, maybe negative cycles).</li>
+        <li><b>State your representation and why</b> before coding: "sparse, so an adjacency list; sets because I'll check membership."</li>
+        <li><b>At system scale,</b> graphs get partitioned across machines and the edge cut becomes the problem: friend-of-friend queries cross shards. Real systems use specialized stores (Facebook's TAO), precomputed fan-out, or graph databases. Know that this exists for design rounds.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Forgetting the reverse edge for undirected graphs, or adding it for directed ones.</li>
+        <li>Missing isolated nodes: they never appear in the edge list. Iterate <code>range(n)</code>, not just the keys of your dict.</li>
+        <li>Duplicate edges and self-loops in the input. Ask whether they can happen.</li>
+        <li>Allocating a V×V matrix "because it's easier" when V = 10⁵. That's 10¹⁰ cells.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>A tree with V nodes has how many edges? And a complete undirected graph?</summary><p>A tree has V − 1. A complete graph has V(V − 1)/2.</p></details>
+      <details class="qa"><summary>How would you represent a 2D grid maze as a graph without building edges?</summary><p>Keep it implicit: node = (row, col); neighbors = the 4 (or 8) adjacent cells that are in bounds and not walls, computed when you need them. That saves memory and code.</p></details>
+      <details class="qa"><summary>When is the matrix the right choice?</summary><p>Small V (a few thousand at most), dense graphs, frequent O(1) edge checks, or algorithms naturally written over all pairs, like Floyd–Warshall or transitive closure.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Exercises:</b> <code>exercises/union_find.py</code> here, and in chapter 2: <code>graphs.py</code> (topological sort, components) and <code>dijkstra.py</code>.</p>
+      <p><b>Classic problems:</b> Number of Islands · Clone Graph · Course Schedule · Number of Connected Components · Graph Valid Tree · Word Ladder.</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const nodes = [{ id: "A", x: 60, y: 50 }, { id: "B", x: 190, y: 35 }, { id: "C", x: 310, y: 70 }, { id: "D", x: 80, y: 175 }, { id: "E", x: 210, y: 150 }, { id: "F", x: 320, y: 190 }];
+  const base = () => [["A", "B", 4], ["A", "D", 2], ["B", "C", 3], ["B", "E", 6], ["D", "E", 1], ["E", "F", 5], ["C", "F", 2]];
+  let edges = base(), focus = "B";
+  const ids = nodes.map((n) => n.id);
+  $("g-focus").replaceChildren(...ids.map((id) => V.el("option", { value: id, selected: id === focus ? "" : null }, id)));
+  function render(msg) {
+    const dir = $("g-dir").checked, w = $("g-w").checked;
+    const adj = Object.fromEntries(ids.map((id) => [id, []]));
+    for (const [a, b, c] of edges) { adj[a].push([b, c]); if (!dir) adj[b].push([a, c]); }
+    const nbrs = new Set(adj[focus].map(([b]) => b));
+    V.graph($("g-svg"), nodes, edges.map(([a, b, c]) => [a, b, w ? c : null]), {
+      directed: dir, width: 380, height: 230,
+      nodeCls: (id) => (id === focus ? "hl" : nbrs.has(id) ? "warn" : ""),
+      edgeCls: (a, b) => (a === focus || (!dir && b === focus) ? "hl" : ""),
+    });
+    $("g-list").innerHTML = ids.map((id) => {
+      const s = `${id}: [${adj[id].map(([b, c]) => (w ? `(${b},${c})` : b)).join(", ")}]`;
+      return id === focus ? `<b style="color:var(--accent)">${s}</b>` : s;
+    }).join("\n");
+    const M = ids.map((r) => ids.map((c) => { const e = adj[r].find(([b]) => b === c); return e ? (w ? e[1] : 1) : 0; }));
+    $("g-matrix").replaceChildren(V.el("table", { class: "dp-table" },
+      V.el("tr", {}, V.el("th", {}), ids.map((c) => V.el("th", {}, c))),
+      ids.map((r, i) => V.el("tr", {}, V.el("th", {}, r), M[i].map((v, j) => V.el("td", { class: r === focus && v ? "cur" : r === focus ? "dep" : "" }, v || "·"))))));
+    const E = edges.length, V_ = ids.length;
+    $("g-msg").innerHTML = msg || `V = ${V_}, E = ${E}. List stores ${dir ? E : 2 * E} entries; matrix stores ${V_ * V_} cells, ${V_ * V_ - (dir ? E : 2 * E)} of them empty. Neighbors of <b>${focus}</b>: list reads ${adj[focus].length} entries, matrix scans a row of ${V_}.`;
+  }
+  $("g-dir").onchange = () => render();
+  $("g-w").onchange = () => render();
+  $("g-focus").onchange = (e) => { focus = e.target.value; render(); };
+  $("g-add").onclick = () => {
+    const free = [];
+    for (const a of ids) for (const b of ids) if (a < b && !edges.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) free.push([a, b]);
+    if (!free.length) return render("Every pair is connected: a complete graph. This is the only case where the matrix wastes nothing.");
+    const [a, b] = free[Math.floor(Math.random() * free.length)];
+    edges.push([a, b, 1 + Math.floor(Math.random() * 9)]); render();
+  };
+  $("g-reset").onclick = () => { edges = base(); render(); };
+  render();
+})();
+</script>
+</body>
+</html>

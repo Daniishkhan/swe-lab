@@ -1,0 +1,1222 @@
+{
+  "phases": [
+    {
+      "n": 1,
+      "title": "DS & algorithm patterns",
+      "sections": [
+        "01",
+        "02"
+      ],
+      "goal": "Until medium problems are routine"
+    },
+    {
+      "n": 2,
+      "title": "Concurrency",
+      "sections": [
+        "03"
+      ],
+      "goal": "Hands-on implementations"
+    },
+    {
+      "n": 3,
+      "title": "System design fundamentals + DDIA",
+      "sections": [
+        "04",
+        "05",
+        "06"
+      ],
+      "goal": "Read DDIA alongside"
+    },
+    {
+      "n": 4,
+      "title": "Case studies",
+      "sections": [
+        "07"
+      ],
+      "goal": "2-3 per week, out loud and timed"
+    },
+    {
+      "n": 5,
+      "title": "Debugging & code reading",
+      "sections": [
+        "08"
+      ],
+      "goal": "Use real open-source repos"
+    },
+    {
+      "n": 6,
+      "title": "Behavioral stories",
+      "sections": [
+        "14"
+      ],
+      "goal": "In parallel from week one"
+    },
+    {
+      "n": 7,
+      "title": "Role-specific depth",
+      "sections": [
+        "09",
+        "10",
+        "11",
+        "12",
+        "13"
+      ],
+      "goal": "Pick based on target company"
+    }
+  ],
+  "sections": [
+    {
+      "num": 1,
+      "id": "01",
+      "slug": "01-data-structures",
+      "title": "Data Structures",
+      "notes": [],
+      "topics": [
+        {
+          "id": "01.01",
+          "tag": "P0",
+          "text": "Arrays, strings, hash maps/sets: collision handling, load factor, resizing cost"
+        },
+        {
+          "id": "01.02",
+          "tag": "P0",
+          "text": "Linked lists, stacks, queues, deques, monotonic stack/queue"
+        },
+        {
+          "id": "01.03",
+          "tag": "P0",
+          "text": "Trees: BST, balanced trees (red-black, AVL at a conceptual level), traversal orders"
+        },
+        {
+          "id": "01.04",
+          "tag": "P0",
+          "text": "Heaps and priority queues: top-k, k-way merge, scheduling"
+        },
+        {
+          "id": "01.05",
+          "tag": "P0",
+          "text": "Graphs: adjacency list vs matrix, directed/undirected, weighted"
+        },
+        {
+          "id": "01.06",
+          "tag": "P1",
+          "text": "Tries, prefix/radix trees (autocomplete, routing tables)"
+        },
+        {
+          "id": "01.07",
+          "tag": "P1",
+          "text": "Union-find (disjoint sets) with path compression"
+        },
+        {
+          "id": "01.08",
+          "tag": "P1",
+          "text": "LRU/LFU cache construction (hash map + doubly linked list)"
+        },
+        {
+          "id": "01.09",
+          "tag": "P1",
+          "text": "Interval structures: merge, sweep line, interval tree basics"
+        },
+        {
+          "id": "01.10",
+          "tag": "P2",
+          "text": "Segment trees, Fenwick trees"
+        },
+        {
+          "id": "01.11",
+          "tag": "P2",
+          "text": "Skip lists (and why Redis uses them)"
+        },
+        {
+          "id": "01.12",
+          "tag": "P2",
+          "text": "Probabilistic structures: Bloom filter, Count-Min Sketch, HyperLogLog"
+        },
+        {
+          "id": "01.13",
+          "tag": "P2",
+          "text": "Storage structures: B-tree, B+tree, LSM tree, SSTable, write-ahead log"
+        },
+        {
+          "id": "01.14",
+          "tag": "P2",
+          "text": "Concurrent structures: lock-free queue, ring buffer, concurrent hash map"
+        }
+      ]
+    },
+    {
+      "num": 2,
+      "id": "02",
+      "slug": "02-algorithms",
+      "title": "Algorithms",
+      "notes": [
+        "Talk through the brute force first, state complexity, then improve it. Senior candidates are judged on clarity, testing their own code, and handling edge cases, not on speed alone."
+      ],
+      "topics": [
+        {
+          "id": "02.01",
+          "tag": "P0",
+          "text": "Complexity analysis: time, space, amortized; knowing when constants matter"
+        },
+        {
+          "id": "02.02",
+          "tag": "P0",
+          "text": "Sorting and its trade-offs (quicksort, mergesort, heapsort, counting/radix); stability"
+        },
+        {
+          "id": "02.03",
+          "tag": "P0",
+          "text": "Binary search, including \"search on the answer\" variants"
+        },
+        {
+          "id": "02.04",
+          "tag": "P0",
+          "text": "Two pointers, sliding window, prefix sums"
+        },
+        {
+          "id": "02.05",
+          "tag": "P0",
+          "text": "BFS/DFS, topological sort, cycle detection, connected components"
+        },
+        {
+          "id": "02.06",
+          "tag": "P0",
+          "text": "Recursion and backtracking (permutations, subsets, constraint search)"
+        },
+        {
+          "id": "02.07",
+          "tag": "P0",
+          "text": "Dynamic programming: 1D/2D, knapsack family, LIS, edit distance, interval DP"
+        },
+        {
+          "id": "02.08",
+          "tag": "P1",
+          "text": "Shortest paths: Dijkstra, Bellman-Ford, A* basics"
+        },
+        {
+          "id": "02.09",
+          "tag": "P1",
+          "text": "Minimum spanning tree (Kruskal, Prim)"
+        },
+        {
+          "id": "02.10",
+          "tag": "P1",
+          "text": "Greedy algorithms and how to argue correctness"
+        },
+        {
+          "id": "02.11",
+          "tag": "P1",
+          "text": "Bit manipulation"
+        },
+        {
+          "id": "02.12",
+          "tag": "P1",
+          "text": "String algorithms: rolling hash, KMP at a conceptual level"
+        },
+        {
+          "id": "02.13",
+          "tag": "P2",
+          "text": "Streaming and external algorithms: reservoir sampling, external merge sort"
+        },
+        {
+          "id": "02.14",
+          "tag": "P2",
+          "text": "Rate limiting algorithms: token bucket, leaky bucket, sliding window log/counter"
+        },
+        {
+          "id": "02.15",
+          "tag": "P2",
+          "text": "Consistent hashing, rendezvous hashing"
+        },
+        {
+          "id": "02.16",
+          "tag": "P2",
+          "text": "Basic probability and estimation for capacity reasoning"
+        }
+      ]
+    },
+    {
+      "num": 3,
+      "id": "03",
+      "slug": "03-concurrency",
+      "title": "Concurrency and Parallelism",
+      "notes": [],
+      "topics": [
+        {
+          "id": "03.01",
+          "tag": "P0",
+          "text": "Threads vs processes vs coroutines; when each is the right tool"
+        },
+        {
+          "id": "03.02",
+          "tag": "P0",
+          "text": "Race conditions, critical sections, atomicity, visibility"
+        },
+        {
+          "id": "03.03",
+          "tag": "P0",
+          "text": "Mutexes, read-write locks, semaphores, condition variables"
+        },
+        {
+          "id": "03.04",
+          "tag": "P0",
+          "text": "Deadlock, livelock, starvation: the four deadlock conditions and how to break them"
+        },
+        {
+          "id": "03.05",
+          "tag": "P0",
+          "text": "Thread pools, work queues, backpressure"
+        },
+        {
+          "id": "03.06",
+          "tag": "P1",
+          "text": "Async I/O and event loops (epoll/kqueue model, async/await semantics)"
+        },
+        {
+          "id": "03.07",
+          "tag": "P1",
+          "text": "Producer-consumer, bounded buffer, reader-writer, dining philosophers"
+        },
+        {
+          "id": "03.08",
+          "tag": "P1",
+          "text": "Memory model basics: happens-before, volatile/atomic, false sharing"
+        },
+        {
+          "id": "03.09",
+          "tag": "P1",
+          "text": "Compare-and-swap, lock-free vs wait-free, the ABA problem"
+        },
+        {
+          "id": "03.10",
+          "tag": "P1",
+          "text": "Futures/promises, structured concurrency, cancellation and timeouts"
+        },
+        {
+          "id": "03.11",
+          "tag": "P1",
+          "text": "Language specifics: Python GIL and multiprocessing, Go channels, C++ std::thread/std::atomic, Swift actors"
+        },
+        {
+          "id": "03.12",
+          "tag": "P2",
+          "text": "Actor model and CSP"
+        },
+        {
+          "id": "03.13",
+          "tag": "P2",
+          "text": "Parallelism limits: Amdahl's law, contention, cache effects"
+        },
+        {
+          "id": "03.14",
+          "tag": "P2",
+          "text": "Implement from scratch: thread-safe queue, rate limiter, connection pool, scheduler, read-through cache with single-flight"
+        }
+      ]
+    },
+    {
+      "num": 4,
+      "id": "04",
+      "slug": "04-system-design-fundamentals",
+      "title": "System Design Fundamentals",
+      "notes": [],
+      "topics": [
+        {
+          "id": "04.01",
+          "tag": "P0",
+          "text": "Requirements gathering: functional vs non-functional, scoping, stating assumptions"
+        },
+        {
+          "id": "04.02",
+          "tag": "P0",
+          "text": "Back-of-envelope estimation: QPS, storage, bandwidth, memory"
+        },
+        {
+          "id": "04.03",
+          "tag": "P0",
+          "text": "Latency numbers every engineer should know; p50/p95/p99 thinking"
+        },
+        {
+          "id": "04.04",
+          "tag": "P0",
+          "text": "Load balancing: L4 vs L7, algorithms, health checks"
+        },
+        {
+          "id": "04.05",
+          "tag": "P0",
+          "text": "Caching: cache-aside, write-through, write-behind, TTLs, invalidation, stampede protection"
+        },
+        {
+          "id": "04.06",
+          "tag": "P0",
+          "text": "Database choice: relational vs document vs key-value vs wide-column vs graph vs search"
+        },
+        {
+          "id": "04.07",
+          "tag": "P0",
+          "text": "Replication (leader-follower, multi-leader, leaderless) and sharding/partitioning strategies"
+        },
+        {
+          "id": "04.08",
+          "tag": "P0",
+          "text": "Message queues and event streams (Kafka, SQS, RabbitMQ): ordering, delivery guarantees"
+        },
+        {
+          "id": "04.09",
+          "tag": "P0",
+          "text": "API design: REST, gRPC, GraphQL; pagination, versioning, idempotency keys"
+        },
+        {
+          "id": "04.10",
+          "tag": "P1",
+          "text": "CDNs, edge caching, object storage"
+        },
+        {
+          "id": "04.11",
+          "tag": "P1",
+          "text": "Stateless services, session handling, horizontal scaling"
+        },
+        {
+          "id": "04.12",
+          "tag": "P1",
+          "text": "Rate limiting, load shedding, circuit breakers, retries with jitter, timeouts, bulkheads"
+        },
+        {
+          "id": "04.13",
+          "tag": "P1",
+          "text": "Multi-region design: active-active vs active-passive, failover, data residency"
+        },
+        {
+          "id": "04.14",
+          "tag": "P1",
+          "text": "Real-time delivery: WebSockets, SSE, long polling, pub/sub fan-out"
+        },
+        {
+          "id": "04.15",
+          "tag": "P1",
+          "text": "Search and indexing: inverted index, ranking basics"
+        },
+        {
+          "id": "04.16",
+          "tag": "P2",
+          "text": "Cost as a design constraint; build vs buy"
+        },
+        {
+          "id": "04.17",
+          "tag": "P2",
+          "text": "Migration strategy: dual writes, backfills, shadow traffic, strangler pattern"
+        }
+      ]
+    },
+    {
+      "num": 5,
+      "id": "05",
+      "slug": "05-distributed-systems",
+      "title": "Distributed Systems Theory",
+      "notes": [],
+      "topics": [
+        {
+          "id": "05.01",
+          "tag": "P0",
+          "text": "CAP and PACELC, and what they do and do not say"
+        },
+        {
+          "id": "05.02",
+          "tag": "P0",
+          "text": "Consistency models: linearizable, sequential, causal, eventual, read-your-writes"
+        },
+        {
+          "id": "05.03",
+          "tag": "P0",
+          "text": "Delivery semantics: at-most-once, at-least-once, effectively-once via idempotency"
+        },
+        {
+          "id": "05.04",
+          "tag": "P1",
+          "text": "Consensus: Raft in detail, Paxos at a conceptual level; leader election"
+        },
+        {
+          "id": "05.05",
+          "tag": "P1",
+          "text": "Quorums, sloppy quorums, hinted handoff, read repair, anti-entropy (Merkle trees)"
+        },
+        {
+          "id": "05.06",
+          "tag": "P1",
+          "text": "Time and ordering: clock skew, Lamport clocks, vector clocks, hybrid logical clocks"
+        },
+        {
+          "id": "05.07",
+          "tag": "P1",
+          "text": "Distributed transactions: 2PC, sagas, outbox pattern, change data capture"
+        },
+        {
+          "id": "05.08",
+          "tag": "P1",
+          "text": "Failure modes: partitions, split brain, gray failure, thundering herd, cascading failure, retry storms"
+        },
+        {
+          "id": "05.09",
+          "tag": "P2",
+          "text": "Distributed locks, fencing tokens, leases"
+        },
+        {
+          "id": "05.10",
+          "tag": "P2",
+          "text": "CRDTs and conflict resolution"
+        },
+        {
+          "id": "05.11",
+          "tag": "P2",
+          "text": "Gossip protocols, membership, failure detection"
+        },
+        {
+          "id": "05.12",
+          "tag": "P2",
+          "text": "Landmark papers: Dynamo, Bigtable, Spanner, GFS, MapReduce, Kafka, Raft"
+        }
+      ]
+    },
+    {
+      "num": 6,
+      "id": "06",
+      "slug": "06-data-intensive-design",
+      "title": "Data-Intensive Design",
+      "notes": [
+        "Core text: Designing Data-Intensive Applications (Kleppmann). Check for the second edition."
+      ],
+      "topics": [
+        {
+          "id": "06.01",
+          "tag": "P0",
+          "text": "Indexing: B-tree vs LSM, composite and covering indexes, when an index hurts"
+        },
+        {
+          "id": "06.02",
+          "tag": "P0",
+          "text": "Transactions and ACID; isolation levels and their anomalies (dirty read, non-repeatable read, phantom, write skew)"
+        },
+        {
+          "id": "06.03",
+          "tag": "P0",
+          "text": "SQL fluency: joins, aggregation, window functions, reading an EXPLAIN plan"
+        },
+        {
+          "id": "06.04",
+          "tag": "P0",
+          "text": "Data modeling: normalization vs denormalization, access-pattern-driven design"
+        },
+        {
+          "id": "06.05",
+          "tag": "P1",
+          "text": "MVCC, optimistic vs pessimistic locking"
+        },
+        {
+          "id": "06.06",
+          "tag": "P1",
+          "text": "Partitioning: hash vs range, hot keys, rebalancing, secondary indexes across shards"
+        },
+        {
+          "id": "06.07",
+          "tag": "P1",
+          "text": "Batch vs stream processing; Lambda vs Kappa architecture"
+        },
+        {
+          "id": "06.08",
+          "tag": "P1",
+          "text": "Stream concepts: windowing, watermarks, late data, exactly-once processing"
+        },
+        {
+          "id": "06.09",
+          "tag": "P1",
+          "text": "Schema evolution and serialization (Protobuf, Avro, backward/forward compatibility)"
+        },
+        {
+          "id": "06.10",
+          "tag": "P1",
+          "text": "OLTP vs OLAP, columnar storage, Parquet, data warehouse vs lakehouse"
+        },
+        {
+          "id": "06.11",
+          "tag": "P2",
+          "text": "Online schema migrations and zero-downtime changes"
+        },
+        {
+          "id": "06.12",
+          "tag": "P2",
+          "text": "Data quality, lineage, backfills, reprocessing"
+        },
+        {
+          "id": "06.13",
+          "tag": "P2",
+          "text": "Vector databases and approximate nearest neighbor search (HNSW, IVF)"
+        }
+      ]
+    },
+    {
+      "num": 7,
+      "id": "07",
+      "slug": "07-system-design-cases",
+      "title": "System Design Case Studies",
+      "notes": [
+        "Practice each as a 45-minute exercise: requirements, estimates, API, data model, high-level design, deep dive, bottlenecks, trade-offs."
+      ],
+      "topics": [
+        {
+          "id": "07.01",
+          "tag": "Classic",
+          "text": "URL shortener; pastebin"
+        },
+        {
+          "id": "07.02",
+          "tag": "Classic",
+          "text": "Rate limiter (single node, then distributed)"
+        },
+        {
+          "id": "07.03",
+          "tag": "Classic",
+          "text": "News feed / timeline (fan-out on write vs read)"
+        },
+        {
+          "id": "07.04",
+          "tag": "Classic",
+          "text": "Chat and messaging (1:1, group, presence, delivery receipts)"
+        },
+        {
+          "id": "07.05",
+          "tag": "Classic",
+          "text": "Notification system (multi-channel, dedup, preferences)"
+        },
+        {
+          "id": "07.06",
+          "tag": "Classic",
+          "text": "Typeahead / autocomplete"
+        },
+        {
+          "id": "07.07",
+          "tag": "Classic",
+          "text": "Web crawler"
+        },
+        {
+          "id": "07.08",
+          "tag": "Classic",
+          "text": "Distributed key-value store"
+        },
+        {
+          "id": "07.09",
+          "tag": "Classic",
+          "text": "Distributed cache"
+        },
+        {
+          "id": "07.10",
+          "tag": "Classic",
+          "text": "Job scheduler / distributed cron / task queue"
+        },
+        {
+          "id": "07.11",
+          "tag": "Classic",
+          "text": "Unique ID generator (Snowflake-style)"
+        },
+        {
+          "id": "07.12",
+          "tag": "Classic",
+          "text": "File sync and storage (Dropbox-style)"
+        },
+        {
+          "id": "07.13",
+          "tag": "Classic",
+          "text": "Ride matching / geospatial proximity (geohash, quadtree, S2)"
+        },
+        {
+          "id": "07.14",
+          "tag": "Classic",
+          "text": "Payment system and ledger (idempotency, reconciliation, double-entry)"
+        },
+        {
+          "id": "07.15",
+          "tag": "Classic",
+          "text": "Ticketing / inventory with contention (flash sale)"
+        },
+        {
+          "id": "07.16",
+          "tag": "Classic",
+          "text": "Collaborative editor (OT vs CRDT)"
+        },
+        {
+          "id": "07.17",
+          "tag": "Classic",
+          "text": "Metrics, monitoring, and alerting pipeline"
+        },
+        {
+          "id": "07.18",
+          "tag": "Classic",
+          "text": "Log aggregation and search"
+        },
+        {
+          "id": "07.19",
+          "tag": "Classic",
+          "text": "Ad click aggregation; top-k / leaderboard"
+        },
+        {
+          "id": "07.20",
+          "tag": "Netflix",
+          "text": "Video streaming: ingest, transcoding pipeline, adaptive bitrate, CDN placement"
+        },
+        {
+          "id": "07.21",
+          "tag": "Netflix",
+          "text": "Recommendation system serving and feature pipelines"
+        },
+        {
+          "id": "07.22",
+          "tag": "Netflix",
+          "text": "A/B testing and experimentation platform"
+        },
+        {
+          "id": "07.23",
+          "tag": "Netflix",
+          "text": "Playback telemetry at scale"
+        },
+        {
+          "id": "07.24",
+          "tag": "Netflix",
+          "text": "Resilience design: chaos engineering, regional evacuation, graceful degradation"
+        },
+        {
+          "id": "07.25",
+          "tag": "Anthropic",
+          "text": "LLM inference API: request routing, batching, streaming tokens, GPU scheduling"
+        },
+        {
+          "id": "07.26",
+          "tag": "Anthropic",
+          "text": "Multi-tenant rate limiting and quota by tokens rather than requests"
+        },
+        {
+          "id": "07.27",
+          "tag": "Anthropic",
+          "text": "Prompt/response caching (prefix caching, KV cache reuse)"
+        },
+        {
+          "id": "07.28",
+          "tag": "Anthropic",
+          "text": "RAG system: ingestion, chunking, embedding, retrieval, reranking, freshness"
+        },
+        {
+          "id": "07.29",
+          "tag": "Anthropic",
+          "text": "Agent execution platform: sandboxing, tool calls, long-running tasks, checkpointing"
+        },
+        {
+          "id": "07.30",
+          "tag": "Anthropic",
+          "text": "Evaluation platform: datasets, graders, regression tracking"
+        },
+        {
+          "id": "07.31",
+          "tag": "Anthropic",
+          "text": "Training data pipeline and distributed job orchestration"
+        },
+        {
+          "id": "07.32",
+          "tag": "Anthropic",
+          "text": "Abuse detection and safety filtering in the request path"
+        }
+      ]
+    },
+    {
+      "num": 8,
+      "id": "08",
+      "slug": "08-debugging-code-reading",
+      "title": "Debugging, Code Reading, and Trace Analysis",
+      "notes": [],
+      "topics": [
+        {
+          "id": "08.01",
+          "tag": "P0",
+          "text": "Systematic debugging: reproduce, isolate, hypothesize, bisect, verify the fix"
+        },
+        {
+          "id": "08.02",
+          "tag": "P0",
+          "text": "Reading stack traces across languages; following a failure through async boundaries"
+        },
+        {
+          "id": "08.03",
+          "tag": "P0",
+          "text": "Reading unfamiliar code quickly: entry points, data flow, invariants"
+        },
+        {
+          "id": "08.04",
+          "tag": "P0",
+          "text": "Finding bugs in provided code: off-by-one, null handling, races, resource leaks, wrong boundary conditions"
+        },
+        {
+          "id": "08.05",
+          "tag": "P1",
+          "text": "Logs, metrics, traces: structured logging, correlation IDs, distributed tracing (OpenTelemetry), reading a flame graph"
+        },
+        {
+          "id": "08.06",
+          "tag": "P1",
+          "text": "Profiling CPU and memory; identifying hot paths, allocation pressure, GC pauses"
+        },
+        {
+          "id": "08.07",
+          "tag": "P1",
+          "text": "Memory issues: leaks, use-after-free, heap dumps, sanitizers (ASan, TSan)"
+        },
+        {
+          "id": "08.08",
+          "tag": "P1",
+          "text": "Debugging concurrency: nondeterministic failures, deadlock dumps, thread dumps"
+        },
+        {
+          "id": "08.09",
+          "tag": "P1",
+          "text": "Production triage: is it the deploy, the dependency, the data, or the load?"
+        },
+        {
+          "id": "08.10",
+          "tag": "P1",
+          "text": "Linux tooling: top/htop, strace, lsof, ss/netstat, tcpdump, perf, dmesg, /proc"
+        },
+        {
+          "id": "08.11",
+          "tag": "P2",
+          "text": "Core dumps and debuggers (gdb, lldb)"
+        },
+        {
+          "id": "08.12",
+          "tag": "P2",
+          "text": "Tail latency investigation: queueing, head-of-line blocking, noisy neighbors"
+        },
+        {
+          "id": "08.13",
+          "tag": "P2",
+          "text": "Reviewing a pull request live: correctness, readability, tests, failure modes"
+        },
+        {
+          "id": "08.14",
+          "tag": "P2",
+          "text": "Reviewing AI-generated code: spotting plausible-but-wrong logic, hallucinated APIs, missing edge cases"
+        }
+      ]
+    },
+    {
+      "num": 9,
+      "id": "09",
+      "slug": "09-os-networking-runtime",
+      "title": "Operating Systems, Networking, and Runtime Internals",
+      "notes": [],
+      "topics": [
+        {
+          "id": "09.01",
+          "tag": "P0",
+          "text": "Processes, threads, context switches, scheduling"
+        },
+        {
+          "id": "09.02",
+          "tag": "P0",
+          "text": "Virtual memory, paging, stack vs heap, page cache"
+        },
+        {
+          "id": "09.03",
+          "tag": "P0",
+          "text": "HTTP/1.1 vs HTTP/2 vs HTTP/3; TLS handshake; DNS resolution"
+        },
+        {
+          "id": "09.04",
+          "tag": "P0",
+          "text": "TCP vs UDP: handshake, flow control, congestion control, connection reuse"
+        },
+        {
+          "id": "09.05",
+          "tag": "P1",
+          "text": "File systems, file descriptors, blocking vs non-blocking I/O, fsync and durability"
+        },
+        {
+          "id": "09.06",
+          "tag": "P1",
+          "text": "What happens when you type a URL and press enter, at depth"
+        },
+        {
+          "id": "09.07",
+          "tag": "P1",
+          "text": "Garbage collection strategies vs manual memory vs ownership/RAII"
+        },
+        {
+          "id": "09.08",
+          "tag": "P1",
+          "text": "Containers: namespaces, cgroups, images; Kubernetes scheduling basics"
+        },
+        {
+          "id": "09.09",
+          "tag": "P2",
+          "text": "CPU caches, cache locality, branch prediction, SIMD awareness"
+        },
+        {
+          "id": "09.10",
+          "tag": "P2",
+          "text": "NUMA, zero-copy I/O, mmap, io_uring"
+        },
+        {
+          "id": "09.11",
+          "tag": "P2",
+          "text": "Proxies, service mesh, NAT, connection pooling pitfalls"
+        }
+      ]
+    },
+    {
+      "num": 10,
+      "id": "10",
+      "slug": "10-code-quality-design-testing",
+      "title": "Code Quality, Design, and Testing",
+      "notes": [],
+      "topics": [
+        {
+          "id": "10.01",
+          "tag": "P0",
+          "text": "Clean, idiomatic code in your primary language; deep knowledge of its standard library"
+        },
+        {
+          "id": "10.02",
+          "tag": "P0",
+          "text": "Object-oriented and functional design; composition over inheritance; SOLID as trade-offs, not rules"
+        },
+        {
+          "id": "10.03",
+          "tag": "P0",
+          "text": "Testing strategy: unit, integration, end-to-end, contract; what to mock and what not to"
+        },
+        {
+          "id": "10.04",
+          "tag": "P1",
+          "text": "Low-level design exercises: parking lot, elevator, in-memory file system, LRU cache, key-value store with transactions, spreadsheet engine, text editor buffer"
+        },
+        {
+          "id": "10.05",
+          "tag": "P1",
+          "text": "API and interface design: naming, error handling, extensibility, backward compatibility"
+        },
+        {
+          "id": "10.06",
+          "tag": "P1",
+          "text": "Common design patterns and when they are overkill"
+        },
+        {
+          "id": "10.07",
+          "tag": "P1",
+          "text": "Refactoring legacy code safely; characterization tests"
+        },
+        {
+          "id": "10.08",
+          "tag": "P2",
+          "text": "Property-based testing, fuzzing, load testing, chaos testing"
+        },
+        {
+          "id": "10.09",
+          "tag": "P2",
+          "text": "Dependency management, build systems, monorepo trade-offs"
+        }
+      ]
+    },
+    {
+      "num": 11,
+      "id": "11",
+      "slug": "11-reliability-operations",
+      "title": "Reliability, Observability, and Operations",
+      "notes": [],
+      "topics": [
+        {
+          "id": "11.01",
+          "tag": "P0",
+          "text": "SLIs, SLOs, error budgets"
+        },
+        {
+          "id": "11.02",
+          "tag": "P0",
+          "text": "Deployment safety: canary, blue-green, feature flags, automated rollback"
+        },
+        {
+          "id": "11.03",
+          "tag": "P1",
+          "text": "Incident response: mitigation before root cause, communication, blameless postmortems"
+        },
+        {
+          "id": "11.04",
+          "tag": "P1",
+          "text": "Capacity planning, autoscaling, load testing"
+        },
+        {
+          "id": "11.05",
+          "tag": "P1",
+          "text": "Alert design: symptom-based alerts, avoiding alert fatigue"
+        },
+        {
+          "id": "11.06",
+          "tag": "P1",
+          "text": "CI/CD pipelines and infrastructure as code"
+        },
+        {
+          "id": "11.07",
+          "tag": "P2",
+          "text": "Disaster recovery: RPO/RTO, backups, restore drills"
+        },
+        {
+          "id": "11.08",
+          "tag": "P2",
+          "text": "Dependency failure planning: degrade gracefully, static fallbacks"
+        }
+      ]
+    },
+    {
+      "num": 12,
+      "id": "12",
+      "slug": "12-security",
+      "title": "Security",
+      "notes": [],
+      "topics": [
+        {
+          "id": "12.01",
+          "tag": "P0",
+          "text": "Authentication vs authorization; sessions, JWT, OAuth 2.0, OIDC"
+        },
+        {
+          "id": "12.02",
+          "tag": "P0",
+          "text": "OWASP Top 10: injection, XSS, CSRF, SSRF, broken access control"
+        },
+        {
+          "id": "12.03",
+          "tag": "P1",
+          "text": "Encryption in transit and at rest; hashing vs encryption; password storage"
+        },
+        {
+          "id": "12.04",
+          "tag": "P1",
+          "text": "Secrets management, least privilege, key rotation"
+        },
+        {
+          "id": "12.05",
+          "tag": "P1",
+          "text": "Multi-tenant isolation and data access boundaries"
+        },
+        {
+          "id": "12.06",
+          "tag": "P2",
+          "text": "Threat modeling a design"
+        },
+        {
+          "id": "12.07",
+          "tag": "P2",
+          "text": "Supply chain security and dependency risk"
+        },
+        {
+          "id": "12.08",
+          "tag": "P2",
+          "text": "LLM-specific risks: prompt injection, data exfiltration through tools, sandbox escape"
+        }
+      ]
+    },
+    {
+      "num": 13,
+      "id": "13",
+      "slug": "13-ai-ml-systems",
+      "title": "AI and ML Systems",
+      "notes": [
+        "Required at AI labs, increasingly asked elsewhere."
+      ],
+      "topics": [
+        {
+          "id": "13.01",
+          "tag": "P1",
+          "text": "How transformers work at a systems level: tokens, context window, attention cost"
+        },
+        {
+          "id": "13.02",
+          "tag": "P1",
+          "text": "Inference serving: batching (static, dynamic, continuous), KV cache, streaming, time-to-first-token vs throughput"
+        },
+        {
+          "id": "13.03",
+          "tag": "P1",
+          "text": "Building on LLM APIs: tool use, structured output, retries, cost and latency budgets"
+        },
+        {
+          "id": "13.04",
+          "tag": "P1",
+          "text": "RAG design and its failure modes"
+        },
+        {
+          "id": "13.05",
+          "tag": "P1",
+          "text": "Evaluation: building eval sets, graders, regression detection, offline vs online metrics"
+        },
+        {
+          "id": "13.06",
+          "tag": "P1",
+          "text": "Working effectively with coding agents: task decomposition, verification, knowing when the model is wrong"
+        },
+        {
+          "id": "13.07",
+          "tag": "P2",
+          "text": "Quantization, distillation, speculative decoding"
+        },
+        {
+          "id": "13.08",
+          "tag": "P2",
+          "text": "GPU fundamentals: memory hierarchy, utilization, multi-GPU and multi-node serving"
+        },
+        {
+          "id": "13.09",
+          "tag": "P2",
+          "text": "Agent architecture: planning loops, memory, tool permissions, sandboxing"
+        },
+        {
+          "id": "13.10",
+          "tag": "P2",
+          "text": "Fine-tuning approaches (full, LoRA) and when not to fine-tune"
+        },
+        {
+          "id": "13.11",
+          "tag": "P2",
+          "text": "Training infrastructure basics: data loaders, checkpointing, distributed training"
+        }
+      ]
+    },
+    {
+      "num": 14,
+      "id": "14",
+      "slug": "14-behavioral-leadership",
+      "title": "Senior-Level Behavioral and Leadership",
+      "notes": [
+        "At senior level this carries as much weight as the technical rounds. Prep method: write 8 to 10 stories in STAR format and map each to several question types."
+      ],
+      "topics": [
+        {
+          "id": "14.01",
+          "tag": "P0",
+          "text": "Project deep dive: explain a system you built, the alternatives you rejected, what you would change"
+        },
+        {
+          "id": "14.02",
+          "tag": "P0",
+          "text": "Ownership stories: driving ambiguous work from problem to shipped result"
+        },
+        {
+          "id": "14.03",
+          "tag": "P0",
+          "text": "Conflict and disagreement: disagree-and-commit, pushing back with data"
+        },
+        {
+          "id": "14.04",
+          "tag": "P0",
+          "text": "Failure stories: a real mistake, its impact, what changed afterward"
+        },
+        {
+          "id": "14.05",
+          "tag": "P1",
+          "text": "Technical influence without authority; aligning multiple teams"
+        },
+        {
+          "id": "14.06",
+          "tag": "P1",
+          "text": "Mentoring and raising the bar for others"
+        },
+        {
+          "id": "14.07",
+          "tag": "P1",
+          "text": "Prioritization and saying no; trading scope, quality, and time"
+        },
+        {
+          "id": "14.08",
+          "tag": "P1",
+          "text": "Writing: design docs, RFCs, postmortems"
+        },
+        {
+          "id": "14.09",
+          "tag": "P1",
+          "text": "Company specifics: Netflix culture memo (freedom and responsibility, candor, context not control); Anthropic's mission, values, and views on AI safety"
+        },
+        {
+          "id": "14.10",
+          "tag": "P2",
+          "text": "Product sense: why are we building this, how would we measure it?"
+        }
+      ]
+    },
+    {
+      "num": 15,
+      "id": "15",
+      "slug": "15-interview-formats",
+      "title": "Interview Formats to Rehearse",
+      "notes": [],
+      "topics": [
+        {
+          "id": "15.01",
+          "tag": "Format",
+          "text": "Algorithmic coding (45 to 60 min, one or two problems)"
+        },
+        {
+          "id": "15.02",
+          "tag": "Format",
+          "text": "Practical coding: build a small working component with tests, often multi-part with growing requirements"
+        },
+        {
+          "id": "15.03",
+          "tag": "Format",
+          "text": "Debugging round: broken code or failing tests in an unfamiliar repo"
+        },
+        {
+          "id": "15.04",
+          "tag": "Format",
+          "text": "Code review round: critique a pull request"
+        },
+        {
+          "id": "15.05",
+          "tag": "Format",
+          "text": "System design (high-level architecture)"
+        },
+        {
+          "id": "15.06",
+          "tag": "Format",
+          "text": "Low-level / object-oriented design"
+        },
+        {
+          "id": "15.07",
+          "tag": "Format",
+          "text": "Concurrency-focused coding"
+        },
+        {
+          "id": "15.08",
+          "tag": "Format",
+          "text": "Take-home or pair-programming project"
+        },
+        {
+          "id": "15.09",
+          "tag": "Format",
+          "text": "AI-assisted coding round (where permitted): graded on direction, verification, and judgment"
+        },
+        {
+          "id": "15.10",
+          "tag": "Format",
+          "text": "Project retrospective / past work deep dive"
+        },
+        {
+          "id": "15.11",
+          "tag": "Format",
+          "text": "Behavioral and values round"
+        },
+        {
+          "id": "15.12",
+          "tag": "Format",
+          "text": "Hiring manager round"
+        }
+      ]
+    }
+  ],
+  "reference": [
+    "15"
+  ]
+}

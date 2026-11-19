@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.04">
+  <title>Two pointers, sliding windows and prefix sums</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.04 · Two pointers, sliding window, prefix sums</p>
+  <h1>Two pointers, sliding windows and prefix sums</h1>
+  <p class="lede">Three techniques that turn "check every subarray" (O(n²)) into one pass (O(n)). They all work the same way: reuse what you computed for the last position instead of starting over.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">Don't recompute overlapping work. A window slides by adding one element on the right and removing one on the left; a prefix sum answers any range sum as one subtraction.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>1. The brute force and its waste</h3>
+      <p>"Longest substring without repeating characters": check every (start, end) pair, which is O(n²) pairs and O(n) to check each, so O(n³). But the substring [2..7] and [2..8] share almost everything. The waste is recomputing the shared part.</p>
+      <h3>2. Sliding window: grow right, shrink left</h3>
+      <pre><code>left = 0
+for right, x in enumerate(items):
+    add x to the window state
+    while window is invalid:
+        remove items[left] from the window state
+        left += 1
+    record the answer for window [left, right]</code></pre>
+      <p>Both pointers only move forward, so the total work is O(n) even with the inner <code>while</code>. The window state is usually a counter, a set, or a running sum.</p>
+      <p><b>When it works:</b> validity must be <em>monotonic</em> as the window grows. If [l, r] is invalid, then [l, r+1] is also invalid (for "at most" constraints), so moving left is safe. Negative numbers in a sum break this, which is when you switch to prefix sums.</p>
+      <h3>3. Two pointers from both ends</h3>
+      <p>On sorted input, one pointer at each end: if the sum is too big, move the right pointer left; if too small, move the left pointer right. Each move rules out a whole row of pairs. That covers two-sum on sorted input, container with most water, 3-sum (fix one, two-pointer the rest), and palindromes.</p>
+      <h3>4. Prefix sums: precompute once, answer any range in O(1)</h3>
+      <pre><code>P[0] = 0, P[i+1] = P[i] + nums[i]
+sum(nums[i..j]) = P[j+1] - P[i]</code></pre>
+      <p>Combined with a hash map of "how many times have I seen prefix value p?", you can count subarrays summing to k in one pass, negatives included: at each point, ask how many earlier prefixes equal <code>current − k</code>.</p>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogies</span></summary>
+    <div class="box-body">
+      <div class="cols">
+        <div class="panel"><h4>Sliding window: a caterpillar</h4><p class="small">The head eats forward. When it's eaten something bad (a repeated letter), the tail inches forward until the bad bit is gone. It never walks backwards.</p></div>
+        <div class="panel"><h4>Two pointers: squeezing a tube of toothpaste</h4><p class="small">Fingers start at both ends and move inward. Each squeeze permanently rules out the part behind your fingers.</p></div>
+        <div class="panel"><h4>Prefix sums: a car's odometer</h4><p class="small">To get the distance between two towns, subtract the odometer readings. You never re-drive the road.</p></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: longest substring without repeats</span></summary>
+    <div class="box-body">
+      <div class="viz-controls"><input id="sw-s" type="text" value="abcabcbbxyz" maxlength="20" style="width:14em"><button class="btn" id="sw-go">Run</button></div>
+      <div id="sw-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it-2">
+    <summary><span class="kicker">See it</span><span class="label">Playground: prefix sums + hash map (subarray sum = k)</span></summary>
+    <div class="box-body">
+      <div class="viz-controls"><span class="small">nums</span><input id="ps-n" type="text" value="3, 4, -7, 1, 3, 3, 1, -4" style="width:15em"><span class="small">k</span><input id="ps-k" type="number" value="7" style="width:5em"><button class="btn" id="ps-go">Run</button></div>
+      <div id="ps-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Justify the O(n):</b> "each index enters the window once and leaves once."</li>
+        <li><b>Know when the window breaks</b> (negatives, non-monotonic validity) and switch to prefix sums with a hash map. Saying why is the senior part.</li>
+        <li><b>"Exactly k" = "at most k" − "at most (k−1)"</b>: a standard trick for counting windows with exactly k distinct values.</li>
+        <li><b>The same idea in systems:</b> sliding-window rate limiters, moving averages over metrics, TCP's sliding window for flow control, and 2D prefix sums (summed-area tables) in image processing and analytics.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Forgetting to seed the prefix-count map with <code>{0: 1}</code>, which misses subarrays starting at index 0.</li>
+        <li>Recording the answer before the window is valid again.</li>
+        <li>Jumping left to <code>last_seen[c] + 1</code> without <code>max(left, …)</code>: left must never move backwards ("abba").</li>
+        <li>Using a sliding window when the array has negative numbers.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>Fixed-size window of k: what's the template?</summary><p>Add nums[i], and once i ≥ k, remove nums[i − k]; record the answer when i ≥ k − 1. No inner while loop needed.</p></details>
+      <details class="qa"><summary>Why does sorted two-sum with two pointers never miss the answer?</summary><p>If sum &gt; target, the right element can't pair with anything at or right of the left pointer (all those are ≥ left), so discarding it loses nothing. The symmetric argument covers the left pointer.</p></details>
+      <details class="qa"><summary>How do you count subarrays with sum divisible by k?</summary><p>Prefix sums mod k: two prefixes with the same remainder bound a subarray whose sum is divisible by k. Count remainders in a map.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Exercise:</b> <code>exercises/sliding_window.py</code>: longest unique substring, minimum-length subarray, subarray sum equals k.</p>
+      <p><b>Classic problems:</b> Two Sum II · 3Sum · Container With Most Water · Minimum Window Substring · Longest Repeating Character Replacement · Product of Array Except Self.</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  function swFrames(s) {
+    const fr = [], last = {}; let left = 0, best = 0, bestL = 0;
+    for (let r = 0; r < s.length; r++) {
+      const c = s[r];
+      if (c in last && last[c] >= left) {
+        fr.push({ l: left, r, dup: last[c], best, bestL, msg: `'${c}' is already in the window at index ${last[c]}. Move left past it.` });
+        left = last[c] + 1;
+      }
+      last[c] = r;
+      if (r - left + 1 > best) { best = r - left + 1; bestL = left; }
+      fr.push({ l: left, r, best, bestL, msg: `Window [${left}, ${r}] = "${s.slice(left, r + 1)}", length ${r - left + 1}. Best so far: <b>${best}</b>.` });
+    }
+    fr.push({ l: bestL, r: bestL + best - 1, best, bestL, final: true, msg: `Done in one pass. Longest is "<b>${s.slice(bestL, bestL + best)}</b>" (length ${best}). Each pointer moved at most n times.` });
+    return fr;
+  }
+  let cur = "";
+  const sw = V.player($("sw-player"), {
+    draw(f, stage) {
+      const ptrs = { [f.l]: "left" }; ptrs[f.r] = f.r === f.l ? "left,right" : "right";
+      stage.append(V.cells([...cur], { ptrs, cls: (i) => (i === f.dup ? "bad" : i >= f.l && i <= f.r ? (f.final ? "done" : "win") : i > f.r ? "dim" : "") }));
+      const win = new Set(cur.slice(f.l, f.r + 1));
+      stage.append(V.el("div", { class: "small muted" }, "window state (a set of characters): {", [...win].join(", "), "}"));
+    },
+  });
+  const swRun = () => { cur = $("sw-s").value || "a"; sw.load(swFrames(cur)); };
+  $("sw-go").onclick = swRun; swRun();
+
+  let nums = [];
+  function psFrames(k) {
+    const fr = [], seen = new Map([[0, 1]]); let p = 0, count = 0; const P = [0], found = [];
+    fr.push({ i: -1, P: [...P], seen: new Map(seen), count, found: [], msg: `Seed the map with prefix 0 seen once (the empty prefix). Looking for sum = <b>${k}</b>.` });
+    nums.forEach((x, i) => {
+      p += x; P.push(p);
+      const need = p - k, hits = seen.get(need) || 0;
+      if (hits) { count += hits; P.forEach((v, j) => { if (j < P.length - 1 && v === need) found.push([j, i]); }); }
+      fr.push({ i, P: [...P], seen: new Map(seen), count, need, found: [...found], msg: `prefix = ${p}. Need an earlier prefix of ${p} − ${k} = <b>${need}</b>: seen ${hits} time${hits === 1 ? "" : "s"}. Count = <b>${count}</b>.` });
+      seen.set(p, (seen.get(p) || 0) + 1);
+    });
+    fr.push({ i: nums.length, P: [...P], seen: new Map(seen), count, found, msg: `Total subarrays summing to ${k}: <b>${count}</b>: ${found.map(([a, b]) => `[${a}..${b}]`).join(", ") || "none"}. One pass, negatives and all.` });
+    return fr;
+  }
+  const ps = V.player($("ps-player"), {
+    draw(f, stage) {
+      const last = f.found[f.found.length - 1];
+      stage.append(V.el("div", { class: "small muted" }, "nums"), V.cells(nums, { ptrs: f.i >= 0 && f.i < nums.length ? { [f.i]: "i" } : {}, cls: (j) => (j === f.i ? "hl" : last && j >= last[0] && j <= last[1] && f.i === last[1] ? "win" : "") }));
+      stage.append(V.el("div", { class: "small muted" }, "prefix sums P (P[j] = sum of nums before j)"), V.cells(f.P, { cls: (j, v) => (v === f.need && j < f.P.length - 1 ? "done" : "") }));
+      stage.append(V.el("div", { class: "small muted" }, "map {prefix: times seen}: ", [...f.seen].map(([a, b]) => `${a}:${b}`).join("  ")));
+    },
+  });
+  const psRun = () => { nums = $("ps-n").value.split(/[ ,]+/).filter(Boolean).map(Number).filter((x) => !isNaN(x)).slice(0, 14); ps.load(psFrames(Number($("ps-k").value))); };
+  $("ps-go").onclick = psRun; psRun();
+})();
+</script>
+</body>
+</html>

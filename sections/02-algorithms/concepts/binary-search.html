@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.03">
+  <title>Binary search and "search on the answer"</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.03 · Binary search, including &quot;search on the answer&quot; variants</p>
+  <h1>Binary search and "search on the answer"</h1>
+  <p class="lede">Binary search isn't really about sorted arrays. It works on any yes/no question whose answer flips exactly once. Find that flip and you can throw away half the possibilities with every guess.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">If a predicate goes false, false, …, false, true, true, …, true over a range, you can find the first true in O(log n) probes. A sorted array is just one place where such a predicate exists.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>1. The real shape: a monotonic predicate</h3>
+      <p>Take <code>ok(i) = nums[i] >= target</code> on a sorted array. As i grows it's F F F T T T. It never flips back. Every binary search question is "where's the first T?" (or the last F).</p>
+      <h3>2. One template, half-open interval</h3>
+      <pre><code>lo, hi = 0, len(nums)          # answer is in [lo, hi]; hi = "none are true"
+while lo &lt; hi:
+    mid = (lo + hi) // 2
+    if ok(mid):  hi = mid        # mid might be the answer; keep it
+    else:        lo = mid + 1    # mid is definitely not; drop it
+return lo                         # first index where ok is true</code></pre>
+      <p>The invariant, which you should say out loud: <b>everything left of lo is false, everything from hi on is true</b>. Each step shrinks [lo, hi) and keeps the invariant, so when lo == hi you've found the boundary. No <code>+1/-1</code> guessing, no infinite loops.</p>
+      <h3>3. Search on the answer</h3>
+      <p>Often you're not searching an array at all. You're searching the space of possible <em>answers</em>: "what's the minimum ship capacity to deliver in D days?" Capacity c either works or doesn't, and if c works, c+1 works too. That's monotonic, so you can binary search c over [max(weight), sum(weights)] with a greedy O(n) check at each probe. Total: O(n log(sum)).</p>
+      <p>Smell test for this pattern: <b>"minimum X such that…" or "maximum X such that…"</b>, plus a check that's easy once X is fixed. Examples: Koko eating bananas, split array largest sum, minimum days to make bouquets, the smallest divisor under a threshold.</p>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogy: finding the bad commit</span></summary>
+    <div class="box-body">
+      <p><code>git bisect</code> is binary search on a predicate: "is the bug present at this commit?" Old commits are good, new ones bad, and somewhere it flips. You never need the commits to be "sorted" by anything except time, and you only need the predicate to flip once.</p>
+      <p class="muted small">Physical picture: a dimmer switch with an unmarked dial. You want the lowest setting where the room is bright enough. Try the middle, then the middle of the half that's left. Ten tries cover a thousand positions.</p>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: lower_bound, step by step</span></summary>
+    <div class="box-body">
+      <div class="viz-controls"><span class="small">target</span><input id="bs-t" type="number" value="23" style="width:6em"><button class="btn" id="bs-go">Search</button><button class="btn" id="bs-new">New array</button></div>
+      <div id="bs-player" style="margin-top:12px"></div>
+      <div class="legend"><span><i style="background:var(--bad)"></i>known false (&lt; target)</span><span><i style="background:var(--ok)"></i>known true (≥ target)</span><span><i style="background:var(--accent)"></i>mid</span></div>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it-2">
+    <summary><span class="kicker">See it</span><span class="label">Playground: search on the answer (ship capacity)</span></summary>
+    <div class="box-body">
+      <p class="small muted">Weights <code>[1..10]</code>, ship within <b>D</b> days. Each probe picks a capacity, packs greedily, and counts days. The strip shows the predicate "capacity works" over all candidate capacities.</p>
+      <div class="viz-controls"><span class="small">days D</span><input id="sc-d" type="range" min="1" max="10" value="5"><b id="sc-dv"></b></div>
+      <div id="sc-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Name the predicate and prove it's monotonic</b> before writing code. That one sentence is the whole correctness argument.</li>
+        <li><b>Use one template everywhere</b> and state the invariant. Interviewers watch for <code>lo &lt;= hi</code> vs <code>lo &lt; hi</code> confusion. Having a single template you can defend reads as senior.</li>
+        <li><b>Overflow:</b> in Java or C++, <code>(lo + hi) / 2</code> can overflow; write <code>lo + (hi - lo) / 2</code>. Python ints don't overflow, but mention it anyway.</li>
+        <li><b>Beyond arrays:</b> bisecting a deploy range, searching a timestamp-sorted log file by seeking to byte offsets, finding a capacity limit with load tests. All the same idea.</li>
+        <li><b>Know the library:</b> <code>bisect.bisect_left</code> / <code>bisect_right</code>, and since Python 3.10 they take a <code>key=</code>.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Infinite loop: <code>lo = mid</code> with <code>mid = (lo + hi) // 2</code> can stall when hi = lo + 1.</li>
+        <li>Wrong search bounds for search-on-answer: the low bound must be feasible-or-below (max weight), the high bound definitely feasible (sum).</li>
+        <li>Using it on a predicate that isn't monotonic, like a "peak" in an unsorted array without the extra argument for why it works.</li>
+        <li>Returning <code>lo</code> without checking it's in range and actually matches (for an exact-match search).</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>How do you get the last index where nums[i] ≤ target from the template?</summary><p>Search the first index where nums[i] &gt; target (bisect_right) and subtract 1.</p></details>
+      <details class="qa"><summary>How does search in a rotated sorted array still work?</summary><p>At any mid, one half is sorted (compare nums[lo] with nums[mid]). Check whether the target lies inside that sorted half's range; if so go there, otherwise go to the other half.</p></details>
+      <details class="qa"><summary>How many probes for a range of 10⁹?</summary><p>About 30, since log₂(10⁹) ≈ 30. That's why "n up to 10⁹" in a problem statement is a hint.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Exercise:</b> <code>exercises/binary_search.py</code>: lower_bound and minimum ship capacity. Tests compare against <code>bisect</code> on random inputs.</p>
+      <p><b>Classic problems:</b> Search Insert Position · First Bad Version · Search in Rotated Sorted Array · Koko Eating Bananas · Split Array Largest Sum · Median of Two Sorted Arrays (hard).</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let arr = [];
+  const newArr = () => { const s = new Set(); while (s.size < 14) s.add(1 + Math.floor(Math.random() * 60)); arr = [...s].sort((a, b) => a - b); };
+  function frames(t) {
+    const fr = []; let lo = 0, hi = arr.length, probes = 0;
+    fr.push({ lo, hi, msg: `Find the first index with value ≥ <b>${t}</b>. Window is [lo, hi) = [${lo}, ${hi}).` });
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1; probes++;
+      const ok = arr[mid] >= t;
+      fr.push({ lo, hi, mid, msg: `mid = ${mid}, value ${arr[mid]} ${ok ? "≥" : "&lt;"} ${t}: ok(mid) is <b>${ok}</b>. ${ok ? "mid might be the answer, so hi = mid." : "Everything up to mid is false, so lo = mid + 1."}` });
+      if (ok) hi = mid; else lo = mid + 1;
+    }
+    fr.push({ lo, hi, ans: lo, msg: `lo == hi == <b>${lo}</b> after ${probes} probes (log₂ ${arr.length} ≈ ${Math.log2(arr.length).toFixed(1)}). ${lo < arr.length ? `First value ≥ ${t} is ${arr[lo]}.` : "No value is ≥ target; the insertion point is the end."}` });
+    return fr;
+  }
+  const bs = V.player($("bs-player"), {
+    draw(f, stage) {
+      const ptrs = {}; ptrs[f.lo] = "lo"; if (f.hi < arr.length) ptrs[f.hi] = (ptrs[f.hi] ? ptrs[f.hi] + "," : "") + "hi"; if (f.mid != null) ptrs[f.mid] = (ptrs[f.mid] ? ptrs[f.mid] + "," : "") + "mid";
+      stage.append(V.cells(arr, { ptrs, cls: (i) => (i === f.mid ? "hl" : f.ans === i ? "done" : i < f.lo ? "bad" : i >= f.hi ? "win" : "") }));
+      if (f.hi === arr.length) stage.append(V.el("div", { class: "small muted" }, "hi = len(nums) = ", arr.length, " (one past the end)"));
+    },
+  });
+  const run = () => bs.load(frames(Number($("bs-t").value)));
+  $("bs-go").onclick = run; $("bs-t").addEventListener("keydown", (e) => e.key === "Enter" && run());
+  $("bs-new").onclick = () => { newArr(); run(); };
+  newArr(); run();
+
+  const W = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const days = (c) => { let d = 1, cur = 0; for (const w of W) { if (cur + w > c) { d++; cur = 0; } cur += w; } return d; };
+  function scFrames(D) {
+    const fr = []; let lo = Math.max(...W), hi = W.reduce((a, b) => a + b, 0);
+    const L0 = lo, H0 = hi;
+    fr.push({ lo, hi, L0, H0, D, msg: `Answer lies in [max weight, total] = [${lo}, ${hi}]. Any capacity ≥ the answer also works: monotonic.` });
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1, d = days(mid), ok = d <= D;
+      fr.push({ lo, hi, mid, L0, H0, D, msg: `Try capacity <b>${mid}</b>: greedy packing needs ${d} day${d > 1 ? "s" : ""} → ${ok ? "works, try smaller (hi = mid)" : "too slow, need bigger (lo = mid + 1)"}.` });
+      if (ok) hi = mid; else lo = mid + 1;
+    }
+    fr.push({ lo, hi, ans: lo, L0, H0, D, msg: `Minimum capacity: <b>${lo}</b>. We checked ${fr.length - 1} capacities out of ${H0 - L0 + 1}.` });
+    return fr;
+  }
+  const sc = V.player($("sc-player"), {
+    draw(f, stage) {
+      const caps = []; for (let c = f.L0; c <= f.H0; c++) caps.push(c);
+      stage.append(V.el("div", { style: "overflow-x:auto" }, V.cells(caps, {
+        idx: false, label: (c) => c,
+        ptrs: f.mid != null ? { [f.mid - f.L0]: "probe" } : {},
+        cls: (i, c) => (c === f.mid ? "hl" : c === f.ans ? "done" : c < f.lo ? "bad" : c >= f.hi ? "win" : "dim"),
+      })));
+      stage.append(V.el("div", { class: "small muted" }, "capacity candidates. Red: proven too small. Green: proven to work. Faded: unknown."));
+    },
+  });
+  const scRun = () => { $("sc-dv").textContent = $("sc-d").value; sc.load(scFrames(Number($("sc-d").value))); };
+  $("sc-d").oninput = scRun; scRun();
+})();
+</script>
+</body>
+</html>

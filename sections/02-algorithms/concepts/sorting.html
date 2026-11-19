@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.02">
+  <title>Sorting and its trade-offs</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.02 · Sorting and its trade-offs (quicksort, mergesort, heapsort, counting/radix); stability</p>
+  <h1>Sorting and its trade-offs</h1>
+  <p class="lede">You'll almost never hand-write a sort at work. You will constantly pick between sorting strategies, reason about stability, and use the ideas inside sorts (partitioning, merging, counting) to solve other problems.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">Comparison sorts can't beat O(n log n) in the worst case. Merge sort and heapsort guarantee it, quicksort usually beats both in practice, and counting/radix sort dodge the limit by not comparing at all.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>Why n log n is the floor for comparison sorts</h3>
+      <p>n items can be arranged in n! orders. Each comparison is a yes/no question, so it at best halves the possible orders. You need log₂(n!) ≈ n log n questions to narrow down to one. No clever trick gets around this. Only using more than comparisons does.</p>
+      <div class="cols">
+        <div class="panel"><h4>Insertion sort: O(n²), but O(n) on nearly sorted data</h4><p class="small">Like sorting a hand of cards: take the next card and slide it left into place. Tiny overhead and stable. It's the inner engine of Timsort for short runs.</p></div>
+        <div class="panel"><h4>Merge sort: O(n log n) always, stable, O(n) extra space</h4><p class="small">Split in half, sort each half, merge two sorted lists in one pass. Predictable. It's the basis of external sorting (data bigger than RAM) and of Python's Timsort.</p></div>
+        <div class="panel"><h4>Quicksort: O(n log n) average, O(n²) worst, in place</h4><p class="small">Pick a pivot and partition into smaller and larger, then recurse. Cache-friendly and usually the fastest. Random pivots make the worst case vanishingly unlikely, and introsort switches to heapsort if recursion goes too deep.</p></div>
+        <div class="panel"><h4>Heapsort: O(n log n) always, in place, not stable</h4><p class="small">Heapify, then pop max repeatedly. Great guarantees, but it jumps around memory, so it's slower in practice. Mostly used as a fallback.</p></div>
+        <div class="panel"><h4>Counting / radix: O(n + k), no comparisons</h4><p class="small">If keys are small integers (ages, bytes, digits), count occurrences and lay them out. Radix sort repeats a stable counting sort digit by digit. That beats n log n for the right data.</p></div>
+      </div>
+      <h3>Stability, and why you should care</h3>
+      <p>A stable sort keeps equal elements in their original order. That lets you sort by multiple keys in passes: sort by name, then <em>stably</em> by department, and each department stays alphabetized. Python's <code>sorted</code> is stable (Timsort). C++'s <code>std::sort</code> is not; use <code>std::stable_sort</code>.</p>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Physical pictures</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Merge sort</b> is two sorted stacks of exam papers face up: always take the smaller top paper. Merging is easy; the recursion is just a way to get sorted stacks.</li>
+        <li><b>Quicksort</b> is a bouncer with a height cutoff: everyone shorter goes left, everyone taller goes right. Then each side gets its own bouncer. A bad cutoff (the shortest person) means one side gets everybody.</li>
+        <li><b>Counting sort</b> is mail sorting into pigeonholes by zip code: you never compare two letters with each other.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: watch them sort</span></summary>
+    <div class="box-body">
+      <div class="viz-controls">
+        <select id="so-algo"><option value="insertion">Insertion sort</option><option value="merge">Merge sort</option><option value="quick" selected>Quicksort (Lomuto, last pivot)</option><option value="heap">Heapsort</option></select>
+        <select id="so-data"><option value="random">Random</option><option value="nearly">Nearly sorted</option><option value="sorted">Already sorted</option><option value="reversed">Reversed</option><option value="few">Few unique values</option></select>
+        <button class="btn" id="so-go">New run</button>
+      </div>
+      <div id="so-player" style="margin-top:12px"></div>
+      <div class="legend"><span><i style="background:var(--warn)"></i>comparing</span><span><i style="background:var(--accent)"></i>writing / swapping</span><span><i style="background:var(--accent-2)"></i>pivot</span><span><i style="background:var(--ok)"></i>final position</span></div>
+      <p class="small muted" style="margin-top:8px">Try quicksort on "Already sorted": with the last element as pivot, every partition is maximally lopsided and comparisons explode to n²/2. Then try insertion sort on "Nearly sorted".</p>
+    </div>
+  </details>
+
+  <details class="box" open id="costs">
+    <summary><span class="kicker">Costs</span><span class="label">Cheat sheet</span></summary>
+    <div class="box-body">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Algorithm</th><th>Best</th><th>Average</th><th>Worst</th><th>Extra space</th><th>Stable</th></tr></thead>
+        <tbody>
+          <tr><td>Insertion</td><td>O(n)</td><td>O(n²)</td><td>O(n²)</td><td>O(1)</td><td>yes</td></tr>
+          <tr><td>Merge</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n)</td><td>yes</td></tr>
+          <tr><td>Quick</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n²)</td><td>O(log n) stack</td><td>no</td></tr>
+          <tr><td>Heap</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(1)</td><td>no</td></tr>
+          <tr><td>Counting</td><td colspan="3">O(n + k), k = key range</td><td>O(k)</td><td>yes</td></tr>
+          <tr><td>Timsort (Python)</td><td>O(n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n)</td><td>yes</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>"Should I sort first?"</b> Sorting is often the O(n log n) step that turns an O(n²) problem into a two-pointer or greedy O(n) pass: intervals, two-sum on sorted input, meeting rooms, deduplication.</li>
+        <li><b>Quickselect</b>: partition, but recurse into only one side. That finds the k-th smallest in O(n) average. Compare it with a heap's O(n log k) and with full sorting.</li>
+        <li><b>Data bigger than memory:</b> external merge sort. Sort chunks that fit in RAM, write them out, then k-way merge with a heap. This is a classic follow-up, and it's how databases sort and how LSM compaction works.</li>
+        <li><b>Real libraries are hybrids:</b> Timsort finds existing runs (great on real-world, partly sorted data); introsort is quicksort + heapsort + insertion sort. Knowing <em>why</em> they are hybrids is the senior bit.</li>
+        <li><b>Custom comparators:</b> in Python, prefer <code>key=</code> over <code>cmp_to_key</code>. The key is computed once per element, not once per comparison.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Quicksort with a fixed first or last pivot on sorted input: O(n²), and possibly a recursion overflow.</li>
+        <li>Merge step using <code>&lt;</code> instead of <code>&lt;=</code> when taking from the left half breaks stability.</li>
+        <li>Sorting inside a loop: that's O(n² log n) hiding in one line.</li>
+        <li><code>list.sort()</code> returns <code>None</code>. <code>sorted()</code> returns a new list.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>You need to sort 1 billion 32-bit integers on one machine with 4 GB of RAM. Approach?</summary><p>Four bytes × 10⁹ = 4 GB, which doesn't fit with overhead. Use external merge sort: sort chunks of a few hundred MB, write the sorted runs to disk, then k-way merge them with a heap. Alternatively, with a bounded key range, counting in buckets (radix-style) also works.</p></details>
+      <details class="qa"><summary>Why is quicksort usually faster than heapsort even though both are O(n log n)?</summary><p>Quicksort scans memory sequentially during partitioning, which is cache-friendly with a tight inner loop. Heapsort jumps between i and 2i+1, causing cache misses at large n.</p></details>
+      <details class="qa"><summary>When would you choose merge sort over quicksort?</summary><p>When you need stability, a guaranteed worst case, or you're sorting linked lists or external data (merging is sequential access, no random access needed).</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p>Implement merge sort and quicksort (with a random pivot) from memory, and test both against <code>sorted()</code> on random lists, including duplicates and empty lists. Use <code>python tools/new.py exercise 02.02 sorts "Sorts from scratch"</code> to scaffold it.</p>
+      <p><b>Classic problems:</b> Sort Colors (Dutch national flag) · Kth Largest Element (quickselect) · Merge Intervals · Largest Number (custom comparator) · Sort List (merge sort on a linked list).</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const N = 28;
+  function data(kind) {
+    let a = Array.from({ length: N }, (_, i) => i + 1);
+    if (kind === "random" || kind === "nearly") a.sort(() => Math.random() - 0.5);
+    if (kind === "nearly") { a.sort((x, y) => x - y); for (let k = 0; k < 3; k++) { const i = Math.floor(Math.random() * (N - 1)); [a[i], a[i + 1]] = [a[i + 1], a[i]]; } }
+    if (kind === "reversed") a.reverse();
+    if (kind === "few") a = Array.from({ length: N }, () => 1 + Math.floor(Math.random() * 4) * 7);
+    return a;
+  }
+  function run(algo, a) {
+    const fr = [], done = new Set(); let cmp = 0, wr = 0;
+    const snap = (o) => fr.push({ a: [...a], done: new Set(done), cmp, wr, ...o });
+    const less = (i, j) => { cmp++; snap({ c: [i, j] }); return a[i] < a[j]; };
+    const swap = (i, j) => { [a[i], a[j]] = [a[j], a[i]]; wr += 2; snap({ w: [i, j] }); };
+    snap({ msg: "Start." });
+    if (algo === "insertion") {
+      for (let i = 1; i < a.length; i++) for (let j = i; j > 0 && less(j, j - 1); j--) swap(j, j - 1);
+    } else if (algo === "merge") {
+      (function ms(lo, hi) {
+        if (hi - lo < 1) return;
+        const mid = (lo + hi) >> 1; ms(lo, mid); ms(mid + 1, hi);
+        const left = a.slice(lo, mid + 1), right = a.slice(mid + 1, hi + 1);
+        let i = 0, j = 0, k = lo;
+        while (i < left.length && j < right.length) { cmp++; a[k] = left[i] <= right[j] ? left[i++] : right[j++]; wr++; snap({ w: [k], range: [lo, hi] }); k++; }
+        while (i < left.length) { a[k] = left[i++]; wr++; snap({ w: [k], range: [lo, hi] }); k++; }
+        while (j < right.length) { a[k] = right[j++]; wr++; snap({ w: [k], range: [lo, hi] }); k++; }
+      })(0, a.length - 1);
+    } else if (algo === "quick") {
+      (function qs(lo, hi) {
+        if (lo > hi) return; if (lo === hi) { done.add(lo); return; }
+        const p = hi; let i = lo;
+        for (let j = lo; j < hi; j++) { cmp++; snap({ c: [j], pivot: p, range: [lo, hi] }); if (a[j] < a[p]) { if (i !== j) swap(i, j); i++; } }
+        if (i !== hi) swap(i, hi); done.add(i); snap({ pivot: i, range: [lo, hi] });
+        qs(lo, i - 1); qs(i + 1, hi);
+      })(0, a.length - 1);
+    } else if (algo === "heap") {
+      const n = a.length;
+      const sift = (i, end) => { while (true) { let l = 2 * i + 1, r = l + 1, m = i; if (l < end && less(m, l)) m = l; if (r < end && less(m, r)) m = r; if (m === i) return; swap(i, m); i = m; } };
+      for (let i = (n >> 1) - 1; i >= 0; i--) sift(i, n);
+      for (let end = n - 1; end > 0; end--) { swap(0, end); done.add(end); sift(0, end); }
+    }
+    for (let i = 0; i < a.length; i++) done.add(i);
+    snap({ msg: "" });
+    const last = fr[fr.length - 1];
+    last.msg = `Sorted. <b>${cmp}</b> comparisons and <b>${wr}</b> writes for n = ${a.length} (n log₂ n ≈ ${Math.round(a.length * Math.log2(a.length))}, n²/2 = ${a.length * a.length / 2}).`;
+    // Thin out frames so playback stays watchable.
+    const step = Math.max(1, Math.floor(fr.length / 260));
+    return fr.filter((_, i) => i % step === 0 || i === fr.length - 1);
+  }
+  const player = V.player($("so-player"), {
+    speed: 120,
+    draw(f, stage) {
+      const max = Math.max(...f.a);
+      stage.append(V.el("div", { class: "bars" }, f.a.map((v, i) => V.el("div", {
+        class: f.done.has(i) && !(f.c || []).includes(i) ? "done" : f.pivot === i ? "pivot" : (f.w || []).includes(i) ? "hl" : (f.c || []).includes(i) ? "cmp" : "",
+        style: `height:${(v / max) * 100}%;${f.range && (i < f.range[0] || i > f.range[1]) ? "opacity:.35" : ""}`,
+      }))));
+      if (!f.msg) f.msg = `comparisons: <b>${f.cmp}</b> · writes: <b>${f.wr}</b>`;
+    },
+  });
+  const go = () => player.load(run($("so-algo").value, data($("so-data").value)));
+  $("so-go").onclick = go; $("so-algo").onchange = go; $("so-data").onchange = go;
+  go();
+})();
+</script>
+</body>
+</html>

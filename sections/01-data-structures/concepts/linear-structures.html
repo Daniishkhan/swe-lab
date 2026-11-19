@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="01.02">
+  <title>Linked lists, stacks, queues and monotonic stacks</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;01.02 · Linked lists, stacks, queues, deques, monotonic stack/queue</p>
+  <h1>Linked lists, stacks, queues and monotonic stacks</h1>
+  <p class="lede">These are all arrays or chains of nodes with one rule about which end you may touch. The rule is the whole point. It's what turns a pile of data into an algorithm.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">A stack touches only the newest item, a queue only the oldest, a deque both ends. A monotonic stack adds one more rule: keep the items sorted by throwing out anything the newcomer makes irrelevant.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>Linked list: trade random access for cheap splicing</h3>
+      <p>An array needs one contiguous block, so inserting in the middle shifts everything. A linked list gives that up: each node holds a value and a pointer to the next node, and nodes can live anywhere in memory.</p>
+      <pre><code>head → [3 | •] → [7 | •] → [1 | ∅]</code></pre>
+      <ul>
+        <li><b>Splice is O(1)</b> if you already hold the node: rewire two pointers.</li>
+        <li><b>Finding is O(n)</b>: no address arithmetic, you have to walk.</li>
+        <li><b>Doubly linked</b> (prev and next pointers) lets you delete a node given only the node itself. That's exactly what an LRU cache needs.</li>
+        <li><b>Sentinel nodes</b>: a dummy head and tail that are never removed. Every real node then has neighbors on both sides, and the "empty list" and "first node" special cases disappear.</li>
+      </ul>
+      <h3>Stack (LIFO): only the top</h3>
+      <p>Push and pop at one end. In Python, a <code>list</code> with <code>append</code>/<code>pop()</code> is a perfect stack, O(1) amortized. Stacks show up whenever the most recent unfinished thing must be finished first: function calls, undo, matching brackets, DFS.</p>
+      <h3>Queue (FIFO): in at the back, out at the front</h3>
+      <p>Fairness and order of arrival: BFS, task queues, request buffers. In Python use <code>collections.deque</code>. <code>list.pop(0)</code> shifts every element, so it's O(n) per dequeue.</p>
+      <h3>Deque: both ends</h3>
+      <p>Usually a ring buffer (an array with wrapping head and tail indexes) or a list of fixed-size blocks, which is what CPython uses. O(1) at both ends, and it's the engine of the monotonic queue.</p>
+      <h3>Monotonic stack: a stack with a sorting rule</h3>
+      <p>Before pushing a new element, pop everything it "beats". The stack stays sorted, and every pop is a moment of discovery: <em>the element being popped just met its next greater element</em>. Each element is pushed once and popped at most once, so the whole pass is O(n), even though there's a loop inside a loop.</p>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogies</span></summary>
+    <div class="box-body">
+      <div class="cols">
+        <div class="panel"><h4>Stack: a pile of plates</h4><p class="small">You take from the top. The plate at the bottom waits until everything above it is gone.</p></div>
+        <div class="panel"><h4>Queue: a coffee line</h4><p class="small">First in, first served. Cutting the line (priority) needs a different structure: a heap.</p></div>
+        <div class="panel"><h4>Linked list: a scavenger hunt</h4><p class="small">Each clue tells you where the next one is. Adding a stop is easy; jumping straight to stop 50 is impossible.</p></div>
+        <div class="panel"><h4>Monotonic stack: waiting for someone taller</h4><p class="small">People arrive one by one, and each is waiting for someone taller to show up. When a tall person arrives, everyone shorter at the back of the crowd has their answer and leaves. Whoever stays is still waiting, and they're always in decreasing height order.</p></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: next greater element with a monotonic stack</span></summary>
+    <div class="box-body">
+      <p class="small muted">The stack holds <em>indexes</em> of elements still waiting for an answer, and their values decrease from bottom to top. Watch how each new value pops everything smaller than itself.</p>
+      <div class="viz-controls">
+        <input id="ms-input" type="text" value="2, 1, 2, 4, 3, 1, 5" style="width:16em">
+        <button class="btn" id="ms-load">Load</button>
+        <button class="btn" id="ms-rand">Random</button>
+      </div>
+      <div id="ms-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it-2">
+    <summary><span class="kicker">See it</span><span class="label">Playground: same input, different rules</span></summary>
+    <div class="box-body">
+      <p class="small muted">Add items, then remove them. The stack and the queue receive the same items in the same order. The only difference is which end they remove from.</p>
+      <div class="viz-controls"><button class="btn primary" id="sq-add">Add next item</button><button class="btn" id="sq-rm">Remove one</button><button class="btn" id="sq-reset">Reset</button></div>
+      <div class="cols" style="margin-top:12px">
+        <div class="panel"><h4>Stack (LIFO): removes newest</h4><div id="sq-stack"></div></div>
+        <div class="panel"><h4>Queue (FIFO): removes oldest</h4><div id="sq-queue"></div></div>
+      </div>
+      <div class="viz-caption" id="sq-msg"></div>
+    </div>
+  </details>
+
+  <details class="box" open id="costs">
+    <summary><span class="kicker">Costs</span><span class="label">Complexity at a glance</span></summary>
+    <div class="box-body">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Structure</th><th>Access i-th</th><th>Push/pop end</th><th>Push/pop front</th><th>Insert middle</th><th>Python</th></tr></thead>
+        <tbody>
+          <tr><td>Dynamic array</td><td>O(1)</td><td>O(1)*</td><td>O(n)</td><td>O(n)</td><td><code>list</code></td></tr>
+          <tr><td>Singly linked list</td><td>O(n)</td><td>O(1) with tail ptr (push only)</td><td>O(1)</td><td>O(1) given the node</td><td>write your own</td></tr>
+          <tr><td>Doubly linked list</td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>O(1) given the node</td><td>write your own</td></tr>
+          <tr><td>Deque (ring/blocks)</td><td>O(1) ends, O(n) middle</td><td>O(1)</td><td>O(1)</td><td>O(n)</td><td><code>collections.deque</code></td></tr>
+        </tbody>
+      </table></div>
+      <p class="small muted">* amortized. The monotonic stack/queue patterns are O(n) total because each element enters and leaves once.</p>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Linked lists usually lose in practice.</b> Big-O says O(1) insert, but finding the insertion point is O(n) pointer-chasing with cache misses at every hop. Arrays win most real benchmarks. Use a linked list when you already hold a handle to the node and need O(1) removal: LRU caches, the Linux kernel's <code>list_head</code>, free lists in allocators.</li>
+        <li><b>Bounded vs unbounded queues.</b> An unbounded queue between a fast producer and a slow consumer is a memory leak with a delay. Senior answer: bound it, and decide what happens when it's full (block, drop, or reject). That's backpressure, which you'll meet again in chapter 3.</li>
+        <li><b>Recognize the monotonic stack pattern from its smell:</b> "for each element, find the nearest element to the left or right that is bigger or smaller." Daily temperatures, stock span, largest rectangle in a histogram, trapping rain water.</li>
+        <li><b>Recursion is a stack.</b> Deep recursion in Python hits the ~1000-frame limit. Converting DFS to an explicit stack is a common follow-up.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><code>list.pop(0)</code> or <code>list.insert(0, x)</code> in a loop: O(n) each. Use <code>deque</code>.</li>
+        <li>Reversing a linked list and losing the rest of it: save <code>next</code> before you rewire.</li>
+        <li>Forgetting to update <code>tail</code> (or <code>head</code>) when removing the last node.</li>
+        <li>Strict vs non-strict comparison in monotonic stacks. With duplicates, <code>&lt;</code> and <code>&lt;=</code> give different answers. Decide which one the problem wants.</li>
+        <li>Storing values on the monotonic stack when you need distances. Store indexes; you can always look up the value.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>Why is the monotonic stack O(n) when it has a while loop inside a for loop?</summary><p>Count the work per element instead of per iteration. Each index is pushed exactly once and popped at most once, so all the inner loop runs across the whole pass add up to at most n pops.</p></details>
+      <details class="qa"><summary>How do you build a queue from two stacks, and what does it cost?</summary><p>Push onto an "in" stack. To dequeue, if the "out" stack is empty, pour everything from "in" into "out" (which reverses the order), then pop from "out". Each element moves at most twice, so it's O(1) amortized.</p></details>
+      <details class="qa"><summary>How do you detect a cycle in a linked list with O(1) extra memory?</summary><p>Floyd's tortoise and hare: one pointer moves 1 step, the other 2. If there's a cycle, the fast one laps the slow one and they meet. If fast reaches the end, there's no cycle.</p></details>
+      <details class="qa"><summary>For sliding window maximum, why a deque and not a stack?</summary><p>You need to drop elements from both ends: from the back when a bigger newcomer arrives (the monotonic rule), and from the front when the oldest index slides out of the window.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Exercises:</b> <code>exercises/monotonic.py</code> (next greater, sliding window max) and <code>exercises/lru_cache.py</code> (doubly linked list with sentinels).</p>
+      <p><b>Classic problems:</b> Valid Parentheses · Min Stack · Reverse Linked List · Linked List Cycle · Daily Temperatures · Largest Rectangle in Histogram · Implement Queue using Stacks.</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  function frames(nums) {
+    const out = [], res = nums.map(() => null), st = [];
+    const snap = (i, msg, popped = -1) => out.push({ i, st: [...st], res: [...res], msg, popped });
+    snap(-1, "Start: empty stack, every answer unknown.");
+    nums.forEach((x, i) => {
+      snap(i, `Look at <b>nums[${i}] = ${x}</b>.`);
+      while (st.length && nums[st[st.length - 1]] < x) {
+        const j = st.pop(); res[j] = x;
+        snap(i, `${x} &gt; nums[${j}] = ${nums[j]}, so pop index ${j}: its next greater element is <b>${x}</b>.`, j);
+      }
+      st.push(i);
+      snap(i, `Push index ${i}. Stack values (bottom→top) stay decreasing: [${st.map((k) => nums[k]).join(", ")}].`);
+    });
+    snap(nums.length, `Done. Indexes left on the stack [${st.join(", ")}] never met anything bigger, so their answer is -1. Every index was pushed once and popped at most once: O(n).`);
+    out[out.length - 1].res = res.map((r) => (r === null ? -1 : r));
+    return out;
+  }
+  const player = V.player($("ms-player"), {
+    draw(f, stage) {
+      const nums = current;
+      stage.append(V.el("div", { class: "small muted" }, "nums"),
+        V.cells(nums, { cls: (k) => (k === f.i ? "hl" : k === f.popped ? "done" : f.st.includes(k) ? "warn" : ""), ptrs: f.i >= 0 && f.i < nums.length ? { [f.i]: "i" } : {} }),
+        V.el("div", { class: "small muted" }, "stack (indexes, bottom → top)"),
+        f.st.length ? V.cells(f.st, { idx: false, label: (k) => `${k}:${nums[k]}`, cls: () => "warn" }) : V.el("div", { class: "cells" }, V.el("div", { class: "cell empty" }, "empty")),
+        V.el("div", { class: "small muted" }, "answer"),
+        V.cells(f.res, { cls: (k, v) => (k === f.popped ? "done" : "") }));
+    },
+  });
+  let current = [];
+  const load = (arr) => { current = arr; player.load(frames(arr)); };
+  $("ms-load").onclick = () => load($("ms-input").value.split(/[ ,]+/).filter(Boolean).map(Number).filter((x) => !isNaN(x)).slice(0, 12));
+  $("ms-rand").onclick = () => { const a = Array.from({ length: 8 }, () => 1 + Math.floor(Math.random() * 9)); $("ms-input").value = a.join(", "); load(a); };
+  $("ms-load").click();
+
+  // Stack vs queue
+  let next = 1, stack = [], queue = [], lastS = null, lastQ = null;
+  const draw = (msg) => {
+    $("sq-stack").replaceChildren(stack.length ? V.cells(stack, { idx: false, cls: (i) => (i === stack.length - 1 ? "hl" : "") , ptrs: { [stack.length - 1]: "top" } }) : V.el("div", { class: "muted small" }, "empty"));
+    $("sq-queue").replaceChildren(queue.length ? V.cells(queue, { idx: false, cls: (i) => (i === 0 ? "hl" : ""), ptrs: { 0: "front" } }) : V.el("div", { class: "muted small" }, "empty"));
+    $("sq-msg").innerHTML = msg;
+  };
+  $("sq-add").onclick = () => { stack.push(next); queue.push(next); draw(`Added <b>${next++}</b> to both.`); };
+  $("sq-rm").onclick = () => { if (!stack.length) return draw("Both are empty."); lastS = stack.pop(); lastQ = queue.shift(); draw(`Stack gave back <b>${lastS}</b> (newest). Queue gave back <b>${lastQ}</b> (oldest).`); };
+  $("sq-reset").onclick = () => { next = 1; stack = []; queue = []; draw("Reset."); };
+  for (let k = 0; k < 4; k++) $("sq-add").click();
+  draw("Added 1, 2, 3, 4 to both. Now remove one.");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.06">
+  <title>Recursion and backtracking</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.06 · Recursion and backtracking (permutations, subsets, constraint search)</p>
+  <h1>Recursion and backtracking</h1>
+  <p class="lede">Backtracking is a depth-first walk through a tree of choices that you never actually build. Choose, explore, un-choose. The skill is seeing the tree, and cutting branches before you walk them.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">Make one choice, recurse on the smaller problem, then undo the choice and try the next one. Pruning (abandoning a partial solution that can't succeed) is what makes exponential search finish in practice.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>1. Recursion is delegation with a contract</h3>
+      <p>A recursive function says: "I'll solve this size-n problem by trusting myself to solve a smaller one." You need a <b>base case</b> (small enough to answer directly) and <b>progress</b> (every call gets closer to it). Don't trace the whole call tree in your head. Trust the contract, which is the "leap of faith" that makes recursion manageable.</p>
+      <h3>2. The decision tree</h3>
+      <p>Subsets of [1, 2, 3]: at each level, decide "include this element or not". That's a binary tree of depth 3 with 2³ = 8 leaves, one per subset. Permutations: level k picks which unused element goes in position k, giving n! leaves. Draw the tree first; the code follows from it.</p>
+      <h3>3. The template</h3>
+      <pre><code>def backtrack(path, choices):
+    if is_complete(path):
+        results.append(path.copy())   # copy! path keeps changing
+        return
+    for c in choices:
+        if not valid(path, c):        # prune
+            continue
+        path.append(c)                # choose
+        backtrack(path, next_choices) # explore
+        path.pop()                    # un-choose</code></pre>
+      <h3>4. Pruning is where the speed comes from</h3>
+      <p>N-queens: placing queens row by row and checking columns and diagonals with sets cuts 8-queens from 16.7 million raw placements to about 2,000 visited nodes. Sudoku, combination sum with a sorted list ("stop once the remaining candidates are too big"), and word search all live or die by pruning.</p>
+      <h3>5. When the tree has repeated subtrees, it's DP</h3>
+      <p>If different paths lead to the <em>same</em> subproblem (same index, same remaining sum), cache the result. That's memoization, and it's the bridge to the next page.</p>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogy: a choose-your-own-adventure book</span></summary>
+    <div class="box-body">
+      <p>At each page you pick an option and turn to it. When you hit a bad ending, you flip back to the last choice and take the other option. Your finger holding the earlier page is the call stack. <b>Un-choosing</b> is flipping back. Pruning is noticing "this path leads into the dragon's cave" and not reading it at all.</p>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: the decision tree for subsets</span></summary>
+    <div class="box-body">
+      <p class="small muted">Each level decides one element: left = skip it, right = take it. The highlighted path is the current call stack; leaves are emitted subsets. Turn on pruning with a target sum to see branches cut early.</p>
+      <div class="viz-controls">
+        <span class="small">elements</span><input id="bt-in" type="text" value="2, 3, 5, 7" style="width:9em">
+        <label class="small"><input type="checkbox" id="bt-prune"> only subsets with sum ≤</label><input id="bt-cap" type="number" value="8" style="width:5em">
+        <button class="btn" id="bt-go">Run</button>
+      </div>
+      <div id="bt-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box" open id="costs">
+    <summary><span class="kicker">Costs</span><span class="label">How big are these trees?</span></summary>
+    <div class="box-body">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Problem</th><th>Leaves</th><th>Total time</th><th>Practical n</th></tr></thead>
+        <tbody>
+          <tr><td>Subsets</td><td>2ⁿ</td><td>O(n · 2ⁿ)</td><td>~20</td></tr>
+          <tr><td>Permutations</td><td>n!</td><td>O(n · n!)</td><td>~9–10</td></tr>
+          <tr><td>Combinations C(n, k)</td><td>C(n, k)</td><td>O(k · C(n, k))</td><td>depends on k</td></tr>
+          <tr><td>N-queens</td><td>≤ n!</td><td>heavily pruned</td><td>~12–14 in Python</td></tr>
+        </tbody>
+      </table></div>
+      <p class="small muted">Space: O(depth) for the call stack and path, plus the output itself. The extra factor of n in time comes from copying each complete path.</p>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Draw a small tree before coding</b> and point at what each level decides. Interviewers love seeing the structure first.</li>
+        <li><b>Handle duplicates by sorting and skipping</b>: <code>if i &gt; start and nums[i] == nums[i-1]: continue</code>. Explain that it prevents identical sibling branches.</li>
+        <li><b>State the complexity honestly:</b> it's exponential, and that's fine when n is small. Show where pruning helps without claiming it changes the worst case.</li>
+        <li><b>Production relevance:</b> constraint solvers, schedulers, config validators, regex engines (catastrophic backtracking is a real outage cause: ReDoS), and search over plans in AI agents.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Appending <code>path</code> instead of <code>path.copy()</code>: every result ends up as the same (empty) list.</li>
+        <li>Forgetting to un-choose (pop, or remove from the used set) after the recursive call.</li>
+        <li>Missing base case or no progress: infinite recursion.</li>
+        <li>Mutable default arguments (<code>def f(path=[])</code>) leaking state across calls.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>Subsets: "include/exclude" tree vs "for i in range(start, n)" loop. What's the difference?</summary><p>Same subsets, different tree shapes. Include/exclude makes a binary tree where every leaf is a subset. The loop version emits a subset at <em>every node</em>, where each node picks the next element to add, which naturally avoids duplicates and handles combinations.</p></details>
+      <details class="qa"><summary>How do you generate permutations without a "used" array?</summary><p>Swap-based: for position k, swap each later element into position k, recurse on k + 1, then swap back.</p></details>
+      <details class="qa"><summary>When should you stop backtracking and switch to DP?</summary><p>When the state of a subproblem (index, remaining capacity…) is small and repeats across branches. Then caching the answer turns exponential work into (number of states × work per state).</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Exercise:</b> <code>exercises/backtracking.py</code>: subsets, permutations, and n-queens count.</p>
+      <p><b>Classic problems:</b> Subsets II · Combination Sum · Letter Combinations of a Phone Number · Palindrome Partitioning · Word Search · Sudoku Solver.</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let els = [], cap = Infinity;
+  function build() {
+    // Build the full decision tree with ids, then generate DFS frames over it.
+    let id = 0;
+    const make = (depth, path, sum) => {
+      const node = { id: id++, depth, path, sum, val: depth === 0 ? "∅" : path.length ? "{" + path.join(",") + "}" : "{}" };
+      node.pruned = sum > cap;
+      if (depth < els.length && !node.pruned) { node.left = make(depth + 1, path, sum); node.right = make(depth + 1, [...path, els[depth]], sum + els[depth]); }
+      return node;
+    };
+    return make(0, [], 0);
+  }
+  function frames(root) {
+    const fr = [], visited = new Set(), out = [];
+    const stack = [];
+    (function dfs(n) {
+      stack.push(n); visited.add(n);
+      const leaf = n.depth === els.length;
+      let msg;
+      if (n.pruned) msg = `Sum ${n.sum} &gt; ${cap}: <b>prune</b>. Nothing below this node can work, so skip its whole subtree.`;
+      else if (leaf) { out.push(n.val); msg = `Leaf: every element decided. Emit <b>${n.val}</b>.`; }
+      else msg = `Decide element <b>${els[n.depth]}</b>: first skip it (left), then take it (right).`;
+      fr.push({ cur: n, stack: new Set(stack), visited: new Set(visited), out: [...out], msg });
+      if (n.left) dfs(n.left);
+      if (n.right) dfs(n.right);
+      stack.pop();
+    })(root);
+    fr.push({ visited, stack: new Set(), out, msg: `Done: ${out.length} subsets emitted, ${visited.size} nodes visited${cap < Infinity ? `, while the unpruned tree has ${2 ** (els.length + 1) - 1}` : ""}.` });
+    return fr;
+  }
+  let root;
+  const player = V.player($("bt-player"), {
+    speed: 450,
+    draw(f, stage) {
+      const svg = V.s("svg", { class: "viz" });
+      // Show only visited nodes so the tree "grows" as the search runs.
+      const prune = (n) => (n && f.visited.has(n) ? { ...n, left: prune(n.left), right: prune(n.right) } : null);
+      const shown = prune(root);
+      V.binaryTree(svg, shown, { dx: 38, dy: 52, r: 16, label: (n) => (n.depth === 0 ? "start" : n.pruned ? "✂" : n.val.length > 7 ? "…" : n.val),
+        cls: (n) => (f.cur && n.id === f.cur.id ? "hl" : n.pruned ? "bad" : [...f.stack].some((s) => s.id === n.id) ? "warn" : n.depth === els.length ? "done" : "") });
+      stage.append(svg, V.el("div", { class: "small muted", style: "margin-top:6px" }, "emitted: ", f.out.join("  ") || "∅"));
+    },
+  });
+  const run = () => {
+    els = $("bt-in").value.split(/[ ,]+/).filter(Boolean).map(Number).filter((x) => !isNaN(x)).slice(0, 4);
+    cap = $("bt-prune").checked ? Number($("bt-cap").value) : Infinity;
+    root = build(); player.load(frames(root));
+  };
+  $("bt-go").onclick = run; $("bt-prune").onchange = run;
+  run();
+})();
+</script>
+</body>
+</html>

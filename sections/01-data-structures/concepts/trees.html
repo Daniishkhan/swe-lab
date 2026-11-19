@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="01.03">
+  <title>Trees, BSTs and traversals</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;01.03 · Trees: BST, balanced trees (red-black, AVL at a conceptual level), traversal orders</p>
+  <h1>Trees, BSTs and traversals</h1>
+  <p class="lede">A tree is a linked list that branches. Put an ordering rule on the branches and every comparison throws away half the remaining data. That only holds while the tree stays bushy, which is why balancing exists.</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">In a binary search tree, everything left of a node is smaller and everything right is larger, so search is a walk down one path. Its cost is the tree's height: log n if it's balanced, n if it degenerates into a stick.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>1. Start from the sorted array</h3>
+      <p>A sorted array gives O(log n) search with binary search, but O(n) insert. What if the "middle element" weren't an array position but a node with pointers to the middle of each half? Then you could insert by adding a leaf instead of shifting. That is a binary search tree: <b>a binary search frozen into pointers</b>.</p>
+      <h3>2. The BST invariant</h3>
+      <p>For every node: all keys in the left subtree &lt; node &lt; all keys in the right subtree. Search, insert and delete each walk one root-to-leaf path, so they cost O(h), where h is the height.</p>
+      <h3>3. The catch: height depends on insertion order</h3>
+      <p>Insert 1, 2, 3, 4, 5 in order and every node goes right. The "tree" is a linked list, h = n, and you've lost the whole benefit. Try it in the playground below.</p>
+      <h3>4. Balanced trees fix the height</h3>
+      <p>They do a bit of extra work on insert and delete, called <b>rotations</b>, to guarantee h = O(log n). Know these at a conceptual level:</p>
+      <div class="cols">
+        <div class="panel"><h4>AVL</h4><p class="small">Left and right subtree heights differ by at most 1 at every node. Strictly balanced, so lookups are fast, but it rotates more often on writes.</p></div>
+        <div class="panel"><h4>Red-black</h4><p class="small">A looser coloring rule keeps the height under 2·log n. Fewer rotations per write. It backs Java's <code>TreeMap</code>, C++'s <code>std::map</code> and the Linux CFS scheduler.</p></div>
+        <div class="panel"><h4>B-tree (preview)</h4><p class="small">Hundreds of keys per node, so the tree is very shallow. It's built for disks, where each node read is expensive. Every relational database index uses one (chapter 6).</p></div>
+      </div>
+      <h3>5. Traversal orders: when you visit the node</h3>
+      <ul>
+        <li><b>Pre-order</b> (node, left, right): copy or serialize a tree; the root comes first.</li>
+        <li><b>In-order</b> (left, node, right): on a BST, yields keys <b>in sorted order</b>. That's the BST's superpower.</li>
+        <li><b>Post-order</b> (left, right, node): children before parent: delete a tree, compute sizes or heights, evaluate an expression tree.</li>
+        <li><b>Level-order</b> (BFS with a queue): layer by layer. Use it for "minimum depth" or "right side view".</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogy: twenty questions</span></summary>
+    <div class="box-body">
+      <p>A BST is a game of twenty questions where every question is "is it smaller than X?". A good questioner (balanced tree) halves the possibilities each time: 20 questions cover a million items. A bad questioner who asks "is it 1? is it 2? is it 3?" (degenerate tree) needs a million questions.</p>
+      <p>Physical picture for <b>rotations</b>: hold a mobile by a different string. The parts hang in the same left-to-right order (the sorted order is preserved), but the mobile hangs shorter.</p>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: build a BST, search it, traverse it</span></summary>
+    <div class="box-body">
+      <div class="viz-controls">
+        <input id="bst-key" type="number" placeholder="number" style="width:7em">
+        <button class="btn primary" id="bst-ins">Insert</button>
+        <button class="btn" id="bst-find">Search</button>
+        <button class="btn" id="bst-rand">Random tree</button>
+        <button class="btn" id="bst-sorted">Insert 1..7 in order</button>
+        <button class="btn" id="bst-reset">Clear</button>
+      </div>
+      <div class="viz-controls">
+        <span class="small muted">Traverse:</span>
+        <button class="btn" data-order="pre">Pre-order</button>
+        <button class="btn" data-order="in">In-order</button>
+        <button class="btn" data-order="post">Post-order</button>
+        <button class="btn" data-order="level">Level-order</button>
+      </div>
+      <div id="bst-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box" open id="costs">
+    <summary><span class="kicker">Costs</span><span class="label">Complexity</span></summary>
+    <div class="box-body">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Operation</th><th>BST (average)</th><th>BST (worst)</th><th>Balanced (AVL / RB)</th></tr></thead>
+        <tbody>
+          <tr><td>search / insert / delete</td><td>O(log n)</td><td>O(n)</td><td>O(log n) guaranteed</td></tr>
+          <tr><td>min / max / successor</td><td>O(log n)</td><td>O(n)</td><td>O(log n)</td></tr>
+          <tr><td>in-order iteration</td><td colspan="3">O(n) total, in sorted order</td></tr>
+          <tr><td>range query [a, b]</td><td colspan="3">O(log n + k) for k results. Hash maps can't do this.</td></tr>
+          <tr><td>traversal space</td><td colspan="3">O(h) recursion/stack for DFS orders; O(width) queue for level-order</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Hash map vs ordered tree is a real design decision.</b> Choose the tree when you need ordering, range scans, floor/ceiling ("the next scheduled job after now"), or predictable worst-case latency without resize spikes.</li>
+        <li><b>Most tree problems are recursion on a contract.</b> Say what your function returns for a subtree ("height", "is valid BST within (lo, hi)", "max path through this node"), trust it for the children, then combine. Saying that contract out loud is what interviewers listen for.</li>
+        <li><b>Validate-BST trap:</b> checking only <code>left &lt; node &lt; right</code> locally is wrong. Pass down (low, high) bounds.</li>
+        <li><b>Real systems:</b> databases use B+ trees (chapter 6), and in-memory sorted sets often use skip lists instead of trees because they're simpler to make concurrent (Redis sorted sets).</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Assuming a BST is balanced. Plain BSTs fed sorted data degrade to O(n).</li>
+        <li>Recursion depth: a 10,000-node stick blows Python's default recursion limit. Iterative traversal uses an explicit stack.</li>
+        <li>Deleting a node with two children: replace it with its in-order successor (the smallest key in the right subtree), then delete that successor.</li>
+        <li>Mixing up "depth" (counted from the root) and "height" (counted from the leaves), and off-by-one on whether an empty tree has height 0 or -1. Pick one convention and say it.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>Which traversal gives sorted output on a BST, and why?</summary><p>In-order. It visits everything smaller (left subtree) before the node, and everything larger (right subtree) after it, recursively. That is the definition of sorted.</p></details>
+      <details class="qa"><summary>Can you rebuild a tree from its pre-order alone?</summary><p>For a general binary tree, no. You need pre-order plus in-order (or explicit null markers). For a BST, yes: the in-order is just the sorted pre-order.</p></details>
+      <details class="qa"><summary>Roughly how tall is a balanced tree with a billion keys? A B-tree with 500 keys per node?</summary><p>Binary: log₂(10⁹) ≈ 30. B-tree: log₅₀₀(10⁹) ≈ 3.3, so about 4 levels. That's why databases can find any row in a few disk reads.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Classic problems:</b> Maximum Depth · Validate BST · Lowest Common Ancestor (of a BST, then of a general tree) · Binary Tree Level Order Traversal · Kth Smallest in a BST · Serialize and Deserialize a Binary Tree · Binary Tree Maximum Path Sum.</p>
+      <p class="small muted">Write each one recursively first, then iteratively with an explicit stack.</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let root = null;
+  const svgHost = () => V.s("svg", { class: "viz" });
+  const insert = (n, v) => { if (!n) return { val: v, left: null, right: null }; if (v < n.val) n.left = insert(n.left, v); else if (v > n.val) n.right = insert(n.right, v); return n; };
+  const height = (n) => (n ? 1 + Math.max(height(n.left), height(n.right)) : 0);
+  const size = (n) => (n ? 1 + size(n.left) + size(n.right) : 0);
+  const stats = () => `n = ${size(root)}, height = ${height(root)}, best possible = ${Math.ceil(Math.log2(size(root) + 1)) || 0}`;
+  const player = V.player($("bst-player"), {
+    draw(f, stage) {
+      const svg = svgHost();
+      V.binaryTree(svg, root, { cls: (n) => (f.cur === n ? "hl" : f.done && f.done.has(n) ? "done" : f.path && f.path.has(n) ? "warn" : "") });
+      stage.append(V.el("div", { class: "small muted" }, stats()), svg);
+      if (f.out) stage.append(V.el("div", { class: "small muted", style: "margin-top:8px" }, "output"), V.cells(f.out, { idx: false }));
+    },
+  });
+  const show = (msg) => player.load([{ msg }]);
+  function insertFrames(v) {
+    const frames = [], path = new Set();
+    let n = root;
+    while (n) {
+      path.add(n);
+      if (v === n.val) { frames.push({ cur: n, path: new Set(path), msg: `${v} is already in the tree.` }); return frames; }
+      frames.push({ cur: n, path: new Set(path), msg: `${v} ${v < n.val ? "&lt;" : "&gt;"} ${n.val}: go <b>${v < n.val ? "left" : "right"}</b>.` });
+      n = v < n.val ? n.left : n.right;
+    }
+    root = insert(root, v);
+    const node = (function find(x) { return x.val === v ? x : find(v < x.val ? x.left : x.right); })(root);
+    frames.push({ cur: node, path, msg: `Empty spot found: <b>${v}</b> becomes a new leaf after ${path.size} comparison${path.size === 1 ? "" : "s"}.` });
+    return frames;
+  }
+  function searchFrames(v) {
+    const frames = [], path = new Set();
+    let n = root;
+    while (n) {
+      path.add(n);
+      if (v === n.val) { frames.push({ cur: n, path: new Set(path), msg: `Found <b>${v}</b> after ${path.size} comparisons (height is ${height(root)}).` }); return frames; }
+      frames.push({ cur: n, path: new Set(path), msg: `${v} ${v < n.val ? "&lt;" : "&gt;"} ${n.val}: half of what's left is ruled out. Go ${v < n.val ? "left" : "right"}.` });
+      n = v < n.val ? n.left : n.right;
+    }
+    frames.push({ path, msg: `Fell off the tree: <b>${v}</b> is not present.` });
+    return frames;
+  }
+  function travFrames(order) {
+    const frames = [], out = [], done = new Set();
+    const visit = (n, why) => { out.push(n.val); done.add(n); frames.push({ cur: n, done: new Set(done), out: [...out], msg: why }); };
+    const names = { pre: "node, left, right", in: "left, node, right", post: "left, right, node", level: "layer by layer using a queue" };
+    if (order === "level") {
+      const q = root ? [root] : [];
+      while (q.length) { const n = q.shift(); visit(n, `Dequeue ${n.val}, visit it, enqueue its children.`); if (n.left) q.push(n.left); if (n.right) q.push(n.right); }
+    } else {
+      (function walk(n) {
+        if (!n) return;
+        if (order === "pre") visit(n, `Pre-order visits <b>${n.val}</b> before its children.`);
+        walk(n.left);
+        if (order === "in") visit(n, `In-order visits <b>${n.val}</b> after everything smaller (its left subtree).`);
+        walk(n.right);
+        if (order === "post") visit(n, `Post-order visits <b>${n.val}</b> after both children.`);
+      })(root);
+    }
+    frames.unshift({ out: [], msg: `${order}-order: ${names[order]}.` });
+    if (order === "in" && out.length) frames[frames.length - 1].msg += " Notice the output is sorted.";
+    return frames;
+  }
+  const readKey = () => { const v = parseInt($("bst-key").value, 10); return isNaN(v) ? null : v; };
+  $("bst-ins").onclick = () => { const v = readKey(); if (v === null) return show("Type a number first."); player.load(insertFrames(v)); $("bst-key").select(); };
+  $("bst-key").addEventListener("keydown", (e) => { if (e.key === "Enter") $("bst-ins").click(); });
+  $("bst-find").onclick = () => { const v = readKey(); if (v === null) return show("Type a number to search for."); player.load(searchFrames(v)); };
+  $("bst-rand").onclick = () => { root = null; const s = new Set(); while (s.size < 10) s.add(1 + Math.floor(Math.random() * 60)); [...s].forEach((v) => (root = insert(root, v))); show("Random insertion order: usually reasonably bushy."); };
+  $("bst-sorted").onclick = () => { root = null; for (let v = 1; v <= 7; v++) root = insert(root, v); show("Inserted 1..7 in sorted order: every node went right. Height 7 instead of 3. This is a linked list wearing a tree costume, and the reason balanced trees exist."); };
+  $("bst-reset").onclick = () => { root = null; show("Empty tree."); };
+  document.querySelectorAll("[data-order]").forEach((b) => (b.onclick = () => player.load(travFrames(b.dataset.order))));
+  [50, 30, 70, 20, 40, 60, 80, 35].forEach((v) => (root = insert(root, v)));
+  show("A small BST. Search for 35, insert a few numbers, or run the traversals.");
+})();
+</script>
+</body>
+</html>

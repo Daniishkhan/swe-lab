@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="01.04">
+  <title>Heaps and priority queues</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content">
+  <p class="muted small"><span class="badge P0">P0</span> &nbsp;01.04 · Heaps and priority queues: top-k, k-way merge, scheduling</p>
+  <h1>Heaps and priority queues</h1>
+  <p class="lede">When you only ever need the smallest thing, keeping everything fully sorted is wasted effort. A heap keeps just enough order to hand you the minimum in O(1) and repair itself in O(log n).</p>
+  <details class="box accent" open id="idea">
+    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
+    <div class="box-body">
+      <p class="one-liner">A heap is a complete binary tree stored in a plain array, where every parent is no bigger than its children. The minimum sits at index 0, and push or pop fixes the order along a single root-to-leaf path.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="first-principles">
+    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
+    <div class="box-body">
+      <h3>1. What a scheduler actually needs</h3>
+      <p>A job scheduler needs one thing fast: "what runs next?" A sorted array answers that in O(1) but costs O(n) per insert. An unsorted array inserts in O(1) but finds the minimum in O(n). We want both in about O(log n).</p>
+      <h3>2. Weaken the invariant</h3>
+      <p>Full sorting relates every element to every other. A heap only promises <b>parent ≤ child</b>. Siblings and cousins can be in any order. That weaker promise is much cheaper to maintain, and it's still enough to know where the minimum is: at the root.</p>
+      <h3>3. Store the tree in an array, no pointers</h3>
+      <p>Fill the tree level by level, left to right (a "complete" tree). Then the shape is implied by the index:</p>
+      <pre><code>children of i:  2i + 1, 2i + 2
+parent of i:    (i - 1) // 2</code></pre>
+      <p>No pointers, perfect cache locality, and the tree is always balanced, so its height is ⌊log₂ n⌋.</p>
+      <h3>4. Two repair moves</h3>
+      <ul>
+        <li><b>push:</b> put the new item at the end, then <b>sift up</b>: swap with the parent while it's smaller.</li>
+        <li><b>pop:</b> take the root, move the last item to the root, then <b>sift down</b>: swap with the smaller child while it's bigger.</li>
+      </ul>
+      <h3>5. Heapify is O(n), not O(n log n)</h3>
+      <p>To build a heap from n items, sift down every non-leaf from the bottom up. Half the nodes are leaves (no work), a quarter sift at most 1 level, an eighth at most 2… The sum n·(1/4 + 2/8 + 3/16 + …) converges to O(n).</p>
+    </div>
+  </details>
+
+  <details class="box analogy" open id="analogy">
+    <summary><span class="kicker">Intuition</span><span class="label">Analogy: a company org chart</span></summary>
+    <div class="box-body">
+      <p>Every manager is more senior than their direct reports, but two people on different teams aren't compared at all. When the CEO leaves (pop), the most junior person is temporarily put in the CEO's chair and keeps getting swapped with their more senior direct report until the rule holds again. A new hire (push) starts at the bottom and gets promoted past anyone less senior above them.</p>
+      <p class="muted small">Physical picture: bubbles. Light things rise (sift up), heavy things sink (sift down), and each one moves through at most log n levels.</p>
+    </div>
+  </details>
+
+  <details class="box viz" open id="see-it">
+    <summary><span class="kicker">See it</span><span class="label">Playground: push and pop on a min-heap</span></summary>
+    <div class="box-body">
+      <p class="small muted">The tree and the array are the same data. Watch which indexes swap.</p>
+      <div class="viz-controls">
+        <input id="hp-val" type="number" placeholder="value" style="width:7em">
+        <button class="btn primary" id="hp-push">Push</button>
+        <button class="btn" id="hp-rand">Push random</button>
+        <button class="btn" id="hp-pop">Pop min</button>
+        <button class="btn" id="hp-heapify">Heapify random array</button>
+      </div>
+      <div id="hp-player" style="margin-top:12px"></div>
+    </div>
+  </details>
+
+  <details class="box" open id="patterns">
+    <summary><span class="kicker">Patterns</span><span class="label">The three heap moves interviews love</span></summary>
+    <div class="box-body">
+      <div class="cols">
+        <div class="panel"><h4>Top-k</h4><p class="small">To keep the k <em>largest</em>, use a <em>min</em>-heap of size k. Each new item competes with the smallest of your current top k (the root); if it's bigger, it replaces the root. O(n log k) time, O(k) memory, and it works on a stream.</p></div>
+        <div class="panel"><h4>K-way merge</h4><p class="small">Merging k sorted lists: put the head of each list in a heap, pop the smallest, push that list's next item. O(N log k). This is how external merge sort and LSM-tree compaction work (chapter 6).</p></div>
+        <div class="panel"><h4>Scheduling / simulation</h4><p class="small">Keep events keyed by time and always process the earliest. Meeting rooms, task schedulers, Dijkstra (chapter 2), timers in event loops.</p></div>
+      </div>
+      <p class="small muted" style="margin-top:10px">Python's <code>heapq</code> is a min-heap. For a max-heap, push <code>-x</code>. To break ties without comparing payloads, push tuples <code>(priority, counter, item)</code>.</p>
+    </div>
+  </details>
+
+  <details class="box" open id="costs">
+    <summary><span class="kicker">Costs</span><span class="label">Complexity</span></summary>
+    <div class="box-body">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Operation</th><th>Binary heap</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>peek min</td><td>O(1)</td><td>index 0</td></tr>
+          <tr><td>push / pop</td><td>O(log n)</td><td>one root-to-leaf path</td></tr>
+          <tr><td>build from n items</td><td>O(n)</td><td>bottom-up heapify</td></tr>
+          <tr><td>search arbitrary item</td><td>O(n)</td><td>a heap is not a search structure</td></tr>
+          <tr><td>decrease-key / delete arbitrary</td><td>O(log n) <em>if</em> you track positions</td><td>otherwise use lazy deletion</td></tr>
+          <tr><td>heapsort</td><td>O(n log n), in place, not stable</td><td>rarely used in practice: poor cache behavior</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details class="box senior" open id="interview">
+    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
+    <div class="box-body">
+      <ul>
+        <li><b>Lazy deletion</b> instead of decrease-key: push a new entry and skip stale ones when you pop them. That's how Dijkstra is usually written with <code>heapq</code>.</li>
+        <li><b>Top-k at scale:</b> on one machine, use a size-k heap. Across machines, each shard computes its local top-k and a coordinator merges them. With heavy-hitter streams, use approximate structures (Count-Min Sketch + heap). This is a classic system design follow-up.</li>
+        <li><b>Starvation:</b> a pure priority queue can starve low-priority work forever. Real schedulers add aging, or use separate queues with weighted fairness.</li>
+        <li><b>Thread safety:</b> <code>heapq</code> isn't thread-safe; <code>queue.PriorityQueue</code> wraps it with a lock.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box trap" open id="traps">
+    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
+    <div class="box-body">
+      <ul>
+        <li>Using a max-heap for "k largest" (you want a min-heap of size k), or the reverse for "k smallest".</li>
+        <li>Pushing tuples whose second element isn't comparable (dicts, custom objects). Ties then crash. Add a counter.</li>
+        <li>Assuming the heap array is sorted. Only index 0 is guaranteed.</li>
+        <li>Sift-down choosing the <em>first</em> child instead of the <em>smaller</em> child.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="box" open id="check">
+    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
+    <div class="box-body">
+      <details class="qa"><summary>Why is a heap stored in an array, but a BST usually isn't?</summary><p>A heap is always a complete tree, so index arithmetic describes its shape exactly with no gaps. A BST's shape depends on the data; storing it in an array would leave huge holes.</p></details>
+      <details class="qa"><summary>How do you find the median of a stream?</summary><p>Two heaps: a max-heap for the lower half and a min-heap for the upper half, kept within one element of each other in size. The median is at one or both roots. O(log n) per insert, O(1) per query.</p></details>
+      <details class="qa"><summary>Why does sift-down swap with the smaller child?</summary><p>The smaller child becomes the parent of the other child, so it has to be ≤ that sibling. Swapping with the larger child would break the invariant right away.</p></details>
+    </div>
+  </details>
+
+  <details class="box" open id="practice">
+    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
+    <div class="box-body">
+      <p><b>Exercise:</b> <code>exercises/min_heap.py</code>: MinHeap with O(n) <code>from_list</code>, plus top-k frequent and k-way merge.</p>
+      <p><b>Classic problems:</b> Kth Largest Element · Top K Frequent Elements · Merge k Sorted Lists · Find Median from Data Stream · Meeting Rooms II · Task Scheduler.</p>
+    </div>
+  </details>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let heap = [5, 9, 7, 12, 10, 8, 15];
+  const toTree = (arr, i = 0) => (i < arr.length ? { val: arr[i], idx: i, left: toTree(arr, 2 * i + 1), right: toTree(arr, 2 * i + 2) } : null);
+  const player = V.player($("hp-player"), {
+    draw(f, stage) {
+      const svg = V.s("svg", { class: "viz" });
+      V.binaryTree(svg, toTree(f.arr), { label: (n) => n.val, cls: (n) => (f.hl && f.hl.includes(n.idx) ? "hl" : f.cmp && f.cmp.includes(n.idx) ? "warn" : f.out === n.idx ? "done" : "") });
+      stage.append(svg, V.el("div", { class: "small muted", style: "margin-top:6px" }, "array (index = position in the tree, level by level)"),
+        V.cells(f.arr, { cls: (i) => (f.hl && f.hl.includes(i) ? "hl" : f.cmp && f.cmp.includes(i) ? "warn" : "") }));
+      if (f.popped != null) stage.append(V.el("div", { class: "small", style: "margin-top:4px" }, "popped: ", V.el("b", {}, f.popped)));
+    },
+  });
+  const show = (msg) => player.load([{ arr: [...heap], msg }]);
+  function pushFrames(v) {
+    const a = heap, fr = [];
+    a.push(v); let i = a.length - 1;
+    fr.push({ arr: [...a], hl: [i], msg: `Append <b>${v}</b> at index ${i}, the next free spot, so the tree stays complete.` });
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (a[p] <= a[i]) { fr.push({ arr: [...a], hl: [i], cmp: [p], msg: `Parent ${a[p]} ≤ ${a[i]}. The invariant holds, so stop.` }); break; }
+      fr.push({ arr: [...a], hl: [i], cmp: [p], msg: `Parent ${a[p]} &gt; ${a[i]}: swap (sift up).` });
+      [a[p], a[i]] = [a[i], a[p]]; i = p;
+      fr.push({ arr: [...a], hl: [i], msg: `Now at index ${i}.` });
+    }
+    if (i === 0) fr.push({ arr: [...a], hl: [0], msg: `Reached the root: <b>${v}</b> is the new minimum.` });
+    return fr;
+  }
+  function siftDownFrames(a, i, fr, n = a.length) {
+    while (true) {
+      const l = 2 * i + 1, r = l + 1;
+      if (l >= n) { fr.push({ arr: [...a], hl: [i], msg: `Index ${i} has no children. Done.` }); return; }
+      const c = r < n && a[r] < a[l] ? r : l;
+      if (a[i] <= a[c]) { fr.push({ arr: [...a], hl: [i], cmp: [l, r].filter((k) => k < n), msg: `${a[i]} ≤ smaller child ${a[c]}. The invariant holds, so stop.` }); return; }
+      fr.push({ arr: [...a], hl: [i], cmp: [c], msg: `${a[i]} &gt; smaller child ${a[c]} (index ${c}): swap (sift down).` });
+      [a[i], a[c]] = [a[c], a[i]]; i = c;
+    }
+  }
+  function popFrames() {
+    const a = heap, fr = [];
+    if (!a.length) return [{ arr: [], msg: "Heap is empty: a real pop raises IndexError." }];
+    const min = a[0];
+    fr.push({ arr: [...a], out: 0, msg: `The minimum is always at index 0: <b>${min}</b>.` });
+    const last = a.pop();
+    if (a.length) { a[0] = last; fr.push({ arr: [...a], hl: [0], popped: min, msg: `Move the last item (${last}) to the root. That keeps the tree complete but breaks the order.` }); siftDownFrames(a, 0, fr); }
+    else fr.push({ arr: [], popped: min, msg: "That was the only item." });
+    fr[fr.length - 1].popped = min;
+    return fr;
+  }
+  function heapifyFrames() {
+    const a = Array.from({ length: 10 }, () => 1 + Math.floor(Math.random() * 50)), fr = [];
+    fr.push({ arr: [...a], msg: "A random array: not a heap yet. Sift down each non-leaf, from the last one back to the root." });
+    for (let i = (a.length >> 1) - 1; i >= 0; i--) { fr.push({ arr: [...a], hl: [i], msg: `Sift down index ${i}.` }); siftDownFrames(a, i, fr); }
+    fr.push({ arr: [...a], msg: "It's a heap now. Total work was O(n), because most nodes sit near the bottom and barely move." });
+    heap = a; return fr;
+  }
+  $("hp-push").onclick = () => { const v = parseInt($("hp-val").value, 10); if (isNaN(v)) return show("Type a value first."); player.load(pushFrames(v)); };
+  $("hp-val").addEventListener("keydown", (e) => { if (e.key === "Enter") $("hp-push").click(); });
+  $("hp-rand").onclick = () => player.load(pushFrames(1 + Math.floor(Math.random() * 30)));
+  $("hp-pop").onclick = () => player.load(popFrames());
+  $("hp-heapify").onclick = () => player.load(heapifyFrames());
+  show("A min-heap. Push 3 and watch it rise, or pop the minimum.");
+})();
+</script>
+</body>
+</html>
