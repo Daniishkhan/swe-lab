@@ -56,6 +56,17 @@ def test_example():
     assert list(d) == [1]
 
 
+def test_appendleft_moves_head_not_items():
+    d = RingDeque(8)
+    for x in "abc":
+        d.append(x)
+    before, head = list(d.buf), d.head
+    d.appendleft("z")
+    assert d.head == (head - 1) % 8, "appendleft should step head back one slot (wrapping), not shift the items"
+    changed = [i for i in range(8) if d.buf[i] is not before[i]]
+    assert changed == [d.head], f"appendleft changed slots {changed}: it should write exactly one slot"
+
+
 def test_empty_and_bad_index():
     d = RingDeque()
     assert len(d) == 0 and list(d) == []

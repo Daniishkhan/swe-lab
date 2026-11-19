@@ -133,7 +133,7 @@ head = head.next                          # pop the front: O(1), nobody moves</c
     <tr><td>Remove at the back</td><td>O(1)</td><td>O(n), even with a <code>tail</code> pointer: the new tail is the node <em>before</em> it, and only a walk from the head finds it</td></tr>
     <tr><td>Insert after a node you hold</td><td>O(n) (shift)</td><td>O(1)</td></tr>
     <tr><td>Find a value</td><td>O(n)</td><td>O(n)</td></tr>
-    <tr><td>Extra memory per item</td><td>one reference (8 bytes)</td><td>a whole node object (in CPython about 100+ bytes, about 56 with <code>__slots__</code>)</td></tr>
+    <tr><td>Extra memory per item</td><td>one reference (8 bytes)</td><td>a whole node object (in CPython roughly 90 to 150 bytes depending on the version, about 50 with <code>__slots__</code>)</td></tr>
   </tbody>
 </table></div>
 
@@ -231,14 +231,14 @@ first real item = HEAD.next      last real item = TAIL.prev</code></pre>
 <div class="keyidea"><p>Reversal: keep <code>prev</code>, <code>cur</code>, <code>nxt</code>, and save <code>nxt</code> before you change <code>cur.next</code>. Fast/slow pointers: the speed difference of one node per turn finds the middle in one pass, and catches a cycle in O(1) memory.</p></div>
 
 <div class="check" id="check-floyd">
-  <p class="q">An interviewer asks you to detect a cycle in a linked list of up to 10 million nodes, using O(1) extra memory. What do you do?</p>
+  <p class="q">An interviewer asks you to detect a cycle in a linked list of unknown length (it could be billions of nodes), using O(1) extra memory. What do you do?</p>
   <div class="opts">
     <button>Put each node in a set; if you see one twice, there's a cycle</button>
     <button>Walk 10 million steps; if you haven't hit None, there's a cycle</button>
     <button data-correct>Move one pointer 1 step and another 2 steps per turn; a cycle exists if they meet</button>
   </div>
   <div class="fb right"><p>Right: O(n) time and two variables of memory. Say why they must meet (the gap shrinks by exactly one per turn), not just that they do.</p></div>
-  <div class="fb wrong"><p>Both other answers have a hidden cost. The set holds up to 10 million nodes, which is O(n) memory, exactly what was forbidden. Counting steps needs you to know the length in advance; a list with 10 million and one nodes and no cycle would fool it. Two runners on a circular track settle it with no memory: the faster one gains one node per turn, so if there's a loop it lands on the slower one; if there's no loop it reaches the end.</p></div>
+  <div class="fb wrong"><p>Both other answers have a hidden cost. The set holds every node, which is O(n) memory, exactly what was forbidden. Counting steps needs you to know the length in advance; a list with 10 million and one nodes and no cycle would fool it, and the length is unknown. Two runners on a circular track settle it with no memory: the faster one gains one node per turn, so if there's a loop it lands on the slower one; if there's no loop it reaches the end.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -410,7 +410,7 @@ read  }   pop { → matches }   stack: (empty)   → valid, because the stack en
 
 <details class="aside another">
   <summary>Explain it another way: a to-do pile of unanswered questions</summary>
-  <p>Think of each day as a sticky note that says "tell me when it gets warmer than 71°". You stack the notes as the days go by. A new day at 72° walks up to the pile and reads the top note: 71°? Answered, throw it away. Next note: 75°? Not answered, and every note under it asks about something even warmer, so stop. Put a "warmer than 72°" note on top.</p>
+  <p>Think of each day as a sticky note that says "tell me when it gets warmer than 71°". You stack the notes as the days go by. A new day at 72° walks up to the pile and reads the top note: 69°? Answered, throw it away. Next: 71°? Answered too. Next: 75°? Not answered, and every note under it asks about something even warmer, so stop. Put a "warmer than 72°" note on top.</p>
   <p>A note is written once and thrown away once. Nobody ever reads a note, leaves it, and comes back to it later, except for the single note that makes them stop. That's why the total work is about two looks per note: O(n).</p>
 </details>
 
@@ -471,7 +471,7 @@ read  }   pop { → matches }   stack: (empty)   → valid, because the stack en
   <div class="cap">Window of size 3 over <code>[4, 3, 2, 1, 5, 3, 6, 2]</code>. Green cells are in the window. The deque holds indexes of candidates; scores go down from front to back, so the front is the max. Watch 4 expire from the front at index 3, then 5 arrive and wipe out every candidate from the back.</div>
 </div>
 
-<p>Same accounting as before: each index enters the deque once and leaves once (from one end or the other). O(n) total, whatever the window size. Space is O(k): the deque never holds more than one window's worth.</p>
+<p>Same accounting as before: each index enters the deque once and leaves once (from one end or the other). O(n) total, whatever the window size. Space is O(k): the deque holds at most one window's worth, plus the newcomer for a moment before the expired front leaves.</p>
 
 <p>This one needs a deque, not a stack, because items leave from <em>both</em> ends: hopeless ones from the back, expired ones from the front.</p>
 

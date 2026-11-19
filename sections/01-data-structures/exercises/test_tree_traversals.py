@@ -178,6 +178,8 @@ def test_valid_bst_small():
     assert is_valid_bst(TreeNode(2, TreeNode(2))) is False  # equal values aren't allowed
     assert is_valid_bst(TreeNode(2, None, TreeNode(2))) is False
     assert is_valid_bst(TreeNode(0, TreeNode(-5), TreeNode(5))) is True
+    assert is_valid_bst(TreeNode(0, None, TreeNode(-1))) is False  # 0 is a real value, not "nothing yet"
+    assert is_valid_bst(TreeNode(0, None, TreeNode(0))) is False
 
 
 def test_valid_bst_checks_the_whole_subtree():

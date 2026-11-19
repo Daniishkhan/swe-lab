@@ -17,7 +17,8 @@ Problem
 Requirements
 ------------
 - Both O(n) time, whatever k is. The obvious versions are O(n^2) and O(n*k):
-  say them out loud first, then improve.
+  say them out loud first, then improve. A lazy heap for the window max is
+  O(n log n) and passes these tests; the target is the O(n) deque.
 - next_greater([]) is [].
 - sliding_window_max returns [] if nums is empty; otherwise assume
   1 <= k <= len(nums).

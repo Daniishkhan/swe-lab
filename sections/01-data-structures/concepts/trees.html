@@ -358,7 +358,7 @@
   <ul>
     <li><b>BST iterator:</b> <code>next()</code> in O(1) amortized and O(height) memory: it's the explicit-stack in-order walk from section 7, paused between visits.</li>
     <li><b>k-th smallest:</b> in-order walk and stop at k (O(height + k)), or subtree sizes (section 5's aside) for O(height).</li>
-    <li><b>Lowest common ancestor:</b> in a BST, walk down from the root until the two keys split to different sides. In a plain binary tree, use post-order: a node is the answer if its subtrees each report one of the two.</li>
+    <li><b>Lowest common ancestor:</b> in a BST, walk down from the root until the two keys split to different sides. In a plain binary tree, use post-order: a node is the answer if its subtrees each report one of the two, or if it is one of the two and either subtree reports the other (one key is an ancestor of the other).</li>
     <li><b>Serialize a tree:</b> pre-order with markers for empty spots rebuilds it exactly. In-order alone can't: many shapes share one in-order sequence. Pre-order plus in-order (no duplicates) can.</li>
     <li><b>Duplicates:</b> decide up front (counts in the node, or "equal goes right") and say how search, delete and range treat them.</li>
     <li><b>Other balanced trees:</b> treaps (random priorities, balanced in expectation), splay trees (recently used keys move to the root), skip lists (topic 01.11; easier to make concurrent, which is why Java has <code>ConcurrentSkipListMap</code> but no concurrent <code>TreeMap</code>).</li>
@@ -603,7 +603,7 @@
         if (!n) return;
         if (kind === "pre") visit(n, n.left || n.right ? "before its children" : "(a leaf)");
         rec(n.left);
-        if (kind === "in") visit(n, "after everything smaller (its left subtree)");
+        if (kind === "in") visit(n, n.left ? "now that its left subtree is done" : "right away: it has no left subtree");
         rec(n.right);
         if (kind === "post") visit(n, n.left && n.right ? "after both of its children" : n.left || n.right ? "after its only child" : "(a leaf)");
       };
