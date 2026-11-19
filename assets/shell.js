@@ -98,7 +98,13 @@
         }
       }
     }
-    const bx = boxes();
+    const heads = document.querySelectorAll("main.book h2[id]");
+    if (heads.length) {
+      const toc = h("div", { class: "toc" });
+      heads.forEach((hd) => toc.append(h("a", { href: "#" + hd.id, "data-target": hd.id, onclick: () => { if (mobile()) setSidebar(true); } }, hd.textContent.trim())));
+      side.append(h("h4", {}, "In this chapter"), toc);
+    }
+    const bx = heads.length ? [] : boxes();
     if (bx.length) {
       const toc = h("div", { class: "toc" });
       bx.forEach((b, i) => {
@@ -129,7 +135,8 @@
         links.forEach((a) => a.classList.toggle("active", a.dataset.target === e.target.id));
       }
     }, { rootMargin: "-20% 0px -70% 0px" });
-    boxes().forEach((b) => obs.observe(b));
+    const heads = document.querySelectorAll("main.book h2[id]");
+    (heads.length ? heads : boxes()).forEach((b) => obs.observe(b));
   }
 
   function init() {

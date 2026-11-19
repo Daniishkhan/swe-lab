@@ -4,129 +4,616 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="topic" content="02.02">
-  <title>Sorting and its trade-offs</title>
+  <title>Putting things in order (Sorting)</title>
   <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
   <link rel="stylesheet" href="../../../assets/style.css">
   <script src="../../../assets/curriculum.js"></script>
   <script src="../../../assets/viz.js"></script>
   <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
 </head>
 <body data-root="../../.." data-section="02" data-page="concept">
-<main class="content">
-  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.02 · Sorting and its trade-offs (quicksort, mergesort, heapsort, counting/radix); stability</p>
-  <h1>Sorting and its trade-offs</h1>
-  <p class="lede">You'll almost never hand-write a sort at work. You will constantly pick between sorting strategies, reason about stability, and use the ideas inside sorts (partitioning, merging, counting) to solve other problems.</p>
-  <details class="box accent" open id="idea">
-    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
-    <div class="box-body">
-      <p class="one-liner">Comparison sorts can't beat O(n log n) in the worst case. Merge sort and heapsort guarantee it, quicksort usually beats both in practice, and counting/radix sort dodge the limit by not comparing at all.</p>
-    </div>
-  </details>
+<main class="content book">
 
-  <details class="box" open id="first-principles">
-    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
-    <div class="box-body">
-      <h3>Why n log n is the floor for comparison sorts</h3>
-      <p>n items can be arranged in n! orders. Each comparison is a yes/no question, so it at best halves the possible orders. You need log₂(n!) ≈ n log n questions to narrow down to one. No clever trick gets around this. Only using more than comparisons does.</p>
-      <div class="cols">
-        <div class="panel"><h4>Insertion sort: O(n²), but O(n) on nearly sorted data</h4><p class="small">Like sorting a hand of cards: take the next card and slide it left into place. Tiny overhead and stable. It's the inner engine of Timsort for short runs.</p></div>
-        <div class="panel"><h4>Merge sort: O(n log n) always, stable, O(n) extra space</h4><p class="small">Split in half, sort each half, merge two sorted lists in one pass. Predictable. It's the basis of external sorting (data bigger than RAM) and of Python's Timsort.</p></div>
-        <div class="panel"><h4>Quicksort: O(n log n) average, O(n²) worst, in place</h4><p class="small">Pick a pivot and partition into smaller and larger, then recurse. Cache-friendly and usually the fastest. Random pivots make the worst case vanishingly unlikely, and introsort switches to heapsort if recursion goes too deep.</p></div>
-        <div class="panel"><h4>Heapsort: O(n log n) always, in place, not stable</h4><p class="small">Heapify, then pop max repeatedly. Great guarantees, but it jumps around memory, so it's slower in practice. Mostly used as a fallback.</p></div>
-        <div class="panel"><h4>Counting / radix: O(n + k), no comparisons</h4><p class="small">If keys are small integers (ages, bytes, digits), count occurrences and lay them out. Radix sort repeats a stable counting sort digit by digit. That beats n log n for the right data.</p></div>
-      </div>
-      <h3>Stability, and why you should care</h3>
-      <p>A stable sort keeps equal elements in their original order. That lets you sort by multiple keys in passes: sort by name, then <em>stably</em> by department, and each department stays alphabetized. Python's <code>sorted</code> is stable (Timsort). C++'s <code>std::sort</code> is not; use <code>std::stable_sort</code>.</p>
-    </div>
-  </details>
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 2</div>
+  <h1>Putting things in order</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> asked almost everywhere</span><span>about 50 minutes</span><span>9 quick checks · 11 exercises</span></div>
+</header>
 
-  <details class="box analogy" open id="analogy">
-    <summary><span class="kicker">Intuition</span><span class="label">Physical pictures</span></summary>
-    <div class="box-body">
-      <ul>
-        <li><b>Merge sort</b> is two sorted stacks of exam papers face up: always take the smaller top paper. Merging is easy; the recursion is just a way to get sorted stacks.</li>
-        <li><b>Quicksort</b> is a bouncer with a height cutoff: everyone shorter goes left, everyone taller goes right. Then each side gets its own bouncer. A bad cutoff (the shortest person) means one side gets everybody.</li>
-        <li><b>Counting sort</b> is mail sorting into pigeonholes by zip code: you never compare two letters with each other.</li>
-      </ul>
-    </div>
-  </details>
+<p>You will almost never write a sorting function at work. Python's <code>sorted()</code> is better than anything you'd write in an afternoon. So why a whole chapter? Because the <em>ideas inside</em> sorting come up again and again: splitting a problem in half, merging two sorted things, partitioning around a pivot, counting instead of comparing. Interviewers use sorting to see if you understand those ideas, and to see if you know when sorting is the right tool.</p>
 
-  <details class="box viz" open id="see-it">
-    <summary><span class="kicker">See it</span><span class="label">Playground: watch them sort</span></summary>
-    <div class="box-body">
-      <div class="viz-controls">
-        <select id="so-algo"><option value="insertion">Insertion sort</option><option value="merge">Merge sort</option><option value="quick" selected>Quicksort (Lomuto, last pivot)</option><option value="heap">Heapsort</option></select>
-        <select id="so-data"><option value="random">Random</option><option value="nearly">Nearly sorted</option><option value="sorted">Already sorted</option><option value="reversed">Reversed</option><option value="few">Few unique values</option></select>
-        <button class="btn" id="so-go">New run</button>
-      </div>
-      <div id="so-player" style="margin-top:12px"></div>
-      <div class="legend"><span><i style="background:var(--warn)"></i>comparing</span><span><i style="background:var(--accent)"></i>writing / swapping</span><span><i style="background:var(--accent-2)"></i>pivot</span><span><i style="background:var(--ok)"></i>final position</span></div>
-      <p class="small muted" style="margin-top:8px">Try quicksort on "Already sorted": with the last element as pivot, every partition is maximally lopsided and comparisons explode to n²/2. Then try insertion sort on "Nearly sorted".</p>
-    </div>
-  </details>
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain insertion sort, merge sort and quicksort in plain words, and write them from memory.</li>
+    <li>Say <em>why</em> merge sort is n log n, and why quicksort is usually fast but sometimes terrible.</li>
+    <li>Explain why no comparison sort can beat n log n, and how counting sort cheats.</li>
+    <li>Know what "stable" means and when it matters.</li>
+    <li>Spot problems where "sort first" is the key move, and problems where sorting is a waste.</li>
+  </ol>
+</div>
 
-  <details class="box" open id="costs">
-    <summary><span class="kicker">Costs</span><span class="label">Cheat sheet</span></summary>
-    <div class="box-body">
-      <div class="table-wrap"><table>
-        <thead><tr><th>Algorithm</th><th>Best</th><th>Average</th><th>Worst</th><th>Extra space</th><th>Stable</th></tr></thead>
-        <tbody>
-          <tr><td>Insertion</td><td>O(n)</td><td>O(n²)</td><td>O(n²)</td><td>O(1)</td><td>yes</td></tr>
-          <tr><td>Merge</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n)</td><td>yes</td></tr>
-          <tr><td>Quick</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n²)</td><td>O(log n) stack</td><td>no</td></tr>
-          <tr><td>Heap</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(1)</td><td>no</td></tr>
-          <tr><td>Counting</td><td colspan="3">O(n + k), k = key range</td><td>O(k)</td><td>yes</td></tr>
-          <tr><td>Timsort (Python)</td><td>O(n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n)</td><td>yes</td></tr>
-        </tbody>
-      </table></div>
-    </div>
-  </details>
+<p class="muted small">How to read this: top to bottom, like a book. You should have read <a href="complexity.html">How fast is your code?</a> first. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
 
-  <details class="box senior" open id="interview">
-    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
-    <div class="box-body">
-      <ul>
-        <li><b>"Should I sort first?"</b> Sorting is often the O(n log n) step that turns an O(n²) problem into a two-pointer or greedy O(n) pass: intervals, two-sum on sorted input, meeting rooms, deduplication.</li>
-        <li><b>Quickselect</b>: partition, but recurse into only one side. That finds the k-th smallest in O(n) average. Compare it with a heap's O(n log k) and with full sorting.</li>
-        <li><b>Data bigger than memory:</b> external merge sort. Sort chunks that fit in RAM, write them out, then k-way merge with a heap. This is a classic follow-up, and it's how databases sort and how LSM compaction works.</li>
-        <li><b>Real libraries are hybrids:</b> Timsort finds existing runs (great on real-world, partly sorted data); introsort is quicksort + heapsort + insertion sort. Knowing <em>why</em> they are hybrids is the senior bit.</li>
-        <li><b>Custom comparators:</b> in Python, prefer <code>key=</code> over <code>cmp_to_key</code>. The key is computed once per element, not once per comparison.</li>
-      </ul>
-    </div>
-  </details>
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: a messy pile</h2>
 
-  <details class="box trap" open id="traps">
-    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
-    <div class="box-body">
-      <ul>
-        <li>Quicksort with a fixed first or last pivot on sorted input: O(n²), and possibly a recursion overflow.</li>
-        <li>Merge step using <code>&lt;</code> instead of <code>&lt;=</code> when taking from the left half breaks stability.</li>
-        <li>Sorting inside a loop: that's O(n² log n) hiding in one line.</li>
-        <li><code>list.sort()</code> returns <code>None</code>. <code>sorted()</code> returns a new list.</li>
-      </ul>
-    </div>
-  </details>
+<div class="story">
+  <p>A teacher has 500 exam papers in a random pile. She wants them in order by score, so she can find the median, spot ties, and see who's in the top 10.</p>
+  <p>Before sorting, every one of those questions means digging through the whole pile. After sorting, each one is instant: the median is the paper in the middle, ties sit next to each other, and the top 10 are on top.</p>
+</div>
 
-  <details class="box" open id="check">
-    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
-    <div class="box-body">
-      <details class="qa"><summary>You need to sort 1 billion 32-bit integers on one machine with 4 GB of RAM. Approach?</summary><p>Four bytes × 10⁹ = 4 GB, which doesn't fit with overhead. Use external merge sort: sort chunks of a few hundred MB, write the sorted runs to disk, then k-way merge them with a heap. Alternatively, with a bounded key range, counting in buckets (radix-style) also works.</p></details>
-      <details class="qa"><summary>Why is quicksort usually faster than heapsort even though both are O(n log n)?</summary><p>Quicksort scans memory sequentially during partitioning, which is cache-friendly with a tight inner loop. Heapsort jumps between i and 2i+1, causing cache misses at large n.</p></details>
-      <details class="qa"><summary>When would you choose merge sort over quicksort?</summary><p>When you need stability, a guaranteed worst case, or you're sorting linked lists or external data (merging is sequential access, no random access needed).</p></details>
-    </div>
-  </details>
+<p>That's the real reason sorting matters. <b>Sorting is a one-time cost that makes lots of later questions cheap.</b> Once a list is sorted:</p>
+<ul>
+  <li>Duplicates are <b>neighbors</b>, so one pass finds them.</li>
+  <li>You can find anything with <b>binary search</b> in O(log n) instead of O(n).</li>
+  <li><b>Two pointers</b> from the two ends can find pairs that add up to a target (you did this in the last chapter).</li>
+  <li>Overlapping intervals (meetings, bookings) line up so you can merge them in one pass.</li>
+</ul>
 
-  <details class="box" open id="practice">
-    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
-    <div class="box-body">
-      <p>Implement merge sort and quicksort (with a random pivot) from memory, and test both against <code>sorted()</code> on random lists, including duplicates and empty lists. Use <code>python tools/new.py exercise 02.02 sorts "Sorts from scratch"</code> to scaffold it.</p>
-      <p><b>Classic problems:</b> Sort Colors (Dutch national flag) · Kth Largest Element (quickselect) · Merge Intervals · Largest Number (custom comparator) · Sort List (merge sort on a linked list).</p>
+<p>So the question for this chapter is: what's the cheapest way to turn a messy pile into a sorted one? Let's start with the most natural idea, the one you'd use without thinking.</p>
+
+<div class="check" id="check-why">
+  <p class="q">Which of these gets much easier once the list is sorted?</p>
+  <div class="opts">
+    <button>Finding the sum of all numbers</button>
+    <button data-correct>Finding the two numbers that are closest together</button>
+    <button>Checking if the number 42 is in the list, once</button>
+  </div>
+  <div class="fb right"><p>Yes. After sorting, the closest pair must be <em>neighbors</em>, so one pass over n − 1 neighboring pairs finds it. Without sorting you'd compare every pair: n². The sum doesn't care about order at all, and for a single lookup, one O(n) scan is cheaper than an O(n log n) sort.</p></div>
+  <div class="fb wrong"><p>Ask: "does order help this question?" A sum is the same in any order, so sorting can't help. A <em>single</em> lookup is O(n) by scanning, while sorting costs O(n log n), so sorting just to check once is a loss (it only pays off if you'll search many times). But the closest pair: after sorting, the two closest numbers <em>must</em> sit next to each other. So you check n − 1 neighbors instead of n² pairs.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>The natural way: insertion sort</h2>
+
+<p>Think about how you sort a hand of playing cards. You pick up cards one at a time. Each new card, you slide left past the bigger ones until it's in the right spot. The cards in your hand are always sorted; you're just inserting one more.</p>
+
+<pre><code>def insertion_sort(a):
+    for i in range(1, len(a)):
+        card = a[i]                 # the new card
+        j = i - 1
+        while j >= 0 and card &lt; a[j]:
+            a[j + 1] = a[j]         # shift the bigger card right
+            j -= 1
+        a[j + 1] = card             # drop the new card in the gap</code></pre>
+
+<h3>How much work is it?</h3>
+<p>It depends on how messy the pile is.</p>
+<ul>
+  <li><b>Worst case: the pile is backwards.</b> Every new card has to slide all the way to the left. Card 2 slides 1 place, card 3 slides 2 places, … card n slides n − 1 places. That adds up to about n²/2. <b>O(n²).</b></li>
+  <li><b>Best case: the pile is already sorted.</b> Every new card is already in place. One comparison each, n comparisons in total. <b>O(n).</b></li>
+  <li><b>Nearly sorted:</b> only a few cards are out of place, so only a few slide. Close to O(n).</li>
+</ul>
+
+<div class="keyidea">Insertion sort is slow on a messy pile (n²) but very fast on an almost-sorted one (about n). Real-world data is often almost sorted, which is why Python's own sort uses insertion sort on small pieces.</div>
+
+<div class="check" id="check-insertion">
+  <p class="q">A log file has 1,000,000 lines, in time order, except that a handful of lines arrived a few milliseconds late and are slightly out of place. Roughly how many comparisons does insertion sort need?</p>
+  <div class="opts">
+    <button>About 500 billion (n²/2)</button>
+    <button>About 20 million (n log n)</button>
+    <button data-correct>About 1 million (n)</button>
+  </div>
+  <div class="fb right"><p>Right. Each line is compared once with its left neighbor and stays put. The few late lines slide a short way. So the total is about n plus a little. Insertion sort's cost is really "n plus the number of out-of-order pairs".</p></div>
+  <div class="fb wrong"><p>n²/2 is the <em>worst</em> case, when every card has to slide all the way left. Here, almost every line is already in place: it gets compared with its left neighbor once, and stops. Only a handful slide, and only a little. So it's about n comparisons. A useful way to say it: insertion sort costs <b>n + (number of out-of-order pairs)</b>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Divide and conquer: merge sort</h2>
+
+<p>n² is too slow for a million items (about 500 billion steps). We need a cleverer idea. Here's one that sounds almost too simple.</p>
+
+<h3>Step 1: merging two sorted piles is easy</h3>
+<p>Imagine two piles of exam papers, each already sorted, face up, lowest score on top. To combine them into one sorted pile, just look at the two top papers, take the lower one, and repeat. You never have to look deeper than the top of each pile. Each paper is handled once, so merging two piles with n papers in total takes about <b>n</b> steps.</p>
+
+<div class="figure">
+  <div id="merge-player"></div>
+  <div class="cap">Merging two sorted piles. At every step, compare only the two front cards (yellow) and move the smaller one down. Press ▶ Play or step with ▶|.</div>
+</div>
+
+<h3>Step 2: but where do sorted piles come from?</h3>
+<p>Here's the trick. Split the pile in half. Sort each half <em>the same way</em> (split it in half again, and again). Keep splitting until each pile has just one paper. A pile of one paper is already sorted! Then merge pairs of piles back together, level by level.</p>
+
+<pre><code>def merge_sort(a):
+    if len(a) &lt;= 1:
+        return a                    # one card: already sorted
+    mid = len(a) // 2
+    left = merge_sort(a[:mid])      # sort the left half
+    right = merge_sort(a[mid:])     # sort the right half
+    return merge(left, right)       # the easy part from step 1</code></pre>
+
+<h3>Why it's n log n</h3>
+<p>Draw the splitting as levels:</p>
+<pre class="diagram"><code>level 0:  [ 8 papers                    ]     merging here: 8 steps
+level 1:  [ 4          ] [ 4          ]     merging here: 4 + 4 = 8 steps
+level 2:  [ 2  ] [ 2  ] [ 2  ] [ 2  ]     merging here: 8 steps
+level 3:  [1][1] [1][1] [1][1] [1][1]     (nothing to merge)</code></pre>
+<p>Two facts make this work:</p>
+<ol>
+  <li><b>Every level does about n work in total.</b> The piles get smaller but there are more of them; together they always hold all n papers, and merging touches each paper once.</li>
+  <li><b>There are only log₂ n levels.</b> You halve each time, and (from the last chapter) you can only halve n about log₂ n times before you reach 1.</li>
+</ol>
+<p>n work per level × log n levels = <b>n log n</b>. For a million items, that's about 20 million steps instead of 500 billion. Same computer, 25,000 times less work.</p>
+
+<div class="keyidea">Merge sort = split in half until trivial, then merge back up. log n levels, n work per level, so O(n log n). Always, no matter what the input looks like.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: the tournament of teams</summary>
+  <p>Picture 1,024 people who need to line up by height. Instead of one person organizing everyone, pair them up: each pair lines itself up (easy). Then pairs of pairs merge into lines of 4. Then 8, 16, and so on. After 10 rounds (because 2¹⁰ = 1,024) there's one line.</p>
+  <p>In every round, every person takes one step into a merged line, so every round costs about 1,024 steps. 10 rounds × 1,024 people ≈ 10,000 steps. That "rounds × people" is exactly log n × n.</p>
+</details>
+
+<div class="check" id="check-merge">
+  <p class="q">You give merge sort a list that's <em>already</em> sorted. How much work does it do?</p>
+  <div class="opts">
+    <button>O(n), because it notices it's sorted</button>
+    <button data-correct>Still O(n log n)</button>
+    <button>O(n²)</button>
+  </div>
+  <div class="fb right"><p>Right. Merge sort doesn't look at the data before splitting. It still makes log n levels and still merges n items per level. That's its strength (predictable: never worse than n log n) and its weakness (never better either, unlike insertion sort).</p></div>
+  <div class="fb wrong"><p>Merge sort splits blindly, in the middle, without looking at the values. So it always builds the same log n levels and always merges every item at every level. Sorted, reversed, random: all n log n. (Python's real sort, Timsort, adds a check for already-sorted runs to get O(n) on sorted data. Plain merge sort doesn't.)</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: the recurrence, and the memory cost</summary>
+  <p>Write T(n) for the time to merge sort n items. Sorting n items means sorting two halves and merging: <b>T(n) = 2·T(n/2) + n</b>. Unroll it: T(n) = 4·T(n/4) + 2n = 8·T(n/8) + 3n = … = n·T(1) + n·log₂ n. That's the same n log n as the picture, in algebra form. This pattern ("split into 2 halves, do n extra work") is so common that it's worth recognizing on sight; the general tool is called the <em>Master Theorem</em>.</p>
+  <p><b>Memory:</b> merging needs somewhere to put the merged result, so merge sort uses <b>O(n) extra space</b>. That's its main downside. It's also why merge sort is the go-to for data too big to fit in memory: you sort chunks that fit, write them to disk, then merge the sorted files by reading just the front of each one. That's <em>external merge sort</em>, and databases do it every time you ORDER BY a huge table.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Quicksort: the bouncer</h2>
+
+<p>Merge sort does its hard work on the way <em>up</em> (merging). Quicksort flips this around: it does the hard work on the way <em>down</em>, so there's nothing left to do on the way up.</p>
+
+<p>Picture a bouncer at a club with a height cutoff. Pick one person as the <b>pivot</b>. Everyone shorter than the pivot goes to the left room. Everyone taller goes to the right room. The pivot stands in the doorway, and now the pivot is in exactly the right final spot. Then each room gets its own bouncer and does the same thing. When a room has 0 or 1 people, it's done.</p>
+
+<p>The splitting step is called <b>partitioning</b>. It takes one pass over the items, so it's O(n), and it happens in place: no second list needed.</p>
+
+<div class="figure">
+  <div id="part-player"></div>
+  <div class="cap">Partitioning around the pivot (purple, the last item). Green cells are known to be smaller than the pivot. The scanner (yellow) checks one item at a time and swaps small ones into the green zone. At the end the pivot swaps into the doorway.</div>
+</div>
+
+<pre><code>def quicksort(a, lo, hi):
+    if lo &gt;= hi:
+        return
+    p = partition(a, lo, hi)   # pivot lands at index p, in its final spot
+    quicksort(a, lo, p - 1)    # the "shorter" room
+    quicksort(a, p + 1, hi)    # the "taller" room</code></pre>
+
+<h3>Good pivot, bad pivot</h3>
+<p>Everything depends on the pivot.</p>
+<ul>
+  <li><b>Good pivot</b> (near the middle): the two rooms are about the same size. That's just like merge sort's halving: log n levels, n work per level, <b>O(n log n)</b>.</li>
+  <li><b>Bad pivot</b> (the smallest or largest): one room is empty and the other has everyone but the pivot. You've removed just <em>one</em> person per level. n levels × n work = <b>O(n²)</b>.</li>
+</ul>
+<p>Here's the trap. A simple quicksort uses the last item as the pivot. If the list is <b>already sorted</b>, the last item is always the largest. Worst case, every time, on the most innocent-looking input there is.</p>
+
+<p>The fix: <b>pick the pivot at random.</b> Now no input is bad on purpose. You'd have to be wildly unlucky, picking the smallest or largest over and over, and that's about as likely as flipping heads a thousand times in a row. On average a random pivot lands somewhere in the middle half, which is plenty good enough.</p>
+
+<div class="keyidea">Quicksort = partition around a pivot, then recurse on both sides. Average O(n log n), worst O(n²). A random pivot makes the worst case practically impossible. It sorts in place and is usually the fastest in practice.</div>
+
+<div class="check" id="check-pivot">
+  <p class="q">Quicksort always picks the <em>first</em> item as the pivot. Which input makes it slowest?</p>
+  <div class="opts">
+    <button>A random shuffle</button>
+    <button data-correct>A list that's already sorted</button>
+    <button>It doesn't matter; quicksort is always n log n</button>
+  </div>
+  <div class="fb right"><p>Right. In a sorted list the first item is the smallest, so the "smaller" room is always empty and you peel off one item per level: n levels, O(n²). A reversed list is just as bad. That's why real quicksorts pick a random pivot (or the median of three samples).</p></div>
+  <div class="fb wrong"><p>Quicksort is only n log n when the pivot splits the list into two decent-sized rooms. If the list is already sorted, the first item is the <em>smallest</em>. Everyone else goes to the "taller" room; the other room is empty. You've only removed one item, and you do that n times: n levels of about n work, so O(n²). Random pivots fix this because no fixed input can trick them.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: when everybody is the same height</summary>
+  <p>Random pivots don't save you from one case: lots of <b>equal</b> items. If all n items are equal, a simple partition puts every item in the same room (they're all "not smaller" than the pivot). One room of n − 1, again and again: O(n²) and, in Python, a RecursionError.</p>
+  <p>The fix is the <b>three-way partition</b> (sometimes called the Dutch national flag partition): split into <em>smaller</em>, <em>equal</em>, and <em>larger</em>. The equal group is finished immediately, and you only recurse on the other two. On an all-equal list, that's one pass and done. Your <code>quicksort</code> exercise tests exactly this.</p>
+  <pre><code>lt, i, gt = lo, lo, hi          # [lo, lt) smaller, [lt, i) equal, (gt, hi] larger
+while i &lt;= gt:
+    if a[i] &lt; pivot:   swap(a, lt, i); lt += 1; i += 1
+    elif pivot &lt; a[i]: swap(a, i, gt); gt -= 1      # don't move i: the swapped-in item is unchecked
+    else:              i += 1</code></pre>
+  <p><b>Why "average n log n" isn't hand-waving:</b> with random pivots, the expected number of comparisons is about 2n·ln n ≈ 1.39·n·log₂ n. Only 39% more than a perfect split every time. The proof counts, for each pair of items, the chance they ever get compared; it's a classic, and worth looking up once.</p>
+  <p><b>Recursion depth:</b> recursing into the smaller room first (and looping on the bigger one) keeps the call stack at O(log n) even in bad cases.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Watch them race</h2>
+
+<p>Time to see all of this. Pick a sort and a kind of input. The counters under the bars show comparisons and writes; compare them with n log₂ n and n²/2 at the end. Things to try:</p>
+<ol>
+  <li>Insertion sort on <b>Nearly sorted</b>, then on <b>Reversed</b>. Huge difference.</li>
+  <li>Quicksort (this one uses the last item as pivot, on purpose) on <b>Random</b>, then on <b>Already sorted</b>. Watch the purple pivot peel off one bar at a time.</li>
+  <li>Merge sort on everything. Boringly similar every time. That's the point.</li>
+</ol>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <select id="so-algo"><option value="insertion">Insertion sort</option><option value="merge">Merge sort</option><option value="quick" selected>Quicksort (last-item pivot)</option><option value="heap">Heapsort</option></select>
+      <select id="so-data"><option value="random">Random</option><option value="nearly">Nearly sorted</option><option value="sorted">Already sorted</option><option value="reversed">Reversed</option><option value="few">Few unique values</option></select>
+      <button class="btn" id="so-go">New run</button>
     </div>
+    <div id="so-player" style="margin-top:10px"></div>
+  </div>
+  <div class="cap">Yellow = being compared, blue = just written, purple = pivot, green = in its final place. Faded bars are outside the part currently being worked on.</div>
+</div>
+
+<div class="check" id="check-race">
+  <p class="q">In the playground, which sort's comparison count changes the <em>least</em> between Random and Already sorted?</p>
+  <div class="opts">
+    <button>Insertion sort</button>
+    <button data-correct>Merge sort</button>
+    <button>Quicksort (last-item pivot)</button>
+  </div>
+  <div class="fb right"><p>Yes. Merge sort splits in the middle without looking, so its work hardly depends on the data (sorted input actually saves a few comparisons during merging, but it stays n log n). Insertion sort drops to about n on sorted input; this quicksort jumps to about n²/2.</p></div>
+  <div class="fb wrong"><p>Try it in the playground: run each sort on Random, then Already sorted, and read the final counts. Insertion sort <em>drops</em> to about n (nothing slides). Last-item quicksort <em>explodes</em> to about n²/2 (worst pivot every time). Merge sort barely moves, because it splits in the middle without ever looking at the values.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>The speed limit: why nothing beats n log n</h2>
+
+<p>Merge sort is n log n. Quicksort is n log n on average. Heapsort (you met heaps in chapter 1) is n log n. Why does everyone get stuck at the same number? Is there a smarter idea nobody's found yet?</p>
+<p>No, and you can prove it with a game of <b>20 questions</b>.</p>
+
+<div class="story">
+  <p>I shuffle n cards and hide them. Your job is to figure out the exact order. You may only ask yes/no questions of the form "is card A smaller than card B?". How many questions do you need?</p>
+</div>
+
+<p>Count the possible answers first. There are <b>n!</b> possible orders (n × (n − 1) × … × 1). For 3 cards that's 6; for 10 cards, 3.6 million.</p>
+<p>Each yes/no answer can at best cut the possibilities in half. To get from n! possibilities down to 1, you need at least <b>log₂(n!)</b> questions, because that's how many halvings it takes. And log₂(n!) is about <b>n log₂ n</b>.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>cards n</th><th>possible orders n!</th><th>questions needed log₂(n!)</th><th>n log₂ n</th></tr></thead>
+  <tbody>
+    <tr><td>3</td><td>6</td><td>3 (2.6, rounded up)</td><td>4.8</td></tr>
+    <tr><td>10</td><td>3,628,800</td><td>22</td><td>33</td></tr>
+    <tr><td>1,000</td><td>a 2,568-digit number</td><td>about 8,530</td><td>about 9,970</td></tr>
+  </tbody>
+</table></div>
+
+<p>A sort that only learns about the data by comparing two items is playing this game. So <b>any comparison sort needs about n log n comparisons in the worst case</b>. Merge sort and heapsort aren't just good; they're as good as it gets.</p>
+
+<div class="keyidea">Every comparison is a yes/no question. There are n! possible orders, so you need log₂(n!) ≈ n log n questions. That's a hard floor for any sort that works by comparing.</div>
+
+<div class="check" id="check-floor">
+  <p class="q">Someone claims their new sort handles any list of numbers in O(n), using only comparisons. What's wrong?</p>
+  <div class="opts">
+    <button>Nothing; maybe they're just clever</button>
+    <button data-correct>n comparisons can only tell apart about 2ⁿ orders, but there are n! of them</button>
+    <button>O(n) is impossible for any task involving a list</button>
+  </div>
+  <div class="fb right"><p>Exactly. n yes/no answers can distinguish at most 2ⁿ situations, and n! grows much faster than 2ⁿ (for n = 20, n! is about 2.4 × 10¹⁸ while 2²⁰ is about a million). So two different orders would get the same answers, and the sort would get one of them wrong.</p></div>
+  <div class="fb wrong"><p>Use the 20-questions argument. With n yes/no questions, you can tell apart at most 2ⁿ different situations. But there are n! possible orders, and n! is way bigger than 2ⁿ (try n = 20). So some different orders would get identical answers, and the sort would have to treat them the same, which means getting one wrong. O(n) <em>is</em> possible, but only by doing something other than comparing; that's the next section.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: why log₂(n!) ≈ n log₂ n</summary>
+  <p>log(n!) = log 1 + log 2 + … + log n. That's at most n·log n (n terms, none bigger than log n). It's also at least the top half of the terms: (n/2) terms, each at least log(n/2), giving (n/2)·log(n/2). Both bounds are "some constant × n log n", so log(n!) = Θ(n log n). (Stirling's formula gives the exact form: log₂(n!) ≈ n log₂ n − 1.44n.)</p>
+  <p>This argument is called a <b>decision tree lower bound</b>. It's one of the few places in computer science where you can prove that no algorithm, ever, can beat a limit.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Breaking the limit: don't compare at all</h2>
+
+<p>The speed limit only applies to sorts that <em>compare</em>. If you know something extra about your data, you can skip comparing entirely.</p>
+
+<h3>Counting sort: pigeonholes</h3>
+<p>Think of a post office sorting letters by zip code into a wall of pigeonholes. The clerk never compares two letters. She reads the zip code and drops the letter straight into its hole. Then she collects the holes in order.</p>
+<p>If your keys are small whole numbers (ages 0–120, exam scores 0–100, bytes 0–255), you can do the same:</p>
+<ol>
+  <li><b>Count</b> how many items have each key. One pass: O(n).</li>
+  <li>Work out where each key's group <b>starts</b> in the output (a running total of the counts). O(k), where k is the number of possible keys.</li>
+  <li><b>Place</b> each item at its group's next free spot, going through the input in order. One pass: O(n).</li>
+</ol>
+<p>Total: <b>O(n + k)</b>. For a million people sorted by age, that's about a million steps, not 20 million.</p>
+
+<div class="figure">
+  <div id="count-player"></div>
+  <div class="cap">Counting sort on exam grades 0–4. Each item drops into its pigeonhole without being compared to anything. Then the holes are emptied in order.</div>
+</div>
+
+<h3>Radix sort: one digit at a time</h3>
+<p>What if keys are big, like 9-digit numbers? A billion pigeonholes is too many. Instead, sort by the <b>last digit</b> (10 holes), then by the second-last, and so on. Each pass must be <em>stable</em> (next section) so that earlier passes aren't undone. Nine passes of O(n) each sorts 9-digit numbers. It's how old punch-card machines sorted, and it's still used for sorting integers and fixed-length strings.</p>
+
+<div class="check" id="check-counting">
+  <p class="q">When is counting sort a <em>bad</em> idea?</p>
+  <div class="opts">
+    <button>Sorting 10 million people by birth year</button>
+    <button data-correct>Sorting 100 prices that can be anywhere from 0 to 1,000,000,000 cents</button>
+    <button>Sorting a million bytes</button>
+  </div>
+  <div class="fb right"><p>Right. Counting sort costs O(n + k). Here n = 100 but k = a billion pigeonholes, almost all empty. A normal O(n log n) sort does about 700 comparisons. Counting sort shines only when k is small compared to n.</p></div>
+  <div class="fb wrong"><p>Look at both parts of O(n + k). Birth years: n = 10 million, k ≈ 150 years; great. Bytes: k = 256; great. But 100 prices with k = a billion means building a billion pigeonholes to hold 100 items. A regular sort on 100 items takes about 700 comparisons. Counting sort only wins when the range of keys (k) isn't much bigger than the number of items (n).</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Stability: keeping ties in order</h2>
+
+<p>A sort is <b>stable</b> if items with equal keys stay in the same order they started in.</p>
+
+<p>Why would you care? Imagine a spreadsheet of employees, already sorted by name. Now you sort by department. With a <b>stable</b> sort, everyone within the same department is <em>still in name order</em>, because equal departments kept their earlier (alphabetical) order. With an unstable sort, each department comes out scrambled.</p>
+
+<div class="cols">
+<div>
+<pre><code>Before (sorted by name)
+Ana    Sales
+Bo     Eng
+Cy     Sales
+Di     Eng</code></pre>
+</div>
+<div>
+<pre><code>After a STABLE sort by department
+Bo     Eng      ← Bo before Di, still
+Di     Eng
+Ana    Sales    ← Ana before Cy, still
+Cy     Sales</code></pre>
+</div>
+</div>
+
+<p>This "sort by the less important key first, then stably by the more important key" trick is exactly how radix sort works, and it's how clicking column headers in a table behaves.</p>
+
+<ul>
+  <li><b>Stable:</b> insertion sort, merge sort, counting sort, Python's <code>sorted</code> and <code>list.sort</code> (Timsort), Java's object sort.</li>
+  <li><b>Not stable:</b> the usual quicksort and heapsort (they swap items over long distances, jumping over equal ones), C++'s <code>std::sort</code>.</li>
+</ul>
+
+<div class="check" id="check-stable">
+  <p class="q">You want a list of orders sorted by customer, and within each customer, by date. You have a stable sort. What do you do?</p>
+  <div class="opts">
+    <button>Sort by customer, then sort by date</button>
+    <button data-correct>Sort by date, then sort by customer</button>
+    <button>It's impossible with one key at a time</button>
+  </div>
+  <div class="fb right"><p>Right. The <em>last</em> sort wins as the main order; the stable sort keeps the earlier order (date) inside each group of ties (same customer). In Python you'd usually just write <code>sorted(orders, key=lambda o: (o.customer, o.date))</code>, which does it in one go.</p></div>
+  <div class="fb wrong"><p>Think about which sort decides the final order: the <em>last</em> one. So the last sort should be by customer. Stability then keeps ties (orders from the same customer) in whatever order they had before, so the sort <em>before</em> it should be by date. Least important key first, most important key last. (In Python, a tuple key <code>(customer, date)</code> does it in one sort.)</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>What real languages actually use</h2>
+
+<p>Real-world sorts are hybrids that steal the best part of each idea:</p>
+<ul>
+  <li><b>Timsort</b> (Python, Java for objects, Android): finds runs that are already sorted, uses insertion sort to stretch short runs, then merges runs like merge sort. Stable. O(n) on sorted data, O(n log n) worst case.</li>
+  <li><b>Introsort / pdqsort</b> (C++ <code>std::sort</code>, Rust's unstable sort, Go): quicksort, but switches to heapsort if the recursion gets suspiciously deep (so the worst case is n log n) and to insertion sort for tiny pieces. Not stable, in place, very fast.</li>
+</ul>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Sort</th><th>Best</th><th>Average</th><th>Worst</th><th>Extra space</th><th>Stable?</th><th>Use it when</th></tr></thead>
+  <tbody>
+    <tr><td>Insertion</td><td>n</td><td>n²</td><td>n²</td><td>1</td><td>yes</td><td>tiny lists, nearly sorted data</td></tr>
+    <tr><td>Merge</td><td>n log n</td><td>n log n</td><td>n log n</td><td>n</td><td>yes</td><td>you need stable, guaranteed, or data on disk</td></tr>
+    <tr><td>Quick (random pivot)</td><td>n log n</td><td>n log n</td><td>n² (very unlikely)</td><td>log n</td><td>no</td><td>general in-memory sorting; fastest in practice</td></tr>
+    <tr><td>Heap</td><td>n log n</td><td>n log n</td><td>n log n</td><td>1</td><td>no</td><td>guaranteed n log n with no extra memory</td></tr>
+    <tr><td>Counting</td><td>n + k</td><td>n + k</td><td>n + k</td><td>n + k</td><td>yes</td><td>small integer keys</td></tr>
+    <tr><td>Radix</td><td>d(n + b)</td><td>d(n + b)</td><td>d(n + b)</td><td>n + b</td><td>yes</td><td>fixed-width integers or strings</td></tr>
+  </tbody>
+</table></div>
+
+<details class="aside deeper">
+  <summary>Go deeper: why quicksort beats heapsort in practice</summary>
+  <p>Both are n log n on paper. But quicksort's partition walks through memory in a straight line, which is what CPU caches are built for: when you read one item, the next few come along for free. Heapsort jumps from index i to 2i + 1, all over the array, missing the cache constantly. The Big-O is the same; the constant factor is not. This is a great example of "when Big-O lies" from the last chapter.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>Sorting as a tool in interviews</h2>
+
+<p>In interviews, you rarely implement a sort. You <em>use</em> one. Here are the patterns to recognize:</p>
+<ol>
+  <li><b>Sort, then scan neighbors.</b> Closest pair, duplicates, "minimum difference", grouping anagrams (sort the letters of each word to get its key).</li>
+  <li><b>Sort intervals by start.</b> Merge overlapping meetings, count rooms needed, insert an interval. After sorting by start, anything that overlaps the current interval must come right after it.</li>
+  <li><b>Sort, then two pointers or binary search.</b> Pair sums, three-sum, "how many pairs are under a limit".</li>
+  <li><b>Custom order.</b> "Largest number from these digits" sorts by a comparison rule, not by value: put a before b if a+b &gt; b+a as strings.</li>
+  <li><b>Don't sort everything when you only need part.</b>
+    <ul>
+      <li>The k-th smallest item: <b>quickselect</b> partitions like quicksort but only recurses into the side that contains k. Average O(n).</li>
+      <li>The top k of a huge stream: keep a <b>heap of size k</b>. O(n log k), with only k items in memory.</li>
+    </ul>
+  </li>
+  <li><b>Don't sort when a hash set will do.</b> "Any duplicates?" is O(n) with a set and O(n log n) with sorting. Mention both, and pick the set unless memory is tight.</li>
+</ol>
+
+<div class="check" id="check-topk">
+  <p class="q">A server sees 1 billion requests a day. You want the 10 slowest. What's the best approach?</p>
+  <div class="opts">
+    <button>Store all of them and sort: O(n log n)</button>
+    <button data-correct>Keep a min-heap of the 10 slowest seen so far: O(n log 10), 10 items of memory</button>
+    <button>Quickselect for the 10th slowest, then scan</button>
+  </div>
+  <div class="fb right"><p>Right. For each request, compare it with the fastest of your current top 10 (the heap's top). If it's slower, swap it in: O(log 10) work, which is basically constant. One pass, tiny memory, and it works on a stream that never ends. Quickselect is O(n) too, but it needs all billion items in memory at once.</p></div>
+  <div class="fb wrong"><p>Sorting a billion items to keep 10 does a huge amount of work you throw away, and needs the whole billion in memory. Quickselect avoids the sorting but still needs everything in memory. A min-heap of size 10 holds your current "top 10 slowest"; its top is the fastest of them. Each new request either beats that and replaces it (O(log 10)), or is ignored. One pass, 10 items of memory, works on a live stream.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>What to say in the interview</h2>
+
+<p>When sorting comes up, a strong answer sounds like this:</p>
+<ol>
+  <li><b>Say why sorting helps:</b> "If I sort by start time, overlapping meetings end up next to each other, so one pass merges them."</li>
+  <li><b>Say the cost:</b> "Sorting is O(n log n), and the scan is O(n), so overall O(n log n). Python's sort uses O(n) extra memory."</li>
+  <li><b>Check if you can do better:</b> "Do we need everything sorted, or just the top k? If just the top k, a heap gets O(n log k)." Or: "The keys are ages, so counting sort would make this O(n)."</li>
+  <li><b>Mention stability if ties matter:</b> "Python's sort is stable, so equal start times keep their input order."</li>
+</ol>
+<p>If you're asked to <em>implement</em> a sort, merge sort is the safest to write correctly under pressure. If you choose quicksort, say "random pivot" and "three-way partition for duplicates" before anyone asks.</p>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Sorting is a one-time O(n log n) cost that makes many later questions cheap: neighbors, binary search, two pointers, intervals.</li>
+  <li>Insertion sort: O(n²) in general, about O(n) when nearly sorted. Stable, tiny overhead.</li>
+  <li>Merge sort: split, sort halves, merge. log n levels × n per level = O(n log n) always. Stable. O(n) extra memory.</li>
+  <li>Quicksort: partition around a pivot. O(n log n) average, O(n²) with bad pivots. Use a random pivot and three-way partitioning. In place, fastest in practice, not stable.</li>
+  <li>No comparison sort beats n log n: n! orders, yes/no answers, log₂(n!) ≈ n log n.</li>
+  <li>Counting and radix sort beat it by not comparing: O(n + k) for small integer keys.</li>
+  <li>Stable means ties keep their order. Sort by the least important key first, or use a tuple key.</li>
+  <li>Need only part of the order? Quickselect (k-th item, O(n)) or a size-k heap (top k, O(n log k)).</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first. The coding exercises are in <code>exercises/sorts.py</code>. Their tests count every comparison you make, so a correct but slow sort fails. Run them with <code>python3 -m pytest -k sorts</code>.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Trace it by hand</h4>
+  <p>Sort <code>[5, 2, 8, 1, 9, 3]</code> three times on paper: with insertion sort (write the list after each card is inserted), merge sort (draw the split levels and each merge), and quicksort with the last item as pivot (write the list after each partition). Count comparisons for each.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Pick the sort</h4>
+  <p>Which sort, and why? (a) 50 items on a tiny embedded chip with almost no spare memory. (b) 2 TB of log lines on a machine with 16 GB of RAM. (c) A list that's sorted except for 20 new items appended at the end. (d) 100 million test scores from 0 to 100. (e) Customer records that are already sorted by signup date, and you need them by country with signup order kept inside each country.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Insertion sort (tiny n, O(1) memory) or heapsort. (b) External merge sort: sort 16 GB chunks, write them out, then merge the sorted files. (c) Insertion sort or Timsort: nearly sorted, so about O(n). Or sort the 20 new items and merge: O(n). (d) Counting sort: k = 101, so O(n). (e) Any stable sort by country; Python's <code>sorted(records, key=country)</code>.</p>
   </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Break the quicksort</h4>
+  <p>Write down an input of 8 numbers that makes "first item as pivot" quicksort do the most comparisons. How many does it do? Then write one that makes it do the fewest. Then explain in two sentences why a random pivot means no input is the worst every time.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>insertion_sort(items)</code>, in place and stable</h4>
+  <p>The card-hand sort. The test checks it's stable and that a nearly sorted list of 2,000 items takes about 2,000 comparisons, not 2 million.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>merge_sort(items)</code>, returns a new list</h4>
+  <p>Split, sort the halves, merge. The test checks stability (when the two fronts are equal, take from the left pile!) and that you use at most n log₂ n comparisons.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>quicksort(items)</code>, in place, random pivot</h4>
+  <p>The test throws five kinds of input at it, including already sorted and <em>all items equal</em>. The simple version passes the first and fails the second. Read the "Go deeper" box in section 4 when it does.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>counting_sort(items, key, max_key)</code>, O(n + k)</h4>
+  <p>Sort people by age without ever comparing two people. The test's items raise an error if you compare them. It must be stable, so place items by walking the input from left to right.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>8. <code>merge_intervals(intervals)</code></h4>
+  <p>The classic "sort then scan". Sort by start, then walk through: if the next interval starts before (or exactly when) the current one ends, stretch the current one; otherwise start a new one.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>9. <code>kth_smallest(items, k)</code> with quickselect</h4>
+  <p>Partition like quicksort, then only keep going on the side that contains position k. The test allows about 10n comparisons for n = 20,000; sorting the whole thing needs about 13n, so it fails.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>10. Sort a file bigger than memory</h4>
+  <p>You have a 100 GB file of numbers and 1 GB of RAM. Describe, step by step, how to sort it. How many chunks? How do you merge 100 sorted files at once without loading them? (Hint: a heap holding the front number of each file.) How many times is every number read from disk?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>11. Say it out loud</h4>
+  <p>Set a 3-minute timer. Explain to an imaginary interviewer: why quicksort is O(n²) in the worst case, why it's still the default in many libraries, and what two tricks make it safe. Did you mention random pivots, three-way partitioning, and cache-friendliness?</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="complexity.html"><small>← Previous</small>How fast is your code?</a>
+  <a class="next" href="binary-search.html"><small>Next →</small>Binary search and "search on the answer"</a>
+</nav>
+
 </main>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
+
+  // ---------- Merge two sorted piles (section 3) ----------
+  (function () {
+    const L = [2, 5, 7, 11], R = [1, 3, 8, 9, 12];
+    const fr = []; let i = 0, j = 0, nc = 0; const out = [];
+    const snap = (msg, took) => fr.push({ i, j, out: [...out], msg, took });
+    snap("Two sorted piles. Look only at the two front cards.");
+    while (i < L.length && j < R.length) {
+      nc++;
+      if (R[j] < L[i]) { out.push(R[j]); snap(`Front cards: <b>${L[i]}</b> vs <b>${R[j]}</b>. ${R[j]} is smaller, so it goes down.`, "R"); j++; }
+      else { out.push(L[i]); snap(`Front cards: <b>${L[i]}</b> vs <b>${R[j]}</b>. ${L[i]} is smaller (or equal, so the left pile wins: that's what keeps it stable).`, "L"); i++; }
+      fr[fr.length - 1].i = i; fr[fr.length - 1].j = j;
+    }
+    while (i < L.length) { out.push(L[i++]); snap("Right pile is empty: the rest of the left pile goes down as is."); }
+    while (j < R.length) { out.push(R[j++]); snap("Left pile is empty: the rest of the right pile goes down as is."); }
+    fr[fr.length - 1].msg = `Done: ${L.length + R.length} cards merged with ${nc} comparisons. Each card was handled exactly once, so merging is O(n).`;
+    V.player($("merge-player"), {
+      frames: fr, speed: 900,
+      draw(f, stage) {
+        const row = (label, vals, cls) => V.el("div", { style: "display:flex;align-items:center;gap:10px;margin:6px 0" }, V.el("span", { class: "small muted", style: "width:64px" }, label), V.cells(vals, { idx: false, cls }));
+        stage.append(
+          row("left", L, (k) => (k < f.i ? "dim" : k === f.i && f.j < R.length ? "cmp" : "")),
+          row("right", R, (k) => (k < f.j ? "dim" : k === f.j && f.i < L.length ? "cmp" : "")),
+          row("merged", f.out.length ? f.out : [null], (k) => (k === f.out.length - 1 ? "hl" : "done")),
+        );
+      },
+    });
+  })();
+
+  // ---------- Partition (section 4) ----------
+  (function () {
+    const a = [7, 2, 9, 4, 1, 8, 3, 6, 5];
+    const hi = a.length - 1, p = a[hi]; let i = 0;
+    const fr = [];
+    const snap = (j, msg, extra = {}) => fr.push({ a: [...a], i, j, msg, ...extra });
+    snap(-1, `Pivot = <b>${p}</b> (the last item). Goal: everything smaller than ${p} to the left.`);
+    for (let j = 0; j < hi; j++) {
+      if (a[j] < p) {
+        snap(j, `${a[j]} &lt; ${p}: it belongs on the left. Swap it to the end of the green zone.`);
+        [a[i], a[j]] = [a[j], a[i]]; i++;
+        snap(j, `Green zone grows to ${i} item${i > 1 ? "s" : ""}.`);
+      } else snap(j, `${a[j]} ≥ ${p}: leave it where it is.`);
+    }
+    [a[i], a[hi]] = [a[hi], a[i]];
+    snap(-1, `Finally swap the pivot into the doorway at index ${i}. Left of it: all smaller. Right: all larger. ${p} is in its final spot, and we never compared the left room with the right room.`, { final: i });
+    V.player($("part-player"), {
+      frames: fr, speed: 900,
+      draw(f, stage) {
+        stage.append(V.cells(f.a, {
+          cls: (k) => (f.final === k ? "pivot" : f.final === undefined && k === hi ? "pivot" : k === f.j ? "cmp" : k < f.i ? "done" : ""),
+          ptrs: f.final === undefined ? { [f.i]: "edge", ...(f.j >= 0 ? { [f.j]: "scan" } : {}) } : {},
+        }));
+      },
+    });
+  })();
+
+  // ---------- Counting sort (section 7) ----------
+  (function () {
+    const items = [["Ana", 3], ["Bo", 1], ["Cy", 3], ["Di", 0], ["Ed", 1], ["Fay", 4], ["Gus", 1]];
+    const K = 5, holes = Array.from({ length: K }, () => []), fr = [];
+    const snap = (msg, cur, out) => fr.push({ holes: holes.map((h) => [...h]), cur, out: out ? [...out] : null, msg });
+    snap("Seven students with grades 0–4. Five pigeonholes, one per grade.", -1);
+    items.forEach(([n, g], k) => { holes[g].push(n); snap(`${n} has grade ${g}: drop into hole ${g}. No comparisons.`, k); });
+    const out = [];
+    for (let g = 0; g < K; g++) for (const n of holes[g]) { out.push(n + " " + g); snap(`Empty hole ${g} in order: ${n}.`, -1, out); }
+    fr[fr.length - 1].msg = "Sorted, in O(n + k). Bo, Ed and Gus all have grade 1 and came out in their original order: stable.";
+    V.player($("count-player"), {
+      frames: fr, speed: 800,
+      draw(f, stage) {
+        stage.append(V.el("div", { class: "small muted" }, "input"), V.cells(items.map(([n, g]) => n + " " + g), { idx: false, cls: (k) => (k === f.cur ? "cmp" : "") }));
+        stage.append(V.el("div", { style: "display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:10px" },
+          f.holes.map((h, g) => V.el("div", { class: "panel", style: "padding:6px;min-height:80px" }, V.el("div", { class: "small muted" }, "hole " + g), h.map((n) => V.el("div", { class: "small" }, n))))));
+        if (f.out) stage.append(V.el("div", { class: "small muted", style: "margin-top:8px" }, "output"), V.cells(f.out, { idx: false, cls: (k) => (k === f.out.length - 1 ? "hl" : "done") }));
+      },
+    });
+  })();
+
+  // ---------- Playground (section 5) ----------
   const N = 28;
   function data(kind) {
     let a = Array.from({ length: N }, (_, i) => i + 1);
@@ -172,7 +659,6 @@
     snap({ msg: "" });
     const last = fr[fr.length - 1];
     last.msg = `Sorted. <b>${cmp}</b> comparisons and <b>${wr}</b> writes for n = ${a.length} (n log₂ n ≈ ${Math.round(a.length * Math.log2(a.length))}, n²/2 = ${a.length * a.length / 2}).`;
-    // Thin out frames so playback stays watchable.
     const step = Math.max(1, Math.floor(fr.length / 260));
     return fr.filter((_, i) => i % step === 0 || i === fr.length - 1);
   }

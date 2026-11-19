@@ -4,7 +4,30 @@
 the placeholders. This page is the style guide that keeps new pages consistent
 with chapters 1 and 2.
 
-## Concept pages (`concept.html`)
+## Book chapters (the new format, use this for rewrites)
+
+`sections/02-algorithms/concepts/complexity.html` and `sorting.html` are the
+reference. A book chapter reads top to bottom instead of being a stack of boxes:
+
+- `<main class="content book">`, load `assets/book.js` after `shell.js`.
+- `header.chapter-head` (eyebrow, h1, meta), then a `.learn-list` of outcomes.
+- Numbered sections: `<h2 id="s1"><span class="sec-num">1</span>Title</h2>`.
+  The sidebar table of contents is built from these.
+- Section 1 is always **the problem**, told as a small `.story` in plain words.
+- Each idea: plain explanation, then a picture or `.figure` visualization, then
+  a `.keyidea`, then a `.check` (quick check). Hard ideas get more space.
+- Quick check: `.check` with `.q`, buttons in `.opts` (right one has
+  `data-correct`), `.fb.right` and `.fb.wrong`. The wrong feedback must explain
+  the idea again in a *different* way, not just give the answer.
+- Optional asides: `details.aside.another` ("Explain it another way") and
+  `details.aside.deeper` ("Go deeper") for the formal or senior-level material.
+- End: "What to say in the interview", `#summary`, `<div class="review" id="review">`,
+  `#exercises` with `.exercise` cards tiered `warm` (paper), `core` (code with
+  tests that count work, not just answers), `stretch`; then `nav.chapter-nav`.
+- Voice: write for a smart high schooler. Short sentences, everyday analogies,
+  real numbers. Define every term the first time it appears.
+
+## Concept pages, box format (`concept.html`, older pages)
 
 Each page is a stack of collapsible **group boxes** (`<details class="box">`).
 Keep this order and delete panes that don't apply:

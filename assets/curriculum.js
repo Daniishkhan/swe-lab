@@ -337,7 +337,7 @@ window.CURRICULUM = {
     {
      "file": "complexity.html",
      "topic": "02.01",
-     "title": "Complexity analysis"
+     "title": "How fast is your code? (Complexity analysis)"
     },
     {
      "file": "dynamic-programming.html",
@@ -347,7 +347,7 @@ window.CURRICULUM = {
     {
      "file": "sorting.html",
      "topic": "02.02",
-     "title": "Sorting and its trade-offs"
+     "title": "Putting things in order (Sorting)"
     },
     {
      "file": "two-pointers-sliding-window.html",
@@ -371,6 +371,15 @@ window.CURRICULUM = {
      "title": "Binary search and \"search on the answer\"",
      "topics": [
       "02.03"
+     ],
+     "result": null
+    },
+    {
+     "file": "complexity_drills.py",
+     "module": "complexity_drills",
+     "title": "Complexity drills: code whose tests measure how much work it does",
+     "topics": [
+      "02.01"
      ],
      "result": null
     },
@@ -416,6 +425,15 @@ window.CURRICULUM = {
      "title": "Two pointers, sliding window, prefix sums",
      "topics": [
       "02.04"
+     ],
+     "result": null
+    },
+    {
+     "file": "sorts.py",
+     "module": "sorts",
+     "title": "Sorts from scratch: write the sorts, and prove how much work they do",
+     "topics": [
+      "02.02"
      ],
      "result": null
     },
@@ -1440,5 +1458,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-19 18:28"
+ "generated": "2026-11-19 18:52"
 };

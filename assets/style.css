@@ -244,6 +244,8 @@ a.card:hover { border-color: var(--accent); text-decoration: none; }
 .cell.bad { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
 .cell.warn { background: var(--warn-soft); border-color: var(--warn); }
 .cell.dim { opacity: 0.35; }
+.cell.cmp { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); transform: translateY(-2px); }
+.cell.pivot { border-color: var(--accent-2); color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-2); }
 .cell.done { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
 .cell.empty { border-style: dashed; color: var(--faint); font-weight: 400; }
 .with-ptrs { padding-top: 22px; }
@@ -301,3 +303,75 @@ svg.viz .grid-line { stroke: var(--border); stroke-dasharray: 3 4; }
   .topic .links { grid-column: 2; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ==========================================================================
+   Book chapters (main.book): one flowing read, numbered sections,
+   adaptive quick checks, exercises at the end. See assets/book.js.
+   ========================================================================== */
+.reading-bar { position: fixed; top: var(--topbar-h); left: 0; height: 3px; width: 0; z-index: 31; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.1s linear; }
+main.book { max-width: 760px; font-size: 1.07rem; line-height: 1.8; }
+main.book p, main.book li { max-width: 68ch; }
+main.book h2 { font-size: 1.55rem; margin: 64px 0 14px; padding-top: 18px; border-top: 1px solid var(--border); letter-spacing: -0.01em; }
+main.book h2 .sec-num { color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 10px; }
+main.book h3 { font-size: 1.12rem; margin: 30px 0 8px; }
+.chapter-head { margin-bottom: 26px; }
+.chapter-head .eyebrow { font: 600 0.75rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.chapter-head h1 { font-size: 2.4rem; margin: 6px 0 10px; }
+.chapter-head .meta { color: var(--muted); font-size: 0.9rem; display: flex; gap: 14px; flex-wrap: wrap; }
+.learn-list { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin: 20px 0; }
+.learn-list h4 { margin: 0 0 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.learn-list ol { margin: 0; }
+.story { border-left: 3px solid var(--accent-2); padding: 4px 0 4px 18px; margin: 18px 0; color: var(--text); font-style: italic; }
+.keyidea { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 12px; padding: 14px 18px; margin: 22px 0; }
+.keyidea::before { content: "KEY IDEA"; display: block; font: 700 0.68rem var(--mono); letter-spacing: 0.1em; color: var(--accent); margin-bottom: 4px; }
+.keyidea p:last-child { margin-bottom: 0; }
+.figure { margin: 22px 0; }
+.figure .cap { font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
+.steps-table td:first-child { font-family: var(--mono); }
+.big-number { font: 700 1.05em var(--mono); color: var(--accent); }
+
+/* Asides that adapt: "explain it another way" and "go deeper" */
+details.aside { border: 1px dashed var(--border-strong); border-radius: 10px; padding: 10px 16px; margin: 18px 0; background: var(--bg-2); }
+details.aside > summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; list-style: none; }
+details.aside > summary::-webkit-details-marker { display: none; }
+details.aside > summary::before { content: "＋ "; color: var(--accent); }
+details.aside[open] > summary::before { content: "－ "; }
+details.aside[open] > summary { margin-bottom: 8px; }
+details.aside.deeper > summary { color: var(--warn); }
+details.aside.deeper > summary::before { color: var(--warn); }
+details.aside.another > summary { color: var(--accent-2); }
+details.aside.another > summary::before { color: var(--accent-2); }
+
+/* Quick checks */
+.check { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 16px 18px; margin: 26px 0; }
+.check .check-label { font: 700 0.68rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ok); margin-bottom: 4px; }
+.check .q { font-weight: 600; margin-bottom: 10px; }
+.check pre { margin: 8px 0 12px; font-size: 0.9rem; }
+.check .opts { display: flex; flex-direction: column; gap: 8px; }
+.check .opts button {
+  text-align: left; font: inherit; font-size: 0.95rem; color: var(--text); background: var(--bg-2);
+  border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; cursor: pointer;
+}
+.check .opts button:hover { border-color: var(--accent); }
+.check .opts button.picked-right { border-color: var(--ok); background: var(--ok-soft); }
+.check .opts button.picked-wrong { border-color: var(--bad); background: var(--bad-soft); text-decoration: line-through; opacity: 0.8; }
+.check .fb { display: none; margin-top: 12px; padding: 12px 14px; border-radius: 8px; font-size: 0.97rem; }
+.check .fb.right { background: var(--ok-soft); }
+.check .fb.wrong { background: var(--warn-soft); }
+.check .fb.show { display: block; }
+.check .fb p:last-child { margin-bottom: 0; }
+.check.done-right { border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
+
+/* Exercises at the end */
+.exercise { border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin: 16px 0; background: var(--surface); }
+.exercise .tier { font: 700 0.68rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; }
+.exercise .tier.warm { color: var(--ok); } .exercise .tier.core { color: var(--accent); } .exercise .tier.stretch { color: var(--warn); }
+.exercise h4 { margin: 4px 0 6px; font-size: 1rem; }
+.review { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 20px 0; background: var(--bg-2); }
+.review h4 { margin: 0 0 6px; }
+.chapter-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.chapter-nav a { display: block; border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; color: var(--text); min-width: 200px; }
+.chapter-nav a:hover { border-color: var(--accent); text-decoration: none; }
+.chapter-nav a small { display: block; color: var(--muted); font-size: 0.75rem; }
+.chapter-nav a.next { text-align: right; margin-left: auto; }
+@media (max-width: 860px) { main.book { font-size: 1rem; } .chapter-head h1 { font-size: 1.8rem; } main.book h2 { font-size: 1.3rem; } }
