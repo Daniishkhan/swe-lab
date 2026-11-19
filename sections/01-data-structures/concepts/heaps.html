@@ -141,7 +141,7 @@
 
 <div class="figure">
   <div id="heap-player"></div>
-  <div class="cap">Push 5, 3, 8, 1, 4, 2, 7 into an empty min-heap, then pop twice. The array and the tree are the same thing seen two ways. Orange: being compared. Blue: just moved.</div>
+  <div class="cap">Push 5, 3, 8, 1, 4, 2, 7 into an empty min-heap, then pop twice. The array and the tree are the same thing seen two ways. Orange: being compared. Blue: just moved. Green: in its place. Red: the root being popped.</div>
 </div>
 
 <p>Each swap moves the newcomer up one level, and there are about log₂ n levels: <b>push is O(log n)</b>. On random data it's even better: most newcomers belong near the bottom, so the average push does only a couple of comparisons.</p>
@@ -292,7 +292,7 @@ heapq.nsmallest(2, data)    # [1, 4]; also nlargest</code></pre>
     <li><b>If k is close to n</b> (the top 900,000 of a million), keep the bottom n − k in a max-heap instead, or just sort.</li>
     <li><b>Spread over machines:</b> each machine finds its own top k, then one machine merges those. This is exact only if each key lives on exactly one machine. A classic trap: "the top URLs across 100 servers' logs". Say URL x has 6 hits on each of 100 servers (600 total) but is never in any server's local top k, while URL y has 500 hits on one server. The merged local lists say y wins; the truth is x. Fix it by first sending each URL's counts to one machine (partition by a hash of the URL), then taking local top k's.</li>
     <li><b>Top k most frequent:</b> count with a hash map first (O(n)), then top-k over the counts. If the stream is too big to count exactly, approximate "heavy hitters" algorithms keep only about k counters: Misra-Gries and Space-Saving, or a Count-Min Sketch plus a heap (topic 01.12).</li>
-    <li><b>What <code>heapq.nlargest</code> does:</b> exactly this min-heap of size k, plus shortcuts: for k = 1 it just calls <code>max</code>, and when k is large compared with n it sorts instead.</li>
+    <li><b>What <code>heapq.nlargest</code> does:</b> exactly this min-heap of size k, plus shortcuts: for k = 1 it just calls <code>max</code>, and if k ≥ the number of items it just sorts.</li>
     <li><b>Ties:</b> top-k has no defined order between equal items. If the output must be deterministic, add a tie-breaker to the key.</li>
   </ul>
 </details>
@@ -342,8 +342,8 @@ heapq.nsmallest(2, data)    # [1, 4]; also nlargest</code></pre>
     <button data-correct>O(N · k) by scanning, O(N log k) with a heap</button>
     <button>O(N) either way, since each item is output once</button>
   </div>
-  <div class="fb right"><p>Right. Each of the N outputs needs the min of k fronts: k comparisons by scanning, about log k with a heap. With k = 1,000 that's 1,000 comparisons vs about 20 per item.</p></div>
-  <div class="fb wrong"><p>Count the work per output item. Every time you output one item, you must find the smallest of the k fronts. Scanning them costs k comparisons; a heap costs about log₂ k (one pop and one push). Output N items and the totals are N·k vs N·log k. It's not O(N) because each output needs a decision among k candidates, and it's not N log N because there are only k candidates at a time, not N.</p></div>
+  <div class="fb right"><p>Right. Each of the N outputs needs the min of k fronts: k comparisons by scanning, about 2 log₂ k with a heap. With k = 1,000 that's 1,000 comparisons vs about 20 per item.</p></div>
+  <div class="fb wrong"><p>Count the work per output item. Every time you output one item, you must find the smallest of the k fronts. Scanning them costs k comparisons; a heap costs about 2 log₂ k (one sift-down, two comparisons per level: about 20 for k = 1,000). Output N items and the totals are N·k vs N·log k. It's not O(N) because each output needs a decision among k candidates, and it's not N log N because there are only k candidates at a time, not N.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -518,7 +518,7 @@ heapq.nsmallest(2, data)    # [1, 4]; also nlargest</code></pre>
   const toTree = (a, i = 0) => (i < a.length ? { val: a[i], idx: i, left: toTree(a, 2 * i + 1), right: toTree(a, 2 * i + 2) } : null);
   const heapView = (a, cls) => {
     const svg = V.s("svg", { class: "viz" });
-    V.binaryTree(svg, toTree(a), { cls: (n) => cls(n.idx), dx: 42, dy: 52 });
+    V.binaryTree(svg, toTree(a), { cls: (n) => (cls(n.idx) === "cmp" ? "warn" : cls(n.idx)), dx: 42, dy: 52 });  // tree nodes have no "cmp" style
     return [svg, V.cells(a, { cls: (i) => cls(i) })];
   };
 

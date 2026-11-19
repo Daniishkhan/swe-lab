@@ -9,7 +9,7 @@ from heap_patterns import assign_jobs, merge_sorted, top_k
 
 
 @pytest.fixture(autouse=True)
-def time_limit():
+def time_limit(request):
     """Heap solutions finish each test in about a second at most. Scanning
     every worker or every list front takes minutes (Unix only)."""
     if not hasattr(signal, "SIGALRM"):
@@ -17,10 +17,11 @@ def time_limit():
         return
 
     def boom(*_):
-        raise TimeoutError("over 5 s: is something scanning all k lists or all workers for every item?")
+        raise TimeoutError("over the time cap: is something scanning all k lists or all workers for every item?")
 
     old = signal.signal(signal.SIGALRM, boom)
-    signal.alarm(5)
+    # 1,000,000 jobs get more room, so a heap written in pure Python passes too
+    signal.alarm(20 if request.node.name == "test_assign_many_workers" else 5)
     try:
         yield
     finally:
@@ -169,7 +170,7 @@ def test_merge_costs_log_k_per_item():
     out = [x.v for x in merge_sorted([iter([C(v) for v in lst]) for lst in lists])]
     total = k * each
     assert out == sorted(v for lst in lists for v in lst)
-    budget = total * (3 * math.log2(k) + 8)
+    budget = total * (4 * math.log2(k) + 8)
     assert C.cmps <= budget, f"{C.cmps:,} comparisons for {total:,} items from {k} lists (budget {budget:,.0f}): is it scanning every front?"
 
 

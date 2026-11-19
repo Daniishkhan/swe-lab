@@ -48,9 +48,11 @@ What the tests measure
   8 MB). A rising stream, where every item gets in, must cost under
   3 log2 k per item (re-scanning a plain list of k costs k).
 - merge_sorted: items pulled after each yield, and comparisons for 256
-  lists: under 3 log2 k + 8 = 32 per item (scanning every front costs 256;
-  a heap about 18 to 20).
-- assign_jobs: 1,000,000 jobs on 500,000 workers under a 5 s cap.
+  lists: under 4 log2 k + 8 = 40 per item (scanning every front costs 256;
+  a heap about 18 to 30). Comparing two (item, index) tuples counts twice,
+  because Python checks == before <.
+- assign_jobs: 1,000,000 jobs on 500,000 workers under a 20 s cap
+  (heapq takes about 1 s, a pure-Python heap about 5 s).
   Scanning the workers for each job is 5 * 10^11 steps, and a sorted list
   with insort and pop(0) moves about as many items.
 
