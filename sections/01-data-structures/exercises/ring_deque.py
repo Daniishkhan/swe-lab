@@ -6,7 +6,7 @@ Problem
 -------
 Build sections 7 and 8 of the chapter. Store the items in a Python list used
 as a fixed row of slots (`self.buf`), plus `self.head` (the slot of the
-first item) and a size. The tests look inside: item i must sit in
+first item, always in 0..len(self.buf) - 1) and a size. The tests look inside: item i must sit in
 self.buf[(self.head + i) % len(self.buf)]. Never shift items: move `head` instead, and wrap
 around with % len(self.buf). Grow only when you must: when append or
 appendleft finds every slot already full, first make a list twice as big

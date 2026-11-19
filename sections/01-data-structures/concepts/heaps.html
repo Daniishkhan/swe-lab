@@ -329,7 +329,7 @@ heapq.nsmallest(2, data)    # [1, 4]; also nlargest</code></pre>
 <details class="aside deeper">
   <summary>Go deeper: merging without a heap, and loser trees</summary>
   <ul>
-    <li><b>Pairwise merging:</b> merge the lists two at a time, like the merge-sort tree: k lists become k/2, then k/4… That's log₂ k rounds, each touching all N items: also O(N log k), with no heap at all. Done round by round, pairwise writes out each round's output, so it can't stream. Done lazily, as a tree of 2-way merges that each pull from the two below, it streams fine and gives the first item after about log₂ k comparisons: that tree is a tournament tree, the next bullet.</li>
+    <li><b>Pairwise merging:</b> merge the lists two at a time, like the merge-sort tree: k lists become k/2, then k/4… That's log₂ k rounds, each touching all N items: also O(N log k), with no heap at all. Done round by round, pairwise writes out each round's output, so it can't stream. Done lazily, as a tree of 2-way merges that each pull from the two below, it streams fine: about k comparisons to fill the tree, then about log₂ k per item. That tree is a tournament tree, the next bullet.</li>
     <li><b>Loser trees</b> (tournament trees) are what external sorts really use: a fixed tree over the k fronts where each step replays only one root-to-leaf path, about log₂ k comparisons per item instead of 2 log₂ k.</li>
     <li><b>The real bottleneck is the disk.</b> With 1,000 runs and 1 GB of memory, each run gets a 1 MB read buffer. Fewer, bigger runs mean bigger buffers and fewer seeks, which is why external sorts often merge in a few passes rather than all at once.</li>
   </ul>
