@@ -1,9 +1,12 @@
+import inspect
 import random
+import re
 import signal
 from bisect import bisect_left, bisect_right
 
 import pytest
 
+import bst as bst_module
 from bst import BST
 
 
@@ -232,3 +235,12 @@ def test_delete_costs_one_path():
     assert len(t) == N - 3_000
     left = sorted(set(range(N)) - set(victims))
     assert values(t) == [2 * i for i in left]
+
+
+def test_the_tree_does_the_work():
+    """Comparisons can't see a hidden sorted list (bisect and list.insert do
+    their work in C), so check the source for the usual shortcuts."""
+    src = inspect.getsource(bst_module)
+    src = re.sub(r'""".*?"""', "", src, flags=re.S)  # ignore docstrings
+    for banned in ("bisect", "sorted(", ".sort(", "SortedList", "dict(", "set("):
+        assert banned not in src, f"bst.py uses {banned!r}: the tree itself must keep the order"

@@ -1,5 +1,6 @@
 import random
 import signal
+import time
 from bisect import bisect_left, bisect_right
 from collections.abc import Sequence
 
@@ -158,7 +159,10 @@ def test_level_order_on_a_wide_tree():
     nodes = [TreeNode(i) for i in range(n)]
     for i in range((n - 1) // 2):
         nodes[i].left, nodes[i].right = nodes[2 * i + 1], nodes[2 * i + 2]
+    start = time.perf_counter()
     levels = level_order(nodes[0])
+    took = time.perf_counter() - start
+    assert took < 2.0, f"level_order took {took:.1f} s on {n:,} nodes (an O(n) version takes about 0.1 s): is the queue a list with pop(0)?"
     assert len(levels) == 19
     for d, level in enumerate(levels):
         assert level == list(range(2 ** d - 1, 2 ** (d + 1) - 1)), f"level {d} is wrong"

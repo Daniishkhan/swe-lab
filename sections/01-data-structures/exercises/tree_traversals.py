@@ -40,7 +40,8 @@ What the tests measure
 (pop(0) on a long queue fails), a validity check on a 100,000-node chain
 with a time cap (re-scanning subtrees is O(n^2)), and an input list that
 counts reads for build_balanced
-(slices of it count too).
+(slices of it count too). Copying it once and slicing the copy would dodge
+the counter: don't. Pass indexes (lo, hi) instead.
 
 Before you code (say it out loud)
 ---------------------------------

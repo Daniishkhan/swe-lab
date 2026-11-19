@@ -18,7 +18,7 @@
 <header class="chapter-head">
   <div class="eyebrow">Chapter 1 · Part 3</div>
   <h1>Sorted and fast</h1>
-  <div class="meta"><span><span class="badge P0">P0</span> trees show up in most loops</span><span>about 60 minutes</span><span>10 quick checks · 8 exercises</span></div>
+  <div class="meta"><span><span class="badge P0">P0</span> trees show up in most loops</span><span>about 60 minutes</span><span>8 quick checks · 8 exercises</span></div>
 </header>
 
 <p>A hash map finds any key in one step, but it has no idea which key comes <em>next</em>. A sorted list knows the order, but every insert shifts half of it. Trees are how you get both: order questions <em>and</em> fast changes, in O(log n). They're also the shape behind file systems, databases, compilers and half of all interview questions. This chapter builds the binary search tree from binary search itself, shows exactly how it breaks, and how balanced trees fix it.</p>
@@ -71,7 +71,7 @@
 
  Smaller than the node? Go left. Bigger? Go right.</code></pre>
 
-<p>That picture is a <b>binary search tree</b>. Now here's the important part: if each number lives in its own little box with two pointers (like the linked list nodes from the previous chapter), we can store <em>that picture itself</em> instead of the array. Then inserting 55 doesn't shift anything. You walk down as if searching for it (40 → right to 60 → left to 50 → right: empty), and hang a new box there. Two pointers change. Nothing moves.</p>
+<p>That picture is a <b>binary search tree</b>. Now here's the important part: if each number lives in its own little box with two pointers (like the linked list nodes from the previous chapter), we can store <em>that picture itself</em> instead of the array. Then inserting 55 doesn't shift anything. You walk down as if searching for it (40 → right to 60 → left to 50 → right: empty), and hang a new box there. One pointer changes (50's right). Nothing moves.</p>
 
 <h3>The words</h3>
 <p>Trees come with a lot of vocabulary. Here it is all at once, using the picture above (a family tree drawn upside down):</p>
@@ -80,7 +80,7 @@
   <li><b>Root:</b> the top node, 40. The only node with no <b>parent</b>.</li>
   <li><b>Leaf:</b> a node with no children (10, 30, 50, 70).</li>
   <li><b>Subtree:</b> a node plus everything below it. The left subtree of 40 is 20, 10 and 30.</li>
-  <li><b>Depth</b> of a node: how many levels down it is; the root is at level 1. <b>Height</b> of a tree: its number of levels, so this one has height 3. (Some books count edges instead of levels, which gives one less. Either is fine; say which.)</li>
+  <li><b>Depth</b> of a node: how many levels down it is; the root is at level 1. <b>Height</b> of a tree: its number of levels, so this one has height 3. (Many books count edges instead of levels, so the root has depth 0 and this tree has height 2. Either is fine; say which.)</li>
 </ul>
 
 <p>A tree is a graph with no loops: from the root there's exactly one path down to each node. That's why "walk down from the root" always makes sense.</p>
@@ -107,7 +107,7 @@
 
 <div class="figure">
   <div id="bst-player"></div>
-  <div class="cap">Insert 50, 30, 70, 20, 40, 60, 80, 65 into an empty tree, then search for 65 (found) and 45 (not found). Orange nodes are the ones being compared. Count them: each search compares with one node per level.</div>
+  <div class="cap">Insert 50, 30, 70, 20, 40, 60, 80, 65 into an empty tree, then search for 65 (found) and 45 (not found). Highlighted nodes are the ones being compared; the found node turns green. Count them: each search compares with one node per level.</div>
 </div>
 
 <p>Each step goes down one level, so the cost of search and insert is the number of levels you pass: <b>O(height)</b>. Keep that in mind; the whole next section is about it.</p>
@@ -165,7 +165,7 @@
     <button data-correct>About 100,000</button>
   </div>
   <div class="fb right"><p>Right. Each new id is bigger than everything so far, so it hangs off the right end of a growing chain. The tree has 100,000 levels, and 100,000 is at the bottom.</p></div>
-  <div class="fb wrong"><p>log₂ n is the height of a <em>balanced</em> tree, and nothing here balances it. Watch the first few inserts: 1 is the root, 2 goes right of 1, 3 goes right of 2 (it's bigger than both), 4 right of 3… Every node has only a right child. That's a linked list with extra steps, so finding the last id walks all 100,000 nodes. Try the "sorted" option in the figure above.</p></div>
+  <div class="fb wrong"><p>log₂ n is the height of a <em>balanced</em> tree, and nothing here balances it; "twice the balanced height" would need some balancing too, just a looser kind. Watch the first few inserts: 1 is the root, 2 goes right of 1, 3 goes right of 2 (it's bigger than both), 4 right of 3… Every node has only a right child. That's a linked list with extra steps, so finding the last id walks all 100,000 nodes. Try the "sorted" option in the figure above.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -176,7 +176,7 @@
   <li><b>Minimum:</b> keep going left until there's no left child. The leftmost node is the smallest. Maximum: keep going right. O(height).</li>
   <li><b>Successor</b> (the next key up, "the player just above me"): if the node has a right subtree, it's the leftmost node of that subtree. If not, it's the nearest ancestor you reach by going up from a left child. Searching from the root for "smallest key bigger than x" does the same thing in one downward walk: every time you go left, remember the node as the best answer so far.</li>
   <li><b>Floor and ceiling:</b> the biggest key ≤ x, and the smallest key ≥ x. Same walk, same remembering.</li>
-  <li><b>Range query</b> (all keys between a and b): find a, then keep taking successors until you pass b. That costs O(height + k) for k results, instead of scanning all n.</li>
+  <li><b>Range query</b> (all keys between a and b): do an in-order walk, but skip any subtree that can't hold keys in range: if a node is below a, its whole left subtree is too, so don't go left; if it's above b, don't go right. You walk down two boundary paths plus the k keys you report: O(height + k), instead of scanning all n. (Calling a from-the-root successor search k times would cost O(k · height).)</li>
   <li><b>All keys in sorted order:</b> visit the left subtree, then the node, then the right subtree. This is the <b>in-order traversal</b>, and it's O(n). It's sorted precisely because of the BST rule: everything smaller is visited before the node, everything bigger after.</li>
 </ul>
 
@@ -250,7 +250,7 @@
 <div class="figure">
   <div class="viz-stage" style="padding-bottom:0"><div class="viz-controls" style="margin-top:0"><label class="small">order <select id="trav-sel"><option value="pre">pre-order</option><option value="in" selected>in-order</option><option value="post">post-order</option><option value="level">level-order</option></select></label></div></div>
   <div id="trav-player"></div>
-  <div class="cap">The tree from section 3. Pick an order and step through it. Green nodes are visited; the output row shows the order. In-order comes out sorted. In post-order, notice that every node comes after both of its children.</div>
+  <div class="cap">The tree from section 3. Pick an order and step through it. Green nodes are visited; the output row shows the order. In-order comes out sorted. In post-order, notice that every node comes after its children.</div>
 </div>
 
 <h3>Post-order in real life: folder sizes</h3>
@@ -298,7 +298,7 @@
 <p>The plain BST's flaw is that the input order decides the shape. Balanced trees fix it by repairing the shape as they go, so the height stays O(log n) for <em>any</em> insert order. To repair a shape, they need a move that changes the shape without breaking the BST rule.</p>
 
 <h3>The rotation</h3>
-<p>Picture a hanging mobile. You can pick it up by a different node and let it hang again: the pieces are still in the same left-to-right order, but a different piece is at the top. A <b>rotation</b> does exactly that to two nodes:</p>
+<p>Picture a hanging mobile. You can pick it up by a different node and let it hang again: the pieces are still in the same left-to-right order, but a different piece is at the top. A <b>rotation</b> does that to two neighboring nodes, a parent and its child. (Where the picture breaks: a real mobile rehangs everything at once. A rotation is local: only one subtree, B below, changes parent, and three pointers change.)</p>
 
 <pre class="diagram"><code>      x                                  y
      / \       rotate left at x         / \
@@ -307,7 +307,8 @@
       B   C     rotate right at y    A   B
 
  Left to right, both pictures read: A, x, B, y, C. Same order, so still a valid BST.
- Three pointers change, so it's O(1). y's side got one level shorter; x's side one level taller.</code></pre>
+ Three pointers change, so it's O(1). C moves up one level, A moves down one level,
+ and B stays at the same depth. So a right-heavy spot gets more even.</code></pre>
 
 <p>The trick to remembering it: <b>B changes parent</b>. B is everything between x and y. In the left picture it's y's left subtree, in the right picture it's x's right subtree. Both places mean "bigger than x, smaller than y", so the rule holds.</p>
 
@@ -332,13 +333,13 @@
     <tr><td>Height for n keys</td><td>≤ ~1.44 log₂ n</td><td>≤ 2 log₂(n + 1)</td></tr>
     <tr><td>Lookups</td><td>slightly faster (shorter)</td><td>slightly slower</td></tr>
     <tr><td>Inserts and deletes</td><td>more rotations</td><td>fewer rotations (O(1) per change)</td></tr>
-    <tr><td>Found in</td><td>in-memory indexes where reads dominate</td><td>Java <code>TreeMap</code>, C++ <code>std::map</code>, the Linux kernel (its CPU scheduler, <code>epoll</code>)</td></tr>
+    <tr><td>Found in</td><td>less common in standard libraries; chosen when lookups far outnumber changes</td><td>Java <code>TreeMap</code>, C++ <code>std::map</code> in practice (libstdc++, libc++, MSVC), the Linux kernel (its CPU scheduler, <code>epoll</code>)</td></tr>
   </tbody>
 </table></div>
 
 <details class="aside deeper">
   <summary>Go deeper: B-trees, when nodes live on disk</summary>
-  <p>A binary tree with a billion keys has 30 levels. In memory, 30 steps is nothing. On disk, each step can be a separate read, and a random read on an SSD is around 100 µs, about 1,000 times slower than RAM. So databases use fat nodes: a <b>B-tree</b> node holds hundreds of sorted keys and has hundreds of children, sized to fill one disk page (4–16 KB). With 500 children per node, a billion keys fit in about 4 levels (500⁴ = 6.25 × 10¹⁰), and the top levels stay cached in memory. Same BST rule, same in-order sorted output, same "split when full" balancing idea. Every major relational database index (PostgreSQL, MySQL's InnoDB, SQLite) is a B-tree variant. Topic 01.13 covers them.</p>
+  <p>A binary tree with a billion keys has 30 levels. In memory, 30 steps is nothing. On disk, each step can be a separate read, and a random read on an SSD is around 100 µs, about 1,000 times slower than RAM. So databases use fat nodes: a <b>B-tree</b> node holds hundreds of sorted keys and has hundreds of children, sized to fill one disk page (4–16 KB). With 500 children per node, a billion keys fit in about 4 levels (500⁴ = 6.25 × 10¹⁰), and the top levels stay cached in memory. Same BST rule and the same in-order sorted output, but a different way to stay balanced: when a node overflows, it splits in two and pushes its middle key up to the parent, so the tree grows at the root and every leaf stays at the same depth. (A red-black tree is secretly a B-tree with up to 4 children per node, drawn as a binary tree.) The default index in every major relational database (PostgreSQL, MySQL's InnoDB, SQLite) is a B-tree variant. Topic 01.13 covers them.</p>
 </details>
 
 <div class="check" id="check-rotation">
@@ -351,6 +352,18 @@
   <div class="fb right"><p>Right. A rotation changes the shape (and the height, which is the point), but reading the keys left to right gives the same sequence, so the tree is still a valid BST.</p></div>
   <div class="fb wrong"><p>Read the two pictures in the diagram left to right: both give A, x, B, y, C. That's the one thing that must not change, because that's what makes it a BST. Everything else is allowed to change, and does: a different node ends up on top (so the root can change if you rotate at the root), and one side gets shorter while the other gets taller. Changing heights is the whole reason to rotate.</p></div>
 </div>
+
+<details class="aside deeper">
+  <summary>Go deeper: tree questions interviewers follow up with</summary>
+  <ul>
+    <li><b>BST iterator:</b> <code>next()</code> in O(1) amortized and O(height) memory: it's the explicit-stack in-order walk from section 7, paused between visits.</li>
+    <li><b>k-th smallest:</b> in-order walk and stop at k (O(height + k)), or subtree sizes (section 5's aside) for O(height).</li>
+    <li><b>Lowest common ancestor:</b> in a BST, walk down from the root until the two keys split to different sides. In a plain binary tree, use post-order: a node is the answer if its subtrees each report one of the two.</li>
+    <li><b>Serialize a tree:</b> pre-order with markers for empty spots rebuilds it exactly. In-order alone can't: many shapes share one in-order sequence. Pre-order plus in-order (no duplicates) can.</li>
+    <li><b>Duplicates:</b> decide up front (counts in the node, or "equal goes right") and say how search, delete and range treat them.</li>
+    <li><b>Other balanced trees:</b> treaps (random priorities, balanced in expectation), splay trees (recently used keys move to the root), skip lists (topic 01.11; easier to make concurrent, which is why Java has <code>ConcurrentSkipListMap</code> but no concurrent <code>TreeMap</code>).</li>
+  </ul>
+</details>
 
 <!-- ============================================================ -->
 <h2 id="s9"><span class="sec-num">9</span>Trees vs hash maps vs sorted arrays</h2>
@@ -373,7 +386,7 @@
 
 <details class="aside deeper">
   <summary>Go deeper: why not always use a tree instead of a hash map?</summary>
-  <p>Beyond O(1) vs O(log n): for a million keys, log₂ n ≈ 20 comparisons, each possibly a cache miss (about 100 ns), so a tree lookup can cost a couple of microseconds while a hash lookup is one or two misses. Trees also need keys that can be <em>ordered</em>, while hash maps need keys that can be <em>hashed</em>. In exchange, trees give a worst case of O(log n) with no hash-flooding risk (Java 8's <code>HashMap</code> turns long buckets into red-black trees for exactly that reason), and ordered iteration for free.</p>
+  <p>Beyond O(1) vs O(log n): for a million keys, log₂ n ≈ 20 comparisons, each possibly a cache miss (about 100 ns), so a tree lookup can cost a couple of microseconds while a hash lookup is one or two misses. Trees also need keys that can be <em>ordered</em>, while hash maps need keys that can be <em>hashed</em>. In exchange, trees give a worst case of O(log n) with no hash-flooding risk (Java 8's <code>HashMap</code> turns a bucket into a red-black tree once it holds 8 entries and the table has at least 64 slots, for exactly that reason; it works best when the keys are <code>Comparable</code>), and ordered iteration for free.</p>
 </details>
 
 <div class="check" id="check-choose">
@@ -471,7 +484,7 @@
 <div class="exercise">
   <div class="tier stretch">Stretch · build</div>
   <h4>6. Make it balance itself</h4>
-  <p>Copy your <code>BST</code> into a scratch file and turn it into an AVL tree: store a height in each node, and after each insert walk back up, doing a single or double rotation wherever the two child heights differ by 2. Insert 1 to 100,000 in order and check that the height stays at most about 1.44 log₂ n ≈ 24. Compare with your plain BST's 100,000.</p>
+  <p>Copy your <code>BST</code> into a scratch file and turn it into an AVL tree: store a height in each node, and after each insert walk back up, doing a single or double rotation wherever the two child heights differ by 2. Insert 1 to 100,000 in order and check that the height stays at most the AVL bound of about 1.44 log₂ n ≈ 24 (sorted inserts actually give about 17, close to perfect). Compare with your plain BST's 100,000.</p>
 </div>
 
 <div class="exercise">
@@ -592,11 +605,11 @@
         rec(n.left);
         if (kind === "in") visit(n, "after everything smaller (its left subtree)");
         rec(n.right);
-        if (kind === "post") visit(n, n.left || n.right ? "after both of its children" : "(a leaf)");
+        if (kind === "post") visit(n, n.left && n.right ? "after both of its children" : n.left || n.right ? "after its only child" : "(a leaf)");
       };
       if (kind === "level") {
         const q = [root];
-        while (q.length) { const n = q.shift(); const kids = [n.left, n.right].filter(Boolean); visit(n, kids.length ? `and queue its children ${kids.map((k) => k.val).join(", ")}` : ""); q.push(...kids); frames[frames.length - 1].queue = q.map((k) => k.val); }
+        while (q.length) { const n = q.shift(); const kids = [n.left, n.right].filter(Boolean); visit(n, kids.length ? `and queue ${kids.length > 1 ? "its children" : "its child"} ${kids.map((k) => k.val).join(", ")}` : ""); q.push(...kids); frames[frames.length - 1].queue = q.map((k) => k.val); }
       } else rec(root);
       frames.unshift({ out: [], cur: null, msg: `${{ pre: "Pre-order", in: "In-order", post: "Post-order", level: "Level-order" }[kind]}: ${explain[kind]}.` });
       frames[frames.length - 1].msg += kind === "in" ? " The output is sorted." : "";
