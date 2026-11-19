@@ -10,7 +10,10 @@
  * and the sidebar (chapter navigation + "on this page" table of contents),
  * and remembers sidebar / theme / pane state in localStorage.
  *
- * Shortcuts:  [  toggle sidebar    t  toggle theme    e  expand all    c  collapse all
+ * Shortcuts:  [  toggle sidebar    t  next theme (Ayu Dark / Mirage / Light)    e  expand all    c  collapse all
+ *
+ * It also colors Python code blocks (pre > code) with Ayu's syntax colors.
+ * Add class="diagram" or class="plain" to a <pre> to skip coloring.
  */
 (function () {
   const store = {
@@ -44,8 +47,45 @@
   const here = location.pathname.split("/").pop();
 
   // ---- Theme ----
+  // Ayu Dark (default) -> Ayu Mirage -> Ayu Light. Colors live in style.css.
+  const THEMES = ["dark", "mirage", "light"];
+  const THEME_NAMES = { dark: "Ayu Dark", mirage: "Ayu Mirage", light: "Ayu Light" };
+  const currentTheme = () => (THEMES.includes(document.documentElement.dataset.theme) ? document.documentElement.dataset.theme : "dark");
   const applyTheme = (t) => { document.documentElement.dataset.theme = t; store.set("theme", t); };
-  const toggleTheme = () => { applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"); document.dispatchEvent(new Event("swe-theme")); };
+  const toggleTheme = () => { applyTheme(THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length]); document.dispatchEvent(new Event("swe-theme")); };
+
+  // ---- Code colors: tag Python tokens so style.css can paint them in Ayu's syntax colors ----
+  const KEYWORDS = new Set("def class return if elif else for while in not and or is import from as with try except finally raise lambda yield pass break continue global nonlocal assert del async await".split(" "));
+  const BUILTINS = new Set("len range print set dict list tuple sorted min max sum int str float bool enumerate zip abs isinstance super map filter any all reversed iter next open self object type hash id".split(" "));
+  const TOKEN = /(#[^\n]*)|((?:[rRbBfFuU]{1,2})?(?:"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'))|(\b\d[\d_]*(?:\.\d+)?(?:e[+-]?\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)|([-+*/%=<>!&|^~@]+)/g;
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  function highlight(code) {
+    const src = code.textContent;
+    let out = "", last = 0, prevWord = "", m;
+    TOKEN.lastIndex = 0;
+    while ((m = TOKEN.exec(src))) {
+      out += esc(src.slice(last, m.index));
+      const [tok, com, str, num, word, op] = m;
+      let cls = null;
+      if (com) cls = "c";
+      else if (str) cls = "s";
+      else if (num) cls = "n";
+      else if (op) cls = "o";
+      else if (word) {
+        if (word === "None" || word === "True" || word === "False") cls = "n";
+        else if (KEYWORDS.has(word)) cls = "k";
+        else if (prevWord === "def") cls = "f";
+        else if (prevWord === "class") cls = "e";
+        else if (BUILTINS.has(word)) cls = "e";
+        else if (src[TOKEN.lastIndex] === "(") cls = "f";
+        prevWord = word;
+      }
+      out += cls ? `<span class="${cls}">${esc(tok)}</span>` : esc(tok);
+      last = TOKEN.lastIndex;
+    }
+    code.innerHTML = out + esc(src.slice(last));
+  }
+  const highlightAll = () => document.querySelectorAll("pre:not(.diagram):not(.plain) > code").forEach((c) => { if (!c.children.length) highlight(c); });
 
   // ---- Panes ----
   const boxes = () => [...document.querySelectorAll("details.box")];
@@ -65,8 +105,8 @@
       if (PAGE === "concept") crumbs.append(" / ", document.title);
     }
     const hasBoxes = boxes().length > 0;
-    const themeBtn = h("button", { class: "btn icon", title: "Toggle theme  t", "aria-label": "Toggle theme" });
-    const paint = () => { themeBtn.textContent = document.documentElement.dataset.theme === "light" ? "☾ Dark" : "☀ Light"; };
+    const themeBtn = h("button", { class: "btn icon", title: "Switch theme: Ayu Dark, Mirage, Light  (t)", "aria-label": "Switch theme" });
+    const paint = () => { themeBtn.textContent = "◐ " + THEME_NAMES[currentTheme()]; };
     themeBtn.addEventListener("click", () => { toggleTheme(); paint(); });
     document.addEventListener("swe-theme", paint);
     paint();
@@ -154,6 +194,7 @@
     body.prepend(buildTopbar());
     setSidebar(mobile() ? true : store.get("sidebarHidden", false));
     scrollSpy();
+    highlightAll();
     document.addEventListener("keydown", (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey || /input|textarea|select/i.test(e.target.tagName)) return;
       if (e.key === "[") toggleSidebar();

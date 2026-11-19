@@ -57,6 +57,17 @@ Reference chapters: `sections/02-algorithms/concepts/complexity.html` and
   count comparisons/reads/copies, so a correct but slow answer fails),
   `stretch` (design, measure, or "say it out loud").
 
+## Look and feel: Ayu
+
+The site uses the Ayu color theme: **Ayu Dark** by default, with **Ayu Mirage**
+and **Ayu Light** on the theme button (or press `t`). All colors are CSS
+variables defined once per theme at the top of `assets/style.css`; never
+hard-code a color in a page or a visualization, use `var(--accent)`,
+`var(--ok)`, `var(--warn)`, `var(--bad)`, `var(--accent-2)`, `var(--brand)`
+and friends so all three themes work. `shell.js` colors Python code blocks
+with Ayu's syntax colors automatically (`--syn-*` tokens); add
+`class="diagram"` or `class="plain"` to a `<pre>` that isn't Python.
+
 ## Layout of the repo
 
 - `curriculum.json`: source of truth for sections and topics (ids like `02.02`,
@@ -65,8 +76,8 @@ Reference chapters: `sections/02-algorithms/concepts/complexity.html` and
   `<meta name="topic" content="NN.MM">`.
 - `sections/NN-slug/exercises/name.py` + `test_name.py`: stubs and tests. The
   stub's docstring has a `Topic: NN.MM` line.
-- `assets/`: `style.css` (theme tokens, book styles), `shell.js` (top bar,
-  sidebar, TOC), `book.js` (quick checks, review, progress bar), `viz.js`
+- `assets/`: `style.css` (Ayu theme tokens, book styles), `shell.js` (top bar,
+  sidebar, TOC, theme switch, code colors), `book.js` (quick checks, review, progress bar), `viz.js`
   (`V.el`, `V.s`, `V.cells`, `V.player`, `V.binaryTree`, `V.graph`), `app.js`.
 - `skills/`: the chapter pipeline (write, visuals, layout, review).
 - `tools/new.py`: scaffold pages and exercises. `tools/build.py`: index.

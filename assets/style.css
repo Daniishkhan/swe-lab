@@ -1,56 +1,101 @@
 /* ==========================================================================
    swe-prep shared styles
-   Dark theme by default. Light theme via <html data-theme="light">.
+   Ayu Dark by default; Ayu Mirage and Ayu Light via <html data-theme="mirage|light">.
    Building blocks: .topbar, .sidebar (toggleable pane), details.box (group box)
    and the .cells / .viz primitives used by visualizations.
    ========================================================================== */
+/* Ayu palettes (https://github.com/ayu-theme/ayu-colors). Three themes:
+   dark (Ayu Dark, default), mirage (Ayu Mirage), light (Ayu Light).
+   Semantic tokens map onto Ayu's syntax hues: accent = entity blue,
+   accent-2 = constant purple, ok = string green, warn = function yellow,
+   bad = markup red, brand = Ayu's own accent. Ayu Light's hues are darkened
+   a little where they're used for UI text, so it stays readable. Code blocks
+   use the --syn-* tokens exactly as Ayu defines them. */
 :root, [data-theme="dark"] {
-  --bg: #0f1115;
-  --bg-2: #151821;
-  --surface: #181b24;
-  --surface-2: #20242f;
-  --surface-3: #2a2f3c;
-  --text: #e6e8ee;
-  --muted: #9097a7;
-  --faint: #626a7c;
-  --border: #2b303d;
-  --border-strong: #3a4152;
-  --accent: #7aa2ff;
-  --accent-2: #b48cff;
-  --accent-soft: rgba(122, 162, 255, 0.14);
-  --ok: #5fd39a;
-  --ok-soft: rgba(95, 211, 154, 0.14);
-  --warn: #f2c14e;
-  --warn-soft: rgba(242, 193, 78, 0.14);
-  --bad: #ff7a7a;
-  --bad-soft: rgba(255, 122, 122, 0.14);
-  --p0: #ff9a5c; --p0-soft: rgba(255, 154, 92, 0.15);
-  --p1: #f2c14e; --p1-soft: rgba(242, 193, 78, 0.15);
-  --p2: #9ad86b; --p2-soft: rgba(154, 216, 107, 0.15);
+  --bg: #0D1017;
+  --bg-2: #0B0E14;
+  --surface: #0F131A;
+  --surface-2: #141821;
+  --surface-3: #1C212B;
+  --text: #BFBDB6;
+  --muted: #8D8B85;
+  --faint: #5A6070;
+  --border: #1E232D;
+  --border-strong: #2D3340;
+  --brand: #E6B450;
+  --accent: #59C2FF;
+  --accent-2: #D2A6FF;
+  --accent-soft: rgba(89, 194, 255, 0.13);
+  --ok: #AAD94C;
+  --ok-soft: rgba(170, 217, 76, 0.12);
+  --warn: #FFB454;
+  --warn-soft: rgba(255, 180, 84, 0.13);
+  --bad: #F07178;
+  --bad-soft: rgba(240, 113, 120, 0.13);
+  --p0: #FF8F40; --p0-soft: rgba(255, 143, 64, 0.14);
+  --p1: #FFB454; --p1-soft: rgba(255, 180, 84, 0.14);
+  --p2: #AAD94C; --p2-soft: rgba(170, 217, 76, 0.13);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --syn-keyword: #FF8F40; --syn-func: #FFB454; --syn-entity: #59C2FF; --syn-string: #AAD94C;
+  --syn-number: #D2A6FF; --syn-comment: rgba(172, 182, 191, 0.55); --syn-op: #F29668; --syn-special: #E6B673;
+  color-scheme: dark;
+}
+[data-theme="mirage"] {
+  --bg: #242936;
+  --bg-2: #1F2430;
+  --surface: #1C212B;
+  --surface-2: #2A3040;
+  --surface-3: #343B4D;
+  --text: #CCCAC2;
+  --muted: #9A9A93;
+  --faint: #707A8C;
+  --border: #323A4C;
+  --border-strong: #3F4859;
+  --brand: #FFCC66;
+  --accent: #73D0FF;
+  --accent-2: #DFBFFF;
+  --accent-soft: rgba(115, 208, 255, 0.14);
+  --ok: #D5FF80;
+  --ok-soft: rgba(213, 255, 128, 0.12);
+  --warn: #FFD173;
+  --warn-soft: rgba(255, 209, 115, 0.14);
+  --bad: #F28779;
+  --bad-soft: rgba(242, 135, 121, 0.14);
+  --p0: #FFAD66; --p0-soft: rgba(255, 173, 102, 0.15);
+  --p1: #FFD173; --p1-soft: rgba(255, 209, 115, 0.15);
+  --p2: #D5FF80; --p2-soft: rgba(213, 255, 128, 0.13);
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --syn-keyword: #FFAD66; --syn-func: #FFD173; --syn-entity: #73D0FF; --syn-string: #D5FF80;
+  --syn-number: #DFBFFF; --syn-comment: rgba(184, 207, 230, 0.5); --syn-op: #F29E74; --syn-special: #FFDFB3;
   color-scheme: dark;
 }
 [data-theme="light"] {
-  --bg: #f6f5f1;
-  --bg-2: #efede6;
-  --surface: #ffffff;
-  --surface-2: #f1efe9;
-  --surface-3: #e5e2d9;
-  --text: #1c1d21;
-  --muted: #5f6370;
-  --faint: #8d909a;
-  --border: #dcd9cf;
-  --border-strong: #c7c3b6;
-  --accent: #2f5bd3;
-  --accent-2: #7a3fd1;
-  --accent-soft: rgba(47, 91, 211, 0.1);
-  --ok: #17803d; --ok-soft: rgba(23, 128, 61, 0.1);
-  --warn: #a16207; --warn-soft: rgba(161, 98, 7, 0.12);
-  --bad: #c0262d; --bad-soft: rgba(192, 38, 45, 0.1);
-  --p0: #c2410c; --p0-soft: #fde8dc;
-  --p1: #a16207; --p1-soft: #fbf0d0;
-  --p2: #4d7c0f; --p2-soft: #e5f1d3;
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --bg: #FCFCFC;
+  --bg-2: #F8F9FA;
+  --surface: #FFFFFF;
+  --surface-2: #F3F4F5;
+  --surface-3: #E7EAED;
+  --text: #5C6166;
+  --muted: #6E757C;
+  --faint: #8A9199;
+  --border: #E1E4E8;
+  --border-strong: #CDD2D8;
+  --brand: #B06F00;
+  --accent: #2672BA;
+  --accent-2: #8A5CC2;
+  --accent-soft: rgba(57, 158, 230, 0.12);
+  --ok: #4C7F00;
+  --ok-soft: rgba(134, 179, 0, 0.13);
+  --warn: #9A5D00;
+  --warn-soft: rgba(242, 174, 73, 0.18);
+  --bad: #CC3A3A;
+  --bad-soft: rgba(240, 113, 113, 0.12);
+  --p0: #B5530F; --p0-soft: rgba(250, 141, 62, 0.15);
+  --p1: #9A5D00; --p1-soft: rgba(242, 174, 73, 0.18);
+  --p2: #4C7F00; --p2-soft: rgba(134, 179, 0, 0.15);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.07);
+  --syn-keyword: #FA8D3E; --syn-func: #F2AE49; --syn-entity: #399EE6; --syn-string: #86B300;
+  --syn-number: #A37ACC; --syn-comment: rgba(120, 123, 128, 0.7); --syn-op: #ED9366; --syn-special: #E6BA7E;
   color-scheme: light;
 }
 :root {
@@ -82,7 +127,7 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
 .small { font-size: 0.85rem; }
 .lede { color: var(--muted); font-size: 1.07rem; max-width: 70ch; }
 strong { color: var(--text); }
-::selection { background: var(--accent-soft); }
+::selection { background: rgba(64, 159, 255, 0.3); }
 
 /* ---------- App shell ---------- */
 .topbar {
@@ -92,7 +137,7 @@ strong { color: var(--text); }
   backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
 }
 .topbar .brand { font-weight: 700; color: var(--text); letter-spacing: -0.01em; white-space: nowrap; }
-.topbar .brand span { color: var(--accent); }
+.topbar .brand span { color: var(--brand); }
 .topbar .crumbs { color: var(--muted); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .topbar .spacer { flex: 1; }
 .btn {
@@ -142,7 +187,7 @@ details.box > summary::before {
   content: "▸"; display: inline-block; color: var(--muted); font-size: 0.8em; transition: transform 0.15s ease;
 }
 details.box[open] > summary::before { transform: rotate(90deg); }
-details.box > summary .kicker { font: 600 0.66rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+details.box > summary .kicker { font: 600 0.66rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand); }
 details.box:not([open]) { padding: 14px 20px 6px; }
 details.box:not([open])::after { content: "collapsed · click the title to open"; font-size: 0.78rem; color: var(--faint); }
 .box-body > :last-child { margin-bottom: 0; }
@@ -202,7 +247,7 @@ a.card:hover { border-color: var(--accent); text-decoration: none; }
 .card .meta { font-size: 0.8rem; color: var(--muted); margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .card.focus { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
 .bar { height: 5px; background: var(--surface-3); border-radius: 99px; overflow: hidden; margin-top: 12px; }
-.bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.bar > span { display: block; height: 100%; background: var(--brand); }
 .phases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .phase { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
 .phase .n { font: 700 0.7rem var(--mono); color: var(--accent); }
@@ -308,14 +353,14 @@ svg.viz .grid-line { stroke: var(--border); stroke-dasharray: 3 4; }
    Book chapters (main.book): one flowing read, numbered sections,
    adaptive quick checks, exercises at the end. See assets/book.js.
    ========================================================================== */
-.reading-bar { position: fixed; top: var(--topbar-h); left: 0; height: 3px; width: 0; z-index: 31; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.1s linear; }
+.reading-bar { position: fixed; top: var(--topbar-h); left: 0; height: 3px; width: 0; z-index: 31; background: var(--brand); transition: width 0.1s linear; }
 main.book { max-width: 760px; font-size: 1.07rem; line-height: 1.8; }
 main.book p, main.book li { max-width: 68ch; }
 main.book h2 { font-size: 1.55rem; margin: 64px 0 14px; padding-top: 18px; border-top: 1px solid var(--border); letter-spacing: -0.01em; }
-main.book h2 .sec-num { color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 10px; }
+main.book h2 .sec-num { color: var(--brand); font-variant-numeric: tabular-nums; margin-right: 10px; }
 main.book h3 { font-size: 1.12rem; margin: 30px 0 8px; }
 .chapter-head { margin-bottom: 26px; }
-.chapter-head .eyebrow { font: 600 0.75rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.chapter-head .eyebrow { font: 600 0.75rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--brand); }
 .chapter-head h1 { font-size: 2.4rem; margin: 6px 0 10px; }
 .chapter-head .meta { color: var(--muted); font-size: 0.9rem; display: flex; gap: 14px; flex-wrap: wrap; }
 .learn-list { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin: 20px 0; }
@@ -383,3 +428,13 @@ details.aside.another > summary::before { color: var(--accent-2); }
   main.book pre { font-size: 0.78rem; }
 }
 .sort-table td:nth-child(2), .sort-table td:nth-child(3) { white-space: nowrap; }
+
+/* Code colors (Ayu syntax). Filled in by shell.js, which tags Python tokens. */
+pre code .k { color: var(--syn-keyword); }
+pre code .f { color: var(--syn-func); }
+pre code .e { color: var(--syn-entity); }
+pre code .s { color: var(--syn-string); }
+pre code .n { color: var(--syn-number); }
+pre code .c { color: var(--syn-comment); font-style: italic; }
+pre code .o { color: var(--syn-op); }
+pre.diagram code { color: var(--text); }

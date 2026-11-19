@@ -40,8 +40,8 @@ text, and sit right after the paragraph that raises it.
   look at and what to try ("Press Double n and watch the ratio").
 - Keep inputs small (5–30 items) so each step is readable. Show the counts
   (comparisons, steps) and compare them with the formula at the end.
-- Use theme tokens (`var(--accent)` etc.), never hard-coded colors, so light and
-  dark both work. No external libraries.
+- Use theme tokens (`var(--accent)` etc.), never hard-coded colors, so all three
+  Ayu themes (Dark, Mirage, Light) work. No external libraries.
 - Put the script at the bottom of the page in one IIFE per figure.
 
 ## Verify

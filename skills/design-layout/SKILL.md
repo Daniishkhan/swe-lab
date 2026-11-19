@@ -11,7 +11,8 @@ placement, and whether the eye goes where the lesson goes.
 ## Look at it
 
 Take screenshots with Playwright at 1280×900 and at iPhone size (390×844), the
-top of the page plus every section. Also toggle light theme (`t`) once.
+top of the page plus every section. Also press `t` to check Ayu Mirage and
+Ayu Light once each.
 
 ## Check
 
@@ -31,7 +32,7 @@ top of the page plus every section. Also toggle light theme (`t`) once.
   extend, closed by default, and the summary text says what's inside.
 - **Hierarchy:** h2 numbered sections, h3 for sub-steps only; the sidebar TOC
   reads as a sensible outline on its own.
-- **Contrast and theme:** text and cell states readable in both themes.
+- **Contrast and theme:** text and cell states readable in all three Ayu themes.
 - **Consistency:** same classes, spacing and patterns as the reference
   chapters. If you need a new pattern, add it to `assets/style.css` under the
   "Book chapters" block and document it in `templates/README.md`.

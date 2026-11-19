@@ -25,7 +25,7 @@ swe-prep/
 ├── index.html                 dashboard: order of attack, chapters, progress
 ├── curriculum.json            the topic list (source of truth: ids, priorities)
 ├── assets/
-│   ├── style.css              dark/light theme, group boxes, viz primitives
+│   ├── style.css              Ayu themes (Dark/Mirage/Light), boxes, viz
 │   ├── shell.js               top bar, toggleable sidebar, pane state, shortcuts
 │   ├── app.js                 renders the dashboard and chapter pages
 │   ├── viz.js                 tiny visualization toolkit (player, cells, trees, graphs)
@@ -105,7 +105,7 @@ them by bare name.
 
 ## Keyboard shortcuts (all pages)
 
-<kbd>[</kbd> toggle sidebar · <kbd>t</kbd> toggle theme · <kbd>c</kbd> collapse all panes · <kbd>e</kbd> expand all panes
+<kbd>[</kbd> toggle sidebar · <kbd>t</kbd> next theme (Ayu Dark → Mirage → Light) · <kbd>c</kbd> collapse all panes · <kbd>e</kbd> expand all panes
 
 Theme, sidebar state, open/closed panes and topic status are remembered per
 browser in localStorage.
