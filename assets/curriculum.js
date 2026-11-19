@@ -148,7 +148,7 @@ window.CURRICULUM = {
     {
      "file": "graphs.html",
      "topic": "01.05",
-     "title": "Graphs and how to store them"
+     "title": "Dots and lines (Graphs and how to store them)"
     },
     {
      "file": "hash-maps.html",
@@ -178,6 +178,24 @@ window.CURRICULUM = {
      "title": "Binary search tree with delete, successor and range queries",
      "topics": [
       "01.03"
+     ],
+     "result": null
+    },
+    {
+     "file": "clone_graph.py",
+     "module": "clone_graph",
+     "title": "Clone a graph",
+     "topics": [
+      "01.05"
+     ],
+     "result": null
+    },
+    {
+     "file": "graph_basics.py",
+     "module": "graph_basics",
+     "title": "Graph basics: transpose, find the judge, pack into CSR",
+     "topics": [
+      "01.05"
      ],
      "result": null
     },
@@ -1521,5 +1539,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-19 21:38"
+ "generated": "2026-11-19 21:48"
 };
