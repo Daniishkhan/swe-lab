@@ -4,203 +4,633 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="topic" content="01.04">
-  <title>Heaps and priority queues</title>
+  <title>The most urgent thing first (Heaps and priority queues)</title>
   <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
   <link rel="stylesheet" href="../../../assets/style.css">
   <script src="../../../assets/curriculum.js"></script>
   <script src="../../../assets/viz.js"></script>
   <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
 </head>
 <body data-root="../../.." data-section="01" data-page="concept">
-<main class="content">
-  <p class="muted small"><span class="badge P0">P0</span> &nbsp;01.04 · Heaps and priority queues: top-k, k-way merge, scheduling</p>
-  <h1>Heaps and priority queues</h1>
-  <p class="lede">When you only ever need the smallest thing, keeping everything fully sorted is wasted effort. A heap keeps just enough order to hand you the minimum in O(1) and repair itself in O(log n).</p>
-  <details class="box accent" open id="idea">
-    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
-    <div class="box-body">
-      <p class="one-liner">A heap is a complete binary tree stored in a plain array, where every parent is no bigger than its children. The minimum sits at index 0, and push or pop fixes the order along a single root-to-leaf path.</p>
-    </div>
-  </details>
+<main class="content book">
 
-  <details class="box" open id="first-principles">
-    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
-    <div class="box-body">
-      <h3>1. What a scheduler actually needs</h3>
-      <p>A job scheduler needs one thing fast: "what runs next?" A sorted array answers that in O(1) but costs O(n) per insert. An unsorted array inserts in O(1) but finds the minimum in O(n). We want both in about O(log n).</p>
-      <h3>2. Weaken the invariant</h3>
-      <p>Full sorting relates every element to every other. A heap only promises <b>parent ≤ child</b>. Siblings and cousins can be in any order. That weaker promise is much cheaper to maintain, and it's still enough to know where the minimum is: at the root.</p>
-      <h3>3. Store the tree in an array, no pointers</h3>
-      <p>Fill the tree level by level, left to right (a "complete" tree). Then the shape is implied by the index:</p>
-      <pre><code>children of i:  2i + 1, 2i + 2
-parent of i:    (i - 1) // 2</code></pre>
-      <p>No pointers, perfect cache locality, and the tree is always balanced, so its height is ⌊log₂ n⌋.</p>
-      <h3>4. Two repair moves</h3>
-      <ul>
-        <li><b>push:</b> put the new item at the end, then <b>sift up</b>: swap with the parent while it's smaller.</li>
-        <li><b>pop:</b> take the root, move the last item to the root, then <b>sift down</b>: swap with the smaller child while it's bigger.</li>
-      </ul>
-      <h3>5. Heapify is O(n), not O(n log n)</h3>
-      <p>To build a heap from n items, sift down every non-leaf from the bottom up. Half the nodes are leaves (no work), a quarter sift at most 1 level, an eighth at most 2… The sum n·(1/4 + 2/8 + 3/16 + …) converges to O(n).</p>
-    </div>
-  </details>
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 1 · Part 4</div>
+  <h1>The most urgent thing first</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> top-k and merge questions are everywhere</span><span>about 55 minutes</span><span>10 quick checks · 8 exercises</span></div>
+</header>
 
-  <details class="box analogy" open id="analogy">
-    <summary><span class="kicker">Intuition</span><span class="label">Analogy: a company org chart</span></summary>
-    <div class="box-body">
-      <p>Every manager is more senior than their direct reports, but two people on different teams aren't compared at all. When the CEO leaves (pop), the most junior person is temporarily put in the CEO's chair and keeps getting swapped with their more senior direct report until the rule holds again. A new hire (push) starts at the bottom and gets promoted past anyone less senior above them.</p>
-      <p class="muted small">Physical picture: bubbles. Light things rise (sift up), heavy things sink (sift down), and each one moves through at most log n levels.</p>
-    </div>
-  </details>
+<p>A queue serves whoever arrived first. Real life usually wants something else: the patient who is sickest, the timer that's due soonest, the job with the highest priority. That's a <b>priority queue</b>, and the structure behind almost every one is the <b>heap</b>. It answers exactly one question, "what's the smallest?", and by refusing to answer anything else it gets cheaper than a sorted list or a tree. This chapter builds it from that one question, then uses it for the three patterns interviews love: top-k, k-way merge and scheduling.</p>
 
-  <details class="box viz" open id="see-it">
-    <summary><span class="kicker">See it</span><span class="label">Playground: push and pop on a min-heap</span></summary>
-    <div class="box-body">
-      <p class="small muted">The tree and the array are the same data. Watch which indexes swap.</p>
-      <div class="viz-controls">
-        <input id="hp-val" type="number" placeholder="value" style="width:7em">
-        <button class="btn primary" id="hp-push">Push</button>
-        <button class="btn" id="hp-rand">Push random</button>
-        <button class="btn" id="hp-pop">Pop min</button>
-        <button class="btn" id="hp-heapify">Heapify random array</button>
-      </div>
-      <div id="hp-player" style="margin-top:12px"></div>
-    </div>
-  </details>
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain why a heap's rule is weaker than a BST's, and why that makes it cheaper.</li>
+    <li>Store a heap in a plain array and find parents and children with index arithmetic.</li>
+    <li>Push and pop in O(log n), and explain why pop swaps with the <em>smaller</em> child.</li>
+    <li>Explain why building a heap from n items is O(n), not O(n log n).</li>
+    <li>Use Python's <code>heapq</code> correctly: max-heaps, tie-breakers, and "changing" a priority.</li>
+    <li>Solve top-k, merge k sorted lists, and assign jobs to workers, and give their costs.</li>
+  </ol>
+</div>
 
-  <details class="box" open id="patterns">
-    <summary><span class="kicker">Patterns</span><span class="label">The three heap moves interviews love</span></summary>
-    <div class="box-body">
-      <div class="cols">
-        <div class="panel"><h4>Top-k</h4><p class="small">To keep the k <em>largest</em>, use a <em>min</em>-heap of size k. Each new item competes with the smallest of your current top k (the root); if it's bigger, it replaces the root. O(n log k) time, O(k) memory, and it works on a stream.</p></div>
-        <div class="panel"><h4>K-way merge</h4><p class="small">Merging k sorted lists: put the head of each list in a heap, pop the smallest, push that list's next item. O(N log k). This is how external merge sort and LSM-tree compaction work (chapter 6).</p></div>
-        <div class="panel"><h4>Scheduling / simulation</h4><p class="small">Keep events keyed by time and always process the earliest. Meeting rooms, task schedulers, Dijkstra (chapter 2), timers in event loops.</p></div>
-      </div>
-      <p class="small muted" style="margin-top:10px">Python's <code>heapq</code> is a min-heap. For a max-heap, push <code>-x</code>. To break ties without comparing payloads, push tuples <code>(priority, counter, item)</code>.</p>
-    </div>
-  </details>
+<p class="muted small">How to read this: go top to bottom. Answer each quick check before reading on; a wrong answer gets the idea explained a different way. Grey "Go deeper" boxes are optional on a first read. This chapter uses trees and their height from <a href="trees.html">Sorted and fast</a>, and queues from <a href="linear-structures.html">Who goes next?</a></p>
 
-  <details class="box" open id="costs">
-    <summary><span class="kicker">Costs</span><span class="label">Complexity</span></summary>
-    <div class="box-body">
-      <div class="table-wrap"><table>
-        <thead><tr><th>Operation</th><th>Binary heap</th><th>Note</th></tr></thead>
-        <tbody>
-          <tr><td>peek min</td><td>O(1)</td><td>index 0</td></tr>
-          <tr><td>push / pop</td><td>O(log n)</td><td>one root-to-leaf path</td></tr>
-          <tr><td>build from n items</td><td>O(n)</td><td>bottom-up heapify</td></tr>
-          <tr><td>search arbitrary item</td><td>O(n)</td><td>a heap is not a search structure</td></tr>
-          <tr><td>decrease-key / delete arbitrary</td><td>O(log n) <em>if</em> you track positions</td><td>otherwise use lazy deletion</td></tr>
-          <tr><td>heapsort</td><td>O(n log n), in place, not stable</td><td>rarely used in practice: poor cache behavior</td></tr>
-        </tbody>
-      </table></div>
-    </div>
-  </details>
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: a million timers</h2>
 
-  <details class="box senior" open id="interview">
-    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
-    <div class="box-body">
-      <ul>
-        <li><b>Lazy deletion</b> instead of decrease-key: push a new entry and skip stale ones when you pop them. That's how Dijkstra is usually written with <code>heapq</code>.</li>
-        <li><b>Top-k at scale:</b> on one machine, use a size-k heap. Across machines, each shard computes its local top-k and a coordinator merges them. With heavy-hitter streams, use approximate structures (Count-Min Sketch + heap). This is a classic system design follow-up.</li>
-        <li><b>Starvation:</b> a pure priority queue can starve low-priority work forever. Real schedulers add aging, or use separate queues with weighted fairness.</li>
-        <li><b>Thread safety:</b> <code>heapq</code> isn't thread-safe; <code>queue.PriorityQueue</code> wraps it with a lock.</li>
-      </ul>
-    </div>
-  </details>
+<div class="story">
+  <p>You run the reminder service for a calendar app. There are <b>1 million</b> pending reminders, each with a time it's due. Every second, about <b>10,000 new reminders</b> are added, and about <b>10,000 come due</b> and must be sent, always the one due soonest first.</p>
+  <p>Keep them in an unsorted list: adding is O(1), but finding the soonest means scanning all million, 10,000 times a second. That's <b>10 billion</b> comparisons per second. Keep them sorted instead: the soonest is at one end, but each new reminder must be inserted in place, shifting about half a million entries. 10,000 × 500,000 is <b>5 billion</b> moves per second.</p>
+</div>
 
-  <details class="box trap" open id="traps">
-    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
-    <div class="box-body">
-      <ul>
-        <li>Using a max-heap for "k largest" (you want a min-heap of size k), or the reverse for "k smallest".</li>
-        <li>Pushing tuples whose second element isn't comparable (dicts, custom objects). Ties then crash. Add a counter.</li>
-        <li>Assuming the heap array is sorted. Only index 0 is guaranteed.</li>
-        <li>Sift-down choosing the <em>first</em> child instead of the <em>smaller</em> child.</li>
-      </ul>
-    </div>
-  </details>
+<p>A heap does both by walking one path from top to bottom, and a heap of a million is only about 20 levels deep, because log₂ of a million is about 20. An add costs up to about 20 comparisons and a removal about 40 (two per level, section 5 shows why). That's roughly 10,000 × 20 + 10,000 × 40 = 600,000 comparisons per second for the whole service: one core, barely busy. This is how real timers work: Python's <code>asyncio</code> keeps its scheduled callbacks in a heap, Java's <code>ScheduledThreadPoolExecutor</code> uses one, and Go's runtime uses a 4-way heap for its timers.</p>
 
-  <details class="box" open id="check">
-    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
-    <div class="box-body">
-      <details class="qa"><summary>Why is a heap stored in an array, but a BST usually isn't?</summary><p>A heap is always a complete tree, so index arithmetic describes its shape exactly with no gaps. A BST's shape depends on the data; storing it in an array would leave huge holes.</p></details>
-      <details class="qa"><summary>How do you find the median of a stream?</summary><p>Two heaps: a max-heap for the lower half and a min-heap for the upper half, kept within one element of each other in size. The median is at one or both roots. O(log n) per insert, O(1) per query.</p></details>
-      <details class="qa"><summary>Why does sift-down swap with the smaller child?</summary><p>The smaller child becomes the parent of the other child, so it has to be ≤ that sibling. Swapping with the larger child would break the invariant right away.</p></details>
-    </div>
-  </details>
+<div class="table-wrap"><table>
+  <thead><tr><th>Structure</th><th>Add</th><th>Find the smallest</th><th>Remove the smallest</th></tr></thead>
+  <tbody>
+    <tr><td>Unsorted list</td><td>O(1)</td><td>O(n)</td><td>O(n)</td></tr>
+    <tr><td>Sorted list</td><td>O(n)</td><td>O(1)</td><td>O(1) from the end</td></tr>
+    <tr><td>Balanced BST</td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td></tr>
+    <tr><td><b>Binary heap</b></td><td>O(log n)</td><td><b>O(1)</b></td><td>O(log n)</td></tr>
+  </tbody>
+</table></div>
 
-  <details class="box" open id="practice">
-    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
-    <div class="box-body">
-      <p><b>Exercise:</b> <code>exercises/min_heap.py</code>: MinHeap with O(n) <code>from_list</code>, plus top-k frequent and k-way merge.</p>
-      <p><b>Classic problems:</b> Kth Largest Element · Top K Frequent Elements · Merge k Sorted Lists · Find Median from Data Stream · Meeting Rooms II · Task Scheduler.</p>
-    </div>
+<p>A balanced BST already does it in O(log n). Why another structure? Because a heap is simpler, has no pointers, fits in one array, and is several times faster in practice. Let's see where that comes from.</p>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Only the smallest: a weaker rule</h2>
+
+<p>A BST keeps <em>everything</em> in order: you can walk it from smallest to biggest. Our reminder service never asks for that. It only ever asks "what's next?". Keeping a full order is work we're paying for and never using.</p>
+
+<p>Picture a company org chart, where everyone's number is how urgent their work is (smaller = more urgent). Make one rule: <b>every boss is at least as urgent as each of their direct reports</b>. Follow any chain upward and the numbers only get smaller or stay the same. So the CEO at the top is the most urgent person in the company. But two people on the same team, or in different departments, can be in any order. Nobody promises who's second.</p>
+
+<pre class="diagram"><code>                1             ← the root: smallest of all
+             /     \
+           3         2        ← each ≤ its children
+          / \       / \
+         5   4     8   7      ← siblings and cousins: any order
+
+ A BST would need 3 &lt; 1 &lt; 2 (left smaller, right bigger). A heap only
+ needs every parent ≤ its children. That's much less to maintain.</code></pre>
+
+<p>That's the <b>heap property</b> for a <b>min-heap</b>: every node is ≤ its children, so the root is the minimum. A <b>max-heap</b> flips it: every node is ≥ its children, so the root is the maximum. The abstract job, "add items, take out the most urgent", is called a <b>priority queue</b>. A heap is the usual way to build one.</p>
+
+<p class="small muted">Where the org chart breaks: in a real company the boss doesn't change when someone more urgent is hired. In a heap, they swap places. That's the next two sections.</p>
+
+<div class="keyidea"><p>A heap keeps only a partial order: each parent is at least as small as its children. That's enough to make the root the minimum, and it's much cheaper to maintain than a full sort, because siblings don't need any order at all.</p></div>
+
+<div class="check" id="check-rule">
+  <p class="q">In a min-heap, the root is 1 and its two children are 3 and 2. Where is the third-smallest item?</p>
+  <div class="opts">
+    <button>It's 3, the left child</button>
+    <button>It must be on the second level</button>
+    <button data-correct>It could be 3, or it could be a child of 2</button>
+  </div>
+  <div class="fb right"><p>Right. The heap only promises that each node is ≤ its own children. 2's children could include something smaller than 3 (say 2.5). Only the minimum has a fixed place: the root.</p></div>
+  <div class="fb wrong"><p>Write down an example. Root 1, children 3 and 2; give 2 the children 2.5 and 9. Every parent is ≤ its children, so it's a valid heap. The sorted order is 1, 2, 2.5, 3, … so the third-smallest is 2.5, on the third level. Now swap 2.5 for 4 and it's 3 instead. The heap rule says nothing about cousins or siblings, so beyond the root, "where's the k-th smallest?" has no fixed answer.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>A tree with no pointers: the array layout</h2>
+
+<p>The plain BST's big flaw was its shape: insert in the wrong order and it becomes a chain. A heap avoids that with a second rule about shape: it's always a <b>complete</b> binary tree. Every level is full, except maybe the last, which fills from left to right with no gaps.</p>
+
+<p>Picture filling seats in a theater, row by row, left to right, never leaving a gap. With n people, the shape is fixed: there's only one way to seat them. So the height is always about log₂ n, with no rebalancing ever needed. (Where the theater breaks: audience members keep their seats, but heap items swap seats constantly. Only the set of occupied seats is fixed.)</p>
+
+<p>And because the shape has no gaps, we can number the seats in that order (row 1 first, left to right, then row 2…) and store the whole tree in an ordinary array. No pointers at all:</p>
+
+<pre class="diagram"><code>              [0] 1
+            /       \
+       [1] 3         [2] 2
+       /   \         /   \
+   [3] 5  [4] 4  [5] 8  [6] 7
+
+ array:  index  0  1  2  3  4  5  6
+         value  1  3  2  5  4  8  7
+
+ children of i:  2i + 1  and  2i + 2      (children of 1 are 3 and 4)
+ parent of i:    (i − 1) // 2              (parent of 5 is 2)</code></pre>
+
+<p>Why does that arithmetic work? Row r (counting from 0) holds 2<sup>r</sup> seats, and every seat in a row has exactly two seats below it in the next row, in the same left-to-right order. Count the seats in front of i's first child. Children are seated in the same order as their parents, so before i's children come the root (1 seat) and the two children of each of seats 0, 1, …, i − 1 (2i seats). That's 1 + 2i seats, numbered 0 to 2i, so i's first child sits at index 2i + 1 and its second at 2i + 2. Check with i = 1: the root and seat 0's two children fill indexes 0, 1, 2, so seat 1's children are 3 and 4.</p>
+
+<p>This is the heap's secret weapon in practice. No node objects, no pointers: a heap of a million numbers is one block of memory, and moving between parent and child is arithmetic. That's why it beats a balanced tree by a wide margin on real machines.</p>
+
+<div class="keyidea"><p>A heap is always a complete tree (filled row by row), so its height is always about log₂ n with no balancing. It lives in a plain array: the children of i are 2i + 1 and 2i + 2, and its parent is (i − 1) // 2.</p></div>
+
+<div class="check" id="check-index">
+  <p class="q">A heap is stored in an array. Where is the parent of the item at index 10?</p>
+  <div class="opts">
+    <button>Index 5</button>
+    <button data-correct>Index 4</button>
+    <button>Index 20</button>
+  </div>
+  <div class="fb right"><p>Right: (10 − 1) // 2 = 4. Check it the other way: 4's children are 2·4 + 1 = 9 and 2·4 + 2 = 10.</p></div>
+  <div class="fb wrong"><p>Go the other direction and check: the children of i are 2i + 1 and 2i + 2. Index 5's children are 11 and 12, not 10. Index 4's children are 9 and 10. So 10's parent is 4, which is what (10 − 1) // 2 gives. Index 20 is down near 10's own children (21 and 22): doubling an index goes down a level, not up. (Using 10 // 2 = 5 is the formula for arrays that start at index 1; Python lists start at 0.)</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Push: add at the bottom, bubble up</h2>
+
+<p>To add an item, the shape rule tells us where it goes: the next free seat, which is the end of the array. That keeps the tree complete, but it may break the heap rule: the newcomer might be smaller than its parent.</p>
+
+<p>The fix is a promotion. A new hire who's more urgent than their boss swaps places with the boss. Then compare with the new boss, and swap again if needed. Stop when the boss is at least as urgent, or the newcomer reaches the top. This is <b>sift up</b> (or "bubble up").</p>
+
+<p>Why doesn't a swap break anything else? After the swap, the old boss sits in the newcomer's old seat. The children of that seat were already below the boss in the tree, so they're ≥ it. The newcomer is now above the old boss and the boss's other report, and it's smaller than both. Nothing else moved.</p>
+
+<div class="figure">
+  <div id="heap-player"></div>
+  <div class="cap">Push 5, 3, 8, 1, 4, 2, 7 into an empty min-heap, then pop twice. The array and the tree are the same thing seen two ways. Orange: being compared. Blue: just moved. Green: in its place. Red: the root being popped.</div>
+</div>
+
+<p>Each swap moves the newcomer up one level, and there are about log₂ n levels: <b>push is O(log n)</b>. On random data it's even better: most newcomers belong near the bottom, so the average push does only a couple of comparisons.</p>
+
+<div class="check" id="check-push">
+  <p class="q">A min-heap holds <code>[2, 5, 3, 9, 6]</code> (as an array). You push 1. How many swaps happen?</p>
+  <div class="opts">
+    <button>1</button>
+    <button data-correct>2</button>
+    <button>5, one per item</button>
+  </div>
+  <div class="fb right"><p>Right. 1 goes to index 5; its parent is (5 − 1) // 2 = 2, holding 3: swap. Now at index 2, the parent is index 0, holding 2: swap. At the root, stop. Two swaps: one per level climbed.</p></div>
+  <div class="fb wrong"><p>Trace the seats. The array has 5 items, so 1 goes into index 5. Its parent is index (5 − 1) // 2 = 2, which holds 3. 1 &lt; 3, so swap: 1 is at index 2. Its parent is index 0, which holds 2. 1 &lt; 2, swap again: 1 is the root. That's 2 swaps, one per level, never one per item. Pushing only walks up one path.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Pop: move the last one up, sift down</h2>
+
+<p>Taking the minimum is the point of the heap, and it's at the root. But removing the root leaves a hole at the top, and the shape rule says the only seat we're allowed to empty is the <em>last</em> one.</p>
+
+<p>So: save the root (that's the answer), move the last item into the root's seat, and shrink the array by one. The shape is fine again. The heap rule probably isn't: the last item came from the bottom, so it's likely big.</p>
+
+<p>Now a demotion, <b>sift down</b>: compare the item with its two children. If it's bigger than either, swap it with the <b>smaller</b> child. Repeat until it's ≤ both children or it reaches the bottom.</p>
+
+<h3>Why the smaller child?</h3>
+<p>This is the step people get wrong. Whoever moves up becomes the parent of the other child, so it must be ≤ that other child. Say the item is 9 and its children are 3 and 5. Swap with 3, and 3 is now the parent of 9 and 5: 3 ≤ both, fine. Swap with 5 instead, and 5 becomes the parent of 3: 5 &gt; 3, broken. Only the smaller child can be promoted safely.</p>
+
+<p>Each level costs two comparisons (the two children with each other, then the smaller one with the item), and there are about log₂ n levels: <b>pop is O(log n)</b>. Peeking at the minimum without removing it is O(1): it's <code>heap[0]</code>.</p>
+
+<div class="keyidea"><p>Push: put the item at the end and sift up while it's smaller than its parent. Pop: take the root, move the last item to the root, and sift down, always swapping with the smaller child. Both walk one path: O(log n).</p></div>
+
+<div class="check" id="check-pop">
+  <p class="q">During sift-down, an item is 7 and its children are 4 and 6. What happens?</p>
+  <div class="opts">
+    <button>Swap 7 with 6, the child closest to 7</button>
+    <button data-correct>Swap 7 with 4</button>
+    <button>Stop: 7 is between its children</button>
+  </div>
+  <div class="fb right"><p>Right. 4 moves up and becomes the parent of 7 and 6, and 4 ≤ both. The heap rule holds at this spot; keep sifting 7 down from its new seat.</p></div>
+  <div class="fb wrong"><p>After the swap, whoever moved up is the parent of the other child. Swap with 6 and 6 becomes the parent of 4, but 6 &gt; 4: broken. Swap with 4 and 4 is the parent of 7 and 6: fine. Stopping isn't allowed either: 7 &gt; 4 already breaks "parent ≤ children". In a min-heap there's no "between": the parent must be ≤ <em>both</em>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Building a heap in O(n)</h2>
+
+<p>You have a million items and want them in a heap. The obvious way is a million pushes: O(n log n). There's a faster way, and the reason it's faster is a counting argument worth knowing for interviews.</p>
+
+<p>Put the items in the array in any order. Now fix it from the bottom up: for every node that has children, starting from the last one and moving toward the root, sift it down. When you reach a node, both of its subtrees are already heaps (you fixed them first), so one sift-down makes its whole subtree a heap. This is <b>heapify</b> (Floyd's method, from 1964).</p>
+
+<h3>Why it's O(n): most nodes are near the bottom</h3>
+<p>A sift-down costs at most the node's distance to the bottom. Here's the key: in a complete tree, <b>half the nodes are leaves</b>, a quarter are one level above them, an eighth two levels above… The nodes that could sift a long way are very few. Push is the opposite: the many nodes at the bottom are the ones that might climb all the way up.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">n =</span><input type="range" id="hf-n" min="3" max="20" value="4" style="width:220px"><b id="hf-nval"></b></div>
+    <div id="hf-out" class="table-wrap" style="margin-top:10px"></div>
+    <div class="viz-caption" id="hf-msg"></div>
+  </div>
+  <div class="cap">For a complete heap of n items: how many nodes sit at each height above the bottom, and the most work their sift-downs can cost. Slide n up and watch the total stay below n, while n pushes in the worst case (falling input) cost the sum of every item's depth, which grows like n log₂ n.</div>
+</div>
+
+<p>Add it up for a heap of n items: n/4 nodes can move 1 level, n/8 can move 2, n/16 can move 3, and so on. That's n × (1/4 + 2/8 + 3/16 + …). Why is the sum in brackets 1? Write "2/8" as 1/8 + 1/8, "3/16" as 1/16 + 1/16 + 1/16, and so on, then regroup into rows:</p>
+
+<pre class="diagram"><code> 1/4 + 1/8 + 1/16 + 1/32 + …  =  1/2     (one from every term)
+       1/8 + 1/16 + 1/32 + …  =  1/4     (the second pieces)
+             1/16 + 1/32 + …  =  1/8     (the third pieces)
+                     …
+ rows added up:  1/2 + 1/4 + 1/8 + …  =  1</code></pre>
+
+<p>Each row is a halving series, like walking half the way to a wall, then half the rest: you never pass the wall. So the total number of swaps is less than n, and the comparisons less than 2n. <b>Heapify is O(n).</b></p>
+
+<details class="aside another">
+  <summary>Explain it another way: a company reorganizing from the bottom</summary>
+  <p>A company with a million employees must reshuffle so every boss is more urgent than their reports. Work bottom-up: first every team lead sorts out their two reports (one comparison, maybe a swap), then every manager sorts out their leads, and so on. Half a million people are individual contributors and do nothing at all. A quarter of a million team leads do one small fix each. Only the handful of executives might cause a shuffle all the way down, and there are very few of them. The busy people are rare; the many people have little to do. That's why the total is about the size of the company, not size × depth.</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: heapsort</summary>
+  <p>Heapify a max-heap in place, then pop the max n times, putting each one in the slot freed at the end of the array. The array ends up sorted. Heapsort is O(n log n) in the worst case with O(1) extra memory, which neither quicksort (O(n²) worst case) nor merge sort (O(n) memory) offers. In practice it's slower than both, because sift-down jumps around the array and misses the cache, and it isn't stable. It's used as the safety net inside introsort (C++'s <code>std::sort</code>): if quicksort's recursion gets too deep, switch to heapsort. The sorting chapter compares them all.</p>
+</details>
+
+<div class="check" id="check-heapify">
+  <p class="q">Why is building a heap bottom-up O(n), when each sift-down can cost O(log n)?</p>
+  <div class="opts">
+    <button>Because the input is usually random, so sift-downs stop early</button>
+    <button data-correct>Because most nodes are near the bottom, where a sift-down can only move a level or two</button>
+    <button>Because it only sifts down half of the nodes</button>
+  </div>
+  <div class="fb right"><p>Right. A node's sift-down is bounded by its height, and half the nodes have height 0, a quarter height 1, and so on. The sum n/4·1 + n/8·2 + n/16·3 + … stays below n.</p></div>
+  <div class="fb wrong"><p>The bound doesn't depend on the input: falling input (n, n − 1, …, 1), the worst case for sift-downs, still heapifies in under n swaps. Skipping the leaves helps, but on its own it would still leave n/2 nodes × log n = O(n log n). And a single sift-down near the top really can cost log n. What saves us is <em>who</em> pays that: only the few nodes near the top. Count by level: n/4 nodes can move at most 1 level, n/8 at most 2, n/16 at most 3. Add those up and you get less than n. Cheap work for the many, expensive work only for the few.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Heaps in Python: <code>heapq</code></h2>
+
+<p>Python's <code>heapq</code> module is a min-heap that works on a plain list. There's no heap class: you keep a list and call functions on it.</p>
+
+<pre><code>import heapq
+h = []
+heapq.heappush(h, 5)        # O(log n)
+heapq.heappush(h, 1)
+smallest = h[0]             # peek: O(1)
+heapq.heappop(h)            # 1, O(log n)
+data = [9, 4, 7, 1]
+heapq.heapify(data)         # O(n), in place
+heapq.nsmallest(2, data)    # [1, 4]; also nlargest</code></pre>
+
+<p>Three things trip people up in interviews:</p>
+<ol>
+  <li><b>There's no max-heap.</b> Push negated priorities: <code>heappush(h, -score)</code>, and negate again when you pop. (For non-numbers, wrap them in a class whose <code>&lt;</code> is reversed.)</li>
+  <li><b>Ties compare the next field.</b> Heap entries are usually tuples <code>(priority, item)</code>. If two priorities are equal, Python compares the items, and if the items are dicts or custom objects that can't be compared, you get a <code>TypeError</code>. The standard fix is a counter as a tie-breaker: <code>(priority, next(counter), item)</code>. As a bonus, equal priorities then come out in insertion order.</li>
+  <li><b>You can't change a priority in place.</b> If a task becomes more urgent, finding it in the heap is O(n). The usual trick is <b>lazy deletion</b>: push a new entry with the new priority, and mark the old one as stale (for example, keep the current priority in a dict). When a stale entry reaches the top, throw it away and pop again. One pop may throw away many stale entries, but each entry is pushed once and thrown away once, so the cost is O(log n) <em>amortized</em> (averaged over all operations), bounded by the number of pushes. The heap also grows with garbage: if stale entries become more than half of it, rebuild it with <code>heapify</code> in O(n). Dijkstra's shortest paths does exactly this. (If you need a true "change priority", keep a dict from item to its index in the array, update it on every swap, and sift the item up or down from there: an <b>indexed heap</b>, O(log n) per change.)</li>
+</ol>
+
+<p>Two more functions save work in the patterns ahead. <code>heapq.heapreplace(h, x)</code> pops the root and pushes x in one sift-down. <code>heapq.heappushpop(h, x)</code> pushes x and then pops the smallest, but if x is already ≤ the root it hands x straight back after one comparison, without touching the heap. Both cost one O(log n) sift instead of two.</p>
+
+<div class="keyidea"><p><code>heapq</code> is a min-heap on a plain list: <code>heappush</code>, <code>heappop</code>, <code>heapify</code>, and <code>h[0]</code> to peek. Negate for a max-heap, add a counter to break ties, and use lazy deletion instead of changing priorities.</p></div>
+
+<div class="check" id="check-heapq">
+  <p class="q">You push <code>(3, {"name": "a"})</code> and then <code>(3, {"name": "b"})</code> onto a heapq heap. What happens?</p>
+  <div class="opts">
+    <button>The second goes after the first, because it was pushed later</button>
+    <button data-correct>A TypeError: with equal priorities Python compares the two dicts</button>
+    <button>Python picks one at random</button>
+  </div>
+  <div class="fb right"><p>Right. Tuples compare field by field. The 3s tie, so Python tries <code>dict &lt; dict</code>, which isn't defined. Use <code>(3, next(counter), task)</code> so the counter decides instead. One more trap: <code>heappush</code> appends before it sifts, so after the error the list has grown by one and may no longer be a valid heap.</p></div>
+  <div class="fb wrong"><p>A heap doesn't know about "pushed later"; it only knows <code>&lt;</code>. To compare two tuples, Python compares the first fields, and if they're equal it moves on to the second ones. The second fields are dicts, and dicts don't support <code>&lt;</code>, so the push raises <code>TypeError</code> while sifting up. A unique counter in the middle of the tuple means Python never gets as far as the dicts.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Pattern 1: top k</h2>
+
+<p>"Find the 100 most-viewed videos out of a billion view counts." Sorting is O(n log n) and needs all billion in memory at once. But we only need 100.</p>
+
+<p>Picture a VIP room with exactly 100 seats, and a bouncer at the door. The bouncer only needs to know one thing: who's the <em>weakest</em> person inside. A newcomer who beats the weakest VIP gets in, and the weakest is thrown out. A newcomer who doesn't is turned away in one comparison. (Where the bouncer breaks: a newcomer who does get in costs more than one comparison, because the room must find its new weakest member, an O(log k) sift-down.) The person to keep an eye on is the minimum of the room, so the room is a <b>min-heap</b> of size k, even though we want the <em>largest</em> k.</p>
+
+<div class="figure">
+  <div id="topk-player"></div>
+  <div class="cap">The 3 largest of a stream of 10 numbers, with a min-heap of size 3. The root (the weakest VIP) is the only number a newcomer is compared with. Most newcomers are turned away in one comparison.</div>
+</div>
+
+<p>The order matters: <b>compare with the root first</b>, and only touch the heap if the newcomer wins (with <code>heapreplace</code>, or in one step with <code>heappushpop</code>). "Push every item, then pop if the heap has k + 1" gives the same answer at the same O(n log k), but every item then pays a full push and pop, about 2 log₂ k comparisons instead of 1. Each item costs one comparison with the root, plus O(log k) if it gets in. Total: <b>O(n log k)</b> time and <b>O(k)</b> memory, and it works on a stream you see once, item by item, without storing it. For k = 100 and n = 1 billion, that's a heap of 100 entries instead of a billion-element sort.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: when not to use a heap for top-k</summary>
+  <ul>
+    <li><b>Quickselect</b> finds the k-th largest in O(n) average time by partitioning like quicksort but only recursing into one side. Faster than O(n log k) when everything fits in memory, but it needs the whole array and rearranges it.</li>
+    <li><b>If k is close to n</b> (the top 900,000 of a million), keep the bottom n − k in a max-heap instead, or just sort.</li>
+    <li><b>Spread over machines:</b> each machine finds its own top k, then one machine merges those. This is exact only if each key lives on exactly one machine. A classic trap: "the top URLs across 100 servers' logs". Say URL x has 6 hits on each of 100 servers (600 total) but is never in any server's local top k, while URL y has 500 hits on one server. The merged local lists say y wins; the truth is x. Fix it by first sending each URL's counts to one machine (partition by a hash of the URL), then taking local top k's.</li>
+    <li><b>Top k most frequent:</b> count with a hash map first (O(n)), then top-k over the counts. If the stream is too big to count exactly, approximate "heavy hitters" algorithms keep only about k counters: Misra-Gries and Space-Saving, or a Count-Min Sketch plus a heap (topic 01.12).</li>
+    <li><b>What <code>heapq.nlargest</code> does:</b> exactly this min-heap of size k, plus shortcuts: for k = 1 it just calls <code>max</code>, and if k ≥ the number of items it just sorts.</li>
+    <li><b>Ties:</b> top-k has no defined order between equal items. If the output must be deterministic, add a tie-breaker to the key.</li>
+  </ul>
+</details>
+
+<div class="check" id="check-topk">
+  <p class="q">To keep the 10 <b>largest</b> numbers from a stream, which heap?</p>
+  <div class="opts">
+    <button>A max-heap of size 10, so the biggest is on top</button>
+    <button data-correct>A min-heap of size 10</button>
+    <button>A max-heap of every number seen, then pop 10</button>
+  </div>
+  <div class="fb right"><p>Right. The question for each newcomer is "does it beat the smallest of my top 10?", so the smallest of the 10 must be on top. O(n log 10) time, 10 entries of memory.</p></div>
+  <div class="fb wrong"><p>Think about what the doorman checks. A newcomer belongs in the top 10 only if it beats the <em>weakest</em> member, so that's the one you need at your fingertips: the minimum of the 10, the root of a min-heap. A max-heap of size 10 puts the strongest on top, and you'd have to search for the weakest every time. A max-heap of everything works, but uses O(n) memory and O(n) time to build, and can't handle a stream that never ends.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Pattern 2: merge k sorted lists</h2>
+
+<p>You have 1,000 log files from 1,000 servers, each already sorted by time, 100 GB in total. You need one file, sorted by time. You can't load it all into memory.</p>
+
+<p>Picture 1,000 checkout lines, each already in order of arrival time. To decide who in the whole store arrived first, you only need to look at the <em>front</em> of each line: whoever is earliest of those 1,000 front people. Serve them, and the next person in that line steps up to the front. So keep the 1,000 front people in a min-heap. Each step: pop the earliest, write it out, push the next item from the same line.</p>
+
+<div class="figure">
+  <div id="merge-player"></div>
+  <div class="cap">Merging 3 sorted lists. The heap only ever holds the front item of each list (tagged with which list it came from). Pop the smallest, then push the next item from that same list.</div>
+</div>
+
+<p>The heap never holds more than k items (one per list), so each pop and push is O(log k). With N items in total, that's <b>O(N log k)</b> time and <b>O(k)</b> memory, plus whatever buffers you read through. For the logs: N is billions of lines, but every step costs only about 2 × log₂ 1000 ≈ 20 comparisons (a pop costs two per level; with <code>heapreplace</code>, pop and push are one sift-down), and memory holds just 1,000 lines plus read buffers.</p>
+
+<p class="small muted">Where the checkout picture breaks: a real store can see all the front people at a glance. The computer can't; finding the earliest of 1,000 fronts by looking at each one is 1,000 comparisons. The heap is what makes "glance at the fronts" cost 20.</p>
+
+<p>This is the merge step of <b>external merge sort</b> (sort chunks that fit in memory, then k-way merge them), which also feeds the sorted inputs of a database merge join, and how LSM-tree databases like RocksDB and Cassandra compact their sorted files. Python has it built in: <code>heapq.merge(*lists)</code> returns a lazy iterator that does exactly this, and it's <b>stable</b>: equal items come out in the order of the lists they came from.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: merging without a heap, and loser trees</summary>
+  <ul>
+    <li><b>Pairwise merging:</b> merge the lists two at a time, like the merge-sort tree: k lists become k/2, then k/4… That's log₂ k rounds, each touching all N items: also O(N log k), with no heap at all. Done round by round, pairwise writes out each round's output, so it can't stream. Done lazily, as a tree of 2-way merges that each pull from the two below, it streams fine: about k comparisons to fill the tree, then about log₂ k per item. That tree is a tournament tree, the next bullet.</li>
+    <li><b>Loser trees</b> (tournament trees) are what external sorts really use: a fixed tree over the k fronts where each step replays only one root-to-leaf path, about log₂ k comparisons per item instead of 2 log₂ k.</li>
+    <li><b>The real bottleneck is the disk.</b> With 1,000 runs and 1 GB of memory, each run gets a 1 MB read buffer. Fewer, bigger runs mean bigger buffers and fewer seeks, which is why external sorts often merge in a few passes rather than all at once.</li>
+  </ul>
+</details>
+
+<div class="check" id="check-merge">
+  <p class="q">You merge k sorted lists with N items in total by repeatedly scanning all k fronts for the smallest. What's the cost, and how does a heap change it?</p>
+  <div class="opts">
+    <button>O(N log N) either way: it's sorting</button>
+    <button data-correct>O(N · k) by scanning, O(N log k) with a heap</button>
+    <button>O(N) either way, since each item is output once</button>
+  </div>
+  <div class="fb right"><p>Right. Each of the N outputs needs the min of k fronts: k comparisons by scanning, about 2 log₂ k with a heap. With k = 1,000 that's 1,000 comparisons vs about 20 per item.</p></div>
+  <div class="fb wrong"><p>Count the work per output item. Every time you output one item, you must find the smallest of the k fronts. Scanning them costs k comparisons; a heap costs about 2 log₂ k (one sift-down, two comparisons per level: about 20 for k = 1,000). Output N items and the totals are N·k vs N·log k. It's not O(N) because each output needs a decision among k candidates, and it's not N log N because there are only k candidates at a time, not N.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>Pattern 3: scheduling</h2>
+
+<p>A render farm has 50 machines. Jobs arrive in a queue, each with a known duration. Each job goes to whichever machine becomes free first. When does each job start?</p>
+
+<p>The question at every step is "which machine is free soonest?", the minimum of 50 free-at times. Keep the machines in a min-heap keyed by <code>(free_at, machine_id)</code>. For each job: pop the soonest-free machine, record its start time, push it back with <code>free_at + duration</code>. The machine id in the tuple breaks ties (the lowest id wins). Cost: O(log m) per job for m machines, instead of O(m) for scanning.</p>
+
+<p>The same shape, "pop the earliest event, handle it, push the events it causes", is a <b>discrete event simulation</b>: elevator systems, network simulators and game engines all run on it. Other heap-shaped problems interviewers like:</p>
+<ul>
+  <li><b>Meeting rooms:</b> sort meetings by start time; keep a min-heap of end times of rooms in use. If the earliest end is ≤ the new start, reuse that room. The heap's biggest size is the number of rooms needed.</li>
+  <li><b>Median of a stream:</b> two heaps: a max-heap of the smaller half and a min-heap of the bigger half, kept within one item of each other in size. The median is at one or both roots: O(log n) per insert, O(1) per query.</li>
+  <li><b>Shortest paths:</b> Dijkstra's algorithm is a heap of "tentative distance to each place", popped nearest-first (chapter 2).</li>
+</ul>
+
+<p>Two follow-ups for any priority scheduler. <b>Starvation:</b> if urgent jobs keep arriving, a low-priority job may never run. The usual fix is <b>aging</b>: raise a job's priority the longer it waits (for example, key by <code>priority + rate × arrival_time</code>: since "now" is the same for every job, that orders them exactly like <code>priority − rate × time_waited</code>, and the key never has to change). <b>Threads:</b> <code>heapq</code> isn't thread-safe; use <code>queue.PriorityQueue</code> in Python or <code>PriorityBlockingQueue</code> in Java, which wrap a heap in a lock.</p>
+
+<div class="keyidea"><p>Whenever a problem repeatedly asks "which one is smallest (or soonest, or best) right now?" while items keep arriving, think heap: top-k (min-heap of size k), k-way merge (heap of fronts), scheduling (heap of free times or events).</p></div>
+
+<div class="check" id="check-schedule">
+  <p class="q">For meeting rooms, why keep a min-heap of <b>end times</b> rather than start times?</p>
+  <div class="opts">
+    <button data-correct>Because the question is "which room frees up first?", and that's the earliest end time</button>
+    <button>Because end times are always bigger than start times</button>
+    <button>Because start times are already sorted, so they don't need a heap</button>
+  </div>
+  <div class="fb right"><p>Right. When a meeting starts, you need to know if <em>any</em> room is already free, and the one most likely to be is the one whose meeting ends first: the min of the end times.</p></div>
+  <div class="fb wrong"><p>Picture the receptionist when a new meeting arrives at 10:00. They don't care when the other meetings started; they care whether some room is empty by 10:00. The room that empties first is the one with the earliest end time. If even that one isn't free, none is, and you need a new room. Start times being sorted is true (you sorted them), but that's about which meeting to process next, not which room to give it.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>Heap or something else?</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Operation</th><th>Binary heap</th><th>Balanced BST</th><th>Sorted array</th></tr></thead>
+  <tbody>
+    <tr><td>Peek at the min</td><td>O(1)</td><td>O(log n) (or O(1) if cached)</td><td>O(1)</td></tr>
+    <tr><td>Insert</td><td>O(log n), often O(1) on average</td><td>O(log n)</td><td>O(n)</td></tr>
+    <tr><td>Remove the min</td><td>O(log n)</td><td>O(log n)</td><td>O(1) (keep it at the end)</td></tr>
+    <tr><td>Build from n items</td><td>O(n)</td><td>O(n log n)</td><td>O(n log n)</td></tr>
+    <tr><td>Find or remove any key</td><td>O(n)</td><td>O(log n)</td><td>O(log n) / O(n)</td></tr>
+    <tr><td>Min <em>and</em> max, successor, sorted walk</td><td>no</td><td>yes</td><td>yes</td></tr>
+    <tr><td>Memory</td><td>one array</td><td>a node per item, with pointers</td><td>one array</td></tr>
+  </tbody>
+</table></div>
+
+<p>Use a heap when the only question is "smallest (or largest) next". The moment you also need "find this specific item", "the largest <em>and</em> the smallest", or "everything in order", a balanced tree earns its extra cost.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: d-ary heaps and fancier heaps</summary>
+  <p>A <b>d-ary heap</b> gives each node d children instead of 2: the tree is shallower (log<sub>d</sub> n levels), so push is cheaper, but each sift-down level compares d children. With d = 4, the four children often sit in the same cache line, which is why Go's timers and many Dijkstra implementations use 4-ary heaps. <b>Fibonacci heaps</b> make "decrease a priority" O(1) amortized, which improves Dijkstra on paper. <b>Pairing heaps</b> are simpler and fast in practice, though their exact decrease-key cost is still an open problem. In practice, a binary heap with lazy deletion usually wins because it's simple and cache-friendly.</p>
+  <p>For millions of timers (the reminder service from section 1), systems often skip the heap entirely and use a <b>timing wheel</b>: a circular array of buckets, one per tick, like a clock face. Adding a timer drops it in the bucket for its due tick: O(1). Each tick, fire everything in the current bucket. Linux kernel timers, Kafka's request purgatory and Netty's <code>HashedWheelTimer</code> use one. The trade-off is precision: times are rounded to the tick. At the scale of a real reminder service you'd also persist reminders (a database with an index on due time) and shard them by time bucket, so a crash loses nothing and no single machine holds them all.</p>
+</details>
+
+<div class="check" id="check-which">
+  <p class="q">A task manager must run the highest-priority task next, but users can also cancel any task by id. What's a good design?</p>
+  <div class="opts">
+    <button>A plain heap: find the task to cancel by scanning</button>
+    <button data-correct>A heap plus a dict of live tasks; cancel by marking the task dead and skip dead tasks when they reach the top</button>
+    <button>A sorted list, re-sorted after every change</button>
+  </div>
+  <div class="fb right"><p>Right: lazy deletion. Cancel is O(1), pops stay O(log n) amortized, and dead entries are thrown away when they surface. A balanced BST keyed by (priority, id) would also work, with O(log n) cancel.</p></div>
+  <div class="fb wrong"><p>A heap can't find an arbitrary item: it only knows where the minimum is, so scanning to cancel is O(n) per cancel. Re-sorting is O(n log n) per change, far worse. The trick from section 7: don't remove the task from the heap at all. Mark it cancelled in a dict, and when a pop returns a cancelled task, throw it away and pop again. Each entry is pushed once and popped once, so the cost is O(log n) per operation, amortized: one pop may skip several dead entries, but each dead entry is skipped only once. If dead entries pile up past half the heap, rebuild it.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s12"><span class="sec-num">12</span>What to say in the interview</h2>
+
+<p>For "find the k most frequent words in a huge log", a strong answer:</p>
+<div class="story">
+  <p>"First count with a hash map: O(n). Then I need the k largest counts out of m distinct words. Sorting them is O(m log m). Better: a min-heap of size k. For each word, I compare its count with the root, the weakest of my current top k. If it's not bigger, I skip it: one comparison, and that's most words. If it is, I replace the root and sift down, O(log k). That's O(m log k) time and O(k) extra memory on top of the counts. If k is close to m I'd just sort, and if it must be exact and in memory, quickselect is O(m) on average. If the counts don't fit on one machine, I'd partition words by hash, so all the counts for one word land on one machine, take a top k on each machine, and merge those. Without that partitioning, merging local top k's can miss a word that's moderately common everywhere."</p>
+</div>
+<p>Habits that make you sound senior:</p>
+<ul>
+  <li>Say which heap and why: "a <em>min</em>-heap of size k, because I'm guarding the weakest of the top k".</li>
+  <li>Give the cost in both n and k: O(n log k), not "O(n log n)".</li>
+  <li>Mention heapify is O(n) if you have everything up front.</li>
+  <li>Mention ties and lazy deletion when priorities can change.</li>
+  <li>Know when a heap is the wrong tool: you need search, both ends, or sorted iteration.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>A min-heap only promises parent ≤ children, so the root is the minimum; siblings have no order.</li>
+  <li>It's a complete tree, so height ≈ log₂ n always, stored in an array: children 2i + 1, 2i + 2; parent (i − 1) // 2.</li>
+  <li>Push: append, sift up. Pop: swap in the last item, sift down with the <em>smaller</em> child. Both O(log n); peek O(1).</li>
+  <li>Heapify bottom-up is O(n): most nodes are near the bottom and barely move.</li>
+  <li><code>heapq</code>: min-heap on a list; negate for max; <code>(priority, counter, item)</code>; lazy deletion for changes.</li>
+  <li>Top k largest: min-heap of size k, O(n log k), O(k) memory, works on streams.</li>
+  <li>Merge k sorted lists: heap of fronts, O(N log k). External sort and LSM compaction run on it.</li>
+  <li>Scheduling: heap of free times or events. Median: two heaps.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do them in order. Warm-ups are pen and paper: commit to an answer before you open it. Core exercises are code in <code>exercises/</code>, and their tests <b>measure how much work your code does</b> (comparisons, items pulled from a stream, memory, a time cap), so a correct but slow answer fails.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Run the heap by hand</h4>
+  <p>Push 6, 2, 9, 4, 1, 7 into an empty min-heap. Write the array after each push. Then pop once and write the array again.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>Push 6: [6]. Push 2: it lands at index 1, smaller than its parent 6, swap: [2, 6]. Push 9: [2, 6, 9], no swap. Push 4: index 3, parent index 1 holds 6, swap; parent index 0 holds 2, stop: [2, 4, 9, 6]. Push 1: index 4, parent index 1 holds 4, swap; parent index 0 holds 2, swap: [1, 2, 9, 6, 4]. Push 7: index 5, parent index 2 holds 9, swap; parent index 0 holds 1, stop: [1, 2, 7, 6, 4, 9].</p>
+    <p>Pop: the answer is 1. Move the last item, 9, to the root: [9, 2, 7, 6, 4]. Its children are 2 and 7: swap with the smaller, 2 → [2, 9, 7, 6, 4]. Now 9's children (indexes 3 and 4) are 6 and 4: swap with 4 → [2, 4, 7, 6, 9]. No children left: done.</p>
   </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Is it a heap?</h4>
+  <p>Which of these arrays are valid min-heaps? (a) <code>[1, 3, 2, 7, 4, 2]</code> (b) <code>[1, 2, 3, 4, 0]</code> (c) <code>[2, 2, 2]</code> (d) <code>[1, 5, 2, 6, 7, 3, 4]</code>. Then heapify <code>[5, 9, 3, 8, 1]</code> bottom-up and give the result.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Yes: index 2 (2) has child index 5 (2), equal is fine. (b) No: index 4 holds 0, and its parent, index 1, holds 2. (c) Yes. (d) Yes: 1 ≤ 5, 2; 5 ≤ 6, 7; 2 ≤ 3, 4. Heapify [5, 9, 3, 8, 1]: the last node with children is index (5 − 2) // 2 = 1. Sift down 9: children 8 and 1, swap with 1 → [5, 1, 3, 8, 9]. Then index 0: 5's children are 1 and 3, swap with 1 → [1, 5, 3, 8, 9]; 5's children are now 8 and 9, stop. Result [1, 5, 3, 8, 9].</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Pick the heap and the cost</h4>
+  <p>Give the heap (min or max, of what, how big) and the time: (a) the 5 cheapest flights out of 10 million; (b) the running median of a stream of prices; (c) merge 64 sorted files totalling 6.4 billion lines; (d) the 1,000 closest restaurants to a user, out of 2 million.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) <em>Max</em>-heap of size 5 (guard the most expensive of the 5 cheapest): O(n log 5), about one comparison per flight. (b) Two heaps: max-heap for the lower half, min-heap for the upper; O(log n) per price. (c) Min-heap of the 64 front lines: O(N log 64): log₂ 64 = 6 levels, about 12 comparisons per line, so about 8 × 10¹⁰ in total, and memory for only 64 lines plus buffers. (d) Max-heap of size 1,000 keyed by distance: O(n log 1000). If this is a repeated query, a spatial index (a geohash grid or a k-d tree) beats scanning all 2 million each time.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>MinHeap</code> from scratch</h4>
+  <p>In <code>exercises/min_heap.py</code>: push, pop, peek and <code>from_list</code> (heapify) on a plain list, with no <code>heapq</code>. The tests hand you keys that count every comparison: pushing n falling values must cost about n log₂ n, popping everything about 2n log₂ n, and <code>from_list</code> fewer than 3n, so heapifying by n pushes, or by sorting, fails.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. Top-k, k-way merge and job scheduling</h4>
+  <p>In <code>exercises/heap_patterns.py</code> (you may use <code>heapq</code>'s <code>heappush</code>, <code>heappop</code>, <code>heapify</code>, <code>heapreplace</code> and <code>heappushpop</code> here, but not <code>nlargest</code>, <code>nsmallest</code> or <code>merge</code>): <code>top_k</code> over a stream, <code>merge_sorted</code> as a lazy generator over k sorted iterators, and <code>assign_jobs</code> for section 10's render farm. The tests count comparisons, check memory while streaming 100,000 items, check that the merge pulls only one item at a time from each input, and put a time cap on 1,000,000 jobs over 500,000 machines (scanning the machines, or keeping them in a sorted list, takes far too long). In <code>top_k</code>, an item that doesn't beat the root must cost one comparison.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · build</div>
+  <h4>6. Median of a stream</h4>
+  <p>Write a <code>RunningMedian</code> class with <code>add(x)</code> in O(log n) and <code>median()</code> in O(1), using two <code>heapq</code> heaps (section 10). Check it against <code>statistics.median</code> on random data after every add. Then answer: what changes if old values must also expire (a sliding-window median)?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure</div>
+  <h4>7. Heapify vs n pushes</h4>
+  <p>Count comparisons (wrap numbers in a class with a counting <code>__lt__</code>) for <code>heapq.heapify</code> and for n calls to <code>heapq.heappush</code>, on random data and on falling data (n, n − 1, …, 1), for n = 2¹⁰ … 2²⁰. Divide each by n. Which one stays flat? Which one grows like log n, and on which input? Why is random input kinder to repeated pushes?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>8. Say it out loud</h4>
+  <p>Set a 2-minute timer and answer: "How would you find the 100 most-played songs out of a billion plays, and what does it cost?" Did you mention counting first, a min-heap of size k and why min, O(n log k), memory, and what changes across many machines?</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k "min_heap or heap_patterns"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="trees.html"><small>← Previous</small>Sorted and fast</a>
+  <a class="next" href="graphs.html"><small>Next →</small>Graphs and how to store them</a>
+</nav>
+
 </main>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  let heap = [5, 9, 7, 12, 10, 8, 15];
-  const toTree = (arr, i = 0) => (i < arr.length ? { val: arr[i], idx: i, left: toTree(arr, 2 * i + 1), right: toTree(arr, 2 * i + 2) } : null);
-  const player = V.player($("hp-player"), {
-    draw(f, stage) {
-      const svg = V.s("svg", { class: "viz" });
-      V.binaryTree(svg, toTree(f.arr), { label: (n) => n.val, cls: (n) => (f.hl && f.hl.includes(n.idx) ? "hl" : f.cmp && f.cmp.includes(n.idx) ? "warn" : f.out === n.idx ? "done" : "") });
-      stage.append(svg, V.el("div", { class: "small muted", style: "margin-top:6px" }, "array (index = position in the tree, level by level)"),
-        V.cells(f.arr, { cls: (i) => (f.hl && f.hl.includes(i) ? "hl" : f.cmp && f.cmp.includes(i) ? "warn" : "") }));
-      if (f.popped != null) stage.append(V.el("div", { class: "small", style: "margin-top:4px" }, "popped: ", V.el("b", {}, f.popped)));
-    },
-  });
-  const show = (msg) => player.load([{ arr: [...heap], msg }]);
-  function pushFrames(v) {
-    const a = heap, fr = [];
-    a.push(v); let i = a.length - 1;
-    fr.push({ arr: [...a], hl: [i], msg: `Append <b>${v}</b> at index ${i}, the next free spot, so the tree stays complete.` });
-    while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (a[p] <= a[i]) { fr.push({ arr: [...a], hl: [i], cmp: [p], msg: `Parent ${a[p]} ≤ ${a[i]}. The invariant holds, so stop.` }); break; }
-      fr.push({ arr: [...a], hl: [i], cmp: [p], msg: `Parent ${a[p]} &gt; ${a[i]}: swap (sift up).` });
-      [a[p], a[i]] = [a[i], a[p]]; i = p;
-      fr.push({ arr: [...a], hl: [i], msg: `Now at index ${i}.` });
+  const toTree = (a, i = 0) => (i < a.length ? { val: a[i], idx: i, left: toTree(a, 2 * i + 1), right: toTree(a, 2 * i + 2) } : null);
+  const heapView = (a, cls) => {
+    const svg = V.s("svg", { class: "viz" });
+    V.binaryTree(svg, toTree(a), { cls: (n) => (cls(n.idx) === "cmp" ? "warn" : cls(n.idx)), dx: 42, dy: 52 });  // tree nodes have no "cmp" style
+    return [svg, V.cells(a, { cls: (i) => cls(i) })];
+  };
+
+  // ---- Push and pop stepper (sections 4 and 5) ----
+  (function () {
+    const h = [], frames = [];
+    const snap = (msg, mark = {}) => frames.push({ a: h.slice(), mark, msg });
+    snap("An empty min-heap: an empty array.");
+    for (const v of [5, 3, 8, 1, 4, 2, 7]) {
+      h.push(v); let i = h.length - 1;
+      snap(`push <b>${v}</b>: put it in the next free seat, index ${i}.`, { [i]: "hl" });
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (h[i] < h[p]) { snap(`${h[i]} &lt; its parent ${h[p]} (index ${p}): swap.`, { [i]: "cmp", [p]: "cmp" }); [h[i], h[p]] = [h[p], h[i]]; i = p; snap(`${v} moved up to index ${i}.`, { [i]: "hl" }); }
+        else { snap(`${h[i]} ≥ its parent ${h[p]}: stop.`, { [i]: "done", [p]: "done" }); break; }
+      }
+      if (i === 0 && h.length > 1) snap(`${v} is the new root, the minimum.`, { 0: "done" });
     }
-    if (i === 0) fr.push({ arr: [...a], hl: [0], msg: `Reached the root: <b>${v}</b> is the new minimum.` });
-    return fr;
-  }
-  function siftDownFrames(a, i, fr, n = a.length) {
-    while (true) {
-      const l = 2 * i + 1, r = l + 1;
-      if (l >= n) { fr.push({ arr: [...a], hl: [i], msg: `Index ${i} has no children. Done.` }); return; }
-      const c = r < n && a[r] < a[l] ? r : l;
-      if (a[i] <= a[c]) { fr.push({ arr: [...a], hl: [i], cmp: [l, r].filter((k) => k < n), msg: `${a[i]} ≤ smaller child ${a[c]}. The invariant holds, so stop.` }); return; }
-      fr.push({ arr: [...a], hl: [i], cmp: [c], msg: `${a[i]} &gt; smaller child ${a[c]} (index ${c}): swap (sift down).` });
-      [a[i], a[c]] = [a[c], a[i]]; i = c;
+    for (let k = 0; k < 2; k++) {
+      const top = h[0], last = h[h.length - 1];
+      snap(`pop: the answer is the root, <b>${top}</b>. Move the last item, ${last}, into its seat.`, { 0: "bad", [h.length - 1]: "hl" });
+      h.pop();
+      if (!h.length) break;
+      h[0] = last; let i = 0;
+      snap(`${last} is now at the root. Sift it down.`, { 0: "hl" });
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1; let m = i;
+        if (l < h.length && h[l] < h[m]) m = l;
+        if (r < h.length && h[r] < h[m]) m = r;
+        if (m === i) { snap(l < h.length ? `${h[i]} ≤ its children: stop. Popped ${top}.` : `${h[i]} has no children: stop. Popped ${top}.`, { [i]: "done" }); break; }
+        const kids = [l, r].filter((x) => x < h.length).map((x) => h[x]);
+        snap(`children of ${h[i]}: ${kids.join(" and ")}. Swap with the smaller, <b>${h[m]}</b>.`, { [i]: "cmp", [m]: "cmp" });
+        [h[i], h[m]] = [h[m], h[i]]; i = m;
+        snap(`${last} moved down to index ${i}.`, { [i]: "hl" });
+      }
     }
-  }
-  function popFrames() {
-    const a = heap, fr = [];
-    if (!a.length) return [{ arr: [], msg: "Heap is empty: a real pop raises IndexError." }];
-    const min = a[0];
-    fr.push({ arr: [...a], out: 0, msg: `The minimum is always at index 0: <b>${min}</b>.` });
-    const last = a.pop();
-    if (a.length) { a[0] = last; fr.push({ arr: [...a], hl: [0], popped: min, msg: `Move the last item (${last}) to the root. That keeps the tree complete but breaks the order.` }); siftDownFrames(a, 0, fr); }
-    else fr.push({ arr: [], popped: min, msg: "That was the only item." });
-    fr[fr.length - 1].popped = min;
-    return fr;
-  }
-  function heapifyFrames() {
-    const a = Array.from({ length: 10 }, () => 1 + Math.floor(Math.random() * 50)), fr = [];
-    fr.push({ arr: [...a], msg: "A random array: not a heap yet. Sift down each non-leaf, from the last one back to the root." });
-    for (let i = (a.length >> 1) - 1; i >= 0; i--) { fr.push({ arr: [...a], hl: [i], msg: `Sift down index ${i}.` }); siftDownFrames(a, i, fr); }
-    fr.push({ arr: [...a], msg: "It's a heap now. Total work was O(n), because most nodes sit near the bottom and barely move." });
-    heap = a; return fr;
-  }
-  $("hp-push").onclick = () => { const v = parseInt($("hp-val").value, 10); if (isNaN(v)) return show("Type a value first."); player.load(pushFrames(v)); };
-  $("hp-val").addEventListener("keydown", (e) => { if (e.key === "Enter") $("hp-push").click(); });
-  $("hp-rand").onclick = () => player.load(pushFrames(1 + Math.floor(Math.random() * 30)));
-  $("hp-pop").onclick = () => player.load(popFrames());
-  $("hp-heapify").onclick = () => player.load(heapifyFrames());
-  show("A min-heap. Push 3 and watch it rise, or pop the minimum.");
+    V.player($("heap-player"), {
+      frames, speed: 1000,
+      draw(f, stage) { stage.append(...heapView(f.a, (i) => f.mark[i] || "")); },
+    });
+  })();
+
+  // ---- Heapify work by level (section 6) ----
+  (function () {
+    const show = () => {
+      const L = Number($("hf-n").value), n = 2 ** L - 1;
+      $("hf-nval").textContent = n.toLocaleString();
+      const rows = []; let total = 0;
+      for (let h = 0; h < L; h++) { const cnt = 2 ** (L - 1 - h); total += cnt * h; rows.push([h, cnt, cnt * h]); }
+      const shown = rows.length > 8 ? rows.slice(0, 6).concat([["…", "…", "…"]], rows.slice(-1)) : rows;
+      $("hf-out").replaceChildren(V.el("table", {}, V.el("tr", {}, V.el("th", {}, "height above the bottom"), V.el("th", {}, "nodes"), V.el("th", {}, "most swaps (nodes × height)")),
+        shown.map((r) => V.el("tr", {}, r.map((c) => V.el("td", {}, typeof c === "number" ? c.toLocaleString() : c))))));
+      let pushes = 0;
+      for (let i = 1; i <= n; i++) pushes += Math.floor(Math.log2(i));
+      $("hf-msg").innerHTML = `Total heapify swaps at most <b>${total.toLocaleString()}</b>, which is less than n = ${n.toLocaleString()}. Half the nodes (${(2 ** (L - 1)).toLocaleString()}) are leaves and never move. ${n.toLocaleString()} pushes of falling values cost <b>${pushes.toLocaleString()}</b> swaps: every item climbs to the root, so the total is the sum of all their depths.`;
+    };
+    $("hf-n").oninput = show; show();
+  })();
+
+  // ---- Top-k stepper (section 8) ----
+  (function () {
+    const stream = [4, 9, 1, 7, 3, 8, 2, 10, 6, 5], k = 3, h = [], frames = [];
+    let cmps = 0;
+    const push = (v) => { h.push(v); let i = h.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (h[i] < h[p]) { [h[i], h[p]] = [h[p], h[i]]; i = p; } else break; } };
+    const replaceTop = (v) => { h[0] = v; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < h.length && h[l] < h[m]) m = l; if (r < h.length && h[r] < h[m]) m = r; if (m === i) break; [h[i], h[m]] = [h[m], h[i]]; i = m; } };
+    frames.push({ a: [], s: -1, msg: `Find the ${k} largest. The room has ${k} seats; the root is the weakest VIP.` });
+    stream.forEach((v, j) => {
+      if (h.length < k) { push(v); frames.push({ a: h.slice(), s: j, msg: `<b>${v}</b>: the room isn't full yet, so ${v} walks in. Weakest inside: ${h[0]}.` }); return; }
+      cmps++;
+      if (v > h[0]) { const out = h[0]; replaceTop(v); frames.push({ a: h.slice(), s: j, msg: `<b>${v}</b> &gt; ${out}, the weakest VIP: ${out} is thrown out and ${v} goes in (O(log k)). Weakest now: ${h[0]}.`, inn: true }); }
+      else frames.push({ a: h.slice(), s: j, msg: `<b>${v}</b> ≤ ${h[0]}, the weakest VIP: turned away after one comparison.`, out: true });
+    });
+    frames[frames.length - 1].msg += ` The top ${k}: <b>${h.slice().sort((x, y) => y - x).join(", ")}</b>.`;
+    V.player($("topk-player"), {
+      frames, speed: 1100,
+      draw(f, stage) {
+        stage.append(V.el("div", { class: "small muted" }, "stream"),
+          V.cells(stream, { cls: (i) => (i === f.s ? (f.out ? "bad" : "hl") : i < f.s ? "dim" : "") }),
+          V.el("div", { class: "small muted" }, `min-heap of size ${k} (root = weakest VIP)`),
+          ...heapView(f.a, (i) => (i === 0 ? "warn" : "")));
+      },
+    });
+  })();
+
+  // ---- k-way merge stepper (section 9) ----
+  (function () {
+    const lists = [[1, 4, 9], [2, 3, 10], [5, 6, 7]], pos = [0, 0, 0], h = [], out = [], frames = [];
+    const name = ["A", "B", "C"];
+    const lt = (x, y) => x[0] < y[0] || (x[0] === y[0] && x[1] < y[1]);
+    const push = (e) => { h.push(e); let i = h.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (lt(h[i], h[p])) { [h[i], h[p]] = [h[p], h[i]]; i = p; } else break; } };
+    const pop = () => { const top = h[0], last = h.pop(); if (h.length) { h[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < h.length && lt(h[l], h[m])) m = l; if (r < h.length && lt(h[r], h[m])) m = r; if (m === i) break; [h[i], h[m]] = [h[m], h[i]]; i = m; } } return top; };
+    const snap = (msg) => frames.push({ pos: pos.slice(), h: h.slice(), out: out.slice(), msg });
+    snap("Three sorted lists. Start by pushing the front of each into the heap.");
+    lists.forEach((l, j) => { push([l[0], j]); pos[j] = 1; });
+    snap("The heap holds one front item per list: 1 (A), 2 (B), 5 (C).");
+    while (h.length) {
+      const [v, j] = pop(); out.push(v);
+      if (pos[j] < lists[j].length) { push([lists[j][pos[j]], j]); pos[j]++; snap(`pop <b>${v}</b> (from ${name[j]}) and output it. Push the next item from ${name[j]}: ${lists[j][pos[j] - 1]}.`); }
+      else snap(`pop <b>${v}</b> (from ${name[j]}) and output it. ${name[j]} is empty, so nothing to push.`);
+    }
+    frames[frames.length - 1].msg += " Done: 9 items, and the heap never held more than 3.";
+    V.player($("merge-player"), {
+      frames, speed: 1100,
+      draw(f, stage) {
+        lists.forEach((l, j) => stage.append(V.el("div", { class: "small muted" }, `list ${name[j]}`), V.cells(l, { idx: false, cls: (i) => (i < f.pos[j] ? "dim" : "") })));
+        stage.append(V.el("div", { class: "small muted" }, "heap (value · list), as an array"),
+          f.h.length ? V.cells(f.h, { idx: false, label: (e) => `${e[0]}·${name[e[1]]}`, cls: (i) => (i === 0 ? "warn" : "") }) : V.el("div", { class: "small", style: "height:38px" }, "(empty)"),
+          V.el("div", { class: "small muted" }, "output"),
+          V.cells(f.out.concat(Array(9 - f.out.length).fill(null)), { idx: false, cls: (i) => (i < f.out.length ? "done" : "") }));
+      },
+    });
+  })();
 })();
 </script>
 </body>
