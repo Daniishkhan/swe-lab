@@ -1,6 +1,7 @@
 """
 Complexity drills: code whose tests measure how much work it does
 Topic: 02.01  |  Priority: P0  |  Chapter: concepts/complexity.html (exercises 4-7)
+(Numbered 1-4 here; they're exercises 4-7 in the chapter.)
 
 These tests don't just check the answer. They count steps (copies, reads,
 multiplications), so a correct but slow solution FAILS. That's the point:
@@ -13,22 +14,29 @@ complexity is something you can measure, not just claim.
    A growable array built on a fixed-size Python list (the "block").
    - append(x): if the block is full, allocate a block twice as big and copy
      every existing item into it. Add 1 to self.copies for EACH item copied.
-   - __getitem__(i), __len__(), and a `capacity` property.
+   - __getitem__(i), __len__(), and a `capacity` property. __getitem__ raises
+     IndexError unless 0 <= i < len(self) (no negative indexes).
    - Start with capacity 1. Do not use list.append on the block itself; write
      into slots: self._block[self._size] = x.
    Target: n appends cause fewer than 2n copies (amortized O(1) per append).
-   Experiment: grow by +10 instead of x2 and watch the test fail.
+   Experiment: grow by +10 instead of x2 and watch the test fail (it checks
+   after every append, so it fails within a few dozen appends).
 
 3. count_pairs_with_sum(sorted_nums, target) -> int
    sorted_nums is sorted ascending with DISTINCT values. Count pairs i < j
    with sorted_nums[i] + sorted_nums[j] == target.
-   Target: O(n) with two pointers. The test passes a list that counts reads;
-   more than about 2n reads fails.
+   Target: O(n) with two pointers. One test passes a list that counts reads,
+   another passes numbers that count additions; more than about 2n of either
+   fails. (Copying the list first doesn't hide the work.)
 
 4. fast_power(base, exp) -> (result, multiplications)
    base ** exp for integer exp >= 0, using square-and-multiply. Count every
-   `*` you perform between numbers. Don't use ** or pow().
-   Target: O(log exp) multiplications (at most 2 * log2(exp) + 2).
+   `*` you perform and return that count. Don't use ** or pow().
+   `base` may be any object that supports `*` (the test passes a number that
+   counts its own multiplications and checks your count), so start the result
+   from 1 and only ever multiply.
+   Target: O(log exp) multiplications (at most 2 * log2(exp) + 2). That's not
+   O(log exp) TIME in Python: big integers get slower to multiply as they grow.
 
 Before you code (say it out loud)
 ---------------------------------

@@ -49,8 +49,6 @@
 
 <p>Here are two correct ways to find a duplicate:</p>
 
-<div class="cols">
-<div>
 <pre><code># Way A: compare every pair
 def has_dup_a(songs):
     for i in range(len(songs)):
@@ -58,8 +56,6 @@ def has_dup_a(songs):
             if songs[i] == songs[j]:
                 return True
     return False</code></pre>
-</div>
-<div>
 <pre><code># Way B: remember what you've seen
 def has_dup_b(songs):
     seen = set()
@@ -68,10 +64,8 @@ def has_dup_b(songs):
             return True
         seen.add(s)
     return False</code></pre>
-</div>
-</div>
 
-<p>Both give the right answer. On 200 songs, both feel instant. So which one is "better"? That's the real question this chapter answers. The surprising answer: on 100 million songs, one of them finishes in seconds and the other takes about a <b>month</b>.</p>
+<p>Both give the right answer. On 200 songs, both feel instant. So which one is "better"? That's the real question this chapter answers. The surprising answer: on 100 million songs, one of them finishes in about ten seconds and the other would run for about <b>16 years</b>.</p>
 
 <!-- ============================================================ -->
 <h2 id="s2"><span class="sec-num">2</span>Count steps, not seconds</h2>
@@ -97,10 +91,11 @@ def has_dup_b(songs):
 
 <p>Now Way A. The outer loop picks a song. The inner loop compares it with every song after it. For n songs, the number of comparisons is:</p>
 <p style="text-align:center" class="big-number">(n − 1) + (n − 2) + … + 1 = n(n − 1) / 2</p>
-<p>That's the number of <em>pairs</em> you can make from n things. Way B looks at each song once, so about <b>n</b> steps (each "is it in the set?" check counts as one step; section 7 of the hash map page explains why that's fair).</p>
+<p>That's the number of <em>pairs</em> you can make from n things. Way B looks at each song once, so about <b>n</b> steps (each "is it in the set?" check counts as one step <em>on average</em>; the <a href="../../01-data-structures/concepts/hash-maps.html">hash map chapter</a> explains why that's fair).</p>
+<p class="small muted">One honest caveat: a "step" only takes constant time when the things involved have a fixed size. Comparing or hashing two numbers is one step. Comparing two strings of length k takes up to k steps, so de-duplicating n long strings is really O(n · k). When sizes vary, say so.</p>
 
 <div class="check" id="check-count">
-  <p class="q">A function loops through a list of n items and, for each item, prints it twice. Roughly how many steps?</p>
+  <p class="q">A function loops through a list of n items and, for each item, prints it twice. Counting each print as one step, how many steps?</p>
   <div class="opts">
     <button>n</button>
     <button data-correct>2n</button>
@@ -119,7 +114,7 @@ def has_dup_b(songs):
   <thead><tr><th>songs (n)</th><th>Way A: n(n−1)/2 steps</th><th>Way B: n steps</th><th>Way A time</th><th>Way B time</th></tr></thead>
   <tbody>
     <tr><td>200</td><td>19,900</td><td>200</td><td>0.002 s</td><td>instant</td></tr>
-    <tr><td>100,000</td><td>5,000,000,000</td><td>100,000</td><td>8 minutes</td><td>0.01 s</td></tr>
+    <tr><td>100,000</td><td>≈ 5 × 10⁹</td><td>100,000</td><td>8 minutes</td><td>0.01 s</td></tr>
     <tr><td>100,000,000</td><td>5 × 10¹⁵</td><td>100,000,000</td><td><b>about 16 years</b></td><td>10 s</td></tr>
   </tbody>
 </table></div>
@@ -138,7 +133,7 @@ def has_dup_b(songs):
     <div class="viz-controls" style="margin-top:0"><span class="small">songs n =</span><input type="range" id="sc-n" min="1" max="8" value="3" style="width:220px"><b id="sc-nval"></b><button class="btn" id="sc-double">Double n</button></div>
     <div id="sc-out" style="margin-top:12px"></div>
   </div>
-  <div class="cap">Step counter for three ways to find a duplicate. The third one, "sort then scan", sorts the list and then checks neighbors; we'll meet it properly in the sorting chapter. Press "Double n" and watch the ratios.</div>
+  <div class="cap">Step counter for three ways to find a duplicate. The middle one, "sort, then check neighbors", sorts the list and then compares each item with the next; we'll meet it properly in the sorting chapter. Press "Double n" and watch the ratios. The bars use a log scale: each extra notch of length means 10× more steps, so a bar twice as long is vastly more work, not double.</div>
 </div>
 
 <h3>So we drop the details</h3>
@@ -149,13 +144,13 @@ def has_dup_b(songs):
 </ol>
 
 <div class="keyidea">
-  <p><b>Big-O</b> describes how the number of steps grows as the input grows, ignoring constant multipliers and smaller terms. "This is O(n²)" means: double the input, and the work roughly quadruples.</p>
+  <p><b>Big-O</b> describes how the number of steps grows as the input grows, ignoring constant multipliers and smaller terms. "This is O(n²)" means: once n is large, double the input and the work roughly quadruples.</p>
 </div>
 
 <details class="aside another">
-  <summary>Explain it another way</summary>
-  <p>Think of two ways to travel: walking and driving. Walking gets a head start because you don't have to find your keys, back out of the garage, or park. For a trip to the corner shop, walking might even win.</p>
-  <p>But for a trip to another city, the head start is meaningless. What decides it is speed per mile. Big-O is about the long trip. The "head start" (constants, setup) only matters for short trips, meaning small inputs.</p>
+  <summary>Explain it another way: the phone book</summary>
+  <p>Find a name in a phone book two ways: read every name from page 1, or open to the middle and keep halving. For a book of 8 names, reading straight through might win, because there's no flipping back and forth.</p>
+  <p>For a million names, reading takes a million looks and halving takes 20. Being a faster reader (a better constant) can't save the first way. What decides it is how the work grows with the size of the book. Big-O is about the big book.</p>
 </details>
 
 <div class="check" id="check-drop">
@@ -173,6 +168,7 @@ def has_dup_b(songs):
   <summary>Go deeper: the formal definition, and Θ vs O</summary>
   <p>Formally, f(n) is O(g(n)) if there are constants c and n₀ such that f(n) ≤ c·g(n) for every n ≥ n₀. In words: past some point, f never grows faster than a constant times g.</p>
   <p>Strictly, O is only an <em>upper bound</em>, so it's technically true that a linear function is also O(n²). The tight bound is written Θ (theta): f is Θ(g) if it's bounded above <em>and</em> below by constant multiples of g. Ω (omega) is the lower bound. In interviews and in industry, people say "O" and mean the tight bound. Use O, but give the tightest one you can justify.</p>
+  <p>These are <em>not</em> the same thing as worst and best case (that's section 8). O, Θ and Ω describe a function; worst and best case pick which function you're describing. "Quicksort's worst case is Θ(n²)" and "quicksort's best case is Θ(n log n)" are both fine sentences.</p>
 </details>
 
 <!-- ============================================================ -->
@@ -185,7 +181,7 @@ def has_dup_b(songs):
 
 <h3>O(log n): halving</h3>
 <p>Play "guess my number between 1 and 100". If you always guess the middle and I tell you "higher" or "lower", you throw away half the numbers each time. 100 → 50 → 25 → 13 → 7 → 4 → 2 → 1. Seven guesses.</p>
-<p><b>log₂ n</b> just means: <em>how many times can you cut n in half before you reach 1?</em> That's all a logarithm is here.</p>
+<p><b>log₂ n</b> just means: <em>how many times can you cut n in half before you reach 1?</em> That's all a logarithm is here. The base doesn't matter in Big-O: log₂ n and log₁₀ n differ only by a constant multiplier (about 3.3), so both are just O(log n).</p>
 
 <div class="figure">
   <div id="halve-player"></div>
@@ -198,7 +194,7 @@ def has_dup_b(songs):
 <p>Look at every item once. Reading every page of a book. Summing a list, finding the max, Way B from our story.</p>
 
 <h3>O(n log n): "sort-like"</h3>
-<p>This is n multiplied by log n. It shows up when you do log n rounds of work and each round touches all n items. Good sorting algorithms work this way. It's only a little worse than linear: for a million items, log n ≈ 20, so it's about 20× the work of one pass.</p>
+<p>This is n multiplied by log n. It shows up when you do log n rounds of work and each round touches all n items. Good sorting algorithms work this way. It grows only a little faster than linear: double n and the work a bit more than doubles. In absolute terms, for a million items log n ≈ 20, so it's about 20 passes' worth of work.</p>
 
 <h3>O(n²): every pair</h3>
 <p>At a party of n people, everyone shakes hands with everyone else. That's n(n−1)/2 handshakes. Any time you see "compare each item with each other item", think n². Way A lives here.</p>
@@ -207,7 +203,7 @@ def has_dup_b(songs):
 <p>Ordering pizza with n possible toppings: each topping is either on or off, so there are 2 × 2 × … × 2 = 2ⁿ possible pizzas. Every new topping <em>doubles</em> the count. With 30 toppings that's over a billion pizzas. Trying every subset (backtracking without shortcuts) lives here.</p>
 
 <h3>O(n!): every ordering</h3>
-<p>The number of ways to seat n people in a row: n × (n−1) × … × 1. With 10 people, that's 3.6 million; with 20, it's more than the number of grains of sand on Earth. Trying every ordering lives here.</p>
+<p>The number of ways to seat n people in a row: n × (n−1) × … × 1. With 10 people, that's 3.6 million; with 20, it's about 2.4 × 10¹⁸: at 10 million steps a second, nearly 8,000 years. Trying every ordering lives here.</p>
 
 <div class="figure">
   <div class="viz-stage">
@@ -215,14 +211,14 @@ def has_dup_b(songs):
     <svg class="viz" id="cx-svg" viewBox="0 0 640 300" style="margin-top:8px"></svg>
     <div id="cx-table" class="table-wrap" style="margin-top:10px"></div>
   </div>
-  <div class="cap">All the families on one chart. The vertical axis is "zoomed out" (each line is 1,000× the one below), because otherwise 2ⁿ would squash everything else flat. The dashed line is about one second of Python.</div>
+  <div class="cap">Six of the families on one chart (n! would shoot off the top before n = 20). The horizontal axis is n. The vertical axis is "zoomed out" (each line is 1,000× the one below), because otherwise 2ⁿ would squash everything else flat. The dashed line is about one second of Python.</div>
 </div>
 
 <h3>A cheat code for interviews</h3>
 <p>Problem statements tell you how big n can be. Since a second of Python is around 10⁷ steps, you can work backwards to what the interviewer expects:</p>
 <div class="table-wrap"><table>
   <thead><tr><th>If n is up to…</th><th>…you probably need</th></tr></thead>
-  <tbody><tr><td>10 or so</td><td>O(n!) is fine (try every ordering)</td></tr><tr><td>20–25</td><td>O(2ⁿ) is fine (try every subset)</td></tr><tr><td>a few hundred</td><td>O(n³)</td></tr><tr><td>a few thousand</td><td>O(n²)</td></tr><tr><td>100,000 to 1,000,000</td><td>O(n log n) or O(n)</td></tr><tr><td>a billion or more</td><td>O(log n) or O(1): math, or binary search</td></tr></tbody>
+  <tbody><tr><td>10 or so</td><td>O(n!) is fine (try every ordering)</td></tr><tr><td>20–25</td><td>O(2ⁿ) is fine (try every subset)</td></tr><tr><td>up to ~200</td><td>O(n³)</td></tr><tr><td>a few thousand</td><td>O(n²)</td></tr><tr><td>100,000 to 1,000,000</td><td>O(n log n) or O(n)</td></tr><tr><td>a billion or more</td><td>O(log n) or O(1): math, or binary search</td></tr></tbody>
 </table></div>
 
 <div class="check" id="check-limits">
@@ -267,8 +263,10 @@ for x in nums:
 while i > 1:
     i = i // 2       # halves every time → O(log n)</code></pre>
 <p>Any time the remaining work is cut by a fixed fraction each step, you get a log.</p>
+<p>That assumes each step costs O(1). If each step does work proportional to what's left, like <em>slicing</em> the list in half, the total is n + n/2 + n/4 + … ≈ 2n, which is O(n). That's why a binary search written with slices (<code>search(a[mid:])</code>) is O(n), not O(log n).</p>
 
 <h3>Rule 4: Recursion = (number of calls) × (work per call)</h3>
+<p class="small muted">This shortcut works when every call does about the same work. When the work depends on the size of the call (merge sort does more work in big calls than small ones), add it up level by level instead; see "Go deeper" at the end of this section.</p>
 <p>Draw the tree of calls. Count how many boxes there are and how much work each box does.</p>
 <pre><code>def fib(n):
     if n &lt; 2: return n
@@ -284,7 +282,7 @@ while i > 1:
     <tr><td><code>x in my_set</code> / <code>my_dict[k]</code></td><td>O(1) on average</td><td>hashing jumps straight to the spot</td></tr>
     <tr><td><code>my_list[a:b]</code></td><td>O(b − a)</td><td>slicing copies</td></tr>
     <tr><td><code>my_list.pop(0)</code>, <code>insert(0, x)</code></td><td>O(n)</td><td>every other item shifts over</td></tr>
-    <tr><td><code>s += "x"</code> on a string</td><td>O(len(s))</td><td>strings can't change, so a new one is built</td></tr>
+    <tr><td><code>s += "x"</code> on a string</td><td>O(len(s))</td><td>strings can't change, so a new one is built. CPython sometimes cheats and grows the string in place when nothing else refers to it, but prepending (<code>s = "x" + s</code>) never benefits and other Pythons don't do it. Use <code>"".join(parts)</code>.</td></tr>
     <tr><td><code>sorted(my_list)</code></td><td>O(n log n)</td><td>it's a full sort</td></tr>
     <tr><td><code>len(my_list)</code>, <code>append</code></td><td>O(1)</td><td>length is stored; append is amortized O(1) (section 7)</td></tr>
   </tbody>
@@ -301,18 +299,19 @@ for x in nums:
     <button data-correct>O(n²)</button>
     <button>O(n log n)</button>
   </div>
-  <div class="fb right"><p>Right. <code>x not in result</code> walks the result list, which can grow to n items. One hidden loop inside a visible loop is n². Change <code>result</code> to a set (and keep order with a separate list) and it becomes O(n).</p></div>
+  <div class="fb right"><p>Right. <code>x not in result</code> walks the result list, which can grow to n items. One hidden loop inside a visible loop is n². Change <code>result</code> to a set (and keep order with a separate list) and it becomes O(n) on average.</p></div>
   <div class="fb wrong"><p>The trap is that <code>in</code> looks like a single step. On a <em>list</em>, Python checks each item until it finds a match, which is a loop you can't see. So for each of the n items, you might scan up to n items: n × n. Whenever you see <code>in</code>, ask "list or set?"</p></div>
 </div>
 
 <h3>Rule 6 (the tricky one): a loop inside a loop is not always n²</h3>
 <p>This is where people lose points. Look carefully:</p>
-<pre><code>j = 0
+<pre><code># nums is sorted. For each i, move j past every value below nums[i] + 10.
+j = 0
 for i in range(n):
     while j &lt; n and nums[j] &lt; nums[i] + 10:
         j += 1</code></pre>
 <p>It looks like n², but <code>j</code> <b>never goes backwards</b>. Over the <em>whole</em> run, j moves from 0 to n at most once. So the inner loop runs at most n times <em>in total</em>, not n times <em>per outer step</em>. Total: n + n = O(n).</p>
-<p>The trick is to <b>count the total work across the whole run</b>, not the worst case for one iteration times the number of iterations. Sliding windows, two pointers and monotonic stacks all depend on this.</p>
+<p>The trick is to <b>count the total work across the whole run</b>, not the worst case for one iteration times the number of iterations. Sliding windows, two pointers and monotonic stacks (a stack you keep in sorted order, coming up in the data structures chapter) all depend on this.</p>
 
 <div class="check" id="check-twoptr">
   <p class="q">What's the complexity?</p>
@@ -328,7 +327,7 @@ while i &lt; n:
     <button data-correct>O(n)</button>
     <button>O(log n)</button>
   </div>
-  <div class="fb right"><p>Yes. <code>i</code> jumps to <code>j</code>, so every index is visited by the inner loop exactly once in total. Two nested loops, O(n) total work. Spotting this is a senior-level signal.</p></div>
+  <div class="fb right"><p>Yes. <code>i</code> jumps to <code>j</code>, so every index is visited by the inner loop at most about twice in total. Two nested loops, O(n) total work. Spotting this is a senior-level signal.</p></div>
   <div class="fb wrong"><p>Follow one index, say index 5. How many times does the inner loop touch it? Once, while j sweeps through the group containing it. After that, <code>i = j</code> jumps past the whole group, so index 5 is never visited again. Every index is touched once, so the total is O(n) even though the loops are nested. Don't count loops; count how many times each item gets touched.</p></div>
 </div>
 
@@ -350,6 +349,8 @@ while i &lt; n:
 
 <h3>The hidden memory: recursion</h3>
 <p>Every function call that hasn't finished yet sits on the <b>call stack</b>, like a stack of plates. A recursion that goes n levels deep holds n plates at once, so it uses O(n) space even if it never creates a list. In Python the stack stops at about 1,000 levels by default, which is why deep recursion crashes with <code>RecursionError</code>.</p>
+<p>Recursion plus slicing is a double trap. <code>def total(a): return 0 if not a else a[0] + total(a[1:])</code> looks like O(n), but every call copies the rest of the list: O(n²) time. Worse, all n slices are alive at once (each one waits on its own call), so it's O(n²) memory too, on top of n stack frames.</p>
+<p>Two conventions interviewers expect you to know: the <b>output</b> usually doesn't count as extra space (returning a list of n answers is fine in "O(1) extra space"), and changing the input in place to save memory is only free if the caller allows it. Ask.</p>
 
 <h3>The big trade: space for time</h3>
 <p>Way A uses O(1) extra space but O(n²) time. Way B uses O(n) space to get O(n) time. That's the most common trade in all of programming: <b>remember things (use memory) so you don't have to redo work (save time)</b>. Caches, indexes and hash maps are all this trade.</p>
@@ -368,7 +369,7 @@ while i &lt; n:
 <!-- ============================================================ -->
 <h2 id="s7"><span class="sec-num">7</span>Amortized: the occasional expensive step</h2>
 
-<p>Here's a puzzle. A Python list stores its items in one solid block of memory. When the block is full and you <code>append</code>, Python has to:</p>
+<p>Here's a puzzle. A Python list stores references to its items in one solid block of memory. When the block is full and you <code>append</code>, Python has to:</p>
 <ol>
   <li>find a new, bigger block,</li>
   <li>copy <em>every</em> item over (that's n steps!),</li>
@@ -401,17 +402,17 @@ while i &lt; n:
 <div class="check" id="check-amort">
   <p class="q">A list grows by doubling. You append 1,024 items, starting from capacity 1. Roughly how many item-copies happen in total?</p>
   <div class="opts">
-    <button>About 1,024 × 1,024</button>
-    <button data-correct>About 1,000 (1 + 2 + 4 + … + 512 = 1,023)</button>
-    <button>Zero, appending never copies</button>
+    <button>About 1,024 × 1,024 ≈ a million</button>
+    <button>About 10 (one per doubling)</button>
+    <button data-correct>About 1,000</button>
   </div>
-  <div class="fb right"><p>Exactly: 1,023 copies for 1,024 appends, less than one copy per append on average.</p></div>
+  <div class="fb right"><p>Exactly. Copies happen when the block is full at sizes 1, 2, 4, …, 512, and 1 + 2 + 4 + … + 512 = 1,023. That's 1,023 copies for 1,024 appends: less than one copy per append on average. (There are about 10 copying <em>events</em>, but each one moves a whole block.)</p></div>
   <div class="fb wrong"><p>Copies only happen when the block is full: at sizes 1, 2, 4, 8, …, 512. Add those up: 1 + 2 + 4 + 8 + 16 + 32 + 64 + 128 + 256 + 512 = 1,023. Doubling makes the copies rare enough that the total is about the same as the number of appends.</p></div>
 </div>
 
 <details class="aside deeper">
   <summary>Go deeper: why real systems don't always double, and where amortized bites</summary>
-  <p>CPython actually grows lists by about 1.125× plus a little, to waste less memory. Any growth factor bigger than 1 gives amortized O(1); a smaller factor means more frequent copies but less unused space. Some allocators prefer 1.5× because freed old blocks can eventually be reused for a later, bigger block.</p>
+  <p>CPython actually grows lists by about 1.125× plus a little, to waste less memory. Any growth factor bigger than 1 gives amortized O(1); a smaller factor means more frequent copies but less unused space. Some containers (MSVC's <code>std::vector</code>, Facebook's folly) use 1.5×: with any factor below about 1.618, the freed old blocks can eventually add up to enough room for a later, bigger block. Even CPython's 1.125× works out to about 8 copies per append on average, which is still a constant.</p>
   <p>The catch for real systems: amortized O(1) still means that <em>one particular request</em> sometimes pays O(n). If that request is a user waiting on a web page, they see a latency spike. This is why Redis resizes its hash tables <em>incrementally</em> (moving a few buckets per operation) instead of all at once. When people talk about "p99 latency", these occasional expensive operations are a common cause.</p>
 </details>
 
@@ -424,12 +425,19 @@ while i &lt; n:
   <li><b>Average case:</b> the expected work over typical or random inputs.</li>
   <li><b>Best case:</b> rarely useful on its own ("it's fast if the answer is first").</li>
 </ul>
+<p>Three words that sound alike but aren't, and interviewers love to ask about them:</p>
+<ul>
+  <li><b>Average</b> is over inputs. An adversary who picks the input can still hit the worst case.</li>
+  <li><b>Expected</b> is over the algorithm's own coin flips. Quicksort with a random pivot is expected O(n log n) on <em>every</em> input, because no input can control the coins.</li>
+  <li><b>Amortized</b> (section 7) involves no luck at all: it's a guarantee on the total cost of any sequence of operations, even though one of them can be slow.</li>
+</ul>
+<p>A Python dict insert is O(1) on average (because of hashing) <em>and</em> amortized (because of resizing).</p>
 <p>Some famous examples where they differ:</p>
 <div class="table-wrap"><table>
   <thead><tr><th></th><th>Average</th><th>Worst</th><th>What causes the worst case</th></tr></thead>
   <tbody>
     <tr><td>Hash map lookup</td><td>O(1)</td><td>O(n)</td><td>every key lands in the same bucket</td></tr>
-    <tr><td>Quicksort</td><td>O(n log n)</td><td>O(n²)</td><td>always picking the smallest item as the pivot</td></tr>
+    <tr><td>Quicksort</td><td>O(n log n)</td><td>O(n²)</td><td>first or last item as pivot on already-sorted input (always the smallest or largest)</td></tr>
     <tr><td>Plain binary search tree</td><td>O(log n)</td><td>O(n)</td><td>inserting already-sorted data</td></tr>
   </tbody>
 </table></div>
@@ -440,7 +448,7 @@ while i &lt; n:
   <div class="opts">
     <button>"O(n), always."</button>
     <button data-correct>"O(n) on average; O(n²) in the worst case if hashing goes badly."</button>
-    <button>"O(1)."</button>
+    <button>"O(n) on average, and O(n) in the worst case too."</button>
   </div>
   <div class="fb right"><p>That's the senior version. You probably don't need to dwell on it, but saying it shows you know where the O(1) comes from.</p></div>
   <div class="fb wrong"><p>Hash lookups are O(1) <em>on average</em>. In the worst case (many keys colliding into one bucket) one lookup can be O(n), and doing n of those would be O(n²). Stating "average" vs "worst" is a small phrase that signals you really understand the tool.</p></div>
@@ -452,13 +460,14 @@ while i &lt; n:
 <p>Big-O throws away constants. Usually that's fine. Sometimes it's not:</p>
 <ul>
   <li><b>Small inputs.</b> An O(n²) algorithm with tiny steps can beat an O(n log n) one with heavy steps when n is 20. That's why Python's own sort switches to a simple O(n²) method (insertion sort) for small chunks.</li>
-  <li><b>Memory layout.</b> Reading a list item by item is very fast because neighbors in memory get loaded together. Following pointers around (like a linked list) is often several times slower <em>with the same Big-O</em>.</li>
+  <li><b>Memory layout.</b> Reading an array of values (a C array, a NumPy array, a Java <code>int[]</code>) item by item is very fast because neighbors in memory get loaded together. (A Python list holds references, so the objects themselves may be scattered.) Following pointers around (like a linked list) is often several times slower <em>with the same Big-O</em>.</li>
   <li><b>Python vs C.</b> <code>sorted()</code> and <code>sum()</code> run in fast C code. A hand-written Python loop doing "less" work can still be slower than a built-in doing "more".</li>
 </ul>
 
 <h3>How to check: the doubling experiment</h3>
 <p>You can measure growth without trusting your analysis. Time your code at n, then at 2n:</p>
 <ul>
+  <li>time barely changes → O(1) or O(log n)</li>
   <li>time roughly ×2 → linear</li>
   <li>a bit more than ×2 → n log n</li>
   <li>×4 → n²</li>
@@ -473,12 +482,23 @@ while i &lt; n:
 
 <p>Here's what a strong answer sounds like for the duplicate problem. Notice the structure: brute force, its cost, the improvement, its cost, and the trade-off.</p>
 <div class="story">
-  <p>"The simplest approach compares every pair: O(n²) time, O(1) extra space. With n up to 10⁵ that's around 5 billion comparisons, too slow. If I keep a set of what I've seen, each check is O(1) on average, so the whole thing is O(n) time, at the cost of O(n) extra space. If memory were tight, I could sort first instead: O(n log n) time and O(1) extra space, then compare neighbors."</p>
+  <p>"The simplest approach compares every pair: O(n²) time, O(1) extra space. With n up to 10⁵ that's around 5 billion comparisons, too slow. If I keep a set of what I've seen, each check is O(1) on average, so the whole thing is O(n) time on average, at the cost of O(n) extra space. If memory were tight, I could sort in place and compare neighbors: O(n log n) time. The extra space depends on the sort: O(1) for heapsort, O(log n) for quicksort's stack, up to O(n) for Python's Timsort. Sorting in place also changes the caller's list, so I'd ask whether that's allowed."</p>
 </div>
+
+<details class="aside deeper">
+  <summary>Go deeper: "what if it doesn't fit in memory?"</summary>
+  <p>Back to the 100 million songs. In Python, a set that big is about 4 GB for the table alone, plus the song IDs themselves: around 10 GB. A senior answer has options ready:</p>
+  <ul>
+    <li><b>External sort, then scan neighbors.</b> Sort chunks that fit in memory, write them to disk, merge them (the sorting chapter covers this), and look for equal neighbors as you merge.</li>
+    <li><b>Hash-partition.</b> Write each song to one of k files by <code>hash(id) % k</code>. Duplicates always land in the same file, so you can de-duplicate each small file in memory.</li>
+    <li><b>Bloom filter</b> for an approximate answer: about 120 MB at a 1% false-positive rate. "Definitely new" or "probably seen before".</li>
+    <li><b>Distribute it:</b> a group-by in a database or a MapReduce/Spark job, which is hash-partitioning across machines.</li>
+  </ul>
+</details>
 <p>Habits that make you sound senior:</p>
 <ul>
   <li>Give <b>both</b> time and space, every time, without being asked.</li>
-  <li><b>Name your variables</b> when there's more than one input: O(n + m), O(n · k), O(V + E). It's more precise than forcing everything into "n".</li>
+  <li><b>Name your variables</b> when there's more than one input: O(n + m), O(n · k), or O(V + E) for a graph with V points and E connections. It's more precise than forcing everything into "n".</li>
   <li>Say <b>average vs worst</b> when hashing or randomness is involved.</li>
   <li>Mention the <b>trade-off</b> you made (usually space for time).</li>
 </ul>
@@ -547,16 +567,16 @@ def f(n):
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
   <h4>3. Pick from the constraints</h4>
-  <p>For each, say the complexity you'd aim for: (a) n ≤ 15, "return all valid orderings"; (b) n ≤ 2 × 10⁵, "find the longest increasing run"; (c) n ≤ 10¹², "find the square root rounded down".</p>
+  <p>For each, say the complexity you'd aim for: (a) n ≤ 15, "find the shortest route that visits every city once"; (b) n ≤ 2 × 10⁵, "find the longest increasing run"; (c) n ≤ 10¹², "find the square root rounded down".</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) O(n!) or O(2ⁿ · n) is acceptable; it's a "try everything with pruning" problem. (b) O(n) or O(n log n). (c) O(log n): binary search on the answer. You can't even loop up to 10¹².</p>
+    <p>(a) 15! ≈ 1.3 × 10¹² orderings is far too many (days of Python), so "try every ordering" is out. n ≤ 15 points to O(2ⁿ · n²): dynamic programming over subsets, 2¹⁵ · 15² ≈ 7 million steps. (b) O(n) or O(n log n). (c) O(log n): binary search on the answer, about 40 steps. A loop trying i = 1, 2, 3… while i · i ≤ n also works, because it stops at 10⁶. What you can't do is loop to n itself. The bound on n and the number of loop steps aren't always the same thing.</p>
   </details>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>4. <code>has_duplicate(nums)</code> in O(n)</h4>
-  <p>Write Way B yourself. The test gives you a list of 20,000 numbers and needs an answer in under a second. Way B takes a few milliseconds; Way A takes 10+ seconds.</p>
+  <p>Write Way B yourself. The test gives you a list of 20,000 numbers and needs an answer in under a second. Way B takes a few milliseconds; Way A takes several seconds.</p>
 </div>
 
 <div class="exercise">
@@ -573,14 +593,15 @@ def f(n):
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
-  <h4>7. <code>fast_power(base, exp)</code> in O(log exp)</h4>
-  <p>Compute base<sup>exp</sup> using "square and multiply": base¹⁰⁰ = (base⁵⁰)². Return <code>(result, multiplications)</code>. The test checks you used at most about 2·log₂(exp) multiplications. Doing 999,999 multiplications for exponent 1,000,000 fails.</p>
+  <h4>7. <code>fast_power(base, exp)</code> with O(log exp) multiplications</h4>
+  <p>Compute base<sup>exp</sup> using "square and multiply": base¹⁰⁰ = (base⁵⁰)². Return <code>(result, multiplications)</code>. The test checks you used at most about 2·log₂(exp) multiplications. The test hands you a number that counts its own multiplications, so the count you report must be honest. Doing 99,999 multiplications for exponent 100,000 fails. One catch: Python's big integers get slower to multiply as they grow, so the <em>time</em> isn't O(log exp). Working mod m (as in cryptography) keeps every step constant.</p>
 </div>
 
 <div class="exercise">
   <div class="tier stretch">Stretch · measure</div>
   <h4>8. The doubling experiment</h4>
   <p>Write a small script (outside the tests) that times <code>has_dup_a</code> and <code>has_dup_b</code> from section 1 at n = 1,000, 2,000, 4,000, 8,000 using <code>time.perf_counter</code>. Print the ratio between each pair of runs. Do you see roughly ×4 and ×2? Then try <code>sorted()</code> at n = 10⁵, 2×10⁵, 4×10⁵ and check that it's a bit more than ×2.</p>
+  <p class="small muted">To get clean numbers: use distinct numbers in random order (<code>random.sample(range(10 * n), n)</code>), because sorted input makes <code>sorted()</code> O(n) and duplicates make the functions return early. Keep the best of 5 runs (<code>timeit.repeat</code>). Time Way B at 10⁵ to 8 × 10⁵; at 1,000 the noise is bigger than the signal.</p>
 </div>
 
 <div class="exercise">
@@ -594,7 +615,7 @@ def f(n):
 
 <nav class="chapter-nav">
   <a href="../index.html"><small>← Back to</small>Chapter 2 overview</a>
-  <a class="next" href="sorting.html"><small>Next →</small>Sorting and its trade-offs</a>
+  <a class="next" href="sorting.html"><small>Next →</small>Putting things in order</a>
 </nav>
 
 </main>
@@ -604,7 +625,7 @@ def f(n):
 
   // Step counter (section 3)
   const sizes = [100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000];
-  const fmtN = (v) => v >= 1e6 ? (v / 1e6).toLocaleString() + " million" : v.toLocaleString();
+  const fmtN = (v) => v >= 1e9 ? (v / 1e9).toLocaleString() + " billion" : v >= 1e6 ? (v / 1e6).toLocaleString() + " million" : v.toLocaleString();
   const fmt = (v) => (v < 1e7 ? Math.round(v).toLocaleString() : v.toExponential(1).replace("e+", " × 10^"));
   const time = (v) => { const s = v / 1e7; return s < 0.001 ? "instant" : s < 1 ? (s * 1000).toFixed(0) + " ms" : s < 120 ? s.toFixed(1) + " s" : s < 7200 ? (s / 60).toFixed(0) + " min" : s < 172800 ? (s / 3600).toFixed(0) + " hours" : s < 3.15e7 ? (s / 86400).toFixed(0) + " days" : (s / 3.15e7).toFixed(0) + " years"; };
   const methods = [
@@ -628,8 +649,9 @@ def f(n):
   $("sc-double").onclick = () => {
     const i = Number($("sc-n").value) - 1, n = sizes[i];
     prev = { n };
-    sizes.splice(i + 1, 0, n * 2); // insert the doubled size as the next stop
-    $("sc-n").max = sizes.length; $("sc-n").value = i + 2; steps();
+    const j = sizes.findIndex((s) => s >= n * 2); // keep the stops in order
+    if (sizes[j] !== n * 2) sizes.splice(j === -1 ? sizes.length : j, 0, n * 2);
+    $("sc-n").max = sizes.length; $("sc-n").value = sizes.indexOf(n * 2) + 1; steps();
   };
   steps();
 
@@ -653,9 +675,9 @@ def f(n):
 
   // Growth chart (section 4)
   const fns = [
-    { name: "1", f: () => 1, c: "#8fa3c8" }, { name: "log n", f: (n) => Math.max(1, Math.log2(n)), c: "#5fd39a" },
-    { name: "n", f: (n) => n, c: "#7aa2ff" }, { name: "n log n", f: (n) => n * Math.max(1, Math.log2(n)), c: "#b48cff" },
-    { name: "n²", f: (n) => n * n, c: "#f2c14e" }, { name: "2ⁿ", f: (n) => 2 ** n, c: "#ff7a7a" },
+    { name: "1", f: () => 1, c: "var(--muted)" }, { name: "log n", f: (n) => Math.max(1, Math.log2(n)), c: "var(--ok)" },
+    { name: "n", f: (n) => n, c: "var(--accent)" }, { name: "n log n", f: (n) => n * Math.max(1, Math.log2(n)), c: "var(--accent-2)" },
+    { name: "n²", f: (n) => n * n, c: "var(--warn)" }, { name: "2ⁿ", f: (n) => 2 ** n, c: "var(--bad)" },
   ];
   const W = 640, H = 300, L = 50, B = 30, T = 10, R = 80, maxN = 60, maxLog = 18;
   const x = (n) => L + ((n - 1) / (maxN - 1)) * (W - L - R);
@@ -664,7 +686,8 @@ def f(n):
     const n = Number($("cx-n").value); $("cx-nval").textContent = n;
     const svg = $("cx-svg"); svg.replaceChildren();
     for (let e = 0; e <= maxLog; e += 3) svg.append(V.s("line", { class: "grid-line", x1: L, x2: W - R, y1: y(10 ** e), y2: y(10 ** e) }), V.s("text", { class: "label", x: L - 8, y: y(10 ** e) + 4, "text-anchor": "end", text: "10^" + e }));
-    svg.append(V.s("line", { x1: L, x2: W - R, y1: y(1e7), y2: y(1e7), stroke: "var(--bad)", "stroke-dasharray": "6 4" }), V.s("text", { class: "label", x: W - R + 4, y: y(1e7) + 4, text: "~1 s Python", fill: "var(--bad)" }));
+    svg.append(V.s("line", { x1: L, x2: W - R, y1: y(1e7), y2: y(1e7), stroke: "var(--text)", "stroke-dasharray": "6 4", opacity: 0.6 }), V.s("text", { class: "label", x: W - R + 4, y: y(1e7) + 4, text: "~1 s Python", fill: "var(--text)" }));
+    svg.append(V.s("text", { class: "label", x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle", text: "n →" }));
     for (const fn of fns) {
       let d = ""; for (let k = 1; k <= maxN; k++) d += (k === 1 ? "M" : "L") + x(k).toFixed(1) + "," + y(fn.f(k)).toFixed(1);
       svg.append(V.s("path", { d, fill: "none", stroke: fn.c, "stroke-width": 2.2 }), V.s("text", { x: W - R + 4, y: y(fn.f(maxN)) + 4, fill: fn.c, "font-size": 12, text: fn.name }), V.s("circle", { cx: x(n), cy: y(fn.f(n)), r: 4, fill: fn.c }));

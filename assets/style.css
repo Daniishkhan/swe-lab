@@ -375,3 +375,11 @@ details.aside.another > summary::before { color: var(--accent-2); }
 .chapter-nav a small { display: block; color: var(--muted); font-size: 0.75rem; }
 .chapter-nav a.next { text-align: right; margin-left: auto; }
 @media (max-width: 860px) { main.book { font-size: 1rem; } .chapter-head h1 { font-size: 1.8rem; } main.book h2 { font-size: 1.3rem; } }
+
+/* Narrow screens: shrink array cells so a 9-10 item row fits without scrolling. */
+@media (max-width: 480px) {
+  .cell { min-width: 30px; height: 32px; padding: 0 4px; font-size: 0.8rem; }
+  .cells { gap: 3px; }
+  main.book pre { font-size: 0.78rem; }
+}
+.sort-table td:nth-child(2), .sort-table td:nth-child(3) { white-space: nowrap; }

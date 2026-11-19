@@ -1,6 +1,5 @@
 import math
 import random
-import time
 
 import pytest
 
@@ -8,6 +7,26 @@ from complexity_drills import DynamicArray, count_pairs_with_sum, fast_power, ha
 
 
 # 1. has_duplicate
+class Song:
+    """A hashable item that counts every comparison (== or <) made on it."""
+
+    cmps = 0
+
+    def __init__(self, v):
+        self.v = v
+
+    def __hash__(self):
+        return hash(self.v)
+
+    def __eq__(self, other):
+        Song.cmps += 1
+        return self.v == other.v
+
+    def __lt__(self, other):
+        Song.cmps += 1
+        return self.v < other.v
+
+
 def test_has_duplicate_small():
     assert has_duplicate([3, 1, 4, 1]) is True
     assert has_duplicate([3, 1, 4]) is False
@@ -15,14 +34,14 @@ def test_has_duplicate_small():
     assert has_duplicate(["a", "b", "a"]) is True
 
 
-def test_has_duplicate_is_linear():
-    n = 20_000
-    nums = list(range(n))  # no duplicates: the worst case, every item is checked
-    start = time.perf_counter()
-    assert has_duplicate(nums) is False
-    elapsed = time.perf_counter() - start
-    # O(n) runs in well under a second; comparing all 200 million pairs takes 10+ seconds.
-    assert elapsed < 1.0, f"took {elapsed:.1f}s: is something O(n^2)?"
+def test_has_duplicate_counts_comparisons():
+    n = 2000
+    songs = [Song(i) for i in range(n)]
+    random.Random(1).shuffle(songs)  # shuffled, so a sort can't get a free ride on sorted input
+    Song.cmps = 0
+    assert has_duplicate(songs) is False  # no duplicates: the worst case, every item is checked
+    # A set needs (almost) no comparisons. Comparing pairs needs ~2,000,000; sorting ~20,000.
+    assert Song.cmps <= 2 * n, f"{Song.cmps} comparisons for n={n}: something compares pairs (or sorts)"
 
 
 # 2. DynamicArray
@@ -38,9 +57,12 @@ def test_dynamic_array_basics():
 
 def test_dynamic_array_index_errors():
     a = DynamicArray()
-    a.append("x")
+    for x in "abc":
+        a.append(x)  # size 3, capacity 4
     with pytest.raises(IndexError):
-        a[1]
+        a[3]  # the slot exists in the block, but it isn't one of your items
+    with pytest.raises(IndexError):
+        a[-1]  # negative indexes aren't supported
 
 
 def test_dynamic_array_grows_by_doubling():
@@ -57,8 +79,10 @@ def test_dynamic_array_amortized_copies():
     a = DynamicArray()
     for i in range(n):
         a.append(i)
+        # Checked after every append, so a slow growth rule fails fast instead of running for minutes.
+        assert a.copies < 2 * (i + 1), f"{a.copies} copies after {i + 1} appends: not amortized O(1)"
     assert a[n - 1] == n - 1
-    assert 0 < a.copies < 2 * n, f"{a.copies} copies for {n} appends: not amortized O(1)"
+    assert a.copies > 0, "count every item you copy in self.copies"
 
 
 # 3. count_pairs_with_sum
@@ -82,6 +106,45 @@ class CountingList:
         for x in self._data:
             self.reads += 1
             yield x
+
+
+class Val:
+    """A number that counts every + and - done with it. Copying the list can't hide these."""
+
+    ops = 0
+
+    def __init__(self, v):
+        self.v = v
+
+    @staticmethod
+    def _raw(o):
+        return o.v if isinstance(o, Val) else o
+
+    def __add__(self, o):
+        Val.ops += 1
+        return self.v + self._raw(o)
+
+    __radd__ = __add__
+
+    def __sub__(self, o):
+        Val.ops += 1
+        return self.v - self._raw(o)
+
+    def __rsub__(self, o):
+        Val.ops += 1
+        return o - self.v
+
+    def __eq__(self, o):
+        return self.v == self._raw(o)
+
+    def __lt__(self, o):
+        return self.v < self._raw(o)
+
+    def __le__(self, o):
+        return self.v <= self._raw(o)
+
+    def __hash__(self):
+        return hash(self.v)
 
 
 def brute_pairs(nums, target):
@@ -110,7 +173,35 @@ def test_count_pairs_reads_linear():
     assert data.reads <= 2 * n + 10, f"{data.reads} reads for n={n}: a nested loop would be ~{n * n // 2}"
 
 
+def test_count_pairs_additions_linear():
+    n = 2000
+    data = [Val(x) for x in range(0, 2 * n, 2)]
+    Val.ops = 0
+    assert count_pairs_with_sum(data, 2 * n) == 999
+    assert Val.ops <= 2 * n, f"{Val.ops} additions for n={n}: checking every pair would be ~{n * n // 2}"
+
+
 # 4. fast_power
+class Num:
+    """A number that counts every multiplication, and refuses ** and pow()."""
+
+    mults = 0
+
+    def __init__(self, v):
+        self.v = v
+
+    def __mul__(self, o):
+        Num.mults += 1
+        return Num(self.v * (o.v if isinstance(o, Num) else o))
+
+    __rmul__ = __mul__
+
+    def __pow__(self, *args):
+        raise TypeError("don't use ** or pow(): build it from multiplications")
+
+    __rpow__ = __pow__
+
+
 def test_fast_power_values():
     assert fast_power(2, 10)[0] == 1024
     assert fast_power(3, 0)[0] == 1
@@ -118,8 +209,10 @@ def test_fast_power_values():
     assert fast_power(5, 13)[0] == 5 ** 13
 
 
-@pytest.mark.parametrize("exp", [1, 2, 15, 16, 1000, 1_000_000])
+@pytest.mark.parametrize("exp", [1, 2, 15, 16, 1000, 100_000])
 def test_fast_power_logarithmic(exp):
-    result, mults = fast_power(1, exp)
-    assert result == 1
-    assert mults <= 2 * math.log2(exp) + 2, f"{mults} multiplications for exp={exp}"
+    Num.mults = 0
+    result, reported = fast_power(Num(3), exp)
+    assert (result.v if isinstance(result, Num) else result) == 3 ** exp
+    assert reported == Num.mults, f"you reported {reported} multiplications but did {Num.mults}"
+    assert Num.mults <= 2 * math.log2(exp) + 2, f"{Num.mults} multiplications for exp={exp}"

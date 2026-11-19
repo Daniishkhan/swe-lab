@@ -87,7 +87,7 @@
   <li><b>Nearly sorted:</b> only a few cards are out of place, so only a few slide. Close to O(n).</li>
 </ul>
 
-<div class="keyidea">Insertion sort is slow on a messy pile (n²) but very fast on an almost-sorted one (about n). Real-world data is often almost sorted, which is why Python's own sort uses insertion sort on small pieces.</div>
+<div class="keyidea">Insertion sort is slow on a messy pile (n²) but very fast on an almost-sorted one (about n). It also has almost no overhead, so it beats fancier sorts on tiny lists. That's why Python's own sort uses (binary) insertion sort on pieces under about 64 items.</div>
 
 <div class="check" id="check-insertion">
   <p class="q">A log file has 1,000,000 lines, in time order, except that a handful of lines arrived a few milliseconds late and are slightly out of place. Roughly how many comparisons does insertion sort need?</p>
@@ -96,7 +96,7 @@
     <button>About 20 million (n log n)</button>
     <button data-correct>About 1 million (n)</button>
   </div>
-  <div class="fb right"><p>Right. Each line is compared once with its left neighbor and stays put. The few late lines slide a short way. So the total is about n plus a little. Insertion sort's cost is really "n plus the number of out-of-order pairs".</p></div>
+  <div class="fb right"><p>Right. Each line is compared once with its left neighbor and stays put. The few late lines slide a short way. So the total is about n plus a little. Insertion sort's cost is really "n plus the number of out-of-order pairs". Those pairs are called <b>inversions</b>, and exercise 5 has you count them fast.</p></div>
   <div class="fb wrong"><p>n²/2 is the <em>worst</em> case, when every card has to slide all the way left. Here, almost every line is already in place: it gets compared with its left neighbor once, and stops. Only a handful slide, and only a little. So it's about n comparisons. A useful way to say it: insertion sort costs <b>n + (number of out-of-order pairs)</b>.</p></div>
 </div>
 
@@ -118,7 +118,7 @@
 
 <pre><code>def merge_sort(a):
     if len(a) &lt;= 1:
-        return a                    # one card: already sorted
+        return a[:]                 # one card: already sorted (return a copy)
     mid = len(a) // 2
     left = merge_sort(a[:mid])      # sort the left half
     right = merge_sort(a[mid:])     # sort the right half
@@ -133,14 +133,14 @@ level 3:  [1][1] [1][1] [1][1] [1][1]     (nothing to merge)</code></pre>
 <p>Two facts make this work:</p>
 <ol>
   <li><b>Every level does about n work in total.</b> The piles get smaller but there are more of them; together they always hold all n papers, and merging touches each paper once.</li>
-  <li><b>There are only log₂ n levels.</b> You halve each time, and (from the last chapter) you can only halve n about log₂ n times before you reach 1.</li>
+  <li><b>There are only log₂ n levels of merging.</b> You halve each time, and (from the last chapter) you can only halve n about log₂ n times before you reach 1. For 8 papers that's 3 levels of merging; the bottom row of single papers needs none.</li>
 </ol>
 <p>n work per level × log n levels = <b>n log n</b>. For a million items, that's about 20 million steps instead of 500 billion. Same computer, 25,000 times less work.</p>
 
 <div class="keyidea">Merge sort = split in half until trivial, then merge back up. log n levels, n work per level, so O(n log n). Always, no matter what the input looks like.</div>
 
 <details class="aside another">
-  <summary>Explain it another way: the tournament of teams</summary>
+  <summary>Explain it another way: merging teams</summary>
   <p>Picture 1,024 people who need to line up by height. Instead of one person organizing everyone, pair them up: each pair lines itself up (easy). Then pairs of pairs merge into lines of 4. Then 8, 16, and so on. After 10 rounds (because 2¹⁰ = 1,024) there's one line.</p>
   <p>In every round, every person takes one step into a merged line, so every round costs about 1,024 steps. 10 rounds × 1,024 people ≈ 10,000 steps. That "rounds × people" is exactly log n × n.</p>
 </details>
@@ -159,7 +159,7 @@ level 3:  [1][1] [1][1] [1][1] [1][1]     (nothing to merge)</code></pre>
 <details class="aside deeper">
   <summary>Go deeper: the recurrence, and the memory cost</summary>
   <p>Write T(n) for the time to merge sort n items. Sorting n items means sorting two halves and merging: <b>T(n) = 2·T(n/2) + n</b>. Unroll it: T(n) = 4·T(n/4) + 2n = 8·T(n/8) + 3n = … = n·T(1) + n·log₂ n. That's the same n log n as the picture, in algebra form. This pattern ("split into 2 halves, do n extra work") is so common that it's worth recognizing on sight; the general tool is called the <em>Master Theorem</em>.</p>
-  <p><b>Memory:</b> merging needs somewhere to put the merged result, so merge sort uses <b>O(n) extra space</b>. That's its main downside. It's also why merge sort is the go-to for data too big to fit in memory: you sort chunks that fit, write them to disk, then merge the sorted files by reading just the front of each one. That's <em>external merge sort</em>, and databases do it every time you ORDER BY a huge table.</p>
+  <p><b>Memory:</b> merging needs somewhere to put the merged result, so merge sort uses <b>O(n) extra space</b>. That's its main downside. It's also why merge sort is the go-to for data too big to fit in memory: you sort chunks that fit, write them to disk, then merge the sorted files by reading just the front of each one. That's <em>external merge sort</em>, and databases do it when an ORDER BY doesn't fit in memory and no index already gives them the order.</p>
 </details>
 
 <!-- ============================================================ -->
@@ -173,7 +173,7 @@ level 3:  [1][1] [1][1] [1][1] [1][1]     (nothing to merge)</code></pre>
 
 <div class="figure">
   <div id="part-player"></div>
-  <div class="cap">Partitioning around the pivot (purple, the last item). Green cells are known to be smaller than the pivot. The scanner (yellow) checks one item at a time and swaps small ones into the green zone. At the end the pivot swaps into the doorway.</div>
+  <div class="cap">Partitioning around the pivot (purple, the last item). Green cells are known to be smaller than the pivot. The scanner (yellow, "scan") checks one item at a time; "edge" marks where the green zone ends, and the next small item is swapped there. At the end the pivot swaps into the doorway.</div>
 </div>
 
 <pre><code>def quicksort(a, lo, hi):
@@ -191,9 +191,9 @@ level 3:  [1][1] [1][1] [1][1] [1][1]     (nothing to merge)</code></pre>
 </ul>
 <p>Here's the trap. A simple quicksort uses the last item as the pivot. If the list is <b>already sorted</b>, the last item is always the largest. Worst case, every time, on the most innocent-looking input there is.</p>
 
-<p>The fix: <b>pick the pivot at random.</b> Now no input is bad on purpose. You'd have to be wildly unlucky, picking the smallest or largest over and over, and that's about as likely as flipping heads a thousand times in a row. On average a random pivot lands somewhere in the middle half, which is plenty good enough.</p>
+<p>The fix: <b>pick the pivot at random.</b> Now no input is bad on purpose. To hit the worst case on 1,000 items you'd have to pick the smallest or largest item at nearly every step, which is far less likely than flipping 1,000 heads in a row. Half the time a random pivot lands in the middle half (a 25/75 split or better), and even a steady 25/75 split only costs about 2.4 × log₂ n levels instead of log₂ n. Still n log n.</p>
 
-<div class="keyidea">Quicksort = partition around a pivot, then recurse on both sides. Average O(n log n), worst O(n²). A random pivot makes the worst case practically impossible. It sorts in place and is usually the fastest in practice.</div>
+<div class="keyidea">Quicksort = partition around a pivot, then recurse on both sides. Average O(n log n), worst O(n²). A random pivot makes the worst case practically impossible for distinct items; with many equal items you also need a three-way partition (Go deeper below). It sorts in place and is usually the fastest in practice.</div>
 
 <div class="check" id="check-pivot">
   <p class="q">Quicksort always picks the <em>first</em> item as the pivot. Which input makes it slowest?</p>
@@ -208,13 +208,12 @@ level 3:  [1][1] [1][1] [1][1] [1][1]     (nothing to merge)</code></pre>
 
 <details class="aside deeper">
   <summary>Go deeper: when everybody is the same height</summary>
-  <p>Random pivots don't save you from one case: lots of <b>equal</b> items. If all n items are equal, a simple partition puts every item in the same room (they're all "not smaller" than the pivot). One room of n − 1, again and again: O(n²) and, in Python, a RecursionError.</p>
-  <p>The fix is the <b>three-way partition</b> (sometimes called the Dutch national flag partition): split into <em>smaller</em>, <em>equal</em>, and <em>larger</em>. The equal group is finished immediately, and you only recurse on the other two. On an all-equal list, that's one pass and done. Your <code>quicksort</code> exercise tests exactly this.</p>
-  <pre><code>lt, i, gt = lo, lo, hi          # [lo, lt) smaller, [lt, i) equal, (gt, hi] larger
-while i &lt;= gt:
-    if a[i] &lt; pivot:   swap(a, lt, i); lt += 1; i += 1
-    elif pivot &lt; a[i]: swap(a, i, gt); gt -= 1      # don't move i: the swapped-in item is unchecked
-    else:              i += 1</code></pre>
+  <p>Random pivots don't save you from one case: lots of <b>equal</b> items. The partition in the animation above (it's called <b>Lomuto's</b>) sends everything "not smaller than the pivot" to the right. If all n items are equal, that's every item. One room of n − 1, again and again: O(n²) and, in Python, a RecursionError.</p>
+  <p>The fix is the <b>three-way partition</b> (sometimes called the Dutch national flag partition): split into <em>smaller</em>, <em>equal</em>, and <em>larger</em>. The equal group is finished immediately, and you only recurse on the other two. On an all-equal list, that's one pass and done. Your <code>quicksort</code> exercise tests exactly this. Keep four zones as you scan:</p>
+  <pre class="diagram"><code>[ smaller | equal | not checked yet | larger ]
+ lo        lt      i                 gt      hi</code></pre>
+  <p>Look at the item at <code>i</code>: if it's smaller, swap it to the end of the "smaller" zone; if larger, swap it to the front of the "larger" zone (and look at whatever came back before moving on); if equal, just step past it. Stop when the unchecked zone is empty.</p>
+  <p><b>Hoare's partition</b>, the other classic, scans from both ends and stops on items <em>equal</em> to the pivot too, so it also splits an all-equal list evenly. Interviewers sometimes ask about Lomuto vs Hoare: Lomuto is simpler to write; Hoare does about 3× fewer swaps and handles duplicates.</p>
   <p><b>Why "average n log n" isn't hand-waving:</b> with random pivots, the expected number of comparisons is about 2n·ln n ≈ 1.39·n·log₂ n. Only 39% more than a perfect split every time. The proof counts, for each pair of items, the chance they ever get compared; it's a classic, and worth looking up once.</p>
   <p><b>Recursion depth:</b> recursing into the smaller room first (and looping on the bigger one) keeps the call stack at O(log n) even in bad cases.</p>
 </details>
@@ -238,17 +237,17 @@ while i &lt;= gt:
     </div>
     <div id="so-player" style="margin-top:10px"></div>
   </div>
-  <div class="cap">Yellow = being compared, blue = just written, purple = pivot, green = in its final place. Faded bars are outside the part currently being worked on.</div>
+  <div class="cap">Yellow = being compared, blue = just written, purple = pivot, green = in its final place. Faded bars are outside the part currently being worked on. (This insertion sort swaps neighbors, so it counts about twice the writes of the shifting version in section 2.)</div>
 </div>
 
 <div class="check" id="check-race">
-  <p class="q">In the playground, which sort's comparison count changes the <em>least</em> between Random and Already sorted?</p>
+  <p class="q">Of these three sorts, whose comparison count changes the <em>least</em> between Random and Already sorted?</p>
   <div class="opts">
     <button>Insertion sort</button>
     <button data-correct>Merge sort</button>
     <button>Quicksort (last-item pivot)</button>
   </div>
-  <div class="fb right"><p>Yes. Merge sort splits in the middle without looking, so its work hardly depends on the data (sorted input actually saves a few comparisons during merging, but it stays n log n). Insertion sort drops to about n on sorted input; this quicksort jumps to about n²/2.</p></div>
+  <div class="fb right"><p>Yes. Merge sort splits in the middle without looking, so its work barely depends on the data. Sorted input does save about a third of the comparisons (around 72 vs 100 here), because each merge stops as soon as the left pile runs out, but it stays n log n. Insertion sort drops to about n on sorted input; this quicksort jumps to about n²/2.</p></div>
   <div class="fb wrong"><p>Try it in the playground: run each sort on Random, then Already sorted, and read the final counts. Insertion sort <em>drops</em> to about n (nothing slides). Last-item quicksort <em>explodes</em> to about n²/2 (worst pivot every time). Merge sort barely moves, because it splits in the middle without ever looking at the values.</p></div>
 </div>
 
@@ -282,17 +281,17 @@ while i &lt;= gt:
   <p class="q">Someone claims their new sort handles any list of numbers in O(n), using only comparisons. What's wrong?</p>
   <div class="opts">
     <button>Nothing; maybe they're just clever</button>
-    <button data-correct>n comparisons can only tell apart about 2ⁿ orders, but there are n! of them</button>
+    <button data-correct>O(n) comparisons can tell apart only 2^(c·n) orders, and n! outgrows that</button>
     <button>O(n) is impossible for any task involving a list</button>
   </div>
-  <div class="fb right"><p>Exactly. n yes/no answers can distinguish at most 2ⁿ situations, and n! grows much faster than 2ⁿ (for n = 20, n! is about 2.4 × 10¹⁸ while 2²⁰ is about a million). So two different orders would get the same answers, and the sort would get one of them wrong.</p></div>
-  <div class="fb wrong"><p>Use the 20-questions argument. With n yes/no questions, you can tell apart at most 2ⁿ different situations. But there are n! possible orders, and n! is way bigger than 2ⁿ (try n = 20). So some different orders would get identical answers, and the sort would have to treat them the same, which means getting one wrong. O(n) <em>is</em> possible, but only by doing something other than comparing; that's the next section.</p></div>
+  <div class="fb right"><p>Exactly. With at most c·n yes/no answers you can tell apart at most 2^(c·n) orders. But log₂(n!) ≈ n log₂ n outgrows c·n for any fixed c: even at 5 comparisons per item, n! passes 2^(5n) at n = 84, and the gap keeps growing. So for big enough n, two different orders get identical answers and the sort gets one of them wrong.</p></div>
+  <div class="fb wrong"><p>Use the 20-questions argument. O(n) comparisons means at most c·n yes/no questions for some fixed c, and those can tell apart at most 2^(c·n) situations. There are n! possible orders, and log₂(n!) ≈ n log₂ n eventually beats c·n whatever c is (for c = 5, from n = 84 on). Past that point some different orders get identical answers, and the sort has to treat them the same, which means getting one wrong. O(n) <em>is</em> possible, but only by doing something other than comparing; that's the next section.</p></div>
 </div>
 
 <details class="aside deeper">
   <summary>Go deeper: why log₂(n!) ≈ n log₂ n</summary>
   <p>log(n!) = log 1 + log 2 + … + log n. That's at most n·log n (n terms, none bigger than log n). It's also at least the top half of the terms: (n/2) terms, each at least log(n/2), giving (n/2)·log(n/2). Both bounds are "some constant × n log n", so log(n!) = Θ(n log n). (Stirling's formula gives the exact form: log₂(n!) ≈ n log₂ n − 1.44n.)</p>
-  <p>This argument is called a <b>decision tree lower bound</b>. It's one of the few places in computer science where you can prove that no algorithm, ever, can beat a limit.</p>
+  <p>This argument is called a <b>decision tree lower bound</b>. It's one of the few places in computer science where you can prove that no <em>comparison-based</em> algorithm, however clever, can beat a limit. The bound also holds on average and for randomized sorts. And if there are only d distinct values, the floor drops to about n log d, which is why three-way quicksort can finish an all-equal list in O(n) without breaking this rule.</p>
 </details>
 
 <!-- ============================================================ -->
@@ -312,7 +311,7 @@ while i &lt;= gt:
 
 <div class="figure">
   <div id="count-player"></div>
-  <div class="cap">Counting sort on exam grades 0–4. Each item drops into its pigeonhole without being compared to anything. Then the holes are emptied in order.</div>
+  <div class="cap">Counting sort on exam grades 0–4. Each item drops into its pigeonhole without being compared to anything. Then the holes are emptied in order. The figure keeps a list per hole (the simplest code); steps 1–3 above do the same thing with only counts, where step 2's running totals say where each hole's group starts in the output.</div>
 </div>
 
 <h3>Radix sort: one digit at a time</h3>
@@ -378,14 +377,15 @@ Cy     Sales</code></pre>
 <ul>
   <li><b>Timsort</b> (Python, Java for objects, Android): finds runs that are already sorted, uses insertion sort to stretch short runs, then merges runs like merge sort. Stable. O(n) on sorted data, O(n log n) worst case.</li>
   <li><b>Introsort / pdqsort</b> (C++ <code>std::sort</code>, Rust's unstable sort, Go): quicksort, but switches to heapsort if the recursion gets suspiciously deep (so the worst case is n log n) and to insertion sort for tiny pieces. Not stable, in place, very fast.</li>
+  <li><b>Java</b> uses dual-pivot quicksort for primitives (<code>int[]</code>) but Timsort for objects. For plain numbers, stability is invisible (two equal 7s look the same), so it can pick the faster unstable sort.</li>
 </ul>
 
-<div class="table-wrap"><table>
+<div class="table-wrap"><table class="sort-table">
   <thead><tr><th>Sort</th><th>Best</th><th>Average</th><th>Worst</th><th>Extra space</th><th>Stable?</th><th>Use it when</th></tr></thead>
   <tbody>
     <tr><td>Insertion</td><td>n</td><td>n²</td><td>n²</td><td>1</td><td>yes</td><td>tiny lists, nearly sorted data</td></tr>
     <tr><td>Merge</td><td>n log n</td><td>n log n</td><td>n log n</td><td>n</td><td>yes</td><td>you need stable, guaranteed, or data on disk</td></tr>
-    <tr><td>Quick (random pivot)</td><td>n log n</td><td>n log n</td><td>n² (very unlikely)</td><td>log n</td><td>no</td><td>general in-memory sorting; fastest in practice</td></tr>
+    <tr><td>Quick (random pivot)</td><td>n log n</td><td>n log n</td><td>n² (unlikely with random pivot + 3-way partition)</td><td>log n (recurse on the smaller side first)</td><td>no</td><td>general in-memory sorting; fastest in practice</td></tr>
     <tr><td>Heap</td><td>n log n</td><td>n log n</td><td>n log n</td><td>1</td><td>no</td><td>guaranteed n log n with no extra memory</td></tr>
     <tr><td>Counting</td><td>n + k</td><td>n + k</td><td>n + k</td><td>n + k</td><td>yes</td><td>small integer keys</td></tr>
     <tr><td>Radix</td><td>d(n + b)</td><td>d(n + b)</td><td>d(n + b)</td><td>n + b</td><td>yes</td><td>fixed-width integers or strings</td></tr>
@@ -402,17 +402,17 @@ Cy     Sales</code></pre>
 
 <p>In interviews, you rarely implement a sort. You <em>use</em> one. Here are the patterns to recognize:</p>
 <ol>
-  <li><b>Sort, then scan neighbors.</b> Closest pair, duplicates, "minimum difference", grouping anagrams (sort the letters of each word to get its key).</li>
+  <li><b>Sort, then scan neighbors.</b> Closest pair, duplicates, "minimum difference". A cousin: grouping anagrams sorts the letters of each word to make a hash key.</li>
   <li><b>Sort intervals by start.</b> Merge overlapping meetings, count rooms needed, insert an interval. After sorting by start, anything that overlaps the current interval must come right after it.</li>
   <li><b>Sort, then two pointers or binary search.</b> Pair sums, three-sum, "how many pairs are under a limit".</li>
-  <li><b>Custom order.</b> "Largest number from these digits" sorts by a comparison rule, not by value: put a before b if a+b &gt; b+a as strings.</li>
+  <li><b>Custom order.</b> "Largest number formed from these numbers" ([3, 30, 34, 5, 9] → 9534330) sorts by a comparison rule, not by value: put a before b if a+b &gt; b+a as strings. In Python, wrap the rule with <code>functools.cmp_to_key</code>.</li>
   <li><b>Don't sort everything when you only need part.</b>
     <ul>
-      <li>The k-th smallest item: <b>quickselect</b> partitions like quicksort but only recurses into the side that contains k. Average O(n).</li>
+      <li>The k-th smallest item: <b>quickselect</b> partitions like quicksort but only recurses into the side that contains k. Average O(n) (n + n/2 + n/4 + … ≈ 2n); O(n²) worst case with terrible pivots.</li>
       <li>The top k of a huge stream: keep a <b>heap of size k</b>. O(n log k), with only k items in memory.</li>
     </ul>
   </li>
-  <li><b>Don't sort when a hash set will do.</b> "Any duplicates?" is O(n) with a set and O(n log n) with sorting. Mention both, and pick the set unless memory is tight.</li>
+  <li><b>Don't sort when a hash set will do.</b> "Any duplicates?" is O(n) expected with a set and O(n log n) with sorting. Mention both, and pick the set unless memory is tight.</li>
 </ol>
 
 <div class="check" id="check-topk">
@@ -438,6 +438,18 @@ Cy     Sales</code></pre>
 </ol>
 <p>If you're asked to <em>implement</em> a sort, merge sort is the safest to write correctly under pressure. If you choose quicksort, say "random pivot" and "three-way partition for duplicates" before anyone asks.</p>
 
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"How unsorted is this list?"</b> Count inversions with merge sort: when you take an item from the right pile, it jumps ahead of everything left in the left pile. O(n log n). That's exercise 5.</li>
+    <li><b>"Can quickselect be O(n) worst case?"</b> Yes: <em>median of medians</em> picks a pivot that's guaranteed decent. It's slow in practice, so libraries use <em>introselect</em>: quickselect that switches to median of medians if it's going badly.</li>
+    <li><b>"What does comparing cost?"</b> Comparing two strings of length L can take L steps, so sorting n strings is O(L · n log n). Same for building anagram keys.</li>
+    <li><b>"What if the data is spread over many machines?"</b> Sample the data to choose split points, send each range to one machine, sort locally, and concatenate (sample sort / range partitioning, which is what MapReduce's shuffle and the TeraSort benchmark do).</li>
+    <li><b>"Every item is at most k places from where it belongs."</b> Slide a min-heap of size k + 1 across the list: O(n log k).</li>
+    <li><b>Python details.</b> A <code>key=</code> function runs once per item, not once per comparison. For "descending by score, ascending by name", sort by name first, then stably by score with <code>reverse=True</code> (which keeps stability), or use a key like <code>(-score, name)</code> when the score is a number.</li>
+  </ul>
+</details>
+
 <!-- ============================================================ -->
 <h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
 <ol>
@@ -448,7 +460,7 @@ Cy     Sales</code></pre>
   <li>No comparison sort beats n log n: n! orders, yes/no answers, log₂(n!) ≈ n log n.</li>
   <li>Counting and radix sort beat it by not comparing: O(n + k) for small integer keys.</li>
   <li>Stable means ties keep their order. Sort by the least important key first, or use a tuple key.</li>
-  <li>Need only part of the order? Quickselect (k-th item, O(n)) or a size-k heap (top k, O(n log k)).</li>
+  <li>Need only part of the order? Quickselect (k-th item, average O(n), O(n²) worst) or a size-k heap (top k, O(n log k)).</li>
 </ol>
 
 <div class="review" id="review"></div>
@@ -469,7 +481,7 @@ Cy     Sales</code></pre>
   <p>Which sort, and why? (a) 50 items on a tiny embedded chip with almost no spare memory. (b) 2 TB of log lines on a machine with 16 GB of RAM. (c) A list that's sorted except for 20 new items appended at the end. (d) 100 million test scores from 0 to 100. (e) Customer records that are already sorted by signup date, and you need them by country with signup order kept inside each country.</p>
   <details class="aside another">
     <summary>Answers</summary>
-    <p>(a) Insertion sort (tiny n, O(1) memory) or heapsort. (b) External merge sort: sort 16 GB chunks, write them out, then merge the sorted files. (c) Insertion sort or Timsort: nearly sorted, so about O(n). Or sort the 20 new items and merge: O(n). (d) Counting sort: k = 101, so O(n). (e) Any stable sort by country; Python's <code>sorted(records, key=country)</code>.</p>
+    <p>(a) Insertion sort (tiny n, O(1) memory) or heapsort. (b) External merge sort: sort chunks that fit comfortably (say 8–10 GB), write out ~200–250 sorted runs, then merge them all at once with a heap holding the front line of each run. Every line is read and written twice. (c) Sort the 20 new items and merge them in: O(n + k log k). Timsort does roughly this on its own. Insertion sort works too, but each new item may slide nearly the whole list, so it's about 20·n: fine for 20, bad for 20,000. (d) Counting sort: k = 101, so O(n). (e) Any stable sort by country; Python's <code>sorted(records, key=lambda r: r.country)</code>.</p>
   </details>
 </div>
 
@@ -481,38 +493,38 @@ Cy     Sales</code></pre>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
-  <h4>4. <code>insertion_sort(items)</code>, in place and stable</h4>
-  <p>The card-hand sort. The test checks it's stable and that a nearly sorted list of 2,000 items takes about 2,000 comparisons, not 2 million.</p>
+  <h4>4. <code>merge_sort(items)</code>, returns a new list</h4>
+  <p>Split, sort the halves, and write the merge yourself. The test checks stability (when the two fronts are equal, take from the left pile!) and that you use at most n log₂ n comparisons. Avoid <code>list.pop(0)</code>: it shifts every remaining item, a hidden O(n).</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
-  <h4>5. <code>merge_sort(items)</code>, returns a new list</h4>
-  <p>Split, sort the halves, merge. The test checks stability (when the two fronts are equal, take from the left pile!) and that you use at most n log₂ n comparisons.</p>
+  <h4>5. <code>count_inversions(items)</code> in O(n log n)</h4>
+  <p>Count pairs i &lt; j with <code>items[i] &gt; items[j]</code>: how unsorted the list is (it's the "out-of-order pairs" from section 2). Checking every pair is n². Instead, ride along with merge sort: whenever you take an item from the <em>right</em> pile, it jumps ahead of every item still waiting in the left pile. The test allows n log₂ n comparisons.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>6. <code>quicksort(items)</code>, in place, random pivot</h4>
-  <p>The test throws five kinds of input at it, including already sorted and <em>all items equal</em>. The simple version passes the first and fails the second. Read the "Go deeper" box in section 4 when it does.</p>
+  <p>The test throws five kinds of input at it, including already sorted and <em>all items equal</em>. The simple (Lomuto) version passes the first and fails the second. Read the "Go deeper" box in section 4 when it does.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>7. <code>counting_sort(items, key, max_key)</code>, O(n + k)</h4>
-  <p>Sort people by age without ever comparing two people. The test's items raise an error if you compare them. It must be stable, so place items by walking the input from left to right.</p>
+  <p>Sort people by age without ever comparing two people. The test's items raise an error if you compare them, and it counts calls to <code>key()</code>, so a loop over every possible key for every item (O(n · k)) fails. It must be stable, so place items by walking the input from left to right.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>8. <code>merge_intervals(intervals)</code></h4>
-  <p>The classic "sort then scan". Sort by start, then walk through: if the next interval starts before (or exactly when) the current one ends, stretch the current one; otherwise start a new one.</p>
+  <p>The classic "sort then scan". Sort by start, then walk through: if the next interval starts before (or exactly when) the current one ends, stretch the current one's end to the larger of the two ends (the next one may sit entirely inside it); otherwise start a new one. The test counts comparisons, so merging pairs over and over (n²) fails.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>9. <code>kth_smallest(items, k)</code> with quickselect</h4>
-  <p>Partition like quicksort, then only keep going on the side that contains position k. The test allows about 10n comparisons for n = 20,000; sorting the whole thing needs about 13n, so it fails.</p>
+  <p>Partition like quicksort, then only keep going on the side that contains position k. The test allows about 10n comparisons for n = 20,000 (best of 3 runs, since quickselect is random); sorting the whole thing needs about 13n, so it fails. Partition in one pass: three separate list comprehensions cost 3 comparisons per item and can blow the budget. It also tests lists full of equal items.</p>
 </div>
 
 <div class="exercise">
@@ -539,15 +551,15 @@ Cy     Sales</code></pre>
 
   // ---------- Merge two sorted piles (section 3) ----------
   (function () {
-    const L = [2, 5, 7, 11], R = [1, 3, 8, 9, 12];
+    const L = [2, 5, 8, 11], R = [1, 3, 8, 9, 12];
     const fr = []; let i = 0, j = 0, nc = 0; const out = [];
     const snap = (msg, took) => fr.push({ i, j, out: [...out], msg, took });
     snap("Two sorted piles. Look only at the two front cards.");
     while (i < L.length && j < R.length) {
       nc++;
-      if (R[j] < L[i]) { out.push(R[j]); snap(`Front cards: <b>${L[i]}</b> vs <b>${R[j]}</b>. ${R[j]} is smaller, so it goes down.`, "R"); j++; }
-      else { out.push(L[i]); snap(`Front cards: <b>${L[i]}</b> vs <b>${R[j]}</b>. ${L[i]} is smaller (or equal, so the left pile wins: that's what keeps it stable).`, "L"); i++; }
-      fr[fr.length - 1].i = i; fr[fr.length - 1].j = j;
+      if (R[j] < L[i]) { out.push(R[j]); snap(`Front cards: <b>${L[i]}</b> vs <b>${R[j]}</b>. ${R[j]} is smaller, so it goes down.`); j++; }
+      else if (L[i] === R[j]) { out.push(L[i]); snap(`Front cards: <b>${L[i]}</b> vs <b>${R[j]}</b>. A tie! Take the one from the <b>left</b> pile first. That one rule is what makes merge sort stable.`); i++; }
+      else { out.push(L[i]); snap(`Front cards: <b>${L[i]}</b> vs <b>${R[j]}</b>. ${L[i]} is smaller, so it goes down.`); i++; }
     }
     while (i < L.length) { out.push(L[i++]); snap("Right pile is empty: the rest of the left pile goes down as is."); }
     while (j < R.length) { out.push(R[j++]); snap("Left pile is empty: the rest of the right pile goes down as is."); }
@@ -559,7 +571,7 @@ Cy     Sales</code></pre>
         stage.append(
           row("left", L, (k) => (k < f.i ? "dim" : k === f.i && f.j < R.length ? "cmp" : "")),
           row("right", R, (k) => (k < f.j ? "dim" : k === f.j && f.i < L.length ? "cmp" : "")),
-          row("merged", f.out.length ? f.out : [null], (k) => (k === f.out.length - 1 ? "hl" : "done")),
+          row("merged", f.out.length ? f.out : [null], (k) => (!f.out.length ? "" : k === f.out.length - 1 ? "hl" : "done")),
         );
       },
     });
@@ -567,7 +579,7 @@ Cy     Sales</code></pre>
 
   // ---------- Partition (section 4) ----------
   (function () {
-    const a = [7, 2, 9, 4, 1, 8, 3, 6, 5];
+    const a = [6, 2, 7, 1, 8, 3, 5];
     const hi = a.length - 1, p = a[hi]; let i = 0;
     const fr = [];
     const snap = (j, msg, extra = {}) => fr.push({ a: [...a], i, j, msg, ...extra });
@@ -600,7 +612,7 @@ Cy     Sales</code></pre>
     snap("Seven students with grades 0–4. Five pigeonholes, one per grade.", -1);
     items.forEach(([n, g], k) => { holes[g].push(n); snap(`${n} has grade ${g}: drop into hole ${g}. No comparisons.`, k); });
     const out = [];
-    for (let g = 0; g < K; g++) for (const n of holes[g]) { out.push(n + " " + g); snap(`Empty hole ${g} in order: ${n}.`, -1, out); }
+    for (let g = 0; g < K; g++) while (holes[g].length) { const n = holes[g].shift(); out.push(n + " " + g); snap(`Empty hole ${g} in order: ${n}.`, -1, out); }
     fr[fr.length - 1].msg = "Sorted, in O(n + k). Bo, Ed and Gus all have grade 1 and came out in their original order: stable.";
     V.player($("count-player"), {
       frames: fr, speed: 800,
@@ -617,15 +629,15 @@ Cy     Sales</code></pre>
   const N = 28;
   function data(kind) {
     let a = Array.from({ length: N }, (_, i) => i + 1);
-    if (kind === "random" || kind === "nearly") a.sort(() => Math.random() - 0.5);
-    if (kind === "nearly") { a.sort((x, y) => x - y); for (let k = 0; k < 3; k++) { const i = Math.floor(Math.random() * (N - 1)); [a[i], a[i + 1]] = [a[i + 1], a[i]]; } }
+    if (kind === "random") for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    if (kind === "nearly") { for (let k = 0; k < 3; k++) { const i = Math.floor(Math.random() * (N - 1)); [a[i], a[i + 1]] = [a[i + 1], a[i]]; } }
     if (kind === "reversed") a.reverse();
     if (kind === "few") a = Array.from({ length: N }, () => 1 + Math.floor(Math.random() * 4) * 7);
     return a;
   }
   function run(algo, a) {
-    const fr = [], done = new Set(); let cmp = 0, wr = 0;
-    const snap = (o) => fr.push({ a: [...a], done: new Set(done), cmp, wr, ...o });
+    const fr = [], done = new Set(); let cmp = 0, wr = 0, ctx = {};
+    const snap = (o) => fr.push({ a: [...a], done: new Set(done), cmp, wr, ...ctx, ...o });
     const less = (i, j) => { cmp++; snap({ c: [i, j] }); return a[i] < a[j]; };
     const swap = (i, j) => { [a[i], a[j]] = [a[j], a[i]]; wr += 2; snap({ w: [i, j] }); };
     snap({ msg: "Start." });
@@ -645,8 +657,9 @@ Cy     Sales</code></pre>
       (function qs(lo, hi) {
         if (lo > hi) return; if (lo === hi) { done.add(lo); return; }
         const p = hi; let i = lo;
-        for (let j = lo; j < hi; j++) { cmp++; snap({ c: [j], pivot: p, range: [lo, hi] }); if (a[j] < a[p]) { if (i !== j) swap(i, j); i++; } }
-        if (i !== hi) swap(i, hi); done.add(i); snap({ pivot: i, range: [lo, hi] });
+        ctx = { pivot: p, range: [lo, hi] };
+        for (let j = lo; j < hi; j++) { cmp++; snap({ c: [j] }); if (a[j] < a[p]) { if (i !== j) swap(i, j); i++; } }
+        if (i !== hi) swap(i, hi); done.add(i); ctx = {}; snap({ pivot: i, range: [lo, hi] });
         qs(lo, i - 1); qs(i + 1, hi);
       })(0, a.length - 1);
     } else if (algo === "heap") {
