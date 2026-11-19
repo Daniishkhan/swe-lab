@@ -42,7 +42,10 @@ swe-prep/
 ├── templates/                 concept page, exercise, design case, STAR story, LLD, style guide
 ├── tools/
 │   ├── build.py               regenerate assets/curriculum.js (optionally with test results)
-│   └── new.py                 scaffold a concept page, exercise, design case, story, LLD
+│   ├── new.py                 scaffold a concept page, exercise, design case, story, LLD
+│   ├── check_exercise.py      prove an exercise's tests catch slow or wrong solutions
+│   └── check_page.js          headless page check: errors, offline, phone width, markup
+├── .claude/skills/            Claude's skills for this repo (see below)
 └── ts/                        TypeScript track (placeholder)
 ```
 
@@ -85,6 +88,23 @@ exercises; their concept pages come next.
    write the solution, run the tests. Then do one or two classic problems.
 5. Mark the topic `learning` or `confident` on the chapter page (stored in your
    browser).
+
+## Using Claude here
+
+Claude Code picks up the skills in `.claude/skills/` on its own. Ask in plain
+words:
+
+- "Teach me consistent hashing" or "quiz me on heaps": `teach` builds the idea
+  from first principles, then has you explain it back to find the gaps.
+- "I'm stuck on `sorts`" or "review my `merge_sort`": `coach` gives one hint
+  at a time and never the solution, then reviews working code like an
+  interviewer would.
+- "Mock interview, system design, 45 minutes": `mock-interview` runs it
+  timed, scores it with evidence, and logs it in
+  `sections/15-interview-formats/mock-log.md`.
+
+Chapters are written with `write-chapter`, `visuals-and-layout` and
+`review-chapter`. `CLAUDE.md` has the rules Claude follows in this repo.
 
 ## Adding material
 
