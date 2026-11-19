@@ -45,12 +45,22 @@ that appears from nowhere gets memorized instead of understood.
 > by growing the table when it fills. That's a hash map, and every part of it
 > has a reason.
 
-## 4. Show it four ways
+## 4. Picture first, then numbers, words, code
 
-- **Words:** short sentences, each term defined in plain words the first time.
-- **Picture:** an everyday analogy or physical image. Say where it breaks.
-- **Numbers:** one worked example small enough to trace by hand.
-- **Code:** 5–15 lines of Python, after the idea is clear in words.
+Intuition comes before formalism, in this order:
+
+1. **Picture:** what the idea would look like if it were made of physical
+   things. What moves, what piles up, what waits, what blocks? Use an
+   everyday analogy or a visualization, and say where it breaks.
+2. **Numbers:** one worked example small enough to trace by hand.
+3. **Words:** only now the general rule and its name, each term defined in
+   plain words the first time.
+4. **Code:** 5–15 lines of Python, once the idea is already clear.
+
+Physical anchors that work: a queue is the line at a counter. A hash is a
+coat-check ticket. A lock is the one key to a single bathroom. Latency is
+distance and throughput is pipe width. Backpressure is a full sink you stop
+pouring into. Big-O is how the pile of work grows when the input doubles.
 
 When one way doesn't land, switch to a different one. Repeating the same
 explanation more slowly doesn't help.
