@@ -161,3 +161,15 @@ def test_from_list_is_linear(shape):
     assert built < 3 * n, f"{built:,} comparisons to build a heap of {n:,} ({built / n:.1f} per item): heapify bottom-up is under 2 per item"
     assert h.pop().v == min(vals)
     assert [h.pop().v for _ in range(100)] == sorted(vals)[1:101]
+
+
+def test_many_ints_quickly():
+    # 100,000 pushes and pops of plain ints: well under a second when each one
+    # walks one path, minutes if push or pop copies the whole list.
+    rng = random.Random(12)
+    vals = [rng.randrange(10 ** 9) for _ in range(100_000)]
+    h = MinHeap()
+    for v in vals:
+        h.push(v)
+    assert len(h) == len(vals)
+    assert drain(h) == sorted(vals)

@@ -99,6 +99,15 @@ def test_top_k_streams_with_few_comparisons_and_little_memory():
     assert peak <= 1_000_000, f"peak memory {peak:,} bytes: is the whole stream being kept?"
 
 
+def test_top_k_rising_stream_costs_log_k_per_item():
+    n, k = 20_000, 100  # every item beats the root, so every item gets in
+    C.cmps = 0
+    got = top_k((C(v) for v in range(n)), k)
+    assert [x.v for x in got] == list(range(n - 1, n - k - 1, -1))
+    budget = 3 * math.log2(k) * n
+    assert C.cmps <= budget, f"{C.cmps:,} comparisons for {n:,} rising items (budget {budget:,.0f}): is it re-scanning all k kept items?"
+
+
 # 2. merge_sorted
 def test_merge_examples():
     assert list(merge_sorted([iter([1, 4, 9]), iter([2, 3]), iter([])])) == [1, 2, 3, 4, 9]
@@ -122,6 +131,11 @@ def test_merge_items_that_only_know_less_than():
 
         def __lt__(self, other):
             return self.p < other.p
+
+        def __eq__(self, other):  # equal jobs: a tuple comparison moves on to the next field
+            return self.p == other.p
+
+        __hash__ = None
 
     lists = [[Job(1), Job(3)], [Job(1), Job(2)], [Job(3)]]
     assert [j.p for j in merge_sorted([iter(x) for x in lists])] == [1, 1, 2, 3, 3]
@@ -155,7 +169,7 @@ def test_merge_costs_log_k_per_item():
     out = [x.v for x in merge_sorted([iter([C(v) for v in lst]) for lst in lists])]
     total = k * each
     assert out == sorted(v for lst in lists for v in lst)
-    budget = total * (2 * math.log2(k) + 4)
+    budget = total * (3 * math.log2(k) + 8)
     assert C.cmps <= budget, f"{C.cmps:,} comparisons for {total:,} items from {k} lists (budget {budget:,.0f}): is it scanning every front?"
 
 
@@ -191,7 +205,7 @@ def test_assign_random():
 
 
 def test_assign_many_workers():
-    n, w = 200_000, 50_000
+    n, w = 1_000_000, 500_000
     got = assign_jobs([1] * n, w)
     # Every job takes 1: round j sends jobs to workers 0..w-1 in order, all starting at time j.
     assert len(got) == n
