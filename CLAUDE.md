@@ -5,6 +5,25 @@ bar). Danish reads the chapters and writes every exercise solution. Claude
 writes chapters, teaches, coaches and runs mock interviews. Plain HTML/CSS/JS,
 opened straight from disk (`file://`), no build step except `tools/build.py`.
 
+## How we teach (every chapter, every explanation)
+
+Break each topic down to first principles, then build it back up, with
+intuition before formalism:
+
+1. **Start from the pain:** a concrete problem with real numbers, never a
+   definition.
+2. **Break it down** to facts a smart high schooler already trusts
+   (counting, halving, waiting in line, distance and time). Then rebuild the
+   idea one fix at a time, each step forced by the last one's flaw.
+3. **Picture first:** every idea gets a physical picture, an everyday analogy
+   (and where it breaks) or a visualization *before* any formula, jargon or
+   code. Then real numbers, then the general rule and its name, then code.
+4. **Check by explaining back,** never by asking "does that make sense?".
+
+Short sentences, every term defined the first time, the most words on the
+hardest ideas. The full method is the `teach` skill. Chapters apply it
+through `write-chapter` and `visuals-and-layout`.
+
 ## Hard rules
 
 1. **Never write exercise solutions,** not in the repo and not in chat. Stubs

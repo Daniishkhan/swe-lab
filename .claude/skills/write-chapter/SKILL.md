@@ -19,6 +19,9 @@ this skill covers the page and the exercises.
    - The **pain**: one concrete story with real numbers for section 1.
    - The **rebuild**: 6–11 sections, each one idea or one fix that the
      previous section's flaw forces.
+   - The **picture** for each section: the physical analogy, worked
+     numbers or visualization that carries it. If a section has none, it
+     isn't broken down far enough yet.
    - The **hard ideas**, where people get confused or interviewers probe.
      They get 2–3× the space: another example, a picture, an "another way"
      aside, a quick check.
@@ -29,7 +32,10 @@ this skill covers the page and the exercises.
 
 - Scaffold with `python3 tools/new.py concept NN.MM slug "Title"`, which copies
   the book skeleton in `templates/concept.html`.
-- Each section: plain explanation → figure or code → `.keyidea` → `.check`.
+- Each section, intuition before formalism: a sentence or two that raise
+  the question → the picture (analogy, worked numbers or `.figure`) → the
+  general rule and its name → code if needed → `.keyidea` → `.check`. No
+  definition, formula or code before the picture.
 - **Quick checks:** 3 options, one `data-correct`, wrong options are mistakes
   real people make. `.fb.wrong` re-teaches from a different angle (a new
   example, a picture in words, plugged-in numbers) and must make sense to

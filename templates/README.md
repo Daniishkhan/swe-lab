@@ -14,8 +14,10 @@ reference. A book chapter reads top to bottom instead of being a stack of boxes:
 - Numbered sections: `<h2 id="s1"><span class="sec-num">1</span>Title</h2>`.
   The sidebar table of contents is built from these.
 - Section 1 is always **the problem**, told as a small `.story` in plain words.
-- Each idea: plain explanation, then a picture or `.figure` visualization, then
-  a `.keyidea`, then a `.check` (quick check). Hard ideas get more space.
+- Each idea, intuition before formalism: the picture (analogy, worked numbers
+  or a `.figure` visualization), then the general rule and its name, then
+  code if needed, then a `.keyidea`, then a `.check` (quick check). Hard ideas
+  get more space.
 - Quick check: `.check` with `.q`, buttons in `.opts` (right one has
   `data-correct`), `.fb.right` and `.fb.wrong`. The wrong feedback must explain
   the idea again in a *different* way, not just give the answer.

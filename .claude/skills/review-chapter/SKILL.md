@@ -13,8 +13,10 @@ not the author's reasoning.
 ## Read it three ways
 
 1. **As a smart high schooler.** Mark every sentence you read twice, every
-   term used before it's defined, every jump that skips a step, and every
-   code block that arrives before the idea is clear.
+   term used before it's defined, every jump that skips a step, every
+   section that gives a definition, formula or code before a picture or
+   worked example, and every idea that is named rather than built up from
+   simpler facts.
 2. **As a skeptical expert.**
    - Recompute every number: step counts, n log n values, table rows, "how
      long would it take" estimates. Run a script.
