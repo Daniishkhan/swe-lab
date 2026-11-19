@@ -45,8 +45,10 @@ What the tests measure
 - top_k: 100,000 counting items from a generator; comparisons must stay
   under 3 per item (sorting needs about 17, and "push, then pop if over k"
   about 13) and peak memory under 1 MB (keeping every item needs about
-  8 MB). A rising stream, where every item gets in, must cost under
-  3 log2 k per item (re-scanning a plain list of k costs k).
+  5 MB). A rising stream, where every item gets in, must cost under
+  3 log2 k per item (re-scanning a plain list of k costs k). And k = 500,000
+  over a 1,000,000-item rising stream runs under a 10 s cap: a heap takes
+  about 2 s, while a sorted list shifts k items per insert (over a minute).
 - merge_sorted: items pulled after each yield, and comparisons for 256
   lists: under 4 log2 k + 8 = 40 per item (scanning every front costs 256;
   a heap about 18 to 30). Comparing two (item, index) tuples counts twice,

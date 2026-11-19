@@ -305,9 +305,9 @@ read  }   pop { → matches }   stack: (empty)   → valid, because the stack en
 <h3>Way 2: the ring buffer</h3>
 <p>Here's a cleverer fix that keeps the array. The problem was the rule "slot 0 is the front". So don't make people walk to the front; <b>move the front</b>. Keep a <code>head</code> index that says which slot holds the first person. Dequeue just moves <code>head</code> forward one slot. Nobody shifts.</p>
 
-<p>That leaves empty slots behind the head. When the back reaches the end of the array, wrap around and reuse them. Picture the slots arranged in a circle, like seats around a round table, with a "front" marker that moves around the table. The back of the line is <code>size</code> seats after the front:</p>
+<p>That leaves empty slots behind the head. When the back reaches the end of the array, wrap around and reuse them. Picture the slots arranged in a circle, like seats around a round table, with a "front" marker that moves around the table. The next person to join sits <code>size</code> seats after the front (the last person in line is one seat before that):</p>
 
-<pre class="diagram"><code>back slot  =  (head + size) % capacity      the % wraps it around the circle</code></pre>
+<pre class="diagram"><code>next free slot  =  (head + size) % capacity      the % wraps it around the circle</code></pre>
 
 <p>When every seat is taken, get a bigger table: make an array twice the size and copy the items over <em>in line order</em>, starting from <code>head</code>. That copy is O(n), but it only happens when the size doubles, so it's amortized O(1) per enqueue, exactly like list <code>append</code>.</p>
 
@@ -475,7 +475,7 @@ read  }   pop { → matches }   stack: (empty)   → valid, because the stack en
 
 <p>This one needs a deque, not a stack, because items leave from <em>both</em> ends: hopeless ones from the back, expired ones from the front.</p>
 
-<p><b>Why not a heap?</b> The obvious alternative keeps a max-heap (next chapter) of (value, index) pairs and, before reading the top, throws away tops whose index has left the window. That's correct and O(n log n): fine as a first answer. The deque is the O(n) answer interviewers are fishing for, and it uses only O(k) memory, while the lazy heap can hold up to n entries.</p>
+<p><b>Why not a heap?</b> The obvious alternative keeps a max-heap (<a href="heaps.html">the heaps chapter</a>) of (value, index) pairs and, before reading the top, throws away tops whose index has left the window. That's correct and O(n log n): fine as a first answer. The deque is the O(n) answer interviewers are fishing for, and it uses only O(k) memory, while the lazy heap can hold up to n entries.</p>
 
 <div class="keyidea"><p>Sliding window max: keep a deque of indexes whose values decrease from front to back. Pop smaller values off the back when a new value arrives; pop the front when it leaves the window. The front is always the max. Each index enters and leaves once: O(n).</p></div>
 
@@ -544,7 +544,7 @@ read  }   pop { → matches }   stack: (empty)   → valid, because the stack en
   <li>Doubly linked lists delete a node you hold in O(1); sentinels remove the edge cases.</li>
   <li>Reverse: save <code>nxt</code>, flip <code>cur.next</code>, advance. Fast/slow pointers find the middle and cycles in O(1) memory.</li>
   <li>Stack = most recent first: <code>list</code>. Queue = oldest first: <code>deque.popleft</code>. Never <code>pop(0)</code>.</li>
-  <li>A ring buffer moves the front marker, not the items: back slot = (head + size) % capacity.</li>
+  <li>A ring buffer moves the front marker, not the items: next free slot = (head + size) % capacity.</li>
   <li>Monotonic stack: keep waiting items sorted, pop what the newcomer beats. Each item in once and out once, so O(n).</li>
   <li>Sliding window max: a decreasing deque; pop hopeless items at the back, expired ones at the front.</li>
   <li>Real queues need a bound and a plan for "full": block, reject, or drop the oldest.</li>

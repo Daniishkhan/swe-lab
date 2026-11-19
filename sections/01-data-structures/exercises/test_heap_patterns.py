@@ -20,8 +20,8 @@ def time_limit(request):
         raise TimeoutError("over the time cap: is something scanning all k lists or all workers for every item?")
 
     old = signal.signal(signal.SIGALRM, boom)
-    # 1,000,000 jobs get more room, so a heap written in pure Python passes too
-    signal.alarm(20 if request.node.name == "test_assign_many_workers" else 5)
+    # the two million-item tests get more room, so a heap written in pure Python passes too
+    signal.alarm({"test_assign_many_workers": 20, "test_top_k_big_k": 10}.get(request.node.name, 5))
     try:
         yield
     finally:
@@ -107,6 +107,16 @@ def test_top_k_rising_stream_costs_log_k_per_item():
     assert [x.v for x in got] == list(range(n - 1, n - k - 1, -1))
     budget = 3 * math.log2(k) * n
     assert C.cmps <= budget, f"{C.cmps:,} comparisons for {n:,} rising items (budget {budget:,.0f}): is it re-scanning all k kept items?"
+
+
+def test_top_k_big_k():
+    # k = 500,000 kept items and a rising stream, so every item gets in.
+    # A heap does O(log k) per item (a pure-Python one takes about 2 s);
+    # a sorted list shifts about k items per insert and takes over a minute.
+    n, k = 1_000_000, 500_000
+    got = top_k(iter(range(n)), k)
+    assert len(got) == k and got[0] == n - 1 and got[-1] == n - k
+    assert all(got[i] == n - 1 - i for i in range(0, k, 997))
 
 
 # 2. merge_sorted

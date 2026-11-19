@@ -127,7 +127,7 @@
     <button>Index 20</button>
   </div>
   <div class="fb right"><p>Right: (10 − 1) // 2 = 4. Check it the other way: 4's children are 2·4 + 1 = 9 and 2·4 + 2 = 10.</p></div>
-  <div class="fb wrong"><p>Go the other direction and check: the children of i are 2i + 1 and 2i + 2. Index 5's children are 11 and 12, not 10. Index 4's children are 9 and 10. So 10's parent is 4, which is what (10 − 1) // 2 gives. Index 20 is a grandchild direction, not a parent. (Using 10 // 2 = 5 is the formula for arrays that start at index 1; Python lists start at 0.)</p></div>
+  <div class="fb wrong"><p>Go the other direction and check: the children of i are 2i + 1 and 2i + 2. Index 5's children are 11 and 12, not 10. Index 4's children are 9 and 10. So 10's parent is 4, which is what (10 − 1) // 2 gives. Index 20 is down near 10's own children (21 and 22): doubling an index goes down a level, not up. (Using 10 // 2 = 5 is the formula for arrays that start at index 1; Python lists start at 0.)</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -137,7 +137,7 @@
 
 <p>The fix is a promotion. A new hire who's more urgent than their boss swaps places with the boss. Then compare with the new boss, and swap again if needed. Stop when the boss is at least as urgent, or the newcomer reaches the top. This is <b>sift up</b> (or "bubble up").</p>
 
-<p>Why doesn't a swap break anything else? The old boss moves down into the newcomer's spot, and the newcomer was the only child there that had changed. The boss's other report was already ≥ the boss, and the newcomer is now above both, smaller than both. Everything else is untouched.</p>
+<p>Why doesn't a swap break anything else? After the swap, the old boss sits in the newcomer's old seat. The children of that seat were already below the boss in the tree, so they're ≥ it. The newcomer is now above the old boss and the boss's other report, and it's smaller than both. Nothing else moved.</p>
 
 <div class="figure">
   <div id="heap-player"></div>
@@ -329,7 +329,7 @@ heapq.nsmallest(2, data)    # [1, 4]; also nlargest</code></pre>
 <details class="aside deeper">
   <summary>Go deeper: merging without a heap, and loser trees</summary>
   <ul>
-    <li><b>Pairwise merging:</b> merge the lists two at a time, like the merge-sort tree: k lists become k/2, then k/4… That's log₂ k rounds, each touching all N items: also O(N log k), with no heap at all. The heap wins when the inputs are streams (pairwise needs every round's output written somewhere) and when you want the first item out right away.</li>
+    <li><b>Pairwise merging:</b> merge the lists two at a time, like the merge-sort tree: k lists become k/2, then k/4… That's log₂ k rounds, each touching all N items: also O(N log k), with no heap at all. Done round by round, pairwise writes out each round's output, so it can't stream. Done lazily, as a tree of 2-way merges that each pull from the two below, it streams fine and gives the first item after about log₂ k comparisons: that tree is a tournament tree, the next bullet.</li>
     <li><b>Loser trees</b> (tournament trees) are what external sorts really use: a fixed tree over the k fronts where each step replays only one root-to-leaf path, about log₂ k comparisons per item instead of 2 log₂ k.</li>
     <li><b>The real bottleneck is the disk.</b> With 1,000 runs and 1 GB of memory, each run gets a 1 MB read buffer. Fewer, bigger runs mean bigger buffers and fewer seeks, which is why external sorts often merge in a few passes rather than all at once.</li>
   </ul>

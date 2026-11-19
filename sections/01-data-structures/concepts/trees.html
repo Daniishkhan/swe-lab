@@ -51,8 +51,8 @@
   <thead><tr><th>Structure</th><th>Find a key</th><th>Insert / delete</th><th>Next key up, min, range</th></tr></thead>
   <tbody>
     <tr><td>Hash map</td><td>O(1) average</td><td>O(1) average</td><td>O(n): no order</td></tr>
-    <tr><td>Sorted array</td><td>O(log n)</td><td>O(n): shifting</td><td>O(log n)</td></tr>
-    <tr><td>Balanced BST</td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td></tr>
+    <tr><td>Sorted array</td><td>O(log n)</td><td>O(n): shifting</td><td>O(log n); a range of k keys O(log n + k)</td></tr>
+    <tr><td>Balanced BST</td><td>O(log n)</td><td>O(log n)</td><td>O(log n); a range of k keys O(log n + k)</td></tr>
   </tbody>
 </table></div>
 
@@ -386,7 +386,7 @@
 
 <details class="aside deeper">
   <summary>Go deeper: why not always use a tree instead of a hash map?</summary>
-  <p>Beyond O(1) vs O(log n): for a million keys, log₂ n ≈ 20 comparisons, each possibly a cache miss (about 100 ns), so a tree lookup can cost a couple of microseconds while a hash lookup is one or two misses. Trees also need keys that can be <em>ordered</em>, while hash maps need keys that can be <em>hashed</em>. In exchange, trees give a worst case of O(log n) with no hash-flooding risk (Java 8's <code>HashMap</code> turns a bucket into a red-black tree once it holds 8 entries and the table has at least 64 slots, for exactly that reason; it works best when the keys are <code>Comparable</code>), and ordered iteration for free.</p>
+  <p>Beyond O(1) vs O(log n): for a million keys, log₂ n ≈ 20 comparisons, each possibly a cache miss (about 100 ns), so a tree lookup can cost a couple of microseconds while a hash lookup is one or two misses. Trees also need keys that can be <em>ordered</em>, while hash maps need keys that can be <em>hashed</em>. In exchange, trees give a worst case of O(log n) with no hash-flooding risk (Java 8's <code>HashMap</code> turns a bucket into a red-black tree once it grows past 8 entries and the table has at least 64 slots, for exactly that reason; it works best when the keys are <code>Comparable</code>), and ordered iteration for free.</p>
 </details>
 
 <div class="check" id="check-choose">

@@ -8,8 +8,9 @@ Build sections 7 and 8 of the chapter. Store the items in a Python list used
 as a fixed row of slots (`self.buf`), plus `self.head` (the slot of the
 first item) and a size. The tests look inside: item i must sit in
 self.buf[(self.head + i) % len(self.buf)]. Never shift items: move `head` instead, and wrap
-around with % len(self.buf). When every slot is full, make a list twice as
-big and copy the items over in line order, starting from head.
+around with % len(self.buf). Grow only when you must: when append or
+appendleft finds every slot already full, first make a list twice as big
+and copy the items over in line order, starting from head, then add.
 
     d = RingDeque()
     d.append(1); d.append(2); d.appendleft(0)   # 0, 1, 2
