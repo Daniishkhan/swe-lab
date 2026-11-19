@@ -153,7 +153,7 @@ window.CURRICULUM = {
     {
      "file": "hash-maps.html",
      "topic": "01.01",
-     "title": "Hash maps, arrays and strings"
+     "title": "Find anything in one step (Hash maps, arrays and strings)"
     },
     {
      "file": "heaps.html",
@@ -176,6 +176,15 @@ window.CURRICULUM = {
      "file": "hash_map.py",
      "module": "hash_map",
      "title": "Hash map from scratch (separate chaining)",
+     "topics": [
+      "01.01"
+     ],
+     "result": null
+    },
+    {
+     "file": "hash_patterns.py",
+     "module": "hash_patterns",
+     "title": "Hash map patterns: seen-it, group-by, running total",
      "topics": [
       "01.01"
      ],
@@ -205,6 +214,15 @@ window.CURRICULUM = {
      "title": "Monotonic stack and monotonic deque",
      "topics": [
       "01.02"
+     ],
+     "result": null
+    },
+    {
+     "file": "probing_map.py",
+     "module": "probing_map",
+     "title": "Hash map with open addressing (linear probing and tombstones)",
+     "topics": [
+      "01.01"
      ],
      "result": null
     },
@@ -1458,5 +1476,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-19 19:48"
+ "generated": "2026-11-19 20:57"
 };
