@@ -158,20 +158,29 @@ window.CURRICULUM = {
     {
      "file": "heaps.html",
      "topic": "01.04",
-     "title": "Heaps and priority queues"
+     "title": "The most urgent thing first (Heaps and priority queues)"
     },
     {
      "file": "linear-structures.html",
      "topic": "01.02",
-     "title": "Linked lists, stacks, queues and monotonic stacks"
+     "title": "Who goes next? (Linked lists, stacks, queues, deques and monotonic stacks)"
     },
     {
      "file": "trees.html",
      "topic": "01.03",
-     "title": "Trees, BSTs and traversals"
+     "title": "Sorted and fast (Trees, binary search trees, balancing and traversals)"
     }
    ],
    "exercises": [
+    {
+     "file": "bst.py",
+     "module": "bst",
+     "title": "Binary search tree with delete, successor and range queries",
+     "topics": [
+      "01.03"
+     ],
+     "result": null
+    },
     {
      "file": "hash_map.py",
      "module": "hash_map",
@@ -191,6 +200,24 @@ window.CURRICULUM = {
      "result": null
     },
     {
+     "file": "heap_patterns.py",
+     "module": "heap_patterns",
+     "title": "Heap patterns: top-k, k-way merge, job scheduling",
+     "topics": [
+      "01.04"
+     ],
+     "result": null
+    },
+    {
+     "file": "linked_lists.py",
+     "module": "linked_lists",
+     "title": "Linked list moves: reverse, middle, cycle",
+     "topics": [
+      "01.02"
+     ],
+     "result": null
+    },
+    {
      "file": "lru_cache.py",
      "module": "lru_cache",
      "title": "LRU cache",
@@ -202,7 +229,7 @@ window.CURRICULUM = {
     {
      "file": "min_heap.py",
      "module": "min_heap",
-     "title": "Binary min-heap, plus two classic uses",
+     "title": "Binary min-heap from scratch",
      "topics": [
       "01.04"
      ],
@@ -223,6 +250,24 @@ window.CURRICULUM = {
      "title": "Hash map with open addressing (linear probing and tombstones)",
      "topics": [
       "01.01"
+     ],
+     "result": null
+    },
+    {
+     "file": "ring_deque.py",
+     "module": "ring_deque",
+     "title": "RingDeque: a double-ended queue on a ring buffer",
+     "topics": [
+      "01.02"
+     ],
+     "result": null
+    },
+    {
+     "file": "tree_traversals.py",
+     "module": "tree_traversals",
+     "title": "Tree traversals, BST validation and building a balanced tree",
+     "topics": [
+      "01.03"
      ],
      "result": null
     },
@@ -1476,5 +1521,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-19 20:57"
+ "generated": "2026-11-19 21:38"
 };
