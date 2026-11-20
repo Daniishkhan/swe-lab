@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="02.14">
+  <title>Rate limiting: buckets and windows</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 14</div>
+  <h1>Rate limiting</h1>
+  <div class="meta"><span><span class="badge P2">P2</span> a favourite system design follow-up</span><span>about 50 minutes</span><span>10 quick checks · 9 exercises</span></div>
+</header>
+
+<p>Every public API, login page and payment endpoint has a bouncer that says "not so fast". The algorithms behind it are small: a counter, a queue, a jar of tokens. The interview questions around them are not. Why does the simple version let twice the limit through? How do you store this for 10 million users? What happens when 20 servers share one limit, or when the clock jumps? This chapter builds the four classic limiters one fix at a time, then takes them to many servers.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Show, with numbers, why a fixed window counter lets 2× the limit through at a window boundary.</li>
+    <li>Explain the sliding window log, the sliding window counter, the token bucket and the leaky bucket, and price each one's memory per key.</li>
+    <li>Write the lazy refill math for a token bucket, and say why it uses a monotonic clock and no timers.</li>
+    <li>Pick a limiter for a given job, and defend the pick against the obvious alternative.</li>
+    <li>Share one limit across many servers with Redis without race conditions, and say what to send back to a client you turn away.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom. It leans on the sliding window idea from <a href="two-pointers-sliding-window.html">Two pointers, sliding window, prefix sums</a> and on hash maps and queues from chapter 1. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: one noisy neighbour</h2>
+
+<div class="story">
+  <p>You run the API for an online shop. Your servers can handle about 2,000 requests a second in total, and on a normal day they see 1,200, from about 40,000 customers.</p>
+  <p>On Friday one customer ships a bug: a retry loop with no pause. It sends 3,000 requests a second. Now the servers get 4,200 a second. Requests queue up, every page takes 10 seconds, and 39,999 customers who did nothing wrong see timeouts.</p>
+</div>
+
+<p>What you want is a rule like <b>"each API key gets at most 100 requests per minute"</b>, checked at the door before any real work happens. A request over the limit gets a fast, cheap "no" (an HTTP 429, section 10), and the server keeps its capacity for everyone else. That rule is a <b>rate limiter</b>. A <b>key</b> is whatever you count by: an API key, a user id, an IP address.</p>
+
+<p>The rule sounds like one line of code. It isn't, because the limiter itself has to be cheap:</p>
+<ul>
+  <li><b>Time:</b> it runs on every request, so it must be O(1). A limiter that scans a user's history costs more than the request it protects.</li>
+  <li><b>Memory:</b> it keeps something for every key. Multiply by 10 million keys before you pick what that something is.</li>
+  <li><b>Accuracy:</b> it must not let much more than the limit through, and it must not block people who stay under it.</li>
+</ul>
+
+<div class="check" id="check-rate-limiting-why">
+  <p class="q">Why not just cap the whole server at 2,000 requests a second, instead of limiting each key?</p>
+  <div class="opts">
+    <button>That works: the server never gets more than it can handle</button>
+    <button data-correct>The noisy client still takes most of the 2,000 slots, so everyone else is still turned away</button>
+    <button>A global cap needs more memory than a per-key one</button>
+  </div>
+  <div class="fb right"><p>Right. A global cap protects the <em>server</em>, but not the <em>other customers</em>. With 3,000 a second from one client and 1,200 from everyone else, a first-come cap of 2,000 admits roughly 2,000 × 3,000/4,200 ≈ 1,430 from the noisy client and only about 570 of the 1,200 good ones. Per-key limits are about fairness: one key can't eat everyone's share. Real systems often have both: per-key limits, plus overall load shedding as a last line of defence.</p></div>
+  <div class="fb wrong"><p>Picture a nightclub with a fire limit of 200 people, and one group of 150 that keeps pushing to the front of the line. The fire limit keeps the building safe, but the group still fills most of the room. Same here: a cap of 2,000 a second keeps the server alive, but about 1,430 of those slots go to the buggy client (3,000 of every 4,200 arrivals). Per-key limits are what stop one customer from taking everyone else's share. And memory isn't the issue: a global cap is one counter.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>First try: count per minute</h2>
+
+<p>The simplest thing that could work: give each key a turnstile counter that resets every time the clock hits a new minute. Minute 12:00 has its own count, minute 12:01 starts again from 0. This is the <b>fixed window counter</b>. A <b>window</b> is the stretch of time you count over; "fixed" means the windows are glued to the clock, 12:00–12:01, 12:01–12:02, and so on.</p>
+
+<pre><code>counts = {}                        # key -&gt; (window number, count)
+
+def allow(key, now, limit=100, window=60):
+    w = int(now // window)         # which minute are we in?
+    start, n = counts.get(key, (w, 0))
+    if start != w:                 # a new minute: forget the old count
+        n = 0
+    if n &gt;= limit:
+        return False               # over the limit: reject, count nothing
+    counts[key] = (w, n + 1)
+    return True</code></pre>
+
+<p>That's O(1) time and two numbers per key. It's what many real systems ran first, and it's often good enough. But look at what happens at the edge between two windows.</p>
+
+<h3>The boundary burst</h3>
+<p>The limit is 100 per minute. A client sends nothing for most of minute 12:00, then 100 requests at 12:00:59. All pass: that minute's count was 0. One second later, at 12:01:00, a new window starts and the count resets. The client sends 100 more, and all of them pass too.</p>
+<p>That's <b>200 requests in about 2 seconds</b>, from a limiter that promises 100 per minute. Any 60-second stretch that straddles the boundary (12:00:30 to 12:01:30, say) holds 200. The fixed window only promises "at most 100 per <em>calendar</em> minute", not "per <em>any</em> 60 seconds".</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">rolling 60 s window starts at</span><input type="range" id="bw-s" min="0" max="60" step="0.5" value="0" style="width:220px"><b id="bw-sval"></b></div>
+    <svg class="viz" id="bw-svg" viewBox="0 0 640 170" style="margin-top:8px"></svg>
+    <div class="small" id="bw-out" style="margin-top:6px"></div>
+  </div>
+  <div class="cap">Limit 10 per minute (scaled down so you can see every request). Green ticks passed the fixed window counter, red ones were rejected. Each dashed box is one fixed window, and each says 10/10, so the counter thinks all is well. The blue box is a rolling 60-second window. At 0:00 it lines up with fixed window 1 and holds 10. Drag it right: once it covers both bunches, it holds 20.</div>
+</div>
+
+<div class="keyidea">A fixed window counter is O(1) time and O(1) memory per key, but it resets all at once at the boundary. A client who times it right gets 2× the limit in a few seconds: a full window's worth just before the reset and another just after.</div>
+
+<div class="check" id="check-rate-limiting-boundary">
+  <p class="q">Fixed window, limit 100 per minute. What's the most requests one client can get through in some 60-second stretch?</p>
+  <div class="opts">
+    <button>100, that's the limit</button>
+    <button data-correct>About 200</button>
+    <button>No limit: they can do it every minute</button>
+  </div>
+  <div class="fb right"><p>Right. 100 at the very end of one window, 100 at the very start of the next: about 200 inside a couple of seconds, and so inside one 60-second stretch. It can't be more than 200, because any 60-second stretch overlaps at most two fixed windows, and each window lets in at most 100.</p></div>
+  <div class="fb wrong"><p>Count windows, not minutes. A 60-second stretch that doesn't line up with the clock always overlaps exactly two fixed windows (unless it lines up perfectly, then one). Each fixed window lets in at most 100. So the worst case is 100 + 100 = 200, and you reach it by bunching both hundreds right next to the boundary. It's never "no limit": each window still stops at 100, so over an hour the client still gets about 6,000, not more.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Keep every timestamp: the sliding window log</h2>
+
+<p>The flaw was that the count resets all at once. The fix: don't reset anything. Instead, every request "expires" on its own, exactly 60 seconds after it happened. Then the question "how many in the last 60 seconds?" has an exact answer at every moment, not just at the start of each minute.</p>
+
+<p>Picture a sign-in sheet at a gym that only lets 100 visits per hour. Each visitor writes the time. When someone new arrives, the front desk first crosses out every line older than an hour, then counts the lines left. Under 100: sign in. Otherwise: come back later. This is the <b>sliding window log</b>: a log (list) of timestamps per key, and a window that slides along with the current time.</p>
+
+<p>Old timestamps always leave from the <em>front</em> (they're the oldest), and new ones join at the <em>back</em>. That's a queue, so a <b>deque</b> (double-ended queue: O(1) add and remove at both ends) is the right container:</p>
+<ol>
+  <li>Pop from the front every timestamp that is 60 seconds old or more.</li>
+  <li>If fewer than <code>limit</code> are left, append <code>now</code> at the back and allow.</li>
+  <li>Otherwise reject.</li>
+</ol>
+
+<div class="figure">
+  <div id="log-player"></div>
+  <div class="cap">A sliding window log with limit 3 per 10 seconds. Red cells are timestamps falling out of the window (now − t ≥ 10), green ones are still inside, blue is the request just logged. Step through and watch the deque never hold more than 3.</div>
+</div>
+
+<h3>What it costs</h3>
+<p><b>Time:</b> one step might pop many old timestamps, which looks like O(n). But each timestamp is pushed once and popped at most once, ever. Over a million requests that's at most two million deque operations: amortized O(1) per request, the same "count the total moves" argument as the sliding window chapter.</p>
+<p><b>Memory:</b> up to <code>limit</code> timestamps per key. At 100 per minute that's 100 × 8 bytes = 800 bytes per busy key, raw. In Python each float is a 24-byte object plus an 8-byte slot in the deque, so about 3 KB. With 10 million keys and a limit of 1,000 per hour, the raw timestamps alone are 80 GB. Exact, but expensive. Section 11 prices all four limiters side by side.</p>
+
+<div class="keyidea">The sliding window log is exact: it answers "how many in the last 60 seconds" by keeping each accepted request's time and dropping it when it's 60 seconds old. Amortized O(1) time, but O(limit) memory per key.</div>
+
+<div class="check" id="check-rate-limiting-log">
+  <p class="q">A sliding window log, limit 100 per minute, logs <em>every</em> request, including rejected ones. A client retries forever at 2 requests per second. What happens?</p>
+  <div class="opts">
+    <button>It gets 100 per minute, like everyone else</button>
+    <button>It gets 2 per second: the limiter can't stop a steady stream</button>
+    <button data-correct>After the first 100, it never gets through again</button>
+  </div>
+  <div class="fb right"><p>Right. At 2 a second, every 60-second stretch holds 120 logged attempts. The log never drops below 100, so every request is rejected, forever, even though the client is "only" asking for 120 a minute. That's why the usual choice is to log only <em>accepted</em> requests. (Logging rejected ones is a valid knob if you want to punish clients that don't back off, but choose it on purpose.)</p></div>
+  <div class="fb wrong"><p>Run the sign-in sheet, now with a one-minute window: the desk writes down everyone who <em>tries</em> to enter, even those turned away. A person knocking twice a second adds 120 lines every minute, and each line is only crossed out a full minute after it was written. The sheet never has fewer than 100 lines, so the door never opens again. With "log only the accepted ones", the client gets exactly 100 per minute and is turned away for the other 20.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Two counters and a guess: the sliding window counter</h2>
+
+<p>The log is exact but stores up to 100 timestamps per key. The fixed window stores 2 numbers but lets 2× through. Can we keep almost the accuracy of the log at almost the cost of the counter?</p>
+
+<p>Keep the fixed windows, but remember <b>two counts per key</b>: this minute's and last minute's. Then <em>estimate</em> how many requests fall in the true last 60 seconds by assuming last minute's requests were spread evenly across it.</p>
+
+<p>The worked example from the sliding window chapter: limit 100 per minute. It's 15 seconds into the current minute. This minute has 30 requests so far; last minute had 80.</p>
+
+<pre class="diagram"><code>         previous minute (80)          current minute (30 so far)
+   |------------------------------|---------------|
+   0s            15s             60s     now = 75s
+                 [============ last 60 seconds ====]
+                 \_ 45 s of the previous minute _/  \_ 15 s _/
+
+   estimate = 80 × 45/60 + 30 = 60 + 30 = 90     → under 100: allow</code></pre>
+
+<p>The rolling 60-second window covers the last 45 seconds of the previous minute, which is 3/4 of it. If its 80 requests were spread evenly, about 3/4 × 80 = 60 of them are still "inside". Add the 30 from this minute: about 90. This is the <b>sliding window counter</b>. In general:</p>
+
+<pre class="diagram"><code>elapsed  = time since the current window started
+estimate = previous × (window − elapsed) / window  +  current</code></pre>
+
+<p>Now replay the boundary burst. 100 requests at 0:59, then 100 more at 1:00. At 1:00, elapsed is 0, so the previous minute counts in full: estimate = 100 × 60/60 + 0 = 100. Full: the second hundred is rejected. As the minute goes on, the old hundred fades out at 100/60 ≈ 1.7 requests per second, and new requests can take its place at that pace. The 2-second burst of 200 is gone.</p>
+
+<h3>Where the guess is wrong</h3>
+<p>The "spread evenly" assumption is the weak spot. If last minute's 80 requests all came in its final second, they're all really inside the window, and the estimate (60) is too low. If they all came in its first second, none are, and the estimate is too high. A client who knows the trick can get close to 2× over a full minute: 100 at 0:59.9, then a steady trickle that the fading estimate allows, ending near 199 inside the stretch 0:59.9 to 1:59.9. But never as a sudden burst. In practice traffic isn't that adversarial: Cloudflare, which uses this method, measured it on 400 million real requests and found 0.003% were wrongly allowed or wrongly limited.</p>
+
+<div class="keyidea">The sliding window counter keeps two counts per key and weights last window's count by how much of it still overlaps the rolling window. O(1) time and O(1) memory, no boundary burst, and an error that only matters when traffic is bunched on purpose.</div>
+
+<div class="check" id="check-rate-limiting-counter">
+  <p class="q">Limit 100 per minute. 45 seconds into the current minute, it has 40 requests so far; the previous minute had 80. What does the sliding window counter estimate?</p>
+  <div class="opts">
+    <button>120, so reject</button>
+    <button data-correct>60, so allow</button>
+    <button>100, so reject</button>
+  </div>
+  <div class="fb right"><p>Right. 45 seconds in, only the last 15 seconds of the previous minute still overlap: 15/60 = 1/4 of it. 80 × 1/4 = 20, plus the 40 from now: 60.</p></div>
+  <div class="fb wrong"><p>Draw it. The rolling window is the last 60 seconds: 45 seconds of this minute, and the 15 seconds just before it, which are the <em>end</em> of last minute. So only 15/60 = a quarter of last minute counts: 80 × 1/4 = 20. Add this minute's 40 in full: 60. 120 counts both minutes in full (that's a 2-minute window); 100 weights the wrong share (3/4 of 80 is the part that's already <em>outside</em>).</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>A jar of tokens: the token bucket</h2>
+
+<p>All three counters answer one question: "how many in the last window?". But that's often not what you mean. A photo app wants to let you upload 20 pictures at once after a quiet hour, and still stop a script that uploads 2 a second all day. That's two separate wishes: a <b>burst</b> (how much at once) and a <b>sustained rate</b> (how much over time). A window has only one knob.</p>
+
+<p>Picture a jar that holds at most 20 tokens, and a tap that drips one token into it every 0.6 seconds (that's 100 a minute). Every request must take a token out of the jar. No token: rejected. When the jar is full, extra drips spill over and are lost.</p>
+<ul>
+  <li>After a quiet spell the jar is full: 20 requests can go at once. <b>Capacity is the burst.</b></li>
+  <li>After that, requests get through only as fast as tokens drip in: 100 a minute. <b>The refill rate is the sustained rate.</b></li>
+</ul>
+
+<p>This is the <b>token bucket</b>, with two knobs: capacity <i>b</i> and rate <i>r</i>. Its promise is easy to state: over any stretch of T seconds, at most <b>b + r × T</b> requests get through. The jar can start full (b), and the tap adds at most r × T during the stretch. The bucket can be used with a <b>cost</b> too: a cheap read takes 1 token, an expensive export takes 10.</p>
+
+<h3>Lazy refill: no tap, just arithmetic</h3>
+<p>A real tap would be a timer that adds a token to every jar every 0.6 seconds. With 1 million keys that's over a million timer wake-ups a second, most of them for jars nobody is using. Instead, store two numbers per key: how many tokens were in the jar, and when you last looked. When a request arrives, work out how much the tap <em>would have</em> added since then:</p>
+
+<pre class="diagram"><code>elapsed = now − last
+tokens  = min(capacity, tokens + elapsed × rate)     # refill, but never past full
+last    = now
+if tokens ≥ cost: tokens −= cost; allow  else: reject</code></pre>
+
+<p>Worked numbers: capacity 4, rate 0.5 per second (one token every 2 s). The jar starts full.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>time</th><th>since last look</th><th>refill</th><th>tokens before</th><th>decision</th><th>tokens after</th></tr></thead>
+  <tbody>
+    <tr><td>0 (×4)</td><td>0</td><td>0</td><td>4, 3, 2, 1</td><td>allow ×4</td><td>0</td></tr>
+    <tr><td>0</td><td>0</td><td>0</td><td>0</td><td>reject</td><td>0</td></tr>
+    <tr><td>1</td><td>1 s</td><td>+0.5</td><td>0.5</td><td>reject (needs 1)</td><td>0.5</td></tr>
+    <tr><td>3</td><td>2 s</td><td>+1</td><td>1.5</td><td>allow</td><td>0.5</td></tr>
+    <tr><td>9</td><td>6 s</td><td>+3</td><td>3.5</td><td>allow</td><td>2.5</td></tr>
+  </tbody>
+</table></div>
+<p>Each row is a handful of arithmetic steps, however long the gap. A key idle for a week costs nothing, and its first request does one subtraction and one multiplication. Lazy refill is the reason the token bucket is O(1) time and two numbers per key.</p>
+
+<div class="figure">
+  <div id="tb-player"></div>
+  <div class="cap">Token bucket with capacity 4 and rate 0.5 per second. The jar on the left fills between requests by elapsed × rate, never past 4. Dots on the timeline are requests, stacked when they share a time: green allowed, red rejected. Watch the burst at t = 0 empty the jar, then the slow drip decide everything after it.</div>
+</div>
+
+<div class="keyidea">Token bucket: capacity sets the burst, rate sets the long-run speed, and over any T seconds at most capacity + rate × T requests pass. Refill lazily from the time since the last look, so each key is two numbers and no timer.</div>
+
+<div class="check" id="check-rate-limiting-burst">
+  <p class="q">Token bucket with capacity 20 and rate 100 per minute (one token per 0.6 s). The key has been idle for 10 minutes. Then 50 requests arrive within one second. About how many get through?</p>
+  <div class="opts">
+    <button>50: ten idle minutes saved up 1,000 tokens</button>
+    <button data-correct>About 21</button>
+    <button>About 2: the rate is under 2 per second</button>
+  </div>
+  <div class="fb right"><p>Right. The jar can't hold more than 20, however long it sat idle; the extra drips spilled over. So 20 go at once, plus whatever drips in during that second: 1/0.6 ≈ 1.7 tokens, so one more. That's the point of the cap: unused capacity doesn't pile up forever.</p></div>
+  <div class="fb wrong"><p>Two rules decide this. First, the jar has a lid: it never holds more than 20, so ten idle minutes leave it at 20, not 1,000 (that's what capacity is for). Second, the rate only limits what happens <em>after</em> the jar is empty: a full jar can be spent all at once. So: 20 immediately, plus about 1.7 tokens dripping in during the second, which lets one more through. About 21.</p></div>
+</div>
+
+<div class="check" id="check-rate-limiting-refill">
+  <p class="q">Capacity 10, rate 2 per second. At t = 4.0 the jar held 3 tokens. The next request arrives at t = 6.5. How many tokens are left after it's allowed?</p>
+  <div class="opts">
+    <button>2: one fewer than before</button>
+    <button data-correct>7</button>
+    <button>9: the jar refills to 10 first</button>
+  </div>
+  <div class="fb right"><p>Right. 2.5 seconds passed, so the tap added 2.5 × 2 = 5 tokens: 3 + 5 = 8, under the cap of 10. The request takes 1: 7 left.</p></div>
+  <div class="fb wrong"><p>Run the three lines. elapsed = 6.5 − 4.0 = 2.5 s. Refill = 2.5 × 2 = 5, so tokens = min(10, 3 + 5) = 8: the cap doesn't bite, because 8 is under 10. Then spend 1: 7. The refill isn't "back to full" and it isn't skipped; it's exactly elapsed × rate, capped at capacity.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>A bucket with a hole: the leaky bucket</h2>
+
+<p>The token bucket lets a burst of 20 hit your server all at once. Usually that's fine. But sometimes the thing behind the limiter can't take bursts at all: a payment partner that bans you if you send more than 10 calls in any second, or an old database that falls over when 50 queries land together. You don't want to <em>reject</em> the burst; you want to <em>spread it out</em>.</p>
+
+<p>Picture a bucket with a small hole in the bottom. Requests pour in at any speed. They drip out of the hole at a steady pace, one every 0.1 seconds, and only then reach the server. If requests pour in faster than they drip out, the bucket fills; once it's full, new ones overflow and are rejected. This is the <b>leaky bucket</b>. Its knobs are the leak rate and the bucket's size (how many requests can wait).</p>
+
+<p>In code, the bucket is a FIFO queue (first in, first out) with a fixed size, emptied at a fixed rate. You don't need a timer for that either. Each accepted request gets a <b>leak time</b>: the first one leaks the moment it arrives, and each later one leaks at <code>max(its arrival, previous leak time + 1/rate)</code>. The server never sees two requests closer together than 1/rate.</p>
+
+<div class="cols">
+<div>
+<pre class="diagram"><code>TOKEN BUCKET, capacity 5, rate 2/s
+burst of 8 at t = 0:
+  t=0.0  ✓✓✓✓✓      5 go at once
+         ✗✗✗        3 rejected
+server sees: 5 requests at t = 0</code></pre>
+</div>
+<div>
+<pre class="diagram"><code>LEAKY BUCKET, room for 4, rate 2/s
+burst of 8 at t = 0:
+  t=0.0 ✓  0.5 ✓  1.0 ✓  1.5 ✓  2.0 ✓
+         ✗✗✗        3 rejected (bucket full)
+server sees: one every 0.5 s</code></pre>
+</div>
+</div>
+
+<p>Same 5 accepted, very different experience. With the token bucket the server takes a spike and the client gets fast answers. With the leaky bucket the server sees a perfectly smooth stream, and the client pays for it in waiting: the fifth request waits 2 seconds. That delay is the leaky bucket's cost. It's great in front of a fragile downstream or for outgoing traffic you control; it's bad for a user staring at a page.</p>
+
+<details class="aside another">
+  <summary>Explain it another way: the same bucket, upside down</summary>
+  <p>There's a second "leaky bucket" in the textbooks: the <b>meter</b>. It doesn't delay anything. Each request pours one unit of water into the bucket; the bucket leaks at rate r; if a request would make it overflow, it's rejected. The water level is just "capacity minus tokens", so the meter is the token bucket turned upside down, with exactly the same behaviour. When someone says "leaky bucket", ask which one they mean: <b>the queue</b> (smooths and delays) or <b>the meter</b> (identical to a token bucket). NGINX's <code>limit_req</code> is a queue-style leaky bucket; its <code>burst=</code> option sets the size of the queue, and adding <code>nodelay</code> lets that burst through at once, which turns it into a token bucket.</p>
+</details>
+
+<div class="keyidea">Leaky bucket (queue version): requests wait in a fixed-size queue and leave at a constant rate. The output is perfectly smooth; the price is delay, plus rejection when the queue is full. Use it when the thing behind it can't take bursts.</div>
+
+<div class="check" id="check-rate-limiting-leaky">
+  <p class="q">Your service calls a payment partner that blocks you if you send more than 10 calls in any one second. Your own traffic arrives in bursts of 30. Which limiter goes in front of the partner?</p>
+  <div class="opts">
+    <button>A token bucket with capacity 30 and rate 10 per second</button>
+    <button data-correct>A leaky bucket queue leaking 10 per second, with room for the bursts to wait</button>
+    <button>A fixed window counter of 10 per second</button>
+  </div>
+  <div class="fb right"><p>Right. You want the bursts spread out, not rejected and not passed through. A queue leaking at 10 a second (one every 0.1 s) means the partner never sees more than 10 in any second, and the burst of 30 drains in 3 seconds instead of failing. The token bucket with capacity 30 would send all 30 at once, and the fixed window allows 20 across a second boundary.</p></div>
+  <div class="fb wrong"><p>Ask "what does the partner see?". A token bucket with capacity 30 hands it all 30 in the same instant: banned. A fixed window of 10 per second allows 10 at 0.99 s and 10 more at 1.00 s: 20 inside one second, banned. A leaky bucket queue releases one request every 0.1 s whatever comes in, so the partner sees a steady 10 per second. The burst waits up to 3 seconds instead of being lost.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Same traffic, five limiters</h2>
+
+<p>Time to compare them on the same traffic. Each limiter below aims at "5 requests per 10 seconds": the windows use limit 5 and window 10 s; the token bucket has capacity 5 and rate 0.5 per second; the leaky bucket leaks 0.5 per second with room for 4 to wait. Things to try:</p>
+<ol>
+  <li><b>Boundary burst</b> with the fixed window, then with the sliding log. Read "busiest 10 s".</li>
+  <li><b>Idle, then a spike</b> with the token bucket, then the leaky bucket. About the same number accepted, very different "longest wait".</li>
+  <li><b>Steady, twice the limit</b> with all five. Which ones end up at about the same total?</li>
+</ol>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <select id="pg-algo"><option value="fixed">Fixed window</option><option value="log">Sliding window log</option><option value="counter">Sliding window counter</option><option value="token" selected>Token bucket</option><option value="leaky">Leaky bucket (queue)</option></select>
+      <select id="pg-traffic"><option value="boundary">Boundary burst</option><option value="spike" selected>Idle, then a spike</option><option value="steady">Steady, twice the limit</option><option value="random">Random bursts</option></select>
+    </div>
+    <svg class="viz" id="pg-svg" viewBox="0 0 640 190" style="margin-top:8px"></svg>
+    <div class="legend"><span><i style="background:var(--ok)"></i>allowed</span><span><i style="background:var(--bad)"></i>rejected</span><span><i style="background:var(--warn)"></i>delayed (line shows when it reaches the server)</span></div>
+    <div class="small" id="pg-out" style="margin-top:6px"></div>
+  </div>
+  <div class="cap">Top row: when requests arrive. Bottom row: when the server sees them (the same moment, except for the leaky bucket). "Busiest 10 s" counts what the server sees in the worst 10-second stretch; the promise is 5 (the token bucket's honest promise is 5 + 0.5 × 10 = 10).</div>
+</div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Limiter</th><th>State per key</th><th>Exact?</th><th>Bursts</th><th>Good for</th><th>Watch out for</th></tr></thead>
+  <tbody>
+    <tr><td>Fixed window counter</td><td>2 numbers</td><td>per calendar window only</td><td>up to 2× at a boundary</td><td>quotas ("10,000 per day"), simple dashboards</td><td>the boundary burst</td></tr>
+    <tr><td>Sliding window log</td><td>up to <i>limit</i> timestamps</td><td>yes</td><td>never over the limit</td><td>small limits that must be exact (login attempts)</td><td>memory: O(limit) per key</td></tr>
+    <tr><td>Sliding window counter</td><td>3 numbers</td><td>close (assumes even spread)</td><td>smoothed</td><td>"N per minute" APIs at scale</td><td>bunched traffic fools the estimate</td></tr>
+    <tr><td>Token bucket</td><td>2 numbers</td><td>yes, for its own promise b + rT</td><td>up to capacity, on purpose</td><td>most APIs: allow bursts, cap the average</td><td>two knobs to explain and tune</td></tr>
+    <tr><td>Leaky bucket (queue)</td><td>a queue of up to <i>size</i></td><td>yes</td><td>none: output is smooth</td><td>protecting a fragile downstream, outgoing calls</td><td>added latency; queued work can go stale</td></tr>
+  </tbody>
+</table></div>
+
+<p>If an interviewer asks you to "design a rate limiter" with no further detail, the token bucket is the safe default: O(1), two numbers per key, and its two knobs map onto what product people actually want ("let them burst a bit, but not hammer us"). AWS API Gateway, for example, exposes exactly those two knobs as "rate" and "burst". Say why, and name the sliding window counter as the alternative when the requirement is literally "N per minute".</p>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Time is harder than it looks</h2>
+
+<p>Every limiter here does arithmetic on "now". So it matters a lot which clock "now" comes from.</p>
+
+<p>Your computer has two kinds of clock. The <b>wall clock</b> (Python's <code>time.time()</code>) is like the clock on the kitchen wall: it tells you the date, and anyone can reset it. It jumps when NTP (the protocol that keeps computer clocks in sync) corrects a drift, when an admin sets it, or when a virtual machine wakes up after being paused. The <b>monotonic clock</b> (<code>time.monotonic()</code>) is a stopwatch: it only ever moves forward, at a steady pace, whatever happens to the wall clock. Its starting point means nothing (often "when the machine booted"), so you can only subtract two readings from it. That's exactly what rate limiters do.</p>
+
+<p>What a wall clock jump does, with numbers:</p>
+<ul>
+  <li><b>Backwards 30 s, token bucket:</b> elapsed = now − last = −30, so the refill adds −30 × r tokens. The jar goes deeply negative and the user is locked out for most of the next 30 seconds (30 s, minus the time it would take to drip back what the jar held), through no fault of their own.</li>
+  <li><b>Forwards 1 hour:</b> every jar refills completely and every window expires at once. Everyone gets a free burst.</li>
+  <li><b>Backwards, sliding log:</b> new timestamps are now <em>smaller</em> than old ones. The deque is no longer in time order, and the old entries look younger than they are, so "pop old ones from the front" lets them out late: the key stays blocked longer than its limit says (warm-up 3 works through it).</li>
+</ul>
+<p>The fix is to use the monotonic clock, and to be defensive anyway: if elapsed comes out negative, treat it as 0. Your <code>token_bucket</code> exercise tests both.</p>
+
+<p>Two more things about time:</p>
+<ul>
+  <li><b>No timers.</b> You saw this in section 5: lazy computation turns "a timer per key" into "a little arithmetic per request". Idle keys cost zero CPU. The same trick works for windows (roll the counters over when the next request arrives) and for the leaky bucket (compute leak times instead of sleeping).</li>
+  <li><b>Floating point.</b> Adding 0.1 a million times doesn't give exactly 100,000. For a limiter that runs for months, many systems store time as integer nanoseconds (<code>time.monotonic_ns()</code>) and tokens as integer thousandths, so nothing drifts.</li>
+</ul>
+
+<div class="keyidea">Rate limiters subtract timestamps, so use a clock that only moves forward (monotonic), clamp negative elapsed time to 0, and compute everything lazily on each request instead of running timers.</div>
+
+<div class="check" id="check-rate-limiting-clock">
+  <p class="q">A token bucket uses <code>time.time()</code>. NTP moves the server's clock back by 30 seconds. What does a user with a full jar notice?</p>
+  <div class="opts">
+    <button>Nothing: their jar was full anyway</button>
+    <button data-correct>They're rejected for most of the next 30 seconds</button>
+    <button>They get unlimited requests for 30 seconds</button>
+  </div>
+  <div class="fb right"><p>Right. On the next request, elapsed = now − last ≈ −30 s, and the refill line adds −30 × rate tokens. The full jar suddenly holds far less than zero, and it takes 30 seconds of real time to climb back to where it was. The user is turned away for most of that time: until the jar is back to at least 1. With <code>time.monotonic()</code> the jump never happens; with a clamp (elapsed below 0 counts as 0) it does no harm.</p></div>
+  <div class="fb wrong"><p>Plug the jump into the refill line. Say rate 2, capacity 10, full jar, last look at "12:00:00". The clock is set back 30 s, so the next request reads "11:59:30". elapsed = −30 s, refill = −60 tokens, jar = 10 − 60 = −50. It needs 25 seconds of dripping just to reach 0, so the user is rejected for about 25 of the next 30 seconds. "Full anyway" ignores that the formula can subtract. "Unlimited" is what a <em>forward</em> jump does (everything refills at once), not a backward one.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Many servers, one limit</h2>
+
+<p>So far everything lived in one process's memory. Real APIs run on many servers behind a load balancer. Say 20 servers, limit 100 per minute per key.</p>
+
+<h3>Try 1: each server limits on its own</h3>
+<p>If every server allows 100, a client spread over all 20 gets 2,000. So give each server 100/20 = 5. That only works if the load balancer spreads each client perfectly evenly. It doesn't: a client with one keep-alive connection (one connection it reuses for every request) sticks to one server and gets 5 per minute instead of 100. And when you autoscale to 30 servers, every limit is suddenly wrong.</p>
+
+<h3>Try 2: one shared counter in Redis</h3>
+<p>Keep the counts in one place every server can reach: Redis, an in-memory key-value store that runs commands one at a time, very fast. The classic fixed window is two commands per request. The window starts at the key's first request and ends when the key expires:</p>
+<pre class="plain"><code>n = INCR  rl:{key}               # add 1, return the new count (creates the key at 1)
+if n == 1:  EXPIRE rl:{key} 60   # first request of the window: delete the key in 60 s
+allow if n &lt;= 100</code></pre>
+<p>This has a hole. INCR and EXPIRE are two separate commands. If the app server crashes (or the network drops) between them, the key has no expiry. It never goes away, its count only grows past 100, and that key is blocked forever. (If the key name includes the minute, <code>rl:{key}:{minute}</code>, the next minute gets a fresh key, so a missed EXPIRE only leaks memory. Either way it's a bug.) The fix is to make the pair one indivisible step. Redis runs a <b>Lua script</b> (a small program sent to Redis) as one atomic unit: no other command runs in the middle of it. (A <code>MULTI</code>/<code>EXEC</code> transaction, which queues commands and runs them together, can't run "EXPIRE only if n == 1": the commands are queued before any of them runs, so nothing can look at INCR's answer. Sending EXPIRE every time would push the expiry back on each request, so a busy client's window never ends. It works only with EXPIRE's <code>NX</code> option (Redis 7+: set an expiry only if the key has none). For the token bucket below, where what to write depends on what was read, the transaction route is <code>WATCH</code>: watch the key, read it, then MULTI/EXEC the write, which Redis aborts if anyone changed the key in between, so you retry. That's correct, but the retries pile up on exactly the hottest keys; a script never retries.)</p>
+<pre class="plain"><code>-- KEYS[1] = "rl:{key}", ARGV[1] = limit, ARGV[2] = window seconds
+local n = redis.call("INCR", KEYS[1])
+if n == 1 then redis.call("EXPIRE", KEYS[1], ARGV[2]) end
+return n &lt;= tonumber(ARGV[1])</code></pre>
+
+<h3>The read-modify-write race</h3>
+<p>A token bucket in Redis is worse, because it reads, computes, then writes. Two servers handle the same key at the same moment:</p>
+<pre class="diagram"><code>server A: GET tokens → 1                          SET tokens 0   → allow
+server B:          GET tokens → 1        SET tokens 0           → allow
+                                    two requests, one token</code></pre>
+<p>Both read 1, both decide "allow", both write 0. The same fix applies: put the whole read-refill-decide-write sequence in one Lua script, so Redis runs it start to finish before touching the next request for that key. The script also needs "now". If each app server sends its own clock, servers whose clocks disagree by a few milliseconds compute different refills. Better: have the script read Redis's own clock (the <code>TIME</code> command), so there's one clock for everyone.</p>
+
+<h3>Try 3: local first, global eventually</h3>
+<p>The shared store works, but now every request pays a network round trip (about 0.2–1 ms inside one data centre), and at 200,000 requests a second the store itself is a hot spot. Two common answers:</p>
+<ul>
+  <li><b>Shard</b> the limiter's keys across several Redis nodes by key. Every key's script touches one key, so it stays on one node.</li>
+  <li><b>Hybrid local + global:</b> each server keeps a local token bucket and syncs with the global count every 100 ms, or takes tokens from the global bucket in batches of 10 ("leasing"). Most requests never leave the server. The price: the limit is a little soft, and the two versions bend it in opposite directions. <em>Syncing</em> lets each server decide alone between syncs, so a client spread over 20 servers can get up to 20 servers' worth of local allowance before the global count catches up: it <em>overshoots</em>. <em>Leasing</em> can't overshoot, because a leased token has already left the global bucket. Instead, tokens can sit unused in leases on servers the client has stopped hitting: with a limit of 100 and leases of 10, ten such servers hold the whole limit, so the client can be turned away <em>early</em>, well under 100.</li>
+</ul>
+<p>And decide what happens when the limiter's store is down. <b>Fail open</b> (allow everything, maybe with a generous local limit) keeps your API up; that's the usual choice for user-facing traffic. <b>Fail closed</b> (reject everything) is for limits that protect money, like a cap on outgoing SMS messages.</p>
+
+<div class="keyidea">A shared limit needs shared state, and every read-decide-write on it must be atomic: do it in one Redis Lua script, with Redis's own clock. Then pay for the round trip with sharding or a local-plus-global hybrid, and choose fail-open or fail-closed on purpose.</div>
+
+<div class="check" id="check-rate-limiting-race">
+  <p class="q">Each app server runs "GET the bucket from Redis, compute the refill, SET it back". Under heavy load the limit leaks: some keys get 30% more than allowed. Why, and what's the fix?</p>
+  <div class="opts">
+    <button>Redis is slow; add a read replica and read from it</button>
+    <button data-correct>Two servers read the same value before either writes; run the whole read-compute-write as one Lua script in Redis</button>
+    <button>The servers' clocks differ; switch every server to time.time()</button>
+  </div>
+  <div class="fb right"><p>Right. GET and SET are atomic one at a time, but the gap between them isn't. Two servers can read "1 token" in that gap and both spend it. A Lua script runs as a single step inside Redis, so no other request for that key can sneak in between the read and the write. (Clock skew is a real but smaller effect, and the fix there is Redis's own <code>TIME</code>, not the wall clock.)</p></div>
+  <div class="fb wrong"><p>Look at the gap between GET and SET. Server A reads 1 token. Before A writes back, server B also reads 1 token. Both allow, both write 0: two requests for one token. Under load these overlaps get common, so the limit leaks. A read replica makes it worse (its data is slightly behind, so even more stale reads). The wall clock doesn't help anything (section 8). The fix is to make read-compute-write indivisible: one Lua script, which Redis runs start to finish with nothing in between.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: GCRA, the token bucket as one number</summary>
+  <p>The <b>generic cell rate algorithm</b> (GCRA) comes from ATM networks in the 1990s. It stores a single timestamp per key: the <b>TAT</b>, "theoretical arrival time", which is when the next request would be on schedule if the client sent at exactly the allowed rate.</p>
+  <p>Let T = 1/rate (the spacing between requests at the allowed rate) and τ = (capacity − 1) × T (how far ahead of schedule a client may run). On each request: tat = max(TAT, now). If tat − now &gt; τ, the client is too far ahead: reject, and tell it to retry in tat − τ − now seconds. Otherwise allow and set TAT = tat + T.</p>
+  <p>Check it with capacity 3, T = 1 s, an idle key at now = 0: the requests see tat = 0, 1, 2 (all within τ = 2) and pass; the fourth sees tat = 3 &gt; 2 and is rejected. Three at once, then one per second: a token bucket, stored as one number instead of two, which halves the memory and makes the Redis script shorter. The leak-time rule in section 6 is the same idea; GCRA is the leaky bucket "meter" written as a schedule. The <code>redis-cell</code> Redis module and libraries such as Go's <code>throttled</code> use GCRA.</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: what to put in the key</summary>
+  <ul>
+    <li><b>API key or user id</b> is the fairest, but only works after authentication. Login and signup endpoints need something else.</li>
+    <li><b>IP address</b> works before login, but one office or mobile carrier can put thousands of people behind one IP (NAT), and one attacker can rotate through thousands of IPs. Use IP limits as a coarse outer layer.</li>
+    <li><b>Key + endpoint</b> lets "search" be cheap and "export" expensive. Or use one bucket with a <b>cost</b> per request.</li>
+    <li><b>Layers:</b> real systems stack them: per-IP at the edge, per-key at the API gateway, per-key-per-endpoint in the service, and a global load shedder that drops low-priority traffic when the whole fleet is overloaded.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>Saying no well</h2>
+
+<p>A rejected request should be cheap for you and useful to the client. The standard answer is HTTP status <b>429 Too Many Requests</b> (defined in RFC 6585), with headers that tell the client what to do next:</p>
+
+<pre class="plain"><code>HTTP/1.1 429 Too Many Requests
+Retry-After: 1
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1764590460
+Content-Type: application/json
+
+{"error": "rate_limited", "message": "100 requests per minute; retry in 1 s"}</code></pre>
+
+<ul>
+  <li><b>Retry-After</b> is a standard HTTP header: either a whole number of seconds or a date. Compute it from the limiter: for a token bucket, (cost − tokens) / rate; for a log, the oldest timestamp + window − now. <b>Round up</b>: 0.3 seconds becomes 1. Rounding down to 0 tells the client to retry right away, into another 429.</li>
+  <li><b>X-RateLimit-Limit / Remaining / Reset</b> aren't an official standard, but are widely copied (GitHub's API sends them, with its limit of 5,000 requests per hour for signed-in users). An IETF draft (draft-ietf-httpapi-ratelimit-headers, an Internet-Draft rather than an RFC at the time of writing) proposes standard ones: a <code>RateLimit-Policy</code> header for the rule and a <code>RateLimit</code> header for what's left. One detail interviewers like: GitHub's Reset is a Unix timestamp, which a client with a wrong clock misreads; the draft counts seconds from now instead, like Retry-After, so clock skew doesn't matter. Sending "Remaining" on <em>every</em> response, not just on 429s, lets good clients slow down before they hit the wall.</li>
+  <li><b>429 vs 503.</b> 429 means "<em>you</em> are over <em>your</em> limit". 503 Service Unavailable means "<em>we</em> are overloaded". The difference tells the client whether slowing down will help.</li>
+</ul>
+
+<p>The client side matters too. A client that gets a 429 should wait at least Retry-After, then back off exponentially (1 s, 2 s, 4 s…) with <b>jitter</b> (a random part of the wait). Without jitter, every client that was limited at 12:00:00 retries at exactly 12:00:01, all together, and the stampede hits the limit again. This is the "thundering herd".</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: rate limiting vs load shedding vs backpressure</summary>
+  <p>They sound alike and get mixed up in interviews. <b>Rate limiting</b> enforces a per-key promise ("you get 100 a minute"), whether or not the server is busy. <b>Load shedding</b> drops work when the <em>server</em> is overloaded, whoever sent it, usually lowest priority first. <b>Backpressure</b> pushes "slow down" back up a pipeline, like a full queue that makes producers block. A healthy system often has all three: a token bucket per key, a shedder that returns 503 when CPU is pegged, and bounded queues between internal stages. Before turning a new limit on, many teams run it in <b>shadow mode</b>: compute the decision and log it, but don't enforce it, to see who would be blocked.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>Memory per key, at scale</h2>
+
+<p>Now the bill. 10 million keys, limit 1,000 requests per hour. Raw sizes, before any store's overhead:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Limiter</th><th>Per busy key</th><th>× 10 million keys</th><th>Delete an idle key after</th></tr></thead>
+  <tbody>
+    <tr><td>Sliding window log</td><td>up to 1,000 × 8 B = 8 KB</td><td>up to 80 GB</td><td>1 window (its last timestamp has expired)</td></tr>
+    <tr><td>Fixed window counter</td><td>window number + count ≈ 16 B</td><td>160 MB</td><td>1 window</td></tr>
+    <tr><td>Sliding window counter</td><td>window + 2 counts ≈ 24 B</td><td>240 MB</td><td>2 windows (until "previous" is empty too)</td></tr>
+    <tr><td>Token bucket</td><td>tokens + last time = 16 B</td><td>160 MB</td><td>capacity / rate (the time to refill to full)</td></tr>
+    <tr><td>GCRA</td><td>one timestamp = 8 B</td><td>80 MB</td><td>when now passes TAT</td></tr>
+  </tbody>
+</table></div>
+
+<p>The key name itself and the store's bookkeeping usually add 50–100 bytes per key, so the small limiters really cost about 1 GB, while the log costs tens of GB. That gap is why big systems use counters or buckets, and keep the log for small, exact limits like "5 login attempts per 15 minutes".</p>
+
+<p>The last column is the other half of memory: most keys are idle most of the time. Delete a key's state once deleting it changes nothing. For a token bucket, that moment is when the jar would be full again: a full jar is exactly what a brand-new key starts with. So set the Redis key to expire after capacity / rate seconds, and refresh that expiry on each request.</p>
+
+<div class="keyidea">Per-key state times the number of keys is the real cost. Counters and buckets are a few numbers per key; the log is O(limit). And expire each key at the moment its state matches a fresh key's, so idle keys cost nothing.</div>
+
+<div class="check" id="check-rate-limiting-ttl">
+  <p class="q">A token bucket has capacity 20 and rate 1 token per second. How long after a key's last request can you delete its state without changing any future decision?</p>
+  <div class="opts">
+    <button>Never: you'd lose its history</button>
+    <button>1 second</button>
+    <button data-correct>20 seconds</button>
+  </div>
+  <div class="fb right"><p>Right. Even if that request emptied the jar, 20 seconds of dripping at 1 per second refills it to the cap of 20. A full jar is exactly the state a brand-new key starts with, so deleting it and recreating it later gives identical answers. That's capacity / rate, and it's the TTL (time to live: how long until Redis deletes the key by itself) to put on the key.</p></div>
+  <div class="fb wrong"><p>Ask: when does this key's state look exactly like a brand-new key's? A new key starts with a full jar. The worst case is that the last request left the jar empty; then it takes 20 tokens ÷ 1 per second = 20 seconds to be full again. After that, nothing about the past is left in the state, so deleting it loses nothing. After only 1 second the jar holds 1 token, and a recreated key would wrongly get 20.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s12"><span class="sec-num">12</span>What to say in the interview</h2>
+
+<p>When "design a rate limiter" comes up, alone or inside a bigger design:</p>
+<ol>
+  <li><b>Pin down the rule:</b> "Limit by what: API key, user, IP? What numbers: 100 a minute, with or without bursts? Hard limit or soft? One server or a fleet? And what happens to rejected requests: drop, or queue?"</li>
+  <li><b>Pick the algorithm and say why:</b> "A token bucket: capacity for bursts, refill rate for the average, two numbers per key, refilled lazily from a monotonic clock. If the rule is literally 'N per minute', a sliding window counter. Not a fixed window, because it allows 2× at the boundary; not a log at this scale, because it's O(limit) memory per key."</li>
+  <li><b>Say the costs:</b> "O(1) per request, about 16 bytes per key plus the key name, so 10 million keys is around a gigabyte. Keys expire after capacity / rate."</li>
+  <li><b>Distribute it:</b> "State in Redis, one Lua script per check so read-refill-write is atomic, using Redis's clock. Shard by key. If Redis is down, fail open with a local fallback limit. If the round trip hurts, local buckets that sync or lease tokens, accepting a slightly soft limit."</li>
+  <li><b>Say no well:</b> "429 with Retry-After rounded up, and remaining-quota headers on every response, so clients back off with jitter."</li>
+</ol>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"Make it thread-safe in one process."</b> A lock per bucket (or a striped set of locks, chapter 1) around the refill-and-spend. The critical section is a few arithmetic steps, so contention is low.</li>
+    <li><b>"Different limits per plan."</b> Store the plan's capacity and rate with the key, or look them up from config; the algorithm doesn't change.</li>
+    <li><b>"Limit across regions."</b> A single global store is a cross-ocean round trip (around 70–150 ms). Usually each region enforces its share locally and they reconcile asynchronously; the limit becomes approximate across regions.</li>
+    <li><b>"How do you test it?"</b> Inject the clock, exactly like this chapter's exercises: fake time makes "wait 59 seconds" instant and repeatable.</li>
+    <li><b>"Some requests take 30 seconds."</b> A rate limit counts how many <em>start</em> per second, not how many are running. For slow, heavy endpoints add a <b>concurrency limit</b>: a counter of requests in flight per key, +1 when one starts and −1 when it finishes (with a timeout, so a crashed request doesn't hold its slot forever).</li>
+    <li><b>"Count rejected requests?"</b> Usually no (section 3). Yes, on purpose, if you want clients who ignore 429s to stay blocked.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>A rate limiter runs on every request, so it must be O(1) time and small memory per key; multiply by the number of keys.</li>
+  <li>Fixed window counter: O(1), two numbers, but up to 2× the limit across a window boundary.</li>
+  <li>Sliding window log: exact, amortized O(1) with a deque, but O(limit) memory per key. Log only accepted requests.</li>
+  <li>Sliding window counter: previous × (window − elapsed) / window + current. O(1), no boundary burst, small error from assuming even spread.</li>
+  <li>Token bucket: capacity = burst, rate = sustained; at most b + rT in any T seconds. Lazy refill: tokens = min(b, tokens + elapsed × r).</li>
+  <li>Leaky bucket (queue): smooth output at a fixed rate, paid for in delay. The meter version is a token bucket upside down; GCRA stores it as one number.</li>
+  <li>Use a monotonic clock, clamp negative elapsed time, and never run timers per key.</li>
+  <li>Distributed: shared state in Redis, read-decide-write atomically in one Lua script with Redis's clock; shard, or go local + global; choose fail-open or fail-closed.</li>
+  <li>Reply 429 with Retry-After (rounded up) and remaining-quota headers; clients back off with jitter.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first. The coding exercises are four files in <code>exercises/</code>: <code>token_bucket.py</code>, <code>rate_window_log.py</code>, <code>rate_window_counter.py</code> and <code>leaky_bucket.py</code>. Every class takes a <code>clock</code> argument, and the tests pass in a fake clock they move by hand, so "wait an hour" is instant. The tests also check the costs this chapter talks about: memory with <code>tracemalloc</code>, time with a cap that scanning or copying the whole log blows through, and the code itself (no threads, timers, sleeps or wall clock). Run one with <code>python3 -m pytest -k token_bucket</code>.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Run four limiters by hand</h4>
+  <p>Requests from one key arrive at t = 2, 5, 9, 10, 11, 14, 19, 21, 23 seconds. For each limiter, mark every request allowed or rejected: (a) fixed window, 3 per 10 s, windows [0, 10), [10, 20), [20, 30); (b) sliding window log, 3 per 10 s (a request at t stops counting at t + 10); (c) sliding window counter, 3 per 10 s, allowing a request when estimate + 1 ≤ 3; (d) token bucket, capacity 3, rate 0.3 per second, starting full. Which one lets the most through, and does it break its own promise?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Fixed: rejects only 19 (the fourth request in [10, 20)). 8 allowed. The 10-second stretch [5, 15) holds 5 of them (5, 9, 10, 11, 14): the boundary burst, at small scale.</p>
+    <p>(b) Log: allows 2, 5, 9. At 10 and 11, the window (0, 10] or (1, 11] still holds 2, 5, 9: reject both (and don't log them). At 14, the window (4, 14] holds 5 and 9: allow. At 19, (9, 19] holds only 14 (9 leaves at exactly 19): allow. At 21, (11, 21] holds 14 and 19: allow. At 23, (13, 23] holds 14, 19, 21: reject. 6 allowed.</p>
+    <p>(c) Counter, estimates before each request: 0, 1, 2 → allow; t=10: 3 × 10/10 = 3 → reject; t=11: 3 × 9/10 = 2.7 → reject; t=14: 3 × 6/10 = 1.8 → allow; t=19: 0.3 + 1 = 1.3 → allow; t=21: window [20, 30), previous = 2, 2 × 9/10 = 1.8 → allow; t=23: 2 × 7/10 + 1 = 2.4 → reject. 6 allowed, the same as the exact log here.</p>
+    <p>(d) Token bucket, tokens before each: 3, 2.9, 3 (capped), 2.3, 1.6, 1.5, 2.0, 1.6, 1.2: all 9 allowed. It keeps its own promise, b + rT = 3 + 0.3 × 21 = 9.3 for the 21 seconds from 2 to 23. "3 per 10 s" as a token bucket is a looser rule than "3 in any 10 s", because the jar can be full at the start of a stretch and the tap keeps dripping through it.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Pick the limiter</h4>
+  <p>Which limiter, which key, and why? (a) At most 5 failed login attempts per account per 15 minutes. (b) A public API with 10 million API keys, 600 requests per minute each, short bursts fine. (c) Your service sends emails through a provider that rejects more than 50 per second. (d) A GPU inference endpoint where one request can cost 100× another. (e) "10,000 requests per day" on a free plan, shown on a billing page.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Sliding window log per account: tiny limit, must be exact, 5 timestamps per account is cheap. Count failures only. (b) Token bucket (or sliding window counter) per API key in Redis: two numbers per key, about a gigabyte in total. (c) Leaky bucket queue leaking 50 per second (with some margin, say 45), in front of the provider: emails can wait a second, but bursts would be rejected. (d) Token bucket per key with a cost per request (estimated tokens or GPU-seconds), so a heavy request spends more. (e) Fixed window counter per day: users understand "resets at midnight UTC", and a boundary burst of 2 days' quota is a billing question, not an overload one.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Break the naive versions</h4>
+  <p>(a) A Redis fixed window does INCR, then EXPIRE in a second call. Describe the exact sequence of events that blocks a user forever. (b) Two app servers run a token bucket as GET, compute, SET. Draw a timeline where one token admits three requests. (c) Design traffic, limit 100 per minute, that gets about 199 requests into one 60-second stretch past a sliding window counter. (d) A sliding log with a 10-second window uses <code>time.time()</code>, and the clock steps back 5 s. Which timestamps does "pop old ones from the front" now get wrong?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) With the key <code>rl:{key}</code> from section 9: the first request of a window runs INCR, which creates the key at 1, and the app crashes before EXPIRE. The key has no expiry, so it never resets. Every request adds 1; after 100 more, every request is rejected, forever, until someone deletes the key by hand. (b) A, B, C all GET 1 before any of them SETs; each allows and writes 0. (c) 100 requests at 0:59.9, then from 1:00 send as fast as allowed: the estimate 100 × (60 − e)/60 + current lets current grow at about 1.7 per second, reaching about 99 by 1:59.9. Everything from 0:59.9 to 1:59.9 is one 60-second stretch: about 199. (d) Say the log holds [100, 101], the clock steps back, and the next request reads 97 and is appended: [100, 101, 97]. Measured by the new readings, 100 and 101 look 5 s younger than they are, so they leave 5 s late in real time. And 97 sits behind larger numbers, so it can't leave until they do (at reading 111, 4 s after its own expiry at 107). Both errors make entries leave late: the key is blocked longer than its limit says.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>TokenBucket</code>: allow, tokens, retry_after</h4>
+  <p>Lazy refill with an injected clock. <code>retry_after(cost)</code> returns how long until that cost would pass (what you'd put in Retry-After, before rounding). Tests check the b + rT promise on random traffic by brute force, a billion-second idle gap and a billion-token jar (a loop that adds one token, or one second, at a time never finishes), a clock that jumps backwards, <code>retry_after</code> after time has passed, at most one clock read per call, flat memory over 100,000 requests, and an AST check for threads, timers, sleeps and <code>time.time</code>.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>SlidingWindowLog</code> for many keys</h4>
+  <p>Exact limits with a deque per key, plus <code>retry_after(key)</code> and <code>forget_idle()</code>. A brute-force checker compares every decision on random traffic. Memory is measured: one busy key must never hold more than <code>limit</code> timestamps, and <code>forget_idle()</code> must really free 20,000 idle keys. A limit of 400,000 with 800,000 requests must finish well under the time cap, so filtering the log, or <code>list.pop(0)</code>, on every request fails.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>SlidingWindowCounter</code> for many keys</h4>
+  <p>The weighted estimate from section 4, with windows aligned to multiples of <code>window</code>. Tests include the 80/30 example, the boundary burst, skipping a whole window, and a brute-force checker. Memory is the point: 300,000 requests on one key with a huge limit must not grow memory at all, and 100,000 keys must cost under 400 bytes each, so a log in disguise fails.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>LeakyBucket</code> as a queue</h4>
+  <p><code>offer(item)</code> returns the delay or <code>None</code>; <code>poll()</code> returns the items whose leak time has come. Tests check every rule on random traffic (leak exactly 1/rate after the previous one, never accept into a full bucket, poll in order), a queue of 200,000 with <code>waiting()</code> asked every time and <code>poll()</code> called rarely (walking the queue to count it, or skipping its leaked-but-unpolled front on every call, fails the cap), and flat memory when polled.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>8. A limiter for 50 servers</h4>
+  <p>50 API servers, 10 million keys, 600 requests per minute per key with bursts of 50, 300,000 requests a second at peak. Write down: the Redis key layout and TTL; the steps of the Lua script (inputs, the refill, the decision, what it returns so you can fill in the headers); how many Redis nodes you need and how you shard; what happens when one Redis node dies; and how a local + global hybrid would change the numbers. What's the worst overshoot of your hybrid?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>9. Say it out loud</h4>
+  <p>Set a 3-minute timer. Explain to an imaginary interviewer: the fixed window's boundary burst, how the sliding window counter fixes it with two numbers, and why you'd still pick a token bucket for a public API. Did you give the 2× number, the weighted formula, the two knobs, and the memory per key?</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="streaming-external.html"><small>← Previous</small>Streaming and external algorithms</a>
+  <a class="next" href="consistent-hashing.html"><small>Next →</small>Which server holds this key?</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const fmtT = (t) => { const m = Math.floor(t / 60), s = t - m * 60; return m + ":" + (s < 10 ? "0" : "") + (Number.isInteger(s) ? s : s.toFixed(1)); };
+
+  // ---------- Boundary burst (section 2) ----------
+  (function () {
+    const svg = $("bw-svg"), slider = $("bw-s");
+    const acc = [], rej = [80, 95, 110];
+    for (let i = 0; i < 10; i++) acc.push(50.5 + i);
+    for (let i = 0; i < 10; i++) acc.push(60 + i * 0.5);
+    let W = 640;
+    const L = 24, R = 24, x = (t) => L + (W - L - R) * t / 120;
+    function draw() {
+      const s = Number(slider.value);
+      // Phones: a narrower viewBox and bigger labels, so the text stays readable.
+      const narrow = svg.parentNode.clientWidth > 0 && svg.parentNode.clientWidth < 520;
+      W = narrow ? 360 : 640;
+      svg.setAttribute("viewBox", `0 0 ${W} 170`);
+      const fs = narrow ? "font-size:13px" : "";
+      $("bw-sval").textContent = fmtT(s);
+      svg.replaceChildren();
+      [0, 60].forEach((a, k) => svg.append(
+        V.s("rect", { x: x(a), y: 22, width: x(a + 60) - x(a), height: 98, style: "fill:none;stroke:var(--border-strong);stroke-dasharray:4 4" }),
+        V.s("text", { class: "label", x: x(a) + 6, y: 38, style: fs, text: narrow ? `window ${k + 1}: 10/10` : `fixed window ${k + 1}: 10 / 10` })));
+      svg.append(V.s("rect", { x: x(s), y: 50, width: x(s + 60) - x(s), height: 62, rx: 6, style: "fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5" }));
+      svg.append(V.s("line", { class: "axis", x1: x(0), x2: x(120), y1: 130, y2: 130 }));
+      for (let t = 0; t <= 120; t += narrow ? 20 : 10) svg.append(
+        V.s("line", { class: "axis", x1: x(t), x2: x(t), y1: 130, y2: 135 }),
+        V.s("text", { class: "label", x: x(t), y: 152, "text-anchor": "middle", style: fs, text: fmtT(t) }));
+      acc.forEach((t) => svg.append(V.s("line", { x1: x(t), x2: x(t), y1: 70, y2: 100, style: "stroke:var(--ok);stroke-width:2" })));
+      rej.forEach((t) => svg.append(V.s("line", { x1: x(t), x2: x(t), y1: 70, y2: 100, style: "stroke:var(--bad);stroke-width:2" })));
+      const n = acc.filter((t) => t >= s && t < s + 60).length;
+      $("bw-out").innerHTML = `Rolling window ${fmtT(s)} to ${fmtT(s + 60)} holds <b>${n}</b> accepted requests (limit 10)` +
+        (n > 10 ? `: <b style="color:var(--bad)">${n / 10}× the limit</b>, and the fixed counter never noticed.` : ".");
+    }
+    slider.oninput = draw;
+    addEventListener("resize", draw);
+    draw();
+  })();
+
+  // ---------- Sliding window log (section 3) ----------
+  (function () {
+    const LIMIT = 3, WIN = 10, times = [1, 3, 4, 6, 11, 12, 13.5, 14, 21];
+    const q = [], fr = [];
+    fr.push({ q: [], cls: [], msg: `Limit ${LIMIT} per ${WIN} s. The log (a deque of accepted times) starts empty.` });
+    for (const t of times) {
+      const old = q.filter((a) => t - a >= WIN);
+      if (old.length) fr.push({ q: [...q], cls: q.map((a) => (t - a >= WIN ? "bad" : "win")), now: t,
+        msg: `t = ${t}: ${old.join(", ")} ${old.length > 1 ? "are" : "is"} ${WIN} s old or more (${t} − ${old[0]} ≥ ${WIN}). Pop from the front.` });
+      while (q.length && t - q[0] >= WIN) q.shift();
+      if (q.length < LIMIT) {
+        q.push(t);
+        fr.push({ q: [...q], cls: q.map((a, i) => (i === q.length - 1 ? "hl" : "win")), now: t,
+          msg: `t = ${t}: ${q.length - 1} in the window, under ${LIMIT}. <b>Allow</b> and append ${t} at the back.` });
+      } else {
+        fr.push({ q: [...q], cls: q.map(() => "win"), now: t,
+          msg: `t = ${t}: already ${LIMIT} in (${t - WIN}, ${t}]. <b>Reject</b>, and don't log it. The oldest (${q[0]}) leaves at ${q[0] + WIN}, so retry in ${q[0] + WIN - t} s.` });
+      }
+    }
+    fr.push({ q: [...q], cls: q.map(() => "win"), msg: `Done: 9 requests, 2 rejected. Every timestamp went in once and out at most once, so the work is amortized O(1), and the log never held more than ${LIMIT}.` });
+    V.player($("log-player"), {
+      frames: fr, speed: 1000,
+      draw(f, stage) {
+        stage.append(V.el("div", { class: "small muted", style: "margin-bottom:6px" }, f.now !== undefined ? `now = ${f.now}` : " "));
+        stage.append(V.cells(f.q.length ? f.q : [null], { idx: false, cls: (i) => f.cls[i] || "" }));
+      },
+    });
+  })();
+
+  // ---------- Token bucket (section 5) ----------
+  (function () {
+    const CAP = 4, RATE = 0.5, reqs = [0, 0, 0, 0, 0, 1, 3, 4, 9, 9, 9.5, 10], T1 = 12;
+    const fr = []; let tok = CAP, last = 0; const done = [];
+    const f2 = (v) => (Math.round(v * 100) / 100).toString();
+    fr.push({ tok, t: 0, done: [], msg: `Capacity ${CAP}, rate ${RATE} per second (one token every 2 s). The jar starts full.` });
+    for (const t of reqs) {
+      const el = t - last, add = el * RATE, before = Math.min(CAP, tok + add);
+      const refill = el > 0 ? `${f2(el)} s since the last look: +${f2(add)} → ${f2(Math.min(CAP, tok + add))}${tok + add > CAP ? " (capped)" : ""}. ` : "";
+      tok = before; last = t;
+      if (tok >= 1) { tok -= 1; done.push([t, true]); fr.push({ tok, t, done: [...done], msg: `t = ${t}: ${refill}Take 1 token: <b>allow</b>. ${f2(tok)} left.` }); }
+      else { done.push([t, false]); fr.push({ tok, t, done: [...done], msg: `t = ${t}: ${refill}Only ${f2(tok)}, need 1: <b>reject</b>, take nothing.` }); }
+    }
+    fr[fr.length - 1].msg += ` In total ${done.filter((d) => d[1]).length} of ${done.length} passed in the 10 s from t = 0 to t = 10; the promise for any 10 s is at most ${CAP} + ${RATE} × 10 = ${CAP + RATE * 10}.`;
+    const W = 640, H = 200, jx = 40, jw = 90, jy = 24, jh = 140, L = 180, R = 20, x = (t) => L + (W - L - R) * t / T1;
+    V.player($("tb-player"), {
+      frames: fr, speed: 1100,
+      draw(f, stage) {
+        const svg = V.s("svg", { class: "viz", viewBox: `0 0 ${W} ${H}` });
+        const h = jh * f.tok / CAP;
+        const fs = $("tb-player").clientWidth > 0 && $("tb-player").clientWidth < 520 ? "font-size:20px" : "";   // phones: bigger labels
+        svg.append(
+          V.s("rect", { x: jx, y: jy + jh - h, width: jw, height: h, style: "fill:var(--accent-soft);stroke:none" }),
+          V.s("rect", { x: jx, y: jy, width: jw, height: jh, rx: 6, style: "fill:none;stroke:var(--border-strong);stroke-width:2" }),
+          V.s("text", { x: jx + jw / 2, y: jy + jh / 2, "text-anchor": "middle", style: "fill:var(--text-strong);font-size:22px;font-weight:600", text: f2(f.tok) }),
+          V.s("text", { class: "label", x: jx + jw / 2, y: jy + jh + 22, "text-anchor": "middle", style: fs, text: `tokens (max ${CAP})` }));
+        for (let k = 1; k < CAP; k++) svg.append(V.s("line", { class: "grid-line", x1: jx, x2: jx + jw, y1: jy + jh * k / CAP, y2: jy + jh * k / CAP }));
+        svg.append(V.s("line", { class: "axis", x1: x(0), x2: x(T1), y1: 140, y2: 140 }));
+        for (let t = 0; t <= T1; t += 2) svg.append(V.s("text", { class: "label", x: x(t), y: 160, "text-anchor": "middle", style: fs, text: t + "s" }));
+        const stack = {};
+        f.done.forEach(([t, ok]) => { const k = stack[t] = (stack[t] || 0) + 1;
+          svg.append(V.s("circle", { cx: x(t), cy: 140 - 14 * k, r: 5, style: `fill:var(${ok ? "--ok" : "--bad"})` })); });
+        svg.append(V.s("line", { x1: x(f.t), x2: x(f.t), y1: 30, y2: 146, style: "stroke:var(--accent);stroke-dasharray:3 3" }),
+          V.s("text", { class: "label", x: x(f.t) + 4, y: 26, style: fs, text: "now" }));
+        stage.append(svg);
+      },
+    });
+  })();
+
+  // ---------- Playground (section 7) ----------
+  (function () {
+    const LIMIT = 5, WIN = 10, CAP = 5, RATE = 0.5, QROOM = 4, T1 = 40;
+    function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+    const traffic = {
+      boundary: () => { const a = []; for (const s of [8, 10, 28, 30]) for (let i = 0; i < 5; i++) a.push(+(s + i * 0.4).toFixed(1)); return a; },
+      spike: () => { const a = [2]; for (let i = 0; i < 12; i++) a.push(+(20 + i * 0.2).toFixed(1)); for (let t = 25; t < T1; t += 3) a.push(t); return a; },
+      steady: () => { const a = []; for (let t = 0; t < T1; t += 1) a.push(t); return a; },
+      random: () => { const r = mulberry32(214), a = []; let t = 0;
+        while (t < T1 - 1) { t += 1 + r() * 6; const n = 1 + Math.floor(r() * 6); for (let i = 0; i < n && t < T1; i++) { a.push(+t.toFixed(1)); t += 0.1 + r() * 0.3; } } return a; },
+    };
+    // Each returns, per request, the time the server sees it, or null if rejected.
+    const algos = {
+      fixed(ts) { const c = {}; return ts.map((t) => { const w = Math.floor(t / WIN); c[w] = c[w] || 0; if (c[w] < LIMIT) { c[w]++; return t; } return null; }); },
+      log(ts) { const q = []; return ts.map((t) => { while (q.length && t - q[0] >= WIN) q.shift(); if (q.length < LIMIT) { q.push(t); return t; } return null; }); },
+      counter(ts) { let w0 = -9, prev = 0, cur = 0; return ts.map((t) => { const w = Math.floor(t / WIN);
+        if (w !== w0) { prev = w === w0 + 1 ? cur : 0; cur = 0; w0 = w; }
+        const est = prev * (WIN - (t - w * WIN)) / WIN + cur; if (est + 1 <= LIMIT + 1e-9) { cur++; return t; } return null; }); },
+      token(ts) { let tok = CAP, last = 0; return ts.map((t) => { tok = Math.min(CAP, tok + (t - last) * RATE); last = t; if (tok >= 1 - 1e-9) { tok -= 1; return t; } return null; }); },
+      leaky(ts) { const leaks = []; let lastLeak = null; return ts.map((t) => {
+        const leak = lastLeak === null ? t : Math.max(t, lastLeak + 1 / RATE);
+        const waiting = leaks.filter((d) => d > t + 1e-9).length;
+        if (leak > t + 1e-9 && waiting >= QROOM) return null;
+        lastLeak = leak; leaks.push(leak); return leak; }); },
+    };
+    let W = 640;
+    const L = 20, R = 20, x = (t) => L + (W - L - R) * t / T1, yIn = 50, yOut = 130;
+    function busiest(times, span) { const s = [...times].sort((a, b) => a - b); let best = 0, j = 0;
+      for (let i = 0; i < s.length; i++) { while (s[i] - s[j] >= span - 1e-9) j++; best = Math.max(best, i - j + 1); } return best; }
+    function draw() {
+      const ts = traffic[$("pg-traffic").value](), out = algos[$("pg-algo").value](ts), svg = $("pg-svg");
+      // Phones: a narrower viewBox and bigger labels, so the text stays readable.
+      const narrow = svg.parentNode.clientWidth > 0 && svg.parentNode.clientWidth < 520;
+      W = narrow ? 360 : 640;
+      svg.setAttribute("viewBox", `0 0 ${W} 190`);
+      const fs = narrow ? "font-size:13px" : "";
+      svg.replaceChildren();
+      for (let t = 0; t <= T1; t += WIN) svg.append(V.s("line", { class: "grid-line", x1: x(t), x2: x(t), y1: 20, y2: 150 }));
+      svg.append(V.s("text", { class: "label", x: L, y: 18, style: fs, text: "arrives" }), V.s("text", { class: "label", x: L, y: yOut + 26, style: fs, text: "server sees" }),
+        V.s("line", { class: "axis", x1: x(0), x2: x(T1), y1: 168, y2: 168 }));
+      for (let t = 0; t <= T1; t += narrow ? 10 : 5) svg.append(V.s("text", { class: "label", x: x(t), y: 185, "text-anchor": "middle", style: fs, text: t + "s" }));
+      const stackIn = {}, stackOut = {};
+      ts.forEach((t, i) => {
+        const o = out[i], key = Math.round(x(t) / 4), k = stackIn[key] = (stackIn[key] || 0) + 1;
+        const cy = yIn - 6 + ((k - 1) % 4) * 7;
+        const col = o === null ? "--bad" : o > t + 1e-9 ? "--warn" : "--ok";
+        if (o !== null) {
+          const ko = stackOut[Math.round(x(o) / 4)] = (stackOut[Math.round(x(o) / 4)] || 0) + 1, cyo = yOut - 6 + ((ko - 1) % 4) * 7;
+          svg.append(V.s("line", { x1: x(t), y1: cy, x2: x(o), y2: cyo, style: `stroke:var(${col});stroke-width:1;opacity:.55` }),
+            V.s("circle", { cx: x(o), cy: cyo, r: 3.2, style: "fill:var(--ok)" }));
+        }
+        svg.append(V.s("circle", { cx: x(t), cy, r: 3.2, style: `fill:var(${col})` }));
+      });
+      const seen = out.filter((o) => o !== null), waits = ts.map((t, i) => (out[i] === null ? 0 : out[i] - t));
+      const b10 = busiest(seen, WIN), b1 = busiest(seen, 1), wmax = Math.max(0, ...waits);
+      $("pg-out").innerHTML = `Allowed <b>${seen.length}</b> of ${ts.length} · busiest 10 s at the server: <b>${b10}</b>` +
+        (b10 > LIMIT ? ` <span style="color:var(--bad)">(over ${LIMIT})</span>` : "") + ` · biggest burst in 1 s: <b>${b1}</b> · longest wait: <b>${wmax.toFixed(1)} s</b>`;
+    }
+    $("pg-algo").onchange = draw; $("pg-traffic").onchange = draw;
+    addEventListener("resize", draw);
+    draw();
+  })();
+})();
+</script>
+</body>
+</html>

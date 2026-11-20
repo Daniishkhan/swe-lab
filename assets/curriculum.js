@@ -659,9 +659,19 @@ window.CURRICULUM = {
      "title": "Binary search and \"search on the answer\""
     },
     {
+     "file": "bit-manipulation.html",
+     "topic": "02.11",
+     "title": "Bit manipulation"
+    },
+    {
      "file": "complexity.html",
      "topic": "02.01",
      "title": "How fast is your code? (Complexity analysis)"
+    },
+    {
+     "file": "consistent-hashing.html",
+     "topic": "02.15",
+     "title": "Which server holds this key? (Consistent hashing)"
     },
     {
      "file": "dynamic-programming.html",
@@ -669,9 +679,44 @@ window.CURRICULUM = {
      "title": "Dynamic programming"
     },
     {
+     "file": "greedy.html",
+     "topic": "02.10",
+     "title": "Greedy algorithms and how to argue correctness"
+    },
+    {
+     "file": "minimum-spanning-tree.html",
+     "topic": "02.09",
+     "title": "Connect everything, cheaply (Minimum spanning trees)"
+    },
+    {
+     "file": "probability-estimation.html",
+     "topic": "02.16",
+     "title": "Numbers on the back of an envelope (estimation and probability)"
+    },
+    {
+     "file": "rate-limiting.html",
+     "topic": "02.14",
+     "title": "Rate limiting: buckets and windows"
+    },
+    {
+     "file": "shortest-paths.html",
+     "topic": "02.08",
+     "title": "Shortest paths: Dijkstra, Bellman-Ford, A*"
+    },
+    {
      "file": "sorting.html",
      "topic": "02.02",
      "title": "Putting things in order (Sorting)"
+    },
+    {
+     "file": "streaming-external.html",
+     "topic": "02.13",
+     "title": "Data bigger than memory (Streaming and external algorithms)"
+    },
+    {
+     "file": "string-algorithms.html",
+     "topic": "02.12",
+     "title": "Finding a needle fast (String search)"
     },
     {
      "file": "two-pointers-sliding-window.html",
@@ -680,6 +725,15 @@ window.CURRICULUM = {
     }
    ],
    "exercises": [
+    {
+     "file": "astar_grid.py",
+     "module": "astar_grid",
+     "title": "A* on a grid",
+     "topics": [
+      "02.08"
+     ],
+     "result": null
+    },
     {
      "file": "backtracking.py",
      "module": "backtracking",
@@ -690,11 +744,65 @@ window.CURRICULUM = {
      "result": null
     },
     {
+     "file": "bellman_ford.py",
+     "module": "bellman_ford",
+     "title": "Bellman-Ford: shortest paths with negative edges, and negative cycles",
+     "topics": [
+      "02.08"
+     ],
+     "result": null
+    },
+    {
      "file": "binary_search.py",
      "module": "binary_search",
      "title": "Binary search: boundaries, rotated arrays, and search on the answer",
      "topics": [
       "02.03"
+     ],
+     "result": null
+    },
+    {
+     "file": "birthday_bound.py",
+     "module": "birthday_bound",
+     "title": "Birthday bound: how long must a random ID be?",
+     "topics": [
+      "02.16"
+     ],
+     "result": null
+    },
+    {
+     "file": "bit_tricks.py",
+     "module": "bit_tricks",
+     "title": "Bit tricks: one step per set bit, pairs that cancel, and a 32-bit adder",
+     "topics": [
+      "02.11"
+     ],
+     "result": null
+    },
+    {
+     "file": "bitmask_subsets.py",
+     "module": "bitmask_subsets",
+     "title": "Bitmask subsets: every subset, every sub-subset, every k-subset",
+     "topics": [
+      "02.11"
+     ],
+     "result": null
+    },
+    {
+     "file": "bitset.py",
+     "module": "bitset",
+     "title": "A bitset: a set of small ints stored as the bits of one Python int",
+     "topics": [
+      "02.11"
+     ],
+     "result": null
+    },
+    {
+     "file": "capacity_estimate.py",
+     "module": "capacity_estimate",
+     "title": "Back-of-the-envelope capacity calculator",
+     "topics": [
+      "02.16"
      ],
      "result": null
     },
@@ -710,7 +818,7 @@ window.CURRICULUM = {
     {
      "file": "consistent_hash.py",
      "module": "consistent_hash",
-     "title": "Consistent hashing ring with virtual nodes",
+     "title": "Consistent hashing ring with virtual nodes and replicas",
      "topics": [
       "02.15"
      ],
@@ -735,11 +843,182 @@ window.CURRICULUM = {
      "result": null
     },
     {
+     "file": "external_sort.py",
+     "module": "external_sort",
+     "title": "External merge sort on a pretend disk",
+     "topics": [
+      "02.13"
+     ],
+     "result": null
+    },
+    {
+     "file": "fanout_latency.py",
+     "module": "fanout_latency",
+     "title": "Fan-out and tail latency",
+     "topics": [
+      "02.16"
+     ],
+     "result": null
+    },
+    {
+     "file": "gas_station.py",
+     "module": "gas_station",
+     "title": "One pass, best so far: fewest jumps and the gas station loop",
+     "topics": [
+      "02.10"
+     ],
+     "result": null
+    },
+    {
      "file": "graphs.py",
      "module": "graphs",
      "title": "Exploring graphs: shortest paths, islands, exits, cycles, build order",
      "topics": [
       "02.05"
+     ],
+     "result": null
+    },
+    {
+     "file": "greedy_intervals.py",
+     "module": "greedy_intervals",
+     "title": "Greedy on intervals: stab them all, cover a range",
+     "topics": [
+      "02.10"
+     ],
+     "result": null
+    },
+    {
+     "file": "huffman_code.py",
+     "module": "huffman_code",
+     "title": "Huffman coding: the shortest prefix-free code",
+     "topics": [
+      "02.10"
+     ],
+     "result": null
+    },
+    {
+     "file": "job_scheduling.py",
+     "module": "job_scheduling",
+     "title": "Scheduling with exchange arguments: most jobs on time, best weighted order",
+     "topics": [
+      "02.10"
+     ],
+     "result": null
+    },
+    {
+     "file": "jump_hash.py",
+     "module": "jump_hash",
+     "title": "Jump consistent hash",
+     "topics": [
+      "02.15"
+     ],
+     "result": null
+    },
+    {
+     "file": "kmp_search.py",
+     "module": "kmp_search",
+     "title": "KMP: never read a character of the text twice",
+     "topics": [
+      "02.12"
+     ],
+     "result": null
+    },
+    {
+     "file": "kruskal_mst.py",
+     "module": "kruskal_mst",
+     "title": "Kruskal's minimum spanning tree",
+     "topics": [
+      "02.09"
+     ],
+     "result": null
+    },
+    {
+     "file": "leaky_bucket.py",
+     "module": "leaky_bucket",
+     "title": "Leaky bucket as a queue (one process)",
+     "topics": [
+      "02.14"
+     ],
+     "result": null
+    },
+    {
+     "file": "longest_dup_substring.py",
+     "module": "longest_dup_substring",
+     "title": "Longest repeated substring: binary search + rolling hash",
+     "topics": [
+      "02.12"
+     ],
+     "result": null
+    },
+    {
+     "file": "misra_gries.py",
+     "module": "misra_gries",
+     "title": "Heavy hitters with k counters (Misra-Gries)",
+     "topics": [
+      "02.13"
+     ],
+     "result": null
+    },
+    {
+     "file": "mst_clustering.py",
+     "module": "mst_clustering",
+     "title": "MST in disguise: clustering and the widest path",
+     "topics": [
+      "02.09"
+     ],
+     "result": null
+    },
+    {
+     "file": "prim_mst.py",
+     "module": "prim_mst",
+     "title": "Prim's minimum spanning tree: with a heap (sparse) and with an array (dense)",
+     "topics": [
+      "02.09"
+     ],
+     "result": null
+    },
+    {
+     "file": "rabin_karp.py",
+     "module": "rabin_karp",
+     "title": "Rabin-Karp: compare numbers, not strings",
+     "topics": [
+      "02.12"
+     ],
+     "result": null
+    },
+    {
+     "file": "rate_window_counter.py",
+     "module": "rate_window_counter",
+     "title": "Sliding window counter (many keys, one process)",
+     "topics": [
+      "02.14"
+     ],
+     "result": null
+    },
+    {
+     "file": "rate_window_log.py",
+     "module": "rate_window_log",
+     "title": "Sliding window log (many keys, one process)",
+     "topics": [
+      "02.14"
+     ],
+     "result": null
+    },
+    {
+     "file": "rendezvous_hash.py",
+     "module": "rendezvous_hash",
+     "title": "Rendezvous hashing (highest random weight)",
+     "topics": [
+      "02.15"
+     ],
+     "result": null
+    },
+    {
+     "file": "reservoir_sample.py",
+     "module": "reservoir_sample",
+     "title": "Reservoir sampling: a fair random sample from a stream of unknown length",
+     "topics": [
+      "02.13"
      ],
      "result": null
     },
@@ -764,7 +1043,7 @@ window.CURRICULUM = {
     {
      "file": "token_bucket.py",
      "module": "token_bucket",
-     "title": "Token bucket rate limiter (single process)",
+     "title": "Token bucket (one key, one process)",
      "topics": [
       "02.14"
      ],
@@ -1782,5 +2061,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-20 19:53"
+ "generated": "2026-11-20 18:20"
 };

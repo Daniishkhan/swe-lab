@@ -324,7 +324,7 @@ heapq.nsmallest(2, data)    # [1, 4]; also nlargest</code></pre>
 
 <p class="small muted">Where the checkout picture breaks: a real store can see all the front people at a glance. The computer can't; finding the earliest of 1,000 fronts by looking at each one is 1,000 comparisons. The heap is what makes "glance at the fronts" cost 20.</p>
 
-<p>This is the merge step of <b>external merge sort</b> (sort chunks that fit in memory, then k-way merge them), which also feeds the sorted inputs of a database merge join, and how LSM-tree databases like RocksDB and Cassandra compact their sorted files. Python has it built in: <code>heapq.merge(*lists)</code> returns a lazy iterator that does exactly this, and it's <b>stable</b>: equal items come out in the order of the lists they came from.</p>
+<p>This is the merge step of <b><a href="../../02-algorithms/concepts/streaming-external.html#s6">external merge sort</a></b> (sort chunks that fit in memory, then k-way merge them), which also feeds the sorted inputs of a database merge join, and how LSM-tree databases like RocksDB and Cassandra compact their sorted files. Python has it built in: <code>heapq.merge(*lists)</code> returns a lazy iterator that does exactly this, and it's <b>stable</b>: equal items come out in the order of the lists they came from.</p>
 
 <details class="aside deeper">
   <summary>Go deeper: merging without a heap, and loser trees</summary>
@@ -357,7 +357,7 @@ heapq.nsmallest(2, data)    # [1, 4]; also nlargest</code></pre>
 <ul>
   <li><b>Meeting rooms:</b> sort meetings by start time; keep a min-heap of end times of rooms in use. If the earliest end is ≤ the new start, reuse that room. The heap's biggest size is the number of rooms needed.</li>
   <li><b>Median of a stream:</b> two heaps: a max-heap of the smaller half and a min-heap of the bigger half, kept within one item of each other in size. The median is at one or both roots: O(log n) per insert, O(1) per query.</li>
-  <li><b>Shortest paths:</b> Dijkstra's algorithm is a heap of "tentative distance to each place", popped nearest-first (chapter 2).</li>
+  <li><b>Shortest paths:</b> Dijkstra's algorithm is a heap of "tentative distance to each place", popped nearest-first (<a href="../../02-algorithms/concepts/shortest-paths.html">shortest paths, 02.08</a>).</li>
 </ul>
 
 <p>Two follow-ups for any priority scheduler. <b>Starvation:</b> if urgent jobs keep arriving, a low-priority job may never run. The usual fix is <b>aging</b>: raise a job's priority the longer it waits (for example, key by <code>priority + rate × arrival_time</code>: since "now" is the same for every job, that orders them exactly like <code>priority − rate × time_waited</code>, and the key never has to change). <b>Threads:</b> <code>heapq</code> isn't thread-safe; use <code>queue.PriorityQueue</code> in Python or <code>PriorityBlockingQueue</code> in Java, which wrap a heap in a lock.</p>

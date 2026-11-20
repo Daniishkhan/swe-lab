@@ -53,12 +53,9 @@ swe-prep/
 
 | Chapter | Concept pages | Exercises |
 |---|---|---|
-| §01 Data structures | Hash maps/arrays/strings · Linked lists, stacks, queues, monotonic stacks · Trees & traversals · Heaps · Graphs | hash_map, lru_cache, min_heap, union_find, trie, monotonic |
-| §02 Algorithms | Complexity · Sorting · Binary search · Two pointers/sliding window/prefix sums · BFS/DFS/topo sort · Backtracking · Dynamic programming | binary_search, sliding_window, graphs, dijkstra, dp, backtracking, token_bucket, consistent_hash |
+| §01 Data structures | All 14 topics: hash maps · linear structures · trees · heaps · graphs · tries · union-find · LRU/LFU caches · intervals · segment and Fenwick trees · skip lists · probabilistic structures · storage structures · concurrent structures | 37 exercises, from hash_map and lru_cache to bloom_filter, lsm_store and mpmc_queue |
+| §02 Algorithms | All 16 topics: complexity · sorting · binary search · two pointers/sliding window · BFS/DFS · backtracking · dynamic programming · shortest paths · minimum spanning trees · greedy · bit manipulation · string algorithms · streaming and external · rate limiting · consistent hashing · probability and estimation | 36 exercises, from sorts and graphs to dijkstra, kruskal_mst, huffman_code, kmp_search, external_sort, token_bucket, consistent_hash and capacity_estimate |
 | §03–§15 | scaffold only | none yet |
-
-P1/P2 topics in chapters 1–2 (tries, union-find, Dijkstra…) already have
-exercises; their concept pages come next.
 
 ## Priority key
 

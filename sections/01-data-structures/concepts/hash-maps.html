@@ -564,7 +564,7 @@ print(Point(1, 2) in seen)  # False: right bucket, but the stored key is now (99
 
 <details class="aside deeper">
   <summary>Go deeper: when the map doesn't fit on one machine</summary>
-  <p>A natural way to spread keys over N servers is <code>server = hash(key) % N</code>. It's the same squash as a bucket. And it has the same problem as resizing: change N from 10 to 11 and almost every key's server changes, so almost all the data has to move. <b>Consistent hashing</b> (chapter 2) fixes that, so adding a server moves only about 1/N of the keys.</p>
+  <p>A natural way to spread keys over N servers is <code>server = hash(key) % N</code>. It's the same squash as a bucket. And it has the same problem as resizing: change N from 10 to 11 and almost every key's server changes, so almost all the data has to move. <b>Consistent hashing</b> (<a href="../../02-algorithms/concepts/consistent-hashing.html">topic 02.15</a>) fixes that, so adding a server moves only about 1/N of the keys.</p>
   <p>Shared maps inside one program need care too: two threads inserting at once can corrupt a chain or lose a resize. Java's <code>ConcurrentHashMap</code> locks per bucket and lets reads skip locks. That's in the concurrent structures chapter.</p>
 </details>
 

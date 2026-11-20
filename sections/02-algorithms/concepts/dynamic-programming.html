@@ -636,7 +636,7 @@ x = 18    tails = [2, 3, 7, 18]     length 4</code></pre>
 <details class="aside deeper">
   <summary>Go deeper: bitmasks, DAGs, Viterbi and other DP in the wild</summary>
   <ul>
-    <li><b>Bitmask DP:</b> when the state must include a <em>set</em> of things used, store it as the bits of an integer. Traveling salesman becomes state (cities visited, current city): n² · 2ⁿ work (Held–Karp). For 20 cities that's about 4 × 10⁸ steps, against 19! ≈ 1.2 × 10¹⁷ routes. Still exponential, so n stays around 20.</li>
+    <li><b><a href="bit-manipulation.html#s8">Bitmask DP</a>:</b> when the state must include a <em>set</em> of things used, store it as the bits of an integer. Traveling salesman becomes state (cities visited, current city): n² · 2ⁿ work (Held–Karp). For 20 cities that's about 4 × 10⁸ steps, against 19! ≈ 1.2 × 10¹⁷ routes. Still exponential, so n stays around 20.</li>
     <li><b>DP is a path problem on a DAG:</b> states are nodes, choices are edges, and the fill order is a topological order. A cycle would mean a state depending on itself. Graphs with cycles need shortest-path tools (Dijkstra, Bellman-Ford), the next topic in this chapter.</li>
     <li><b>DP on trees:</b> each node's answer is built from its children's ("invite the most people, but never someone together with their direct boss"). Post-order is the fill order.</li>
     <li><b>Viterbi:</b> the most likely hidden states behind noisy observations, with state (time step, hidden state). It decodes error-correcting codes in phones and modems, and powered classic speech recognition.</li>
@@ -764,7 +764,7 @@ x = 18    tails = [2, 3, 7, 18]     length 4</code></pre>
 
 <nav class="chapter-nav">
   <a href="backtracking.html"><small>← Previous</small>Recursion and backtracking</a>
-  <a class="next" href="../index.html"><small>Next →</small>Back to Algorithms</a>
+  <a class="next" href="shortest-paths.html"><small>Next →</small>Shortest paths</a>
 </nav>
 
 </main>

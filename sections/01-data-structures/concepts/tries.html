@@ -531,7 +531,7 @@ def bit(x, i):                  # i-th bit from the left, i = 0..31
   <ul>
     <li><b>Sharing suffixes too.</b> A trie shares starts but not endings: "walking", "talking" and "parking" all store -ing separately. A <b>DAWG</b> (directed acyclic word graph) merges identical subtrees, so shared endings are stored once; it's no longer a tree, because a node can have several parents. An <b>FST</b> (finite state transducer) does the same and also attaches outputs, such as a number, to the paths. Lucene, the search library under Elasticsearch, keeps its term dictionary index in an FST, and Elasticsearch's completion suggester is built on one.</li>
     <li><b>Ternary search tree.</b> Each node holds one letter and three children: less, equal, greater. At every level it's a little BST over the letters that occur there, so no node wastes slots on missing letters, and you still get prefix walks, at the price of a few extra comparisons per letter.</li>
-    <li><b>Suffix tree.</b> Insert every suffix of one long text into a radix tree, and "does this pattern occur anywhere in the text?" becomes a walk of the pattern's length. Built cleverly it takes O(text length) time and space; string algorithms (topic 02.12) cover the simpler tools.</li>
+    <li><b>Suffix tree.</b> Insert every suffix of one long text into a radix tree, and "does this pattern occur anywhere in the text?" becomes a walk of the pattern's length. Built cleverly it takes O(text length) time and space; string algorithms (<a href="../../02-algorithms/concepts/string-algorithms.html">topic 02.12</a>) cover the simpler tools.</li>
   </ul>
 </details>
 

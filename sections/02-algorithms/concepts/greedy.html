@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="02.10">
+  <title>Greedy algorithms and how to argue correctness</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 10</div>
+  <h1>Greedy algorithms, and how to prove them</h1>
+  <div class="meta"><span><span class="badge P1">P1</span> the "why is that right?" follow-up</span><span>about 55 minutes</span><span>10 quick checks · 9 exercises</span></div>
+</header>
+
+<p>A greedy algorithm is the shortest code you'll write in an interview: sort, then one pass. It's also the easiest to get wrong without noticing, because a wrong greedy still returns a valid answer, just not the best one. So the interviewer's next question is almost always "why is that optimal?". This chapter is about answering it: two proof patterns that cover most problems, and a quick way to break a greedy rule before you bet the interview on it.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Say what makes an algorithm greedy, and why "it gave a valid answer" proves nothing.</li>
+    <li>Break a greedy rule with a counterexample of three or four items, by hand or with a brute-force hunt.</li>
+    <li>Prove a greedy correct with "greedy stays ahead" or with an exchange argument, in three spoken sentences.</li>
+    <li>Use those proofs on interval scheduling, deadlines, jump game, gas station, Huffman codes and the fractional knapsack.</li>
+    <li>Tell when greedy fails (coins 1, 3, 4; the 0/1 knapsack) and switch to dynamic programming.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom, like a book. It uses <a href="sorting.html">sorting</a>, the meeting-room problems from <a href="../../01-data-structures/concepts/intervals.html">intervals</a>, and the coin story from <a href="dynamic-programming.html">dynamic programming</a>. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: one room, thirty requests</h2>
+
+<div class="story">
+  <p>A recording studio has one room. For Saturday, 30 people have asked for a slot, each with a fixed start and end time. Two bookings can't overlap. The manager wants to say yes to as many people as possible.</p>
+  <p>The sure way is to try every subset of the 30 requests, throw out the ones with overlaps, and keep the biggest. Each request is in or out, so there are 2<sup>30</sup> ≈ 1.07 billion subsets. At 10 million subset checks a second that's nearly two minutes for 30 requests, and every extra request doubles it: 40 requests take over a day.</p>
+  <p>The manager doesn't do that. She uses a rule: "look at the requests in some order, and say yes to each one that still fits". That takes a sort and one pass, a few microseconds. The question is which order. "Earliest start first" sounds fair. "Shortest first" sounds efficient. Both are wrong, and neither one ever tells you so.</p>
+</div>
+
+<p>That rule is a <b>greedy algorithm</b>: it builds the answer one piece at a time, takes whatever piece looks best right now by a fixed rule, and never takes a piece back. It's fast because it never explores: one choice per step, no backtracking. That's also the risk. A choice that looks best now can block better choices later, and the algorithm never finds out.</p>
+
+<p>Look at what a wrong greedy gives you: a schedule with no overlaps. It <em>is</em> a valid answer. It's just smaller than it could be. Nothing crashes, no test with a "valid?" check fails. That's why a greedy needs a proof, or at least a serious attempt to break it.</p>
+
+<div class="check" id="check-valid">
+  <p class="q">You try a greedy rule by hand on five inputs, and every time it produces a schedule with no overlaps. What have you shown?</p>
+  <div class="opts">
+    <button>That the rule is optimal on those five inputs</button>
+    <button data-correct>Only that it produces valid schedules, which almost any "take it if it fits" rule does</button>
+    <button>That it's optimal in general, since five varied inputs is a good sample</button>
+  </div>
+  <div class="fb right"><p>Right. "Take each request if it still fits" can never create an overlap, whatever the order, so valid is guaranteed for free. Optimal means no other valid schedule is bigger, and to know that you need to compare against the best schedule (by brute force on small inputs) or prove it.</p></div>
+  <div class="fb wrong"><p>Separate two questions: "is this schedule allowed?" and "is there a bigger one?". Any rule of the form "take it if it doesn't clash" passes the first one every time, by construction, so checking it tells you nothing about the rule. To answer the second one you have to know the best possible size, which means trying every subset on small inputs or writing a proof. Five valid outputs answer only the first question.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Four reasonable rules, three of them wrong</h2>
+
+<p>Here are four rules a sensible person might try for the studio. Each one sorts the requests somehow and then says yes to each one that doesn't clash with what's already booked. (Times are half-open, [start, end), as in the intervals chapter: a booking ending at 10 and one starting at 10 don't clash.)</p>
+
+<ol>
+  <li><b>Earliest start first.</b> First come, first served.</li>
+  <li><b>Shortest first.</b> Short bookings use up less of the day.</li>
+  <li><b>Fewest clashes first.</b> Take the request that overlaps the fewest others, remove what it clashes with, repeat.</li>
+  <li><b>Earliest end first.</b> Take the booking that frees the room soonest.</li>
+</ol>
+
+<p>Before trying to prove any of them, try to <b>break</b> them. A <b>counterexample</b> is one input where the rule's answer is worse than the best answer. It only takes one, and it's usually tiny:</p>
+
+<ul>
+  <li><b>Earliest start</b> dies on one long booking: [0, 10) starts first, so it's taken, and it blocks [1, 3), [4, 6) and [7, 9). The rule keeps 1; the best keeps 3.</li>
+  <li><b>Shortest first</b> dies on a short bridge: [5, 8) is the shortest, but it overlaps both [0, 6) and [7, 13), which don't overlap each other. The rule keeps 1; the best keeps 2.</li>
+  <li><b>Fewest clashes</b> is harder to break. The smallest trap people usually show has 11 bookings. It's in the figure.</li>
+  <li><b>Earliest end</b> survives every attack. Sections 3 and 4 prove it can't be beaten.</li>
+</ul>
+
+<div class="figure">
+  <div class="viz-stage">
+    <svg class="viz" id="rt-svg" role="img" aria-label="Bookings on a timeline, the ones a greedy rule took, and a best plan"></svg>
+    <div class="viz-controls">
+      <span class="small">rule</span>
+      <select id="rt-rule">
+        <option value="start">Earliest start</option>
+        <option value="short">Shortest first</option>
+        <option value="clash">Fewest clashes</option>
+        <option value="end">Earliest end</option>
+      </select>
+      <span class="small">input</span>
+      <select id="rt-input">
+        <option value="long">One long booking</option>
+        <option value="bridge">A short bridge</option>
+        <option value="trap">The 11-booking trap</option>
+        <option value="lab">Eleven classroom slots</option>
+      </select>
+      <button class="btn primary" id="rt-hunt">Hunt for a counterexample</button>
+    </div>
+    <div class="viz-caption" id="rt-msg"></div>
+  </div>
+  <div class="cap">Green bars are the bookings the rule took; the bottom two rows compare its plan with a best plan found by trying every subset. Try each rule on each input. Then pick a rule and press Hunt: it tries up to 20,000 random inputs of 3 to 8 bookings and shows the first one where the rule loses. Earliest start and shortest first fall at once. Fewest clashes usually survives the hunt even though it's wrong, because its smallest traps are bigger than the hunt's inputs. Passing a hunt is evidence, not proof.</div>
+</div>
+
+<div class="keyidea">Greedy rules are cheap to try and cheap to break. Before proving anything, attack the rule with 3 or 4 items: one long item, one short item that bridges two others, ties. If a tiny input breaks it, you've saved yourself from proving something false.</div>
+
+<div class="check" id="check-break">
+  <p class="q">A teammate suggests "latest start first", filling the day from the evening backwards: sort by start, from latest to earliest, and take each booking that fits. What's true?</p>
+  <div class="opts">
+    <button>It fails on one long booking, just like earliest start</button>
+    <button data-correct>It's always optimal: it's earliest end first, run on the clock backwards</button>
+    <button>It fails on a short bridge, just like shortest first</button>
+  </div>
+  <div class="fb right"><p>Right. Flip the timeline, so time t becomes −t. Every start becomes an end and the other way round, and "the latest start" becomes "the earliest end". A rule that's optimal on the flipped day is optimal on the real one. Not every rule that sounds like a broken one is broken: try to break it, and if you can't, look for why.</p></div>
+  <div class="fb wrong"><p>Test it on the attackers. One long booking [0, 10) with [1, 3), [4, 6), [7, 9): the latest start is 7, so [7, 9) goes first, then [4, 6), then [1, 3); [0, 10) clashes. That keeps 3, the best. The short bridge [0, 6), [5, 8), [7, 13): latest start is 7, take [7, 13), then [5, 8) clashes, [0, 6) fits: 2, the best. Now run the clock backwards: every start becomes an end, and "latest start" becomes "earliest end", the rule that works.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Proof one: greedy stays ahead</h2>
+
+<p>Earliest end survived. Why can't any plan beat it? Here's the first way to argue it, and it works by watching two plans side by side.</p>
+
+<p>Picture two people booking the same room, each building a list of bookings from morning to evening. One uses the greedy rule. The other follows any valid plan you like, maybe the best one. After each of them has made k bookings, ask: <em>whose k-th booking frees the room earlier?</em> The claim is that greedy's always does, or ties. Greedy is never behind.</p>
+
+<div class="figure">
+  <div id="sa-player"></div>
+  <div class="cap">Eleven bookings sorted by end. First the greedy scan: each booking is taken (green) if it starts at or after the last taken end, or skipped (red). Then greedy's plan is lined up against another plan that also fits four bookings. Watch the two end marks at each step (green for greedy, dashed purple for the other plan): greedy's k-th end is never to the right of the other plan's.</div>
+</div>
+
+<p>Why can't greedy fall behind? Step by step, with g<sub>k</sub> for greedy's k-th booking and o<sub>k</sub> for the other plan's:</p>
+<ol>
+  <li><b>Step 1.</b> Greedy's first pick, g<sub>1</sub>, has the earliest end of all bookings. So it ends no later than o<sub>1</sub>, whatever o<sub>1</sub> is.</li>
+  <li><b>Step k.</b> Suppose g<sub>k−1</sub> ends no later than o<sub>k−1</sub>. The other plan's next booking o<sub>k</sub> starts at or after the end of o<sub>k−1</sub>, so it also starts at or after the end of g<sub>k−1</sub>. That means o<sub>k</sub> was <em>still available</em> to greedy at step k. Greedy took the available booking with the earliest end, so g<sub>k</sub> ends no later than o<sub>k</sub>.</li>
+  <li><b>The finish.</b> Suppose the other plan had more bookings than greedy: greedy stopped after m, but o<sub>m+1</sub> exists. Then o<sub>m+1</sub> starts at or after the end of o<sub>m</sub>, which is no earlier than the end of g<sub>m</sub>, so it was available to greedy. But greedy only stops when nothing is available. That's a contradiction, so no plan has more bookings than greedy.</li>
+</ol>
+
+<p>This pattern is called <b>greedy stays ahead</b>. Pick a measure of progress (here, "when does my k-th booking end?"). Show that after every step, greedy's measure is at least as good as any other plan's, by induction: step 1, then "if it was ahead before this step, it's still ahead after it". Then show that being ahead at every step means being at least as good at the end.</p>
+
+<div class="keyidea">Greedy stays ahead: pick a progress measure, show greedy is at least as good on it after every step (induction), then show that implies the final answer is at least as good. For bookings: greedy's k-th booking always ends no later than any plan's k-th, so no plan fits more.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: two runners and a row of gates</summary>
+  <p>Two runners race along the same track, and each must pass through gates. A gate counts only if you pass it after leaving your previous gate. The greedy runner always picks the next gate that lets them out soonest. Compare the runners after their 1st gate, their 2nd gate, and so on: the greedy runner is never further back on the track. So any gate the other runner can still use next is also still ahead of the greedy runner, and the other runner can never finish with one gate more.</p>
+  <p>Where the picture breaks: real runners can be ahead at one point and behind at another. The proof only works because greedy's lead can't shrink, and that's exactly what the induction step checks.</p>
+</details>
+
+<div class="check" id="check-ahead">
+  <p class="q">In the induction step, why is the other plan's booking o<sub>k</sub> available to greedy at step k?</p>
+  <div class="opts">
+    <button>Because greedy considers every booking, so all of them are available</button>
+    <button>Because o<sub>k</sub> has the earliest end among the remaining bookings</button>
+    <button data-correct>Because o<sub>k</sub> starts at or after the end of o<sub>k−1</sub>, which is no earlier than the end of g<sub>k−1</sub></button>
+  </div>
+  <div class="fb right"><p>Right. That's the whole trick: the lead from the previous step (g<sub>k−1</sub> ends first) turns into a guarantee about this step (anything the other plan can do next, greedy can do too). Then greedy's rule, "earliest end among available", makes g<sub>k</sub> end no later than o<sub>k</sub>.</p></div>
+  <div class="fb wrong"><p>"Available" means "starts at or after greedy's last booking ends", so greedy may take it without a clash. Greedy does look at every booking, but most are not available: they clash with what it already took. And o<sub>k</sub> needn't have the earliest end; it's whatever the other plan chose. Use the numbers from the figure: greedy's 2nd booking [5, 7) ends at 7, the other plan's 2nd [5, 7) at 7, and the other plan's 3rd, [8, 12), starts at 8 ≥ 7. So greedy could have taken [8, 12), and it took [8, 11), which ends sooner.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Proof two: the exchange argument</h2>
+
+<p>The second way to argue doesn't race two plans. It takes a best plan and <em>edits</em> it, one swap at a time, into greedy's plan, without ever making it worse.</p>
+
+<p>Picture a finished jigsaw that someone else solved, and your own half-built one that follows a rule. You walk along both. At the first piece where they differ, you pull out their piece and put in yours. If the puzzle still fits together and is no worse, keep going. When you're done, their puzzle has become yours, and it was never worse than the best at any point. So yours is a best one too.</p>
+
+<p>For bookings, with an optimal plan O (one with the most bookings possible):</p>
+<pre class="diagram"><code>optimal O:     [--- o1 ---)     [-- o2 --)     [-- o3 --)
+greedy's g1:   [- g1 -)         ← ends no later than o1
+
+swap o1 → g1:  [- g1 -)         [-- o2 --)     [-- o3 --)
+               still no clash: o2 starts at or after o1's end,
+               and o1 ends no earlier than g1</code></pre>
+<ol>
+  <li>Let o<sub>1</sub> be O's earliest-ending booking. Greedy's first pick g<sub>1</sub> has the earliest end of all, so g<sub>1</sub> ends no later than o<sub>1</sub>.</li>
+  <li>Swap o<sub>1</sub> out and g<sub>1</sub> in. Every other booking in O starts at or after the end of o<sub>1</sub>, so at or after the end of g<sub>1</sub>: no clash. The plan is still valid and has the same size, so it's still optimal, and now it starts with g<sub>1</sub>.</li>
+  <li>Throw away g<sub>1</sub> and every booking that clashes with it. Since no booking ends before g<sub>1</sub> does, what's left is exactly the bookings that start at or after g<sub>1</sub> ends: the same problem, smaller. The rest of O is a valid plan there, with one booking fewer, and greedy does exactly the same thing on it. Repeat the swap (induction), and O turns into greedy's plan without losing a booking.</li>
+</ol>
+
+<p>The general recipe for an <b>exchange argument</b>:</p>
+<ol>
+  <li>Take any optimal solution O.</li>
+  <li>Find the first place where O differs from greedy's solution G.</li>
+  <li>Show that swapping O's choice there for G's choice keeps O valid and doesn't make it worse.</li>
+  <li>Repeat: each swap makes O agree with G in one more place, so eventually O becomes G, and G is optimal.</li>
+</ol>
+
+<p>Which proof should you reach for? Stays-ahead fits when the answer is built step by step and you can name a running score ("how far have I got?"). An exchange fits when you can compare one choice with another directly ("this piece is at least as good as that piece"). Many problems allow both. In an interview, the exchange argument is usually quicker to say out loud.</p>
+
+<div class="keyidea">Exchange argument: take any optimal answer, swap one of its choices for greedy's choice, and show it stays valid and no worse. Repeat until it is greedy's answer. Then greedy's answer is optimal.</div>
+
+<div class="check" id="check-exchange">
+  <p class="q">In the swap, we replace o<sub>1</sub> by g<sub>1</sub>. Why can't g<sub>1</sub> clash with o<sub>2</sub>?</p>
+  <div class="opts">
+    <button>Because g<sub>1</sub> is the shortest booking</button>
+    <button data-correct>Because g<sub>1</sub> ends no later than o<sub>1</sub>, and o<sub>2</sub> starts at or after the end of o<sub>1</sub></button>
+    <button>Because g<sub>1</sub> starts before o<sub>1</sub></button>
+  </div>
+  <div class="fb right"><p>Right. A clash with o<sub>2</sub> would need g<sub>1</sub> to still be running when o<sub>2</sub> starts. But g<sub>1</sub> is over by the time o<sub>1</sub> is over, and o<sub>2</sub> waits for o<sub>1</sub>. Where g<sub>1</sub> starts doesn't matter at all: only its end can bump into what comes after.</p></div>
+  <div class="fb wrong"><p>Only the <em>end</em> of g<sub>1</sub> can collide with later bookings. Put numbers in: o<sub>1</sub> = [2, 6), o<sub>2</sub> = [6, 9), and g<sub>1</sub> = [0, 5), which starts earlier and is longer than o<sub>1</sub>. g<sub>1</sub> ends at 5, before o<sub>2</sub> starts at 6, so no clash. Short or early-starting doesn't help: the shortest-first counterexample showed a short booking can clash with two. What matters is "ends no later than the booking it replaces".</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: an answer that proves itself</summary>
+  <p>For closed intervals (touching counts as overlapping), greedy can hand you a certificate. Suppose you found k intervals that don't touch each other. Then any set of points that stabs every interval needs at least k points, one inside each of those k. And if you also find k points that stab every interval, then no set of non-touching intervals can have more than k members, since each one needs its own point. Two numbers that meet in the middle prove each other optimal, with no exchange argument at all. The greedy in exercise 4 finds both halves in one pass: each point it places is the right end of an interval that doesn't touch the previous one it aimed at. (The tests only ask for the points.)</p>
+  <p>This "two problems whose answers bound each other" idea is called <b>duality</b>. Max flow equals min cut is the famous case, and so is "rooms needed equals the biggest pile-up of overlapping meetings", from the intervals chapter.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Exchanges for order: deadlines and lateness</h2>
+
+<p>Exchange arguments shine when the answer is an <em>order</em>. Here's a new problem. You have several jobs and one machine (or one person). Job i takes t<sub>i</sub> hours and is due at hour d<sub>i</sub>. You run them one after another from hour 0, no gaps. A job that finishes at hour f is <b>late</b> by f − d<sub>i</sub> if that's positive, and 0 otherwise. You want the order that makes the <b>worst lateness</b>, the biggest lateness of any job, as small as possible.</p>
+
+<p>Try to break the obvious rules first, with two jobs each:</p>
+<ul>
+  <li><b>Shortest first.</b> Jobs (1 hour, due 100) and (10 hours, due 10). Shortest first runs the 1-hour job, so the 10-hour job ends at 11: late by 1. The other order ends the 10-hour job at 10 and the short one at 11, well before 100: nobody late.</li>
+  <li><b>Least slack first.</b> Slack is d − t, the spare time a job has. Jobs (1 hour, due 2) and (10 hours, due 10) have slack 1 and 0, so the 10-hour job goes first and the short job ends at 11: late by 9. Running the short job first makes the long one end at 11: late by only 1.</li>
+  <li><b>Earliest deadline first (EDD)</b> survives both: in the first pair it runs the 10-hour job (due 10) first, and in the second it runs the 1-hour job (due 2) first. Both are the better orders.</li>
+</ul>
+
+<div class="check" id="check-slack">
+  <p class="q">Three jobs as (hours, due): A (2, 3), B (1, 9), C (4, 5). Run them by earliest deadline first. What's the worst lateness?</p>
+  <div class="opts">
+    <button>0: earliest deadline first never makes anyone late</button>
+    <button data-correct>1: C finishes at hour 6 but was due at 5</button>
+    <button>2: B is the last job and has to wait the longest</button>
+  </div>
+  <div class="fb right"><p>Right. Order A, C, B. A ends at 2 (due 3, fine), C ends at 6 (due 5, late by 1), B ends at 7 (due 9, fine). Worst lateness 1. A and C need 6 hours in total and the later of their deadlines is 5, so one of them must be late by at least 1: no order does better.</p></div>
+  <div class="fb wrong"><p>Write the order and the finish times out. Deadlines 3, 5, 9 give A, C, B. Finish times: 2, then 2 + 4 = 6, then 7. Compare each with its deadline: A 2 ≤ 3, C 6 &gt; 5 (late by 1), B 7 ≤ 9. EDD minimizes the <em>worst</em> lateness, it doesn't promise zero: here A and C together need 6 hours before hour 5, which is impossible. And B going last doesn't make it late; its deadline is far away.</p></div>
+</div>
+
+<p>Now the proof, by exchange. Call a pair of jobs an <b>inversion</b> if the one with the later deadline runs first. EDD is exactly the order with no inversions. Take any order with an inversion. Somewhere in it, two <em>neighbors</em> must be inverted: if every neighbor pair were in deadline order, the whole list would be sorted by deadline. Swap those two neighbors, i (later deadline) and j (earlier deadline):</p>
+
+<pre class="diagram"><code>before:  | i: a hours, due d_i | j: b hours, due d_j |
+         t                    t+a                  t+a+b
+
+after:   | j: b hours, due d_j | i: a hours, due d_i |
+         t                    t+b                  t+a+b
+
+d_i &gt; d_j: i is due later, yet it ran first</code></pre>
+
+<ul>
+  <li><b>Everyone else</b> starts and finishes at the same hours as before: the pair still fills exactly [t, t + a + b).</li>
+  <li><b>j</b> now finishes earlier, so its lateness can only drop.</li>
+  <li><b>i</b> now finishes at t + a + b, exactly when j used to. Same finish time, later deadline: (t + a + b) − d<sub>i</sub> is smaller than (t + a + b) − d<sub>j</sub>, so i's new lateness is no more than j's old lateness. ("No more", not "less": both can be 0.)</li>
+</ul>
+<p>So the pair's worst lateness after the swap is at most j's old lateness, which was already part of the old worst.</p>
+
+<p>So the worst lateness doesn't go up, and there's one inversion fewer. Keep swapping and you reach an order with no inversions (there are at most n(n − 1)/2 to remove), never getting worse on the way. So EDD is at least as good as the order you started from, which could have been the best one.</p>
+
+<p>One loose end an interviewer may pull: ties. Jobs with the <em>same</em> deadline aren't inverted either way, so there can be several "EDD orders". They all have the same worst lateness: swapping two neighbors with equal deadlines leaves the pair ending at t + a + b with the same deadline for whichever job is second, and the first one finishes earlier than that. So any order without inversions is optimal, whichever way you break ties.</p>
+
+<div class="figure">
+  <div id="ld-player"></div>
+  <div class="cap">Five jobs start in a bad order (deadline order reversed). Each step finds a neighbor pair whose deadlines are out of order (yellow) and swaps them. Watch the "worst lateness" number: it can stay the same or drop, but it never rises. The last frame is the EDD order.</div>
+</div>
+
+<p>Once you have the proof, the code is a sort:</p>
+
+<pre><code>def max_lateness_edd(jobs):               # jobs: list of (hours, due)
+    t, worst = 0, 0
+    for hours, due in sorted(jobs, key=lambda j: j[1]):   # earliest deadline first
+        t += hours                        # this job finishes at hour t
+        worst = max(worst, t - due)       # late by t - due, if that's positive
+    return worst                          # O(n log n), all of it the sort</code></pre>
+
+<div class="keyidea">For "find the best order" problems, use the adjacent swap: take two neighbors in the wrong order, show swapping them changes nothing outside the pair and doesn't hurt inside it. Then sorting by the rule is optimal. For worst lateness, the rule is earliest deadline first.</div>
+
+<div class="check" id="check-swap">
+  <p class="q">Why does the proof swap <em>neighbors</em> rather than any two inverted jobs, say the 1st and the 5th?</p>
+  <div class="opts">
+    <button>Because swapping neighbors is faster to code</button>
+    <button>Because inversions can only happen between neighbors</button>
+    <button data-correct>Because swapping neighbors leaves every other job's finish time exactly as it was</button>
+  </div>
+  <div class="fb right"><p>Right. Swap jobs 1 and 5 and the jobs in between start earlier or later by the difference in their lengths, so their lateness changes in ways you'd have to track. Swap neighbors and the pair fills the same stretch of time as before. Only two numbers change, and you can compare them directly.</p></div>
+  <div class="fb wrong"><p>Inversions can be far apart (in the order due 9, due 5, due 3, the first and last jobs are inverted). The proof isn't code at all, so speed isn't the point. Picture the two jobs as two blocks on a timeline. If they're neighbors, they fill [t, t + a + b) before and after the swap, and nothing else moves. If there are jobs between them and the blocks have different lengths, every job in between shifts, and you'd have to argue about all of them.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>One pass, best so far: jumps and gas stations</h2>
+
+<p>Some greedy algorithms don't sort at all. They walk left to right once and keep one running number, "the best so far". Two interview favorites work this way.</p>
+
+<h3>Jump game: can you reach the end?</h3>
+
+<p>You stand on stone 0 of a row of stones. Stone i has a number <code>nums[i]</code>: from there you may jump forward up to that many stones. Can you reach the last stone? Trying every sequence of jumps is exponential. Instead, picture walking along the stones with a flashlight that shows the farthest stone you know you can reach. Each stone you step on may push the light farther. If you ever walk past the light, you're standing on a stone you can't actually reach, so the answer is no.</p>
+
+<pre><code>def can_jump(nums):
+    reach = 0                           # farthest stone we know we can reach
+    for i, step in enumerate(nums):
+        if i &gt; reach:                   # stone i is beyond every jump so far
+            return False
+        reach = max(reach, i + step)    # from stone i we can get this far
+    return True                         # O(n) time, O(1) memory</code></pre>
+
+<p>Why is one number enough? Because the stones you can reach always form one unbroken stretch from stone 0. If you can land on stone r, you can land on any stone q before it too. Your path from 0 to r either lands on q, or jumps over it, from some stone p before q to a stone after it. A jump from p may be any length up to nums[p], so a shorter jump from p lands exactly on q. So "everything up to <code>reach</code>" is the whole picture, and walking past <code>reach</code> means you hit a gap you can never cross. The proof is stays-ahead in disguise. The claim after looking at stone i is "<code>reach</code> is the farthest stone reachable using jumps from stones 0 to i". Each step keeps it true: any stone reachable through stone i is at most i + nums[i]. The fewest-jumps version (exercise 5) thinks in rounds: every stone you can reach with one jump, then with two. Each round is a stretch of stones, and the next round ends at the farthest reach from inside the current one.</p>
+
+<h3>Gas station: where do you start?</h3>
+
+<p>Stations sit on a loop. Station i gives you gas[i] liters, and driving on to the next station burns cost[i]. Your tank starts empty. From which station can you drive the whole loop without running dry? Trying every start and driving until you fail is O(n²). The picture that solves it is a graph of your tank.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <svg class="viz" id="gs-svg" role="img" aria-label="Tank level around the loop for a chosen start station"></svg>
+    <div class="viz-controls">
+      <span class="small">start at station</span><input type="range" id="gs-start" min="0" max="7" value="0" style="width:160px"><b id="gs-sval"></b>
+      <button class="btn" id="gs-new">New route</button>
+    </div>
+    <div class="viz-caption" id="gs-msg"></div>
+  </div>
+  <div class="cap">The line is the tank after each leg, for the start you pick. Red parts are below zero: you ran dry. These routes have exactly as much gas as they burn. Slide the start and watch the shape: it never changes, it only moves up or down and rotates around the loop. The start that works is the one right after the lowest point, because that lifts the whole line to zero or above.</div>
+</div>
+
+<p>Two facts fall out of the picture:</p>
+<ol>
+  <li><b>If the total gas is less than the total cost, no start works.</b> After a full loop the tank would hold total gas − total cost liters, which is negative, whatever the start.</li>
+  <li><b>If it's at least the total cost, starting right after the lowest point works.</b> The curve's shape is the running total of gas − cost; picking a start only shifts it. Start right after the lowest point, and that point becomes 0. Every other point was higher, so it stays at 0 or above. (If there's gas to spare, the stretch after you wrap past station 0 also gets the spare liters added, which only lifts it higher.)</li>
+</ol>
+
+<p>You don't even need to find the lowest point by storing the curve. Start at station 0 and drive. If the tank first goes negative just after station i, then <em>no station from your start up to i</em> can be the answer: you arrived at each of them with a tank of zero or more, and still ran dry by i, so starting there with an empty tank would run dry by i too. Skip them all and try i + 1. One pass, O(n) time, O(1) memory; exercise 5 asks you to write it.</p>
+
+<p>But the last start you try only gets driven up to station n − 1. Why trust it for the part after the wrap, without driving it? Because each reset happens exactly when the running total from station 0 drops below every value it had before: a new lowest point. So the last start is the station right after the lowest point, and fact 2 already proved that one works whenever total gas ≥ total cost. That's why the one pass needs only a check of the totals at the end, not a second lap.</p>
+
+<div class="keyidea">Some greedy algorithms are one pass with one running number: the farthest reach, the tank level. The proof is an invariant ("after step i, this number is the best possible using items 0 to i") or a picture: start the gas loop right after the lowest point of the running total.</div>
+
+<div class="check" id="check-gas">
+  <p class="q">Starting at station 3, your tank first goes negative on the leg after station 7. Which stations can you rule out as the answer?</p>
+  <div class="opts">
+    <button>Only station 3</button>
+    <button data-correct>Stations 3, 4, 5, 6 and 7</button>
+    <button>Stations 3 to 7, and also 0 to 2</button>
+  </div>
+  <div class="fb right"><p>Right. You reached 4, 5, 6 and 7 with zero or more liters in the tank. Starting at any of them means arriving there with exactly zero, which is no better, so you'd also run dry after 7. Stations 0 to 2 are untested: the next try starts at station 8, and if the total gas covers the total cost, a start exists among the ones left.</p></div>
+  <div class="fb wrong"><p>Think about what the tank held when you passed each station. Starting at 3, you pulled into station 5 with, say, 4 liters, and still ran dry after 7. Starting at 5 instead gives you 0 liters at station 5, which is worse than 4, so you'd also run dry by 7. The same holds for 4, 6 and 7. Stations 0 to 2 come before your start, and you haven't driven through them yet in this attempt, so you know nothing about them.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Huffman codes: greedy builds a tree</h2>
+
+<p>A text file has 100,000 characters, all from six letters, with these counts in thousands: a 45, b 13, c 12, d 16, e 9, f 5. Six letters need 3 bits each in a fixed-length code (2<sup>3</sup> = 8 ≥ 6), so the file is 300,000 bits. But a is nearly half the file. Giving a a 1-bit code and the rare letters longer ones should save a lot. How do you choose the codes?</p>
+
+<p>First a trap. Codes a = 0, b = 01, c = 10 look fine, but the bits 010 could be "a c" (0 + 10) or "b a" (01 + 0). To read a stream of bits without separators, no code word may be the start of another. Such a code is called <b>prefix-free</b>.</p>
+
+<p>The picture that makes prefix-free codes easy is a <b>binary tree</b>: start at the root, go left for 0 and right for 1, and put each letter on a <b>leaf</b>, a node with no children. A letter's code is the path to its leaf, so its code length is its depth. No code is the start of another because no leaf sits on the path to another leaf. Decoding is walking down from the root until you hit a leaf, then starting again.</p>
+
+<pre class="diagram"><code>              (100)
+            0/     \1
+         a 45      (55)
+                 0/    \1
+              (25)      (30)
+             0/  \1    0/   \1
+           c 12  b 13 (14)  d 16
+                     0/  \1
+                    f 5   e 9
+
+codes:  a = 0   c = 100   b = 101   d = 111   f = 1100   e = 1101
+total:  45·1 + (12+13+16)·3 + (5+9)·4 = 224 thousand bits, not 300</code></pre>
+
+<p>The cost of a tree is the sum of count × depth over all letters: the length of the encoded file. David Huffman found the greedy that builds the cheapest tree in 1952, as a student who chose a term paper over his final exam: <b>take the two rarest letters, make them siblings under a new node whose count is their sum, and treat that node as one new letter.</b> Repeat until one tree is left.</p>
+
+<div class="figure">
+  <div id="hf-player"></div>
+  <div class="cap">The six letters start as six one-node trees. Each step takes the two trees with the smallest counts (yellow), joins them under a new node (blue) that holds the sum, and puts it back. Five merges later one tree is left. The last frame reads off the codes: 224 thousand bits.</div>
+</div>
+
+<p>Why is "merge the two rarest" safe? An exchange argument, then a shrink:</p>
+<ol>
+  <li><b>Some best tree has the two rarest letters as siblings at the bottom.</b> Take any best tree. Its deepest level has two leaves that are siblings (a deepest node can't be an only child, or you could move it up and save bits). Swap the two rarest letters into those two spots. A rare letter moving deeper and a more common letter moving up can only lower count × depth in total, so the tree is still a best one. In numbers: swap a rarest letter x (count f<sub>x</sub>, depth d<sub>x</sub>) with the letter y in a deepest spot (count f<sub>y</sub> ≥ f<sub>x</sub>, depth D ≥ d<sub>x</sub>). The cost changes by (f<sub>y</sub> − f<sub>x</sub>)(d<sub>x</sub> − D), a number ≥ 0 times a number ≤ 0, so it can't go up.</li>
+  <li><b>Merge them and the problem shrinks.</b> Glue those two siblings into one letter whose count is their sum. Every tree for the n letters with them as siblings matches a tree for the n − 1 letters, costing exactly (sum of the two counts) more. So the best tree for n letters is the best tree for n − 1 letters with the merged node split back into two. Greedy solves the smaller problem the same way, and induction does the rest.</li>
+</ol>
+
+<p>With the trees in a <a href="../../01-data-structures/concepts/heaps.html">heap</a>, each merge is two pops and a push, so n letters cost O(n log n). (If the counts arrive already sorted, two plain queues do it in O(n): the merged counts come out in increasing order, so the two smallest are always at the front of one queue or the other.) Exercise 7 has you write it, codes and all. Huffman codes are inside DEFLATE, the compression in gzip, zip and PNG, and inside JPEG. "Optimal" has a fine print an interviewer may probe: it is the best code that gives each letter its own whole number of bits. A letter that is 99% of the text still costs a full bit each time, though the theoretical floor for a letter that common is about 0.015 bits (log₂ of 1/0.99). Arithmetic coding and ANS (inside zstd) spend fractions of a bit per letter and beat Huffman there.</p>
+
+<div class="keyidea">Huffman: repeatedly merge the two rarest trees. It's optimal because some best tree has the two rarest letters as deepest siblings (exchange), and merging them leaves the same problem with one letter fewer (shrink). Heap: O(n log n).</div>
+
+<div class="check" id="check-prefix">
+  <p class="q">Counts are a 5, b 2, c 2, d 1. What does Huffman merge first, and what is a's code length?</p>
+  <div class="opts">
+    <button>a with b first, because a is the most common; a gets 1 bit</button>
+    <button data-correct>d with b (or c) first; a ends up with a 1-bit code</button>
+    <button>d with b (or c) first; every letter gets 2 bits since there are four</button>
+  </div>
+  <div class="fb right"><p>Right. Merge d 1 + b 2 = 3. Now the counts are 5, 2 (c), 3: merge c 2 + 3 = 5. Now a 5 and 5: merge to 10. a sits right under the root (1 bit), c at depth 2, b and d at depth 3. Total: 5·1 + 2·2 + 2·3 + 1·3 = 18 bits, against 20 for two bits each.</p></div>
+  <div class="fb wrong"><p>Huffman always starts from the <em>rarest</em>, never the most common: the most common letter should end up near the top, so it's merged last. Two bits each is the fixed-length code, and it costs 2 × 10 = 20 bits. Run the rule: d 1 and one of the 2s merge into 3; then the other 2 and that 3 merge into 5; then a 5 and that 5 merge. a hangs directly under the root: a 1-bit code. Total 18 bits.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>When greedy breaks: coins and knapsacks</h2>
+
+<p>Now the cases where the exchange argument fails, because seeing <em>where</em> it fails tells you when to stop trusting greedy.</p>
+
+<h3>The fractional knapsack, where greedy works</h3>
+
+<p>A thief has a bag that holds 50 kg and finds three sacks: 10 kg of spice worth $60, 20 kg worth $100, and 30 kg worth $120. The dust can be poured, so he may take any part of a sack. Greedy: sort by value per kg (6, 5 and 4 dollars per kg), and pour in the best first. That's all of the first two (30 kg, $160) and 20 of the 30 kg of the third ($80): <b>$240</b>.</p>
+
+<p>The exchange argument: suppose a best bag holds some kg of a worse sack while a better sack isn't used up. Swap one kg of the worse for one kg of the better. Same weight, more value. So a best bag never leaves a better sack unfinished while holding a worse one, and that's exactly greedy's bag.</p>
+
+<pre><code>def fractional_knapsack(items, capacity):     # items: list of (kg, value)
+    total = 0.0
+    for kg, value in sorted(items, key=lambda it: it[1] / it[0], reverse=True):
+        if capacity &lt;= 0:
+            break
+        take = min(kg, capacity)              # all of it, or the part that fits
+        total += value * take / kg
+        capacity -= take
+    return total                              # O(n log n), for the sort</code></pre>
+
+<h3>The 0/1 knapsack, where it doesn't</h3>
+
+<p>Now the sacks are sealed boxes: all or nothing. Same greedy: take the $60 box (10 kg) and the $100 box (20 kg). The $120 box weighs 30 kg and only 20 kg is left, so it doesn't fit: <b>$160</b>. But the 20 kg and 30 kg boxes fit together, exactly 50 kg: <b>$220</b>.</p>
+
+<p>The exchange argument broke at "swap one kg". Boxes can't be split, so you can only swap whole boxes, and a better box may be too heavy for the space a worse one leaves. Choices now interact: which box you take changes what fits later. That's the signal for dynamic programming, which tries every choice but solves each "capacity left" once (the <a href="dynamic-programming.html">DP chapter</a>, section 5).</p>
+
+<h3>Coins</h3>
+
+<p>"Fewest coins: take the biggest coin that fits, repeat." With US coins, 1, 5, 10 and 25 cents, it's optimal. With coins 1, 3 and 4 and an amount of 6 it isn't: greedy pays 4 + 1 + 1, three coins, while 3 + 3 is two. Even a real coin system breaks if you remove one coin: with 1, 10 and 25 cents (no nickel), 30 cents is 25 + five 1s, six coins, against three 10s.</p>
+
+<p>The exchange fails because swapping one big coin for small ones isn't a fair trade in general: whether the 4 was a good idea depends on what's left after it. Greedy is optimal only for special coin systems, called <b>canonical</b> ones, and you need a proof (or a check) for each system.</p>
+
+<div class="table-wrap"><table style="min-width:620px">
+  <thead><tr><th>Problem</th><th>Greedy rule</th><th>Optimal?</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Most bookings, one room</td><td>earliest end</td><td>yes</td><td>stays ahead, or exchange</td></tr>
+    <tr><td>Worst lateness</td><td>earliest deadline</td><td>yes</td><td>adjacent exchange</td></tr>
+    <tr><td>Huffman code</td><td>merge two rarest</td><td>yes</td><td>exchange, then shrink</td></tr>
+    <tr><td>Fractional knapsack</td><td>best value per kg</td><td>yes</td><td>swap one kg</td></tr>
+    <tr><td>0/1 knapsack</td><td>best value per kg</td><td><b>no</b>: 160 vs 220</td><td>can't split a box; use DP</td></tr>
+    <tr><td>Fewest coins, 1, 3, 4</td><td>biggest coin</td><td><b>no</b>: 3 vs 2 coins for 6</td><td>choices interact; use DP</td></tr>
+    <tr><td>Most total value of bookings</td><td>any order</td><td><b>no</b></td><td>one $100 booking can beat ten $1 ones; DP over bookings sorted by end</td></tr>
+  </tbody>
+</table></div>
+
+<div class="keyidea">Greedy fails when the exchange can't be done: a choice can't be split (0/1 knapsack), or its value depends on what's left (coins 1, 3, 4). If you can't make the swap fair, expect a counterexample, and switch to DP.</div>
+
+<div class="check" id="check-knapsack">
+  <p class="q">A bag holds 10 kg. Boxes (all or nothing): 6 kg worth $30, 5 kg worth $20, 5 kg worth $20. Greedy by value per kg takes what, and what's best?</p>
+  <div class="opts">
+    <button>Greedy takes both 5 kg boxes for $40, which is best</button>
+    <button data-correct>Greedy takes the 6 kg box ($5/kg) and then nothing fits: $30. Best is both 5 kg boxes: $40</button>
+    <button>Greedy takes the 6 kg box and part of a 5 kg box: $46</button>
+  </div>
+  <div class="fb right"><p>Right. The 6 kg box has the best ratio, $5 per kg against $4, so greedy takes it first. That leaves 4 kg, and both other boxes need 5. The two 5 kg boxes fill the bag exactly for $40. The best ratio wasted 4 kg of space, and with sealed boxes there's no sliver to fill it.</p></div>
+  <div class="fb wrong"><p>Run greedy literally. Ratios: 30/6 = 5, and 20/5 = 4 for both others. So the 6 kg box goes first, and 4 kg are left. A 5 kg box doesn't fit, and you can't take part of a sealed box ($46 would be the fractional answer). So greedy ends at $30. Compare with the 5 + 5 pair: 10 kg exactly, $40. The swap "trade a kg of worse for a kg of better" is impossible here, which is exactly where the greedy proof breaks.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: matroids, and other greedy algorithms you already know</summary>
+  <ul>
+    <li><b>Matroids.</b> There's a precise answer to "when is 'take the most valuable item that keeps the set allowed' optimal for every choice of values?": when the allowed sets form a <b>matroid</b>. That means any subset of an allowed set is allowed, and if one allowed set is bigger than another, you can always add some element of the bigger one to the smaller one and stay allowed (the exchange property, built into the definition). Sets of edges with no cycle form one, which is why Kruskal's algorithm works (<a href="minimum-spanning-tree.html">minimum spanning trees</a>). Sets of one-hour jobs that can all finish by their deadlines form one too, so "take the best-paying job that still fits" is optimal for them. Jobs of different lengths don't form a matroid, which is why exercise 6 needs its own exchange argument.</li>
+    <li><b>Dijkstra's algorithm</b> is greedy: settle the closest unsettled node. Its proof is stays-ahead ("every settled distance is final"), and it breaks with negative edges for the same reason greedy coins break: a bad-looking choice can pay off later (<a href="shortest-paths.html">shortest paths</a>).</li>
+    <li><b>Coin systems.</b> Checking whether greedy is optimal for a coin system is easy to do by machine: compare greedy with the DP for every amount up to a bound. A known result (Kozen and Zaks, 1994) says that if greedy ever fails, it already fails for some amount below the sum of the two largest coins.</li>
+    <li><b>Greedy as an approximation.</b> When greedy isn't optimal, it's sometimes provably close. For "cover every element with the fewest sets", greedy (take the set that covers the most new elements) is within a factor of about ln n of the best, and doing much better is believed to be impossible in polynomial time.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>The interview move: try, hunt, prove or switch</h2>
+
+<p>Put together, the chapter gives you a routine for any problem where a greedy rule comes to mind:</p>
+<ol>
+  <li><b>Say the rule in one sentence.</b> "Sort by end time, take every booking that starts after the last one I took."</li>
+  <li><b>Attack it on tiny inputs.</b> Spend a minute on 2 to 4 items: one long item, a short item that bridges two others, ties, a zero. Say the attempts out loud; interviewers like seeing it.</li>
+  <li><b>If it breaks, switch.</b> The counterexample usually shows why: choices interact. That points to DP (a few numbers describe "where you are") or to search.</li>
+  <li><b>If it survives, prove it.</b> Choose stays-ahead or exchange, and say it in three sentences.</li>
+</ol>
+
+<p>At home, or in a practical round with a laptop, step 2 can be automated. Write the brute force, which is short and obviously right, and compare it with the greedy on thousands of random small inputs:</p>
+
+<pre><code>import itertools, random
+
+def best_by_brute_force(bookings):            # the slow, sure answer: every subset
+    for r in range(len(bookings), 0, -1):
+        for plan in itertools.combinations(bookings, r):
+            if all(a[1] &lt;= b[0] or b[1] &lt;= a[0] for a, b in itertools.combinations(plan, 2)):
+                return r
+    return 0
+
+def hunt(greedy, tries=10_000, seed=1):
+    rng = random.Random(seed)
+    for _ in range(tries):
+        starts = [rng.randint(0, 10) for _ in range(rng.randint(1, 7))]
+        bookings = [(s, s + rng.randint(1, 5)) for s in starts]
+        if greedy(bookings) != best_by_brute_force(bookings):
+            return bookings                   # a counterexample: shrink it by hand
+    return None                               # evidence, not a proof</code></pre>
+
+<p>Keep inputs small, so the brute force stays fast and the counterexample you find is easy to read. Use small value ranges, so ties and touching ends actually happen. And remember the figure in section 2: "fewest clashes" passes this hunt even though it's wrong, because its smallest traps need around ten bookings. A hunt that finds nothing raises your confidence. It doesn't replace the proof.</p>
+
+<div class="keyidea">Try the greedy, hunt for a counterexample on tiny inputs (by hand, or brute force against greedy on random cases), then either prove it with stays-ahead or exchange, or switch to DP. Most of the credit is in the reasoning, not the sort.</div>
+
+<div class="check" id="check-hunt">
+  <p class="q">Your greedy agrees with brute force on 10,000 random inputs of up to 7 items. The interviewer asks "is it correct?" What's the best answer?</p>
+  <div class="opts">
+    <button>"Yes: 10,000 random tests is overwhelming evidence."</button>
+    <button>"I can't know without trying every possible input."</button>
+    <button data-correct>"It survived a random hunt, which rules out the small traps. Here's why it's right: …", followed by an exchange or stays-ahead argument</button>
+  </div>
+  <div class="fb right"><p>Right. The hunt is how you decide the rule is worth proving. The proof is what answers the question. Inputs of up to 7 items can't contain a trap that needs ten or so, and "fewest clashes" is exactly that kind of rule.</p></div>
+  <div class="fb wrong"><p>Two separate things: evidence and proof. Random tests on small inputs are good evidence, but some wrong rules only fail on bigger inputs (fewest clashes needs around ten bookings), so "overwhelming" overstates it. And you don't need every input: a proof covers all of them at once, because it argues about an arbitrary optimal answer. Say what the hunt shows, then give the three-sentence argument.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>What to say in the interview</h2>
+
+<p>A strong greedy answer sounds like this, before or alongside the code:</p>
+<ol>
+  <li><b>Name the brute force and its cost.</b> "Trying every subset of bookings is 2ⁿ. I think a greedy works here."</li>
+  <li><b>State the rule, and what you tried to break it with.</b> "Sort by end time and take what fits. Earliest start fails on one long booking and shortest first fails on a short one bridging two others; earliest end handles both."</li>
+  <li><b>Give the proof in three sentences.</b> "Take any optimal plan. Its first booking ends no earlier than mine, so swapping mine in keeps it valid and the same size. Repeating that turns it into my plan, so mine is optimal."</li>
+  <li><b>Give the cost.</b> "O(n log n) for the sort, then one O(n) pass; O(1) extra memory beyond the sort."</li>
+  <li><b>Name where it would break.</b> "If bookings had values and I wanted the most total value, greedy fails and I'd do DP over bookings sorted by end, with a binary search for the last compatible one."</li>
+</ol>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"What about k rooms?"</b> The most bookings in k rooms: still sort by end, and give each booking to the room that freed up most recently among those already free, and skip it if none is (keep the rooms' end times sorted). The fewest rooms for all bookings is a different problem, solved by the sweep in the intervals chapter.</li>
+    <li><b>"Ties?"</b> Two bookings with the same end: either works; the exchange argument doesn't care. Say so, so it's clear you thought about it.</li>
+    <li><b>"Prove EDD."</b> Adjacent swap: an inverted neighbor pair fills the same time before and after, the earlier-due job finishes sooner, the later-due job finishes when the other one used to and has the later deadline.</li>
+    <li><b>"Why not greedy?"</b> for a DP problem: have the counterexample ready (coins 1, 3, 4 for 6; boxes 10/20/30 kg in a 50 kg bag).</li>
+    <li><b>"The data streams in."</b> Some greedy algorithms work online (jump game, gas station, the one-pass part of interval scheduling once sorted). Sorting needs all the data first, so say what you'd do if the bookings arrived in end order already.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Greedy: one choice per step by a fixed rule, never undone. Fast (usually a sort and a pass), and a wrong one still returns a valid answer.</li>
+  <li>Break rules on tiny inputs first. Earliest start dies on one long booking, shortest first on a short bridge, least slack on (1 h, due 2) and (10 h, due 10).</li>
+  <li>Stays ahead: a progress measure, greedy at least as good after every step (induction), so at least as good at the end. Bookings: greedy's k-th end is never later.</li>
+  <li>Exchange: take an optimal answer, swap in greedy's choice, show it stays valid and no worse, repeat.</li>
+  <li>Orders: swap an inverted neighbor pair. Worst lateness: earliest deadline first.</li>
+  <li>One pass: jump game keeps the farthest reach; gas station starts right after the lowest point of the running total, and fails if total gas &lt; total cost.</li>
+  <li>Huffman: merge the two rarest. 224 vs 300 thousand bits for the six-letter example. O(n log n) with a heap.</li>
+  <li>Greedy fails when the exchange isn't fair: 0/1 knapsack ($160 vs $220), coins 1, 3, 4 for 6. Then use DP.</li>
+  <li>Interview routine: rule, hunt, prove or switch. A passed hunt is evidence, not proof.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first, and commit to an answer before you open it. The coding exercises are in <code>exercises/</code>: <code>greedy_intervals.py</code>, <code>gas_station.py</code>, <code>job_scheduling.py</code> and <code>huffman_code.py</code>. Their tests check optimality against brute force on small inputs and count the work your code does, through numbers that tally every comparison or lists that tally every read. A correct answer that re-scans everything for each choice fails. Run one with, for example, <code>python3 -m pytest -k gas_station</code>.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Break it, or explain why you can't</h4>
+  <p>For each rule, find the smallest input where it isn't optimal, or say which proof shows it is. (a) Fewest jumps to the last stone: "always jump as far as you can". (b) Fewest coins with coins 1, 5 and 12: "biggest coin first". (c) Most bookings in one room: "take the booking with the latest start first". (d) Worst lateness: "longest job first".</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Breaks: [2, 4, 1, 1, 1, 1]. Jumping 2 lands on a 1, then it takes 4 jumps in all; jumping 1 to the 4 reaches the end in 2. (b) Breaks at 15: greedy gives 12 + 1 + 1 + 1, four coins; 5 + 5 + 5 is three. (c) Optimal: it's earliest end on a reversed clock (the check in section 2). (d) Breaks with two jobs: (1 h, due 1) and (5 h, due 10). Longest first ends the short job at 6, late by 5; EDD makes nobody late.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Trace EDD and Huffman by hand</h4>
+  <p>(a) Jobs as (hours, due): (3, 4), (2, 6), (1, 8), (4, 9). Write the EDD order, each finish time and lateness, and the worst lateness. Then find one inverted neighbor pair in the order "(4, 9), (3, 4), (2, 6), (1, 8)" and check that swapping it doesn't raise the worst lateness. (b) Counts: a 10, b 1, c 1, d 2, e 4. Draw the Huffman tree, list the codes, and compare the total with a fixed 3-bit code.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) EDD is the given order: finish times 3, 5, 6, 10; latenesses 0, 0, 0, 1; worst 1. The bad order finishes at 4, 7, 9, 10: latenesses 0, 3, 3, 2, worst 3. The first pair is inverted (due 9 before due 4). Swapping it gives (3, 4), (4, 9), (2, 6), (1, 8): finish 3, 7, 9, 10, latenesses 0, 0, 3, 2, worst 3. Not worse, and one inversion fewer. (b) Merge b + c = 2; then d 2 with that 2 = 4; then e 4 with that 4 = 8; then a 10 with 8. Codes: a 0, e 10, d 110, b 1110, c 1111 (or with 0 and 1 swapped somewhere). Total 10·1 + 4·2 + 2·3 + 1·4 + 1·4 = 32 bits, against 18 × 3 = 54.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Greedy or DP?</h4>
+  <p>Pick the tool and give a one-line reason. (a) Fewest coins with 1, 5, 10, 25. (b) The most value in a bag of poured spice. (c) The most value in a bag of sealed boxes. (d) The most bookings in one room. (e) The most total fee from bookings, each with its own fee. (f) The fewest jumps to the last stone.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Greedy: this system is canonical (DP also works). (b) Greedy by value per kg: you can swap one kg for one kg. (c) DP: boxes can't be split, so 10/20/30 kg in 50 kg breaks greedy. (d) Greedy, earliest end. (e) DP: one big fee can beat many small ones, so sort by end and take the better of "skip it" and "take it plus the best up to the last compatible booking". (f) Greedy, in rounds of reach (a BFS where each layer is a stretch of stones).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>fewest_stabs(intervals)</code> and <code>fewest_to_cover(clips, T)</code></h4>
+  <p>Two cousins of the booking problem in <code>greedy_intervals.py</code>. Stabs: the fewest points that hit every closed interval (arrows through balloons). Cover: the fewest clips whose union covers [0, T]. Both are a sort and one pass, and both have a stays-ahead or exchange proof you should say out loud. The tests compare with brute force on small inputs, use big inputs whose answers are known by construction, and count comparisons on 2,000 intervals: 3 n log₂ n + 10 n is the budget, so re-scanning every interval for each new point fails.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>min_jumps(nums)</code> and <code>circuit_start(gas, cost)</code></h4>
+  <p>The two one-pass problems from section 6, in <code>gas_station.py</code>. The fewest jumps is jump game in rounds; the gas station returns a start that works, or −1. The lists count every read: 3 reads per item for jumps (with a 2-second cap on 30,000 long jumps, which kills the "update every stone in reach" table), 2 reads per station per list for the loop (the adversarial input makes "try every start" read about n² items), and tracemalloc checks that both use O(1) extra memory.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>most_on_time(jobs)</code> and <code>best_weighted_order(jobs)</code></h4>
+  <p>Exchange arguments for scheduling, in <code>job_scheduling.py</code>. First: skip jobs so that as many as possible finish by their deadlines. Walk in deadline order, and when the newest job would be late, drop one job. Which one, and why is it safe? Second: run every job, where each costs its weight times its finish time; derive the sort key from an adjacent swap. The tests check against brute force (every subset, every order) on small inputs and count comparisons on 3,000 jobs, including on any key you compute from the numbers.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>huffman_code(freqs)</code></h4>
+  <p>Build the code words, not just the cost, in <code>huffman_code.py</code>. The tests check that the code is prefix-free and that the total length is the smallest possible: against brute force over every merge order on small inputs, against 2,048 equal counts (exactly 11 bits each), and against an offline total for 2,000 random counts. They count comparisons between counts, with a budget of 12 n log₂ n; scanning for the two smallest every round needs about 4 million. A timed test on 524,288 symbols also catches a sorted list kept with <code>pop(0)</code> or <code>insort</code>: few comparisons, but each call shifts every item after the spot it touches. Careful with ties in a heap of tuples: Python will try to compare your trees.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure</div>
+  <h4>8. Hunt coin systems</h4>
+  <p>Write <code>greedy_coins(coins, amount)</code> and a DP <code>fewest_coins(coins, amount)</code> in a scratch file, and a hunter that finds the smallest amount where they disagree. Run it on {1, 3, 4}, {1, 5, 12}, {1, 5, 10, 25}, {1, 10, 25} and {1, 7, 10}. Check each answer against the Kozen–Zaks bound from section 8 (if greedy fails, it fails below the sum of the two largest coins). Then write two sentences on why a hunt with that bound <em>is</em> a proof for coin systems, while the random hunt in section 9 isn't one for bookings.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>9. Say it out loud</h4>
+  <p>Set a 3-minute timer. Explain to an imaginary interviewer why earliest deadline first minimizes the worst lateness, why shortest first and least slack don't, and why the fractional knapsack greedy works while the 0/1 one doesn't. Did you use the adjacent swap, a two-job counterexample for each broken rule, and the phrase "you can't split a box"?</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="minimum-spanning-tree.html"><small>← Previous</small>Connect everything, cheaply</a>
+  <a class="next" href="bit-manipulation.html"><small>Next →</small>Bit manipulation</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  // Bar styles by state (same meaning as cells: hl current, cmp being looked at, done taken, bad rejected, dim out of play).
+  var ST = {
+    "": "fill:var(--surface-3);stroke:var(--border-strong)",
+    hl: "fill:color-mix(in srgb, var(--accent) 24%, var(--surface));stroke:var(--accent)",
+    cmp: "fill:color-mix(in srgb, var(--warn) 24%, var(--surface));stroke:var(--warn)",
+    done: "fill:color-mix(in srgb, var(--ok) 22%, var(--surface));stroke:var(--ok)",
+    bad: "fill:color-mix(in srgb, var(--bad) 18%, var(--surface));stroke:var(--bad)",
+    dim: "fill:var(--surface-2);stroke:var(--border)"
+  };
+  var tc = function (p) { return "[" + p[0] + "," + p[1] + ")"; };
+  var txt = function (p) { return "[" + p[0] + ", " + p[1] + ")"; };
+
+  // Rows of bars over a time axis. o: {lo, hi, step, rows: [{label, bars: [{s, e, cls, text}]}], lines: [{t, style}], gapAfter}
+  function timeline(svg, o) {
+    var W = 460, L = o.labelW == null ? 52 : o.labelW, R = 12, RH = o.rowH || 22, top = 6, gap = 10;
+    var yOf = function (r) { return top + r * RH + (o.gapAfter != null && r > o.gapAfter ? gap : 0); };
+    var base = yOf(o.rows.length - 1) + RH + 4, H = base + 20;
+    var x = function (t) { return L + (t - o.lo) / (o.hi - o.lo) * (W - L - R); };
+    svg.replaceChildren();
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.style.maxWidth = "660px";
+    svg.style.minWidth = "420px";  // on a phone the stage scrolls sideways instead of shrinking the labels
+    for (var t = o.lo; t <= o.hi; t += o.step) {
+      svg.append(V.s("line", { class: "grid-line", x1: x(t), x2: x(t), y1: 0, y2: base }));
+      svg.append(V.s("text", { class: "label", x: x(t), y: H - 5, "text-anchor": "middle", text: String(t) }));
+    }
+    svg.append(V.s("line", { class: "axis", x1: L, x2: W - R, y1: base, y2: base }));
+    o.rows.forEach(function (row, r) {
+      var y = yOf(r);
+      if (row.label) svg.append(V.s("text", { class: "label", x: L - 7, y: y + RH / 2, "text-anchor": "end", "dominant-baseline": "central", text: row.label }));
+      row.bars.forEach(function (b) {
+        var x1 = x(b.s), w = Math.max(3, x(b.e) - x1), cls = b.cls || "";
+        var g = V.s("g", { style: cls === "dim" ? "opacity:0.45" : null });
+        g.append(V.s("rect", { x: x1, y: y + 2, width: w, height: RH - 4, rx: 4, style: ST[cls] + ";stroke-width:1.5" }));
+        if (b.text) {
+          var tw = 6.1 * b.text.length, inside = w >= tw + 6, right = x1 + w + 4 + tw <= W - 2;
+          g.append(V.s("text", { x: inside ? x1 + w / 2 : right ? x1 + w + 4 : x1 - 4, y: y + RH / 2 + 0.5, "text-anchor": inside ? "middle" : right ? "start" : "end", "dominant-baseline": "central", style: "fill:var(--text-strong);font-size:10.5px", text: b.text }));
+        }
+        svg.append(g);
+      });
+    });
+    (o.lines || []).forEach(function (ln) {
+      svg.append(V.s("line", { x1: x(ln.t), x2: x(ln.t), y1: ln.fromRow != null ? yOf(ln.fromRow) - 2 : 0, y2: base + 3, style: ln.style || "stroke:var(--accent);stroke-width:2.5" }));
+    });
+  }
+
+  var overlap = function (a, b) { return a[0] < b[1] && b[0] < a[1]; };
+
+  // ---------- Rule tester and counterexample hunt (section 2) ----------
+  (function () {
+    var PRESETS = {
+      long: [[0, 10], [1, 3], [4, 6], [7, 9]],
+      bridge: [[0, 6], [5, 8], [7, 13]],
+      trap: [[0, 4], [5, 9], [10, 14], [15, 19], [8, 11], [3, 6], [3, 6], [3, 6], [13, 16], [13, 16], [13, 16]],
+      lab: [[1, 4], [3, 5], [0, 6], [5, 7], [3, 9], [5, 9], [6, 10], [8, 11], [8, 12], [2, 14], [12, 16]]
+    };
+    var NAMES = { start: "Earliest start", short: "Shortest first", clash: "Fewest clashes", end: "Earliest end" };
+    function byKey(bs, key) {
+      var order = bs.map(function (_, i) { return i; }).sort(function (i, j) { return key(bs[i]) - key(bs[j]) || i - j; });
+      var taken = [];
+      order.forEach(function (i) { if (taken.every(function (t) { return !overlap(bs[t], bs[i]); })) taken.push(i); });
+      return taken;
+    }
+    function fewestClashes(bs) {
+      var rem = bs.map(function (_, i) { return i; }), taken = [];
+      while (rem.length) {
+        var best = -1, bestC = Infinity;
+        rem.forEach(function (i) {   // ties: earlier start, then input order
+          var c = rem.filter(function (j) { return j !== i && overlap(bs[i], bs[j]); }).length;
+          if (c < bestC || (c === bestC && bs[i][0] < bs[best][0])) { best = i; bestC = c; }
+        });
+        taken.push(best);
+        rem = rem.filter(function (j) { return j !== best && !overlap(bs[best], bs[j]); });
+      }
+      return taken;
+    }
+    function run(rule, bs) {
+      if (rule === "clash") return fewestClashes(bs);
+      return byKey(bs, rule === "start" ? function (b) { return b[0]; } : rule === "short" ? function (b) { return b[1] - b[0]; } : function (b) { return b[1]; });
+    }
+    function brute(bs) {   // every subset, as bitmasks; keep the biggest with no clash
+      var n = bs.length, conf = [], bestM = 0, bestK = 0;
+      for (var i = 0; i < n; i++) { conf.push(0); for (var j = 0; j < n; j++) if (i !== j && overlap(bs[i], bs[j])) conf[i] |= 1 << j; }
+      for (var m = 1; m < (1 << n); m++) {
+        var k = 0, ok = true;
+        for (var i2 = 0; i2 < n && ok; i2++) if (m & (1 << i2)) { k++; if (conf[i2] & m) ok = false; }
+        if (ok && k > bestK) { bestK = k; bestM = m; }
+      }
+      var out = []; for (var b = 0; b < n; b++) if (bestM & (1 << b)) out.push(b);
+      return out;
+    }
+    var custom = null;
+    function show(note) {
+      var rule = $("rt-rule").value, bs = custom || PRESETS[$("rt-input").value];
+      var taken = run(rule, bs), best = brute(bs);
+      var order = bs.map(function (_, i) { return i; }).sort(function (i, j) { return bs[i][0] - bs[j][0] || bs[i][1] - bs[j][1]; });
+      var hi = Math.max.apply(null, bs.map(function (b) { return b[1]; }));
+      var rows = order.map(function (i) { return { bars: [{ s: bs[i][0], e: bs[i][1], cls: taken.indexOf(i) >= 0 ? "done" : "dim", text: tc(bs[i]) }] }; });
+      rows.push({ label: "rule", bars: taken.map(function (i) { return { s: bs[i][0], e: bs[i][1], cls: "done" }; }) });
+      rows.push({ label: "best", bars: best.map(function (i) { return { s: bs[i][0], e: bs[i][1], cls: "hl" }; }) });
+      timeline($("rt-svg"), { lo: 0, hi: Math.max(12, Math.ceil(hi / 2) * 2), step: 2, rows: rows, gapAfter: order.length - 1 });
+      var msg = (note ? note + " " : "") + NAMES[rule] + " keeps <b>" + taken.length + "</b> booking" + (taken.length === 1 ? "" : "s") + "; the best plan keeps <b>" + best.length + "</b>. ";
+      msg += taken.length < best.length ? "A counterexample." : "Same as the best on this input.";
+      $("rt-msg").innerHTML = msg;
+    }
+    function hunt() {
+      var rule = $("rt-rule").value;
+      var ri = function (a, b) { return a + Math.floor(Math.random() * (b - a + 1)); };
+      for (var t = 1; t <= 20000; t++) {
+        var n = ri(3, 8), bs = [];
+        for (var k = 0; k < n; k++) { var s = ri(0, 12); bs.push([s, s + ri(1, 6)]); }
+        if (run(rule, bs).length < brute(bs).length) { custom = bs; show("Found after " + t.toLocaleString() + " random tr" + (t === 1 ? "y" : "ies") + "."); return; }
+      }
+      custom = null; show();
+      $("rt-msg").innerHTML = "No counterexample in 20,000 random inputs of 3 to 8 bookings. " + (rule === "end"
+        ? "That's evidence; sections 3 and 4 turn it into a proof."
+        : "Yet the 11-booking trap breaks it: pick that input. A hunt that finds nothing is evidence, not proof.");
+    }
+    $("rt-rule").onchange = function () { custom = null; show(); };
+    $("rt-input").onchange = function () { custom = null; show(); };
+    $("rt-hunt").onclick = hunt;
+    show();
+  })();
+
+  // ---------- Greedy stays ahead (section 3) ----------
+  (function () {
+    var bs = [[1, 4], [3, 5], [0, 6], [5, 7], [3, 9], [5, 9], [6, 10], [8, 11], [8, 12], [2, 14], [12, 16]];  // already sorted by end
+    var other = [[3, 5], [5, 7], [8, 12], [12, 16]];
+    var fr = [], st = bs.map(function () { return ""; }), taken = [], free = 0;
+    var snap = function (o) { fr.push(Object.assign({ st: st.slice(), g: taken.slice(), o: [] }, o)); };
+    snap({ msg: "Eleven bookings, sorted by end time. Greedy walks down the list once. The room is free from time 0." });
+    bs.forEach(function (b, i) {
+      st[i] = "cmp";
+      var fits = b[0] >= free;
+      snap({ free: free, msg: txt(b) + " starts at " + b[0] + (fits ? " ≥ " : " &lt; ") + free + ", the end of the last booking taken. " + (fits ? "It fits: take it." : "It clashes: skip it.") });
+      if (fits) { st[i] = "done"; taken.push(b); free = b[1]; } else st[i] = "bad";
+    });
+    snap({ free: free, msg: "Greedy took <b>" + taken.length + "</b> bookings: " + taken.map(txt).join(", ") + ". Now line it up against another plan with four bookings." });
+    for (var k = 1; k <= 4; k++) {
+      var g = taken[k - 1], o = other[k - 1];
+      snap({ g: taken.slice(0, k), o: other.slice(0, k), cmpLines: [g[1], o[1]], dimAll: true,
+        msg: "k = " + k + ": greedy's booking " + k + " " + txt(g) + " ends at <b>" + g[1] + "</b>; the other plan's " + txt(o) + " ends at <b>" + o[1] + "</b>. " + (g[1] < o[1] ? "Greedy is ahead." : "A tie: greedy is not behind.") +
+          (k < 4 ? " So the other plan's next booking, which starts at or after " + o[1] + ", was also open to greedy." : "") });
+    }
+    snap({ g: taken, o: other, dimAll: true, msg: "Greedy never fell behind, so whenever the other plan could fit one more booking, greedy could too. No plan beats four." });
+    V.player($("sa-player"), {
+      frames: fr, speed: 1100,
+      draw: function (f, stage) {
+        var svg = V.s("svg", { class: "viz", role: "img", "aria-label": "Bookings sorted by end, greedy's picks and another plan" });
+        stage.append(svg);
+        var rows = bs.map(function (b, i) { return { bars: [{ s: b[0], e: b[1], cls: f.dimAll ? (f.st[i] === "done" ? "done" : "dim") : f.st[i], text: tc(b) }] }; });
+        rows.push({ label: "greedy", bars: f.g.map(function (b) { return { s: b[0], e: b[1], cls: "done" }; }) });
+        rows.push({ label: "other", bars: f.o.map(function (b) { return { s: b[0], e: b[1], cls: "hl" }; }) });
+        var lines = [];
+        if (f.free !== undefined && !f.dimAll) lines.push({ t: f.free, style: "stroke:var(--accent);stroke-width:2" });
+        if (f.cmpLines) {
+          lines.push({ t: f.cmpLines[0], fromRow: bs.length, style: "stroke:var(--ok);stroke-width:2.5" });
+          lines.push({ t: f.cmpLines[1], fromRow: bs.length, style: "stroke:var(--accent-2);stroke-width:2;stroke-dasharray:5 3" });
+        }
+        timeline(svg, { lo: 0, hi: 16, step: 2, rows: rows, gapAfter: bs.length - 1, lines: lines });
+      }
+    });
+  })();
+
+  // ---------- Bubbling a schedule into EDD order (section 5) ----------
+  (function () {
+    var JOBS = { A: [2, 4], B: [3, 6], C: [1, 7], D: [4, 11], E: [2, 12] };   // name: [hours, due]
+    var order = ["E", "D", "C", "B", "A"], fr = [];
+    function lateness(ord) {
+      var t = 0;
+      return ord.map(function (n) { t += JOBS[n][0]; return { n: n, s: t - JOBS[n][0], f: t, late: Math.max(0, t - JOBS[n][1]) }; });
+    }
+    var worst = function (L) { return Math.max.apply(null, L.map(function (x) { return x.late; })); };
+    var snap = function (o) { var L = lateness(order); fr.push(Object.assign({ ord: order.slice(), L: L, worst: worst(L) }, o)); };
+    snap({ msg: "Five jobs in a bad order: latest deadline first. Worst lateness: <b>" + worst(lateness(order)) + "</b> hours. Each bar is a job, labeled with its name and deadline." });
+    while (true) {
+      var i = -1;
+      for (var k = 0; k + 1 < order.length; k++) if (JOBS[order[k]][1] > JOBS[order[k + 1]][1]) { i = k; break; }
+      if (i < 0) break;
+      var a = order[i], b = order[i + 1], before = worst(lateness(order));
+      snap({ pair: [i, i + 1], msg: a + " (due " + JOBS[a][1] + ") runs before " + b + " (due " + JOBS[b][1] + "): an inverted pair of neighbors. Together they fill [" + lateness(order)[i].s + ", " + lateness(order)[i + 1].f + ")." });
+      order[i] = b; order[i + 1] = a;
+      var L = lateness(order), after = worst(L);
+      snap({ pair: [i, i + 1], swapped: true, msg: "Swapped. " + b + " now ends earlier, at " + L[i].f + "; " + a + " ends at " + L[i + 1].f + ", where " + b + " used to, and its deadline " + JOBS[a][1] + " is later. Worst lateness " + before + " → <b>" + after + "</b>" + (after < before ? ": it dropped." : ": no worse.") });
+    }
+    snap({ done: true, msg: "No inverted neighbors left: this is earliest-deadline-first order, A B C D E. Worst lateness <b>" + worst(lateness(order)) + "</b>. It never went up on the way." });
+    V.player($("ld-player"), {
+      frames: fr, speed: 1200,
+      draw: function (f, stage) {
+        var svg = V.s("svg", { class: "viz", role: "img", "aria-label": "Jobs as blocks on a timeline" });
+        stage.append(svg);
+        timeline(svg, { lo: 0, hi: 12, step: 1, labelW: 52, rowH: 26, rows: [{ label: "run", bars: f.L.map(function (x, k) {
+          var inPair = f.pair && (k === f.pair[0] || k === f.pair[1]);
+          return { s: x.s, e: x.f, cls: f.done ? "done" : inPair ? (f.swapped ? "hl" : "cmp") : "", text: x.n + " d" + JOBS[x.n][1] };
+        }) }] });
+        stage.append(V.el("div", { style: "display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap" },
+          V.el("span", { class: "small muted", style: "width:64px;flex:none" }, "late by"),
+          V.cells(f.L.map(function (x) { return x.late; }), { idx: false, label: function (v, k) { return f.L[k].n + ": " + v; }, cls: function (k) { return f.L[k].late > 0 ? "bad" : "done"; } }),
+          V.el("span", { class: "small" }, "worst: ", V.el("b", {}, String(f.worst)))));
+      }
+    });
+  })();
+
+  // ---------- Gas station tank chart (section 6) ----------
+  (function () {
+    var gas = [4, 1, 5, 2, 1, 6, 2, 3], cost = [3, 4, 2, 4, 3, 2, 4, 2];
+    function tanks(s) { var n = gas.length, t = 0, out = [0]; for (var k = 0; k < n; k++) { var i = (s + k) % n; t += gas[i] - cost[i]; out.push(t); } return out; }
+    function draw() {
+      var n = gas.length, s = Number($("gs-start").value);
+      $("gs-sval").textContent = s;
+      var all = []; for (var k = 0; k < n; k++) all = all.concat(tanks(k));
+      var lo = Math.min(0, Math.min.apply(null, all)), hi = Math.max.apply(null, all);
+      var W = 460, H = 210, L = 34, R = 14, T = 12, B = 34;
+      var x = function (k) { return L + k * (W - L - R) / n; }, y = function (v) { return T + (hi - v) / (hi - lo || 1) * (H - T - B); };
+      var svg = $("gs-svg"); svg.replaceChildren();
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.style.maxWidth = "660px"; svg.style.minWidth = "400px";
+      for (var v = Math.ceil(lo); v <= hi; v++) {
+        svg.append(V.s("line", { class: v === 0 ? "axis" : "grid-line", x1: L, x2: W - R, y1: y(v), y2: y(v), style: v === 0 ? "stroke-width:1.6" : null }));
+        if ((v - Math.ceil(lo)) % 2 === 0 || v === 0) svg.append(V.s("text", { class: "label", x: L - 6, y: y(v), "text-anchor": "end", "dominant-baseline": "central", text: String(v) }));
+      }
+      var tk = tanks(s), firstBad = -1;
+      for (var k2 = 0; k2 < n; k2++) {
+        var bad = tk[k2 + 1] < 0;
+        if (bad && firstBad < 0) firstBad = k2;
+        svg.append(V.s("line", { x1: x(k2), y1: y(tk[k2]), x2: x(k2 + 1), y2: y(tk[k2 + 1]), style: "stroke-width:3;stroke-linecap:round;stroke:" + (bad ? "var(--bad)" : "var(--ok)") }));
+      }
+      for (var k3 = 0; k3 <= n; k3++) {
+        var st = (s + k3) % n;
+        svg.append(V.s("circle", { cx: x(k3), cy: y(tk[k3]), r: 3.5, style: "fill:" + (tk[k3] < 0 ? "var(--bad)" : "var(--text-strong)") }));
+        svg.append(V.s("text", { class: "label", x: x(k3), y: H - 18, "text-anchor": "middle", text: k3 === n ? "back" : String(st) }));
+        if (k3 < n) svg.append(V.s("text", { class: "label", x: (x(k3) + x(k3 + 1)) / 2, y: H - 5, "text-anchor": "middle", text: (gas[st] - cost[st] >= 0 ? "+" : "−") + Math.abs(gas[st] - cost[st]) }));
+      }
+      var G = gas.reduce(function (p, q) { return p + q; }, 0), C = cost.reduce(function (p, q) { return p + q; }, 0);
+      var run = tanks(0), low = 0, lowAt = 0;
+      for (var k4 = 1; k4 <= n; k4++) if (run[k4] < low) { low = run[k4]; lowAt = k4 % n; }
+      var msg = "Total gas " + G + ", total cost " + C + ". ";
+      if (firstBad < 0) msg += "Starting at station " + s + ", the tank never drops below 0: <b>this start works</b>." + (s === lowAt ? " It's the station right after the lowest point (" + low + ") of the running total from station 0." : " (More than one start can work: when the running total hits its lowest value twice.)");
+      else msg += "Starting at station " + s + ", the tank first drops to <b>" + tk[firstBad + 1] + "</b> on the leg after station " + ((s + firstBad) % n) + ". The answer is station " + lowAt + ", right after the lowest point (" + low + ") of the running total from station 0.";
+      $("gs-msg").innerHTML = msg;
+    }
+    $("gs-start").oninput = draw;
+    $("gs-new").onclick = function () {
+      var n = gas.length;
+      for (var i = 0; i < n; i++) { gas[i] = Math.floor(Math.random() * 7); cost[i] = 1 + Math.floor(Math.random() * 6); }
+      var d = cost.reduce(function (p, q) { return p + q; }, 0) - gas.reduce(function (p, q) { return p + q; }, 0);
+      while (d > 0) { var j = Math.floor(Math.random() * n); gas[j]++; d--; }   // total gas = total cost, so a start exists
+      while (d < 0) { var j2 = Math.floor(Math.random() * n); cost[j2]++; d++; }   // and the curve only shifts as the start moves
+      draw();
+    };
+    draw();
+  })();
+
+  // ---------- Huffman merges (section 7) ----------
+  (function () {
+    var counts = [["a", 45], ["b", 13], ["c", 12], ["d", 16], ["e", 9], ["f", 5]];
+    var id = 0;
+    var forest = counts.map(function (c) { return { sym: c[0], w: c[1], id: id++ }; });
+    var fr = [];
+    var byW = function (p, q) { return p.w - q.w || p.id - q.id; };
+    var snap = function (o) { fr.push(Object.assign({ forest: forest.slice().sort(byW) }, o)); };
+    snap({ msg: "Six one-node trees, one per letter, with counts in thousands. A fixed 3-bit code would cost 3 × 100 = 300 thousand bits." });
+    var cost = 0;
+    while (forest.length > 1) {
+      forest.sort(byW);
+      var a = forest[0], b = forest[1];
+      snap({ pick: [a.id, b.id], msg: "The two smallest counts: <b>" + a.w + "</b> and <b>" + b.w + "</b>. They'll be siblings, so every letter below them gets one bit longer." });
+      var node = { w: a.w + b.w, left: a, right: b, id: id++ };
+      cost += node.w;
+      forest = forest.slice(2).concat([node]);
+      snap({ made: node.id, msg: "Joined under a new node with count " + a.w + " + " + b.w + " = <b>" + node.w + "</b>. Bits added by this merge: " + node.w + " (each of those " + node.w + " thousand letters got one bit longer). Running total: " + cost + "." });
+    }
+    var codes = [];
+    (function walk(nd, path) { if (nd.sym) codes.push([nd.sym, nd.w, path || "0"]); else { walk(nd.left, path + "0"); walk(nd.right, path + "1"); } })(forest[0], "");
+    codes.sort(function (p, q) { return p[0] < q[0] ? -1 : 1; });
+    snap({ final: true, msg: "One tree left. Left is 0, right is 1, and a letter's code is its path from the root. Total: <b>" + cost + "</b> thousand bits, the same as the sum of all merge counts, against 300 for 3 bits each." });
+
+    function drawTree(root, cls) {
+      var items = V.layoutTree(root.sym ? { val: root } : toBin(root)), dx = 42, dy = 50, r = 18;
+      var depth = Math.max.apply(null, items.map(function (it) { return it.y; }));
+      var Wd = 2 * r + 8 + (items.length - 1) * dx, Hd = 2 * r + 8 + depth * dy;
+      var svg = V.s("svg", { class: "viz", viewBox: "0 0 " + Wd + " " + Hd, style: "width:" + Wd + "px;min-width:" + Wd + "px;flex:none" });
+      var pos = new Map(items.map(function (it) { return [it.node, { x: r + 4 + it.x * dx, y: r + 4 + it.y * dy }]; }));
+      items.forEach(function (it) { if (it.parent) { var p = pos.get(it.parent), q = pos.get(it.node); svg.append(V.s("line", { class: "edge", x1: p.x, y1: p.y, x2: q.x, y2: q.y })); } });
+      items.forEach(function (it) {
+        var p = pos.get(it.node), nd = it.node.val;
+        svg.append(V.s("g", { class: "node " + cls(nd) }, V.s("circle", { cx: p.x, cy: p.y, r: r }),
+          V.s("text", { x: p.x, y: p.y, text: nd.sym ? nd.sym + " " + nd.w : String(nd.w), style: "font-size:11px" })));
+      });
+      return svg;
+    }
+    function toBin(nd) { return nd.sym ? { val: nd } : { val: nd, left: toBin(nd.left), right: toBin(nd.right) }; }
+    V.player($("hf-player"), {
+      frames: fr, speed: 1300,
+      draw: function (f, stage) {
+        var cls = function (nd) { return f.pick && f.pick.indexOf(nd.id) >= 0 ? "warn" : nd.id === f.made ? "hl" : f.final ? "done" : ""; };
+        stage.append(V.el("div", { style: "display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap" }, f.forest.map(function (t) { return drawTree(t, cls); })));
+        if (f.final) {
+          stage.append(V.el("div", { class: "small", style: "display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px" }, codes.map(function (c) {
+            return V.el("span", {}, V.el("b", {}, c[0]), " = ", V.el("code", {}, c[2]), V.el("span", { class: "muted" }, " (" + c[1] + " × " + c[2].length + ")"));
+          })));
+        }
+      }
+    });
+  })();
+})();
+</script>
+</body>
+</html>

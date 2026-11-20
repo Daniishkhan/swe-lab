@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="02.16">
+  <title>Numbers on the back of an envelope (estimation and probability)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <!-- On a phone the 640-wide charts shrink to about half size; keep their axis labels readable. -->
+  <style>@media (max-width: 600px) { #ll-svg .label, #q-svg .label, #bd-svg .label { font-size: 17px; } }</style>
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 16</div>
+  <h1>Numbers on the back of an envelope</h1>
+  <div class="meta"><span><span class="badge P2">P2</span> the arithmetic under every system design answer</span><span>about 60 minutes</span><span>10 quick checks · 8 exercises</span></div>
+</header>
+
+<p>Every system design interview has a moment where you need a number: how many servers, how much disk, how slow is "slow". Nobody expects it exact. They expect it within a factor of two or three, quickly, with the reasoning out loud. The same interviews test a second skill that feels different but isn't: reasoning about <b>chance at scale</b>. One server failing is rare. One of a thousand failing is Tuesday. This chapter builds both from counting, multiplying and waiting in line.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Turn daily users into requests per second, peak traffic, storage per year and network bandwidth, in your head.</li>
+    <li>Quote the latency numbers every engineer should know, with the right caveats, and use them to rule designs out.</li>
+    <li>Use Little's law (requests in flight = arrival rate × time inside) to size thread pools and connection pools.</li>
+    <li>Explain why a server at 90% busy is ten times slower than an idle one, not 10% slower.</li>
+    <li>Compute "at least one of n fails", and what fan-out does to tail latency (p99).</li>
+    <li>Pick an ID length with the birthday bound, and say how even random load balancing really is.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom. It uses Big-O ideas from <a href="complexity.html">How fast is your code?</a> and one fact about hashing (a good hash spreads keys like random throws), from the <a href="../../01-data-structures/concepts/hash-maps.html">hash map chapter</a>. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: two questions at the whiteboard</h2>
+
+<div class="story">
+  <p>The interviewer says: <em>"We're building a photo-sharing app. 100 million people use it every day. Each opens it a few times and scrolls through about 50 photos. One in ten posts a photo. How many servers do we need, and how much disk?"</em> There is no laptop. You have three minutes.</p>
+  <p>Later, a follow-up: <em>"Each page load asks 100 backend servers for pieces of the feed and waits for all of them. Each backend is healthy 99.9% of the time. How often does a page load hit a broken backend?"</em></p>
+</div>
+
+<p>The first question is arithmetic with huge numbers: it goes wrong when people lose a factor of 1,000 between megabytes and gigabytes, or forget that a day has 86,400 seconds. The second is about chance: most people answer "0.1%, about the same as one server". The real answer is <b>9.5%</b>, nearly one page load in ten. At scale, rare events stop being rare.</p>
+
+<p>Both answers come from the same few facts a smart high schooler already trusts: how to count zeros, how to multiply, how waiting in line works, and how to multiply chances of things that don't affect each other. We'll build the rest from those.</p>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Big numbers in your head</h2>
+
+<p>Multiplying 100,000,000 by 2,000,000 in your head is hard. Counting zeros is easy: 8 zeros plus 6 zeros is 14 zeros, and 1 × 2 = 2, so the answer is 2 followed by 14 zeros. That's <b>scientific notation</b>: write every number as a short leading number times a power of ten, 2 × 10¹⁴. Multiplying means multiplying the leading numbers and <em>adding</em> the exponents. Dividing means dividing the leading numbers and subtracting the exponents.</p>
+
+<p>The trick that keeps it fast is <b>rounding to one significant digit</b> (one non-zero leading digit) as you go. 86,400 becomes 9 × 10⁴, or even 10⁵. 3.65 becomes 4. Each rounding costs maybe 10–20%, and in capacity planning you're trying to land within 2×, so that's fine. Losing a factor of 1,000 is not, so count zeros carefully.</p>
+
+<h3>Powers of two are almost powers of ten</h3>
+<p>Computers count in powers of two, people in powers of ten. One coincidence connects them: 2¹⁰ = 1,024, about a thousand. So every ten doublings add three zeros:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>power of 2</th><th>about</th><th>name</th><th>handy for</th></tr></thead>
+  <tbody>
+    <tr><td>2¹⁰</td><td>10³, a thousand</td><td>kilo (KB)</td><td>a short JSON response</td></tr>
+    <tr><td>2²⁰</td><td>10⁶, a million</td><td>mega (MB)</td><td>a phone photo is 2–5 MB</td></tr>
+    <tr><td>2³⁰</td><td>10⁹, a billion</td><td>giga (GB)</td><td>RAM in a laptop: 16–64 GB</td></tr>
+    <tr><td>2³²</td><td>4 × 10⁹</td><td></td><td>how many 32-bit IDs exist</td></tr>
+    <tr><td>2⁴⁰</td><td>10¹², a trillion</td><td>tera (TB)</td><td>one big disk</td></tr>
+    <tr><td>2⁵⁰</td><td>10¹⁵</td><td>peta (PB)</td><td>a big company's photo store</td></tr>
+    <tr><td>2⁶⁴</td><td>1.8 × 10¹⁹</td><td></td><td>how many 64-bit IDs exist</td></tr>
+  </tbody>
+</table></div>
+
+<p>A few more numbers worth knowing by heart:</p>
+<ul>
+  <li><b>A day is 86,400 seconds</b>, about 10⁵. Using 10⁵ makes your answer 14% low; say so if it matters.</li>
+  <li><b>A year is about 3 × 10⁷ seconds</b> (π × 10⁷ is a famous way to remember it). A year is 365 days, so "per day × 400" is a quick, slightly high "per year".</li>
+  <li><b>Sizes:</b> a character of English text is 1 byte; a number or a timestamp is 8 bytes; a UUID is 16 bytes; a tweet-sized post with its metadata is a few hundred bytes to 1 KB; a thumbnail is 10–50 KB; a minute of HD video is around 50–100 MB.</li>
+</ul>
+
+<div class="keyidea"><p>Estimate with one significant digit and powers of ten: multiply the leading digits, add the exponents. Round boldly; count zeros carefully. 2¹⁰ ≈ 10³ turns bits and bytes into thousands, millions and billions.</p></div>
+
+<div class="check" id="check-powers">
+  <p class="q">How many 4 KB pages fit in 16 GB of RAM?</p>
+  <div class="opts">
+    <button>About 4,000</button>
+    <button data-correct>About 4 million</button>
+    <button>About 4 billion</button>
+  </div>
+  <div class="fb right"><p>Right. 16 GB is 16 × 10⁹ bytes and a page is 4 × 10³, so 16/4 = 4 and 9 − 3 = 6 zeros: 4 × 10⁶. In powers of two: 2³⁴ / 2¹² = 2²² ≈ 4 million.</p></div>
+  <div class="fb wrong"><p>Write both as a leading number times a power of ten: 16 GB = 1.6 × 10¹⁰ bytes, 4 KB = 4 × 10³ bytes. Divide the leading numbers (1.6 / 4 = 0.4) and subtract exponents (10 − 3 = 7): 0.4 × 10⁷ = 4 × 10⁶, four million. 4,000 forgets the "giga" (that's 16 MB / 4 KB); 4 billion forgets to divide by the page size.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>From users to requests per second</h2>
+
+<p>Servers are sized by <b>QPS</b> (queries, or requests, per second), but product people talk in <b>DAU</b> (daily active users: different people who use the app on a given day). The bridge is one division.</p>
+
+<p>Photo app: 100 million users × 50 photo views each = 5 × 10⁹ views a day. Spread over 86,400 seconds:</p>
+<p style="text-align:center" class="big-number">5 × 10⁹ / 8.64 × 10⁴ ≈ 58,000 views per second</p>
+<p>With the rounder 10⁵ seconds you get 50,000: close enough, and doable in your head. A handy anchor: <b>1 million a day is about 12 a second</b>.</p>
+
+<h3>Traffic isn't flat: peak versus average</h3>
+<p>That 58,000 is an average. People don't use apps evenly through the day: they scroll in the evening and sleep at night. Draw one day of traffic and it looks like a hill:</p>
+
+<pre class="diagram"><code>requests/s
+  peak ┤                     ╭──╮          ← plan for this
+       │                  ╭──╯  ╰─╮
+  avg  ┤ ─ ─ ─ ─ ─ ─ ─ ─╭─╯─ ─ ─ ─ ╰╮─ ─   ← the division gives you this
+       │  ╮          ╭──╯           ╰╮
+       │  ╰──────────╯               ╰──
+       └──┬──────┬──────┬──────┬──────┬─→ hour
+          0      6     12     18     24</code></pre>
+
+<p>The <b>peak factor</b> is the busiest moment divided by the average. For a single-country consumer app, 2–3× is a common working number; for a global service the time zones flatten the hill. Launches, live sports and New Year's Eve can be 10× or more for minutes. Machines must handle the peak, because that's when users notice. So the photo app needs to serve about 3 × 58,000 ≈ 175,000 views a second at its busiest.</p>
+
+<p>Split <b>reads</b> from <b>writes</b>, because they hit different parts of the system. Here, 10 million photos are posted a day: 10⁷ / 10⁵ = about 100 writes a second on average, 300 at peak, against 175,000 reads. A <b>read-heavy</b> system like this one wants caches and copies; a write-heavy one (logging, metrics) wants fast appends and sharding.</p>
+
+<pre><code>DAY = 86_400                        # seconds; 10**5 in your head
+dau = 100_000_000
+reads = dau * 50 / DAY              # ~58,000 views/s on average
+writes = dau * 0.1 / DAY            # ~116 uploads/s on average
+peak_reads = 3 * reads              # plan for the busy hour: ~175,000/s
+
+per_machine = 2_000                 # requests/s one machine handles (measured!)
+machines = peak_reads / (per_machine * 0.6)   # run at most 60% busy: ~145</code></pre>
+
+<p>The last two lines need two more facts: how much one machine can handle (measure it; for a simple cached read it might be thousands per second, for a heavy one tens), and why you'd run machines at 60% instead of 100%. Section 7 answers the second.</p>
+
+<div class="check" id="check-qps">
+  <p class="q">A service gets 2 billion requests a day, with a peak factor of 3. Roughly what peak QPS should you plan for?</p>
+  <div class="opts">
+    <button>About 7,000</button>
+    <button data-correct>About 70,000</button>
+    <button>About 700,000</button>
+  </div>
+  <div class="fb right"><p>Yes. 2 × 10⁹ / 10⁵ = 2 × 10⁴ = 20,000 on average (23,000 with the exact 86,400), and × 3 is 60,000–70,000 at peak.</p></div>
+  <div class="fb wrong"><p>Use the anchor: 1 million a day ≈ 12 a second. 2 billion is 2,000 millions, so 2,000 × 12 ≈ 24,000 a second on average. Then multiply by the peak factor of 3: about 70,000. 7,000 divides by too many zeros; 700,000 drops a zero from the seconds in a day (86,400 has 5 digits, it's about 10⁵, not 10⁴).</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Storage and bandwidth</h2>
+
+<p>Storage is a pile that only grows. Each day adds (writes per day) × (bytes per write), and the pile keeps everything you don't delete. For the photo app:</p>
+<ul>
+  <li>10⁷ photos a day × 2 MB = 2 × 10¹³ bytes = <b>20 TB a day</b>.</li>
+  <li>× 365 days ≈ 7 × 10¹⁵ bytes = <b>7 PB a year</b>.</li>
+  <li>× 3, because real systems keep 3 copies (<b>replicas</b>) so one dead disk or one lost data center doesn't lose photos: <b>about 22 PB a year</b>.</li>
+</ul>
+<p>The rule is <b>storage = writes/day × size × days kept × replicas</b>, plus some slack for indexes, metadata and smaller resized copies (thumbnails are small, but there are several sizes per photo). Notice which number dominates: the 2 MB photos, not the 1 KB of metadata about each one. Find the biggest term and get it right; the rest is rounding.</p>
+
+<h3>Bandwidth: how wide is the pipe?</h3>
+<p>Picture the network as a pipe. <b>Latency</b> is how long one drop takes to get through it (distance). <b>Bandwidth</b> or <b>throughput</b> is how much flows per second (pipe width). Bandwidth is (requests per second) × (bytes per response).</p>
+<p>The photo feed doesn't send the 2 MB originals; it sends <b>feed-sized copies</b>, resized to fit a phone screen, about 200 KB each (bigger than a 10–50 KB thumbnail, much smaller than the original): 58,000 views/s × 2 × 10⁵ bytes ≈ 1.2 × 10¹⁰ bytes a second on average, 3 × that at peak. Now a trap: networks are measured in <b>bits</b> per second, and a byte is 8 bits. So the peak is 3.6 × 10¹⁰ bytes/s × 8 ≈ <b>300 Gbit/s</b> leaving your servers (that's called <b>egress</b>). A typical server network card does 10–100 Gbit/s, so this is a job for a <b>CDN</b> (content delivery network: caches near users that serve the bytes for you), not for your app servers.</p>
+
+<div class="keyidea"><p>Storage = writes/day × bytes × days × replicas. Bandwidth = requests/s × bytes, then × 8 for bits. Find the biggest term (usually the media, not the metadata) and get that one right.</p></div>
+
+<div class="check" id="check-bits">
+  <p class="q">A server has a 10 Gbit/s network card. Each response is 1 MB. About how many responses per second can the card send, at most?</p>
+  <div class="opts">
+    <button>About 10,000</button>
+    <button data-correct>About 1,250</button>
+    <button>About 10</button>
+  </div>
+  <div class="fb right"><p>Right. 10 Gbit/s ÷ 8 = 1.25 GB/s, and 1.25 GB/s ÷ 1 MB = 1,250. In practice protocol overhead takes a few percent more, so plan for around 1,000.</p></div>
+  <div class="fb wrong"><p>Convert to the same unit first. The card moves 10 × 10⁹ <em>bits</em> a second, which is 10⁹ × 10 / 8 = 1.25 × 10⁹ <em>bytes</em>. Each response is 10⁶ bytes. 1.25 × 10⁹ / 10⁶ = 1,250. Forgetting the ÷ 8 gives 10,000 (8× too many); treating the 1 MB response as 1 GB (10⁹ bytes, three zeros too many) gives about 10.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Latency numbers every engineer should know</h2>
+
+<p>Capacity tells you whether the system can keep up. Latency tells you whether a design can be fast at all. Some delays are physics: nothing travels faster than light, and light in optical fiber covers about <b>200 km per millisecond</b> (two-thirds of its speed in vacuum). New York to London is about 5,600 km, so a round trip takes at least 56 ms before any computer does anything. No software makes that smaller.</p>
+
+<p>The table below is the famous list, popularized by Jeff Dean at Google around 2009 and kept up to date by many people since. Treat every number as an <b>order of magnitude</b> (the nearest power of ten) for mid-2020s server hardware. Exact values depend on the machine and change every few years. The <em>ratios</em> between rows are what last.</p>
+
+<div class="table-wrap"><table class="steps-table">
+  <thead><tr><th>operation</th><th>about</th><th>if 1 ns were 1 second</th></tr></thead>
+  <tbody>
+    <tr><td>read from the CPU's L1 cache</td><td>1 ns</td><td>1 second</td></tr>
+    <tr><td>branch mispredict</td><td>3–5 ns</td><td>4 seconds</td></tr>
+    <tr><td>lock and unlock an uncontended mutex</td><td>20 ns</td><td>20 seconds</td></tr>
+    <tr><td>read from main memory (RAM)</td><td>100 ns</td><td>under 2 minutes</td></tr>
+    <tr><td>compress 1 KB with a fast compressor</td><td>2 µs</td><td>half an hour</td></tr>
+    <tr><td>read 1 MB in a row from RAM</td><td>50 µs</td><td>14 hours</td></tr>
+    <tr><td>random 4 KB read from an NVMe SSD</td><td>100 µs</td><td>a day</td></tr>
+    <tr><td>network round trip inside one data center</td><td>0.1–0.5 ms</td><td>1–6 days</td></tr>
+    <tr><td>read 1 MB in a row from an SSD</td><td>0.3 ms</td><td>3–4 days</td></tr>
+    <tr><td>spinning disk seek</td><td>5–10 ms</td><td>2–4 months</td></tr>
+    <tr><td>read 1 MB in a row from a spinning disk</td><td>5 ms</td><td>2 months</td></tr>
+    <tr><td>round trip California ↔ Europe</td><td>150 ms</td><td>about 5 years</td></tr>
+  </tbody>
+</table></div>
+<p class="small muted">1 µs (microsecond) = 1,000 ns; 1 ms (millisecond) = 1,000 µs. Sources: Jeff Dean's "Numbers everyone should know" talks (around 2009–2012), Peter Norvig's list, and Colin Scott's interactive version that projects them by year. Check your own hardware before quoting a number to two digits.</p>
+
+<p>Read the right-hand column as a story. RAM is a two-minute walk; an SSD is a day trip; another continent is years. The ratios to remember:</p>
+<ul>
+  <li><b>Memory is about 1,000× faster than SSD</b>, which is about 50–100× faster than a spinning disk for random reads. That's why caches exist and why databases fight to keep their working set in RAM.</li>
+  <li><b>Sequential beats random.</b> Reading 1 MB in a row from a disk costs about as much as one seek. Log-structured storage and batching are built on this.</li>
+  <li><b>A network hop inside a data center costs as much as thousands of memory reads.</b> Ten sequential calls between services add milliseconds. Crossing an ocean costs 100+ ms, so a user-facing request can afford that maybe once.</li>
+</ul>
+
+<p>Use them to rule things out: "Each page makes 30 database calls one after another, each a round trip of 0.5 ms plus 1 ms of query: 45 ms before we render anything. Batch them or run them in parallel."</p>
+
+<div class="check" id="check-latency">
+  <p class="q">A request handler in Virginia reads 20 rows, one at a time, from a database in Oregon (a round trip of about 70 ms). Roughly how long does the handler take?</p>
+  <div class="opts">
+    <button>About 70 ms, the round trip</button>
+    <button data-correct>About 1.4 seconds</button>
+    <button>About 2 ms, since database reads take about 0.1 ms</button>
+  </div>
+  <div class="fb right"><p>Right. 20 sequential round trips × 70 ms = 1,400 ms. The query work is noise next to the distance. The fixes are a single batched query (one round trip), or putting the data near the handler.</p></div>
+  <div class="fb wrong"><p>Picture each read as a letter sent across the country that must come back before the next one is sent. Twenty letters in a row means twenty trips: 20 × 70 ms = 1.4 s. The speed of the database doesn't matter when each request waits on distance. Only one batched request would cost about one round trip.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Little's law: the coffee shop</h2>
+
+<p>A coffee shop gets 30 customers an hour, and each one stays 20 minutes. On average, how many people are inside? You don't need to watch the door. Think about it: a new customer arrives every 2 minutes, and each stays for 20, so while one person is inside, about 10 more arrive. On average <b>10 people</b> are in the shop.</p>
+
+<p>That's <b>Little's law</b>. With λ (the Greek letter lambda) for the arrival rate and W for the average time each one spends inside:</p>
+<p style="text-align:center" class="big-number">L = λ × W</p>
+<p>L is the average number inside. Here, λ = 0.5 per minute, W = 20 minutes, L = 10. It works for any "shop" where things arrive, stay a while and leave: requests in a server, messages in a queue, cars on a bridge. It doesn't care about the order they're served in, or how random the arrivals are, as long as the shop isn't filling up forever.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <label class="small">arrivals per hour <input type="range" id="ll-rate" min="10" max="120" step="5" value="30" style="width:130px"></label><b id="ll-rate-v"></b>
+      <label class="small">minutes inside <input type="range" id="ll-stay" min="5" max="40" step="1" value="20" style="width:130px"></label><b id="ll-stay-v"></b>
+    </div>
+    <div class="viz-controls"><label class="small">look at minute <input type="range" id="ll-t" min="0" max="120" step="1" value="60" style="width:200px"></label><b id="ll-t-v"></b></div>
+    <svg class="viz" id="ll-svg" viewBox="0 0 640 250" style="margin-top:8px"></svg>
+    <div class="viz-caption" id="ll-msg"></div>
+  </div>
+  <div class="cap">Two hours in a coffee shop. Each bar is one customer, from the minute they walk in to the minute they leave; arrivals are random and stays vary around the average. Highlighted (brighter) bars cross the dashed line: they're inside at that minute. Drag the minute and the count jumps around, but the two-hour average stays close to λ × W. Double the minutes inside and the shop is twice as full.</div>
+</div>
+
+<h3>Why it's true: count person-minutes twice</h3>
+<p>Look at the bars over 120 minutes and add up their lengths: the total <b>person-minutes</b> spent inside. Count it two ways:</p>
+<ul>
+  <li><b>By customer:</b> about 60 people came (30 an hour × 2 hours), each stayed about 20 minutes: 60 × 20 = 1,200 person-minutes.</li>
+  <li><b>By minute:</b> at each of the 120 minutes, count who's inside, and add those up. That total is 120 × L, where L is the average number inside.</li>
+</ul>
+<p>Same bars, same total, so 120 × L = 1,200 and L = 10. In general (λ × T) × W = T × L, so L = λW. That's the whole proof: the area under the bars, counted by rows or by columns.</p>
+
+<h3>What it does for servers</h3>
+<p>A service receives 20,000 requests a second, and each spends 50 ms inside it. Then on average <b>20,000 × 0.05 = 1,000 requests are in flight</b> at once. If each one holds a thread, you need about 1,000 threads (plus room for bursts). If each holds a database connection for 10 ms of that time, about 20,000 × 0.01 = 200 connections are busy.</p>
+<p>Turn it around and you get a speed limit: a pool of 100 connections, each held for 20 ms, can serve at most 100 / 0.02 = <b>5,000 queries a second</b>. That's L = λW solved for λ.</p>
+<p>Now the outage story it explains. The database gets slow: queries take 100 ms instead of 10. Traffic hasn't changed, but W has: busy connections jump 10× (20,000 × 0.1 = 2,000) and requests in flight nearly triple (50 ms becomes 140 ms). The connection pool and then the thread pool fill up, new requests queue, they wait longer, W grows again. Nobody sent more traffic, yet the service falls over. When latency goes up, <b>concurrency goes up with it</b>, and that's often what runs out first.</p>
+
+<div class="keyidea"><p><b>Little's law:</b> things inside = arrival rate × time each spends inside (L = λW). Use it to size pools (threads, connections, buffers), to find a pool's throughput limit (λ = L / W), and to predict that a slowdown multiplies concurrency.</p></div>
+
+<div class="check" id="check-little">
+  <p class="q">A service handles 4,000 requests/s at 25 ms each, using 100 worker threads (one request per thread). A dependency slows down and each request now takes 50 ms. Traffic stays at 4,000/s. What happens?</p>
+  <div class="opts">
+    <button>Nothing; it's the same traffic</button>
+    <button data-correct>It needs 200 threads busy; with 100 it can serve only 2,000/s and the rest queue</button>
+    <button>It needs 50 threads now</button>
+  </div>
+  <div class="fb right"><p>Exactly. Before: 4,000 × 0.025 = 100 in flight, so the pool was already full. After: 4,000 × 0.05 = 200. With 100 threads the most it can do is 100 / 0.05 = 2,000 requests a second, so half the traffic piles up in a queue that grows every second.</p></div>
+  <div class="fb wrong"><p>Go back to the coffee shop: same customers per hour, but each now stays twice as long. The shop holds twice as many people. Here: 4,000 arrive each second and each stays 0.05 s, so 4,000 × 0.05 = 200 are inside. A pool of 100 can only hold 100, so it serves 100 / 0.05 = 2,000 a second. "Same traffic" ignores the time inside, and "50 threads" divides instead of multiplying.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Random arrivals, and why 100% busy is a trap</h2>
+
+<p>Section 3 planned to run machines at 60%. Why waste 40%? Because requests don't arrive evenly spaced. They arrive when millions of people independently decide to tap, and independent decisions <b>bunch up</b>.</p>
+
+<h3>The shape of random arrivals</h3>
+<p>Picture 100,000 users, each with a tiny chance of tapping in any given second, so that on average 100 taps arrive per second. Some seconds get 90, some 110, now and then 130. This pattern (many independent sources, each one rarely active) is called a <b>Poisson process</b>, and it fits real traffic well over short windows. Two facts carry most of the intuition:</p>
+<ul>
+  <li><b>The typical swing is the square root of the average.</b> At 100 per second the typical swing is √100 = 10, so most seconds land between 80 and 120. A second with 130 or more happens about 0.2% of the time: every 7 minutes or so. Never is not an option.</li>
+  <li><b>Bigger is smoother.</b> At 10,000 per second the swing is ±100, just 1%. Large systems are relatively steadier than small ones, which is one quiet advantage of pooling traffic.</li>
+</ul>
+
+<h3>Bunching makes queues, even below 100%</h3>
+<p>Now one server takes 10 ms per request, so it can do 100 a second. Send it 80 a second on average: it's 80% <b>utilized</b> (busy 80% of the time). Surely nobody waits? But when the swing brings 12 requests in the same 100 ms, the server can only finish 10; two wait. Idle moments can't be saved up for later: the capacity the server wastes while it's idle is gone for good, but the queue built during a burst stays until the server works it off. The result for this classic model (random arrivals, random service times, one server) is:</p>
+<p style="text-align:center" class="big-number">time in system = service time / (1 − utilization)</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>utilization</th><th>time in system (× the 10 ms of work)</th></tr></thead>
+  <tbody>
+    <tr><td>50%</td><td>2× = 20 ms</td></tr>
+    <tr><td>80%</td><td>5× = 50 ms</td></tr>
+    <tr><td>90%</td><td>10× = 100 ms</td></tr>
+    <tr><td>95%</td><td>20× = 200 ms</td></tr>
+    <tr><td>99%</td><td>100× = 1 s</td></tr>
+  </tbody>
+</table></div>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><label class="small">utilization <input type="range" id="q-rho" min="10" max="97" step="1" value="80" style="width:220px"></label><b id="q-rho-v"></b></div>
+    <svg class="viz" id="q-svg" viewBox="0 0 640 240" style="margin-top:8px"></svg>
+    <div class="viz-caption" id="q-msg"></div>
+  </div>
+  <div class="cap">One server, random arrivals, 10 ms of work per request on average. The line is how many requests are inside (waiting or being served) over 3 seconds. Slide from 50% to 90% and watch the hills grow far faster than the 40-point change suggests. The measured average comes from 50,000 simulated requests, so near 95% it wobbles around the formula.</div>
+</div>
+
+<p>Going from 80% to 90% busy doubles the time in system. Going from 90% to 99% multiplies it by ten. That's the <b>hockey stick</b> (the curve is flat, then shoots up), and it's why capacity plans aim for 50–70% at peak: headroom for bursts, for a machine that dies, and for a deploy that takes some machines out. Real servers have several cores and smarter scheduling, which moves the knee to the right, but they don't remove it.</p>
+
+<div class="keyidea"><p>Random arrivals bunch up; the typical swing is about √(average). Because quiet moments can't be saved for busy ones, waiting grows like 1 / (1 − utilization): 2× at 50%, 10× at 90%, 100× at 99%. Plan for 50–70% busy at peak.</p></div>
+
+<details class="aside deeper">
+  <summary>Go deeper: the Poisson formula, and where this model is wrong</summary>
+  <p>With an average of λ arrivals per second, the chance of exactly k arrivals in one second is λᵏ e<sup>−λ</sup> / k!. It's the limit of "n users, each tapping with chance λ/n", as n gets huge. The gaps between arrivals are <em>exponential</em>: short gaps are common, long ones rare, and how long you've already waited tells you nothing about the next arrival.</p>
+  <p>The 1 / (1 − ρ) result (ρ, rho, for utilization) is the M/M/1 queue: Markov (random) arrivals, Markov service times, 1 server. With k servers sharing one queue (M/M/k), waiting stays low until much higher utilization, which is one more reason to share queues instead of giving each server its own line: a supermarket with one line feeding ten tills beats ten separate lines. Where does 1 / (1 − ρ) come from? For this model the average number inside works out to L = ρ / (1 − ρ); then Little's law gives the time inside, W = L / λ, and with λ = ρ / service time that is service time / (1 − ρ). Real traffic is often <em>burstier</em> than Poisson (retries, batch jobs, a celebrity's post), which makes queues worse, not better.</p>
+</details>
+
+<div class="check" id="check-util">
+  <p class="q">A server does 20 ms of work per request. At 50% utilization, requests take 40 ms on average (half work, half waiting). Traffic grows 1.8×, so the server is now 90% busy. Roughly how long does a request take now?</p>
+  <div class="opts">
+    <button>About 72 ms, 1.8× the traffic so 1.8× the time</button>
+    <button data-correct>About 200 ms</button>
+    <button>Still about 40 ms, the work per request didn't change</button>
+  </div>
+  <div class="fb right"><p>Right. Time in system = 20 ms / (1 − 0.9) = 200 ms, up from 20 / (1 − 0.5) = 40 ms. A 1.8× rise in traffic made every request 5× slower. That's the hockey stick, and it's why you add machines long before 100%.</p></div>
+  <div class="fb wrong"><p>Use the formula with the actual work, 20 ms. At 50%: 20 / 0.5 = 40 ms, which matches. At 90%: 20 / 0.1 = 200 ms. Waiting isn't proportional to traffic, because only the spare capacity (1 − utilization) absorbs bursts. Shrinking that spare from 50% to 10% makes it 5× smaller, so the time in system is 5× bigger.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Chance at scale: expected value and "at least one fails"</h2>
+
+<p>Back to the follow-up from section 1. A server is up 99.9% of the time, so at any moment it's down with probability p = 0.001. We have 100 of them.</p>
+
+<h3>The average: expected value</h3>
+<p>How many are down at a typical moment? Each one contributes "1 server down" with chance 0.001, so on average 100 × 0.001 = <b>0.1 servers</b> are down. That's the <b>expected value</b>: the long-run average of a quantity, found by adding up (each outcome × its chance). The useful rule is <b>linearity</b>: the expected total is the sum of the expected parts, always, even if the parts affect each other. Expected disks failing this year = disks × yearly failure rate. Expected colliding pairs = pairs × chance per pair (section 11 needs this).</p>
+<p>But an average of 0.1 doesn't tell you how often <em>something</em> is broken. For that we need a different question.</p>
+
+<h3>At least one: multiply the good cases</h3>
+<p>"At least one is down" has many ways to happen (server 1, or 7, or 3 and 50…). Its opposite has just one: <b>all 100 are up</b>. If the servers fail <b>independently</b> (one being down doesn't change the chance of another being down), then chances of "this and that" multiply, like coin flips:</p>
+<p style="text-align:center" class="big-number">P(all up) = 0.999¹⁰⁰ ≈ 0.905, so P(at least one down) = 1 − 0.999¹⁰⁰ ≈ 9.5%</p>
+
+<div class="table-wrap"><table class="steps-table">
+  <thead><tr><th>servers n</th><th>P(at least one down), each 0.1%</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>0.1%</td></tr>
+    <tr><td>10</td><td>1.0%</td></tr>
+    <tr><td>100</td><td>9.5%</td></tr>
+    <tr><td>1,000</td><td>63%</td></tr>
+    <tr><td>10,000</td><td>99.995%</td></tr>
+  </tbody>
+</table></div>
+
+<p>Two shortcuts make this mental math. While n × p is small (say under 0.1), the answer is about <b>n × p</b>: 10 × 0.001 = 1%. Once n × p is near 1 or bigger, use <b>1 − e<sup>−np</sup></b>: for 1,000 servers, np = 1 and 1 − e⁻¹ ≈ 63%. At 10,000 servers something is always broken, so the system must treat failure as normal, not exceptional.</p>
+
+<p>The same arithmetic runs in reverse for redundancy. Two independent replicas, each down 1% of the time: both down at once is 0.01 × 0.01 = 0.01%. Requiring <em>all</em> parts multiplies availabilities down (100 parts at 99.9% give 90.5%); needing <em>any one</em> of several copies multiplies the failure chances down.</p>
+<p>Availability is often quoted in <b>nines</b>, and it helps to turn them into time. A year is about 8,760 hours. 99.9% ("three nines") allows 0.1% of that: <b>8.8 hours down a year</b>. 99.99% allows 53 minutes; 99.999% about 5 minutes. A service that calls three dependencies in a row, each at 99.9%, can't promise better than 0.999³ ≈ 99.7%: about a day of downtime a year.</p>
+
+<div class="keyidea"><p>Expected values add: n parts × p each = np on average. "At least one of n fails" = 1 − (1 − p)ⁿ, about np when that's small and 1 − e<sup>−np</sup> otherwise. Both rest on <b>independence</b>; check it before multiplying.</p></div>
+
+<details class="aside deeper">
+  <summary>Go deeper: when independence is a lie</summary>
+  <p>Failures share causes: the same rack (one power supply, one top-of-rack switch), the same bad deploy rolled to every server, the same leap-second bug, the same certificate expiring, the same overloaded dependency. Then "both replicas down" isn't p², it's close to p. The cure is to make failures independent on purpose: replicas in different racks and zones, staged rollouts, different versions in canaries, and per-cell isolation so one blast radius doesn't cover everything.</p>
+  <p>Interviewers like to ask: "You need 3 replicas for 99.99% durability, assuming independent failures. What breaks that assumption, and what do you do?" The answer is the list above, plus "I'd measure correlated failures from incident history instead of trusting the formula."</p>
+</details>
+
+<div class="check" id="check-atleast">
+  <p class="q">A nightly job runs 500 independent tasks. Each fails with probability 0.2%. What's the chance the night has at least one failure?</p>
+  <div class="opts">
+    <button>About 0.2%</button>
+    <button data-correct>About 63%</button>
+    <button>100%, since 500 × 0.2% = 1</button>
+  </div>
+  <div class="fb right"><p>Right. np = 500 × 0.002 = 1, so the answer is about 1 − e⁻¹ ≈ 63% (exactly, 1 − 0.998⁵⁰⁰ = 63.3%). Retries per task are the usual fix: one retry turns 0.2% into 0.0004% per task.</p></div>
+  <div class="fb wrong"><p>Flip it around: the night is clean only if all 500 tasks succeed, and each succeeds with chance 0.998. Independent chances multiply: 0.998⁵⁰⁰ ≈ e⁻¹ ≈ 0.37. So a failure happens 63% of nights. "0.2%" is the chance for one task, not 500. "100%" adds chances, which double-counts nights with two failures; adding only works while np is small.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Averages hide the pain: percentiles</h2>
+
+<p>Before we can talk about slow requests, we need a good way to say "slow". Take 1,000 requests: 980 take 20 ms and 20 take 2,000 ms (a garbage collection pause, a cold cache, a retry). The <b>mean</b> (the average) is (980 × 20 + 20 × 2,000) / 1,000 = <b>59.6 ms</b>. Not a single request took 59.6 ms. The fast ones took a third of that; the slow ones took 30 times as long.</p>
+
+<p>A <b>percentile</b> answers "how slow is it for the unlucky ones?". Sort the latencies. The <b>p50</b> (median) is the value halfway up the list: half the requests are at or below it. The <b>p99</b> is 99% of the way up: only 1 in 100 requests is slower. Here, p50 = 20 ms, and the p99 is 2,000 ms, because the 990th fastest of the 1,000 is already one of the slow ones.</p>
+
+<ul>
+  <li><b>The mean mixes the two groups into a number that describes nobody.</b> A small change in the slow group moves it a lot; a big change in the fast group barely shows.</li>
+  <li><b>p99 matters more than it sounds.</b> A user who loads 50 pages a session, each making a few requests, meets your p99 several times every session. Your heaviest users, often your best customers, meet it the most.</li>
+  <li><b>You can't average percentiles.</b> Server A's p99 is 100 ms, server B's is 300 ms; the combined p99 is not 200 ms. It depends on how the two distributions overlap. Keep histograms (counts per latency bucket), which you can add up across servers, then read percentiles from the sum. Tools like HdrHistogram and t-digest do this.</li>
+</ul>
+
+<div class="keyidea"><p>Report latency as percentiles (p50, p99, p99.9), not the mean. pXX is the value XX% of requests are at or below. Percentiles from different machines can't be averaged; merge histograms instead.</p></div>
+
+<div class="check" id="check-pct">
+  <p class="q">A dashboard shows the average of each server's p99 across 20 servers: 120 ms. What can you say about the fleet's real p99?</p>
+  <div class="opts">
+    <button>It's 120 ms</button>
+    <button>It's at most 120 ms</button>
+    <button data-correct>Not much: it could be well above or below 120 ms; you need the merged histogram</button>
+  </div>
+  <div class="fb right"><p>Right. If 19 servers have p99 = 50 ms and one sick server has p99 = 1,450 ms, the average of p99s is 120 ms, but the fleet's p99 depends on how many of the total requests are slow, which a per-server summary has thrown away. Merge histograms, or compute the percentile over all raw latencies.</p></div>
+  <div class="fb wrong"><p>A percentile is a position in a sorted list. Averaging two positions from two different lists doesn't give the position in the combined list. Try it: server A's latencies are all 10 ms, server B's are all 100 ms, equal traffic. Each p99 is its own value, so the average of p99s is 55 ms. But in the combined list, half the requests take 100 ms, so the fleet's p99 is 100 ms, and no request took 55 ms.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>Fan-out: when your p99 becomes everyone's median</h2>
+
+<p>Now combine sections 8 and 9. A search page asks 100 backend servers for their slice of results <em>in parallel</em> and waits for all of them. This is <b>fan-out</b>. The page is as slow as its slowest backend, like a dinner that starts when the last friend arrives.</p>
+
+<p>Say each backend is "slow" (beyond its own p99) 1% of the time, independently. The page is fast only if all 100 are fast:</p>
+<p style="text-align:center" class="big-number">P(page fast) = 0.99¹⁰⁰ ≈ 37%</p>
+<p>So 63% of page loads wait on at least one slow backend.
+The backend's rare bad case (1 in 100) has become the page's <em>normal</em> case. Its p99 latency is now roughly the page's <b>median</b>.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <label class="small">backends n <input type="range" id="fo-n" min="1" max="200" step="1" value="100" style="width:160px"></label><b id="fo-n-v"></b>
+      <label class="small">each slow <select id="fo-p"><option value="0.001">0.1% of the time</option><option value="0.01" selected>1% of the time</option><option value="0.05">5% of the time</option></select></label>
+    </div>
+    <div class="viz-controls"><button class="btn primary" id="fo-one">Send 1 request</button><button class="btn" id="fo-many">Send 1,000 requests</button></div>
+    <div id="fo-grid" style="display:flex;flex-wrap:wrap;gap:3px;margin-top:12px;max-width:560px"></div>
+    <div class="viz-caption" id="fo-msg"></div>
+  </div>
+  <div class="cap">Each square is one backend answering one request: green took about 10 ms, red took 300–1,000 ms. The request finishes when its slowest square does. "Send 1,000 requests" compares the measured share of slow requests with 1 − (1 − p)ⁿ. Set n = 1 to see a single backend's p99, then raise n and watch the request's median turn red.</div>
+</div>
+
+<h3>The rule: q-th percentile of the max = the q<sup>1/n</sup> percentile of one</h3>
+<p>Turn the question around: what must each backend achieve so that the page's p99 is still fast? The page's latency is at most some value v exactly when <em>all</em> backends are at most v. With independence, P(page ≤ v) = P(backend ≤ v)ⁿ. For the page to be under v 99% of the time, each backend needs P(backend ≤ v) = 0.99<sup>1/100</sup> ≈ 0.9999. So:</p>
+<p style="text-align:center" class="big-number">page p99 with 100 backends = each backend's p99.99</p>
+<p>To promise a p99, every backend must deliver its p99.99: a hundred times rarer bad luck. Exercise 6 turns this into code.</p>
+
+<h3>What to do about it</h3>
+<ul>
+  <li><b>Hedged requests:</b> if a backend hasn't answered by its p95 time, send the same request to a replica and take whichever answers first. The extra load is only about 5%, and the tail mostly disappears, since both copies being slow is p², not p.</li>
+  <li><b>Fewer backends per request:</b> fan out to 20, not 100, by sharding differently or caching combined results.</li>
+  <li><b>Answer with what you have:</b> return results from the 98 backends that answered within the deadline; a search page with 98% of results is better than a slow one.</li>
+  <li><b>Shrink the tail at the source:</b> garbage collection pauses, noisy neighbours, background compaction. A backend's p99.99 is now a product feature.</li>
+</ul>
+
+<details class="aside deeper">
+  <summary>Go deeper: "The Tail at Scale"</summary>
+  <p>Jeff Dean and Luiz Barroso's 2013 paper of that name is where this framing comes from. Its example: a service whose servers answer in 10 ms at their median, but with a p99 of 1 second; a request that touches 100 of them is slow 63% of the time. Its mitigations include hedged requests, <em>tied requests</em> (send to two servers, and whichever starts first tells the other to cancel), micro-partitions (many small shards per machine, so load moves in small pieces), and putting slow machines on probation. In one Google benchmark (1,000 keys read from a BigTable spread over 100 servers), sending a hedge after 10 ms cut the p99.9 from 1,800 ms to 74 ms, for just 2% more requests.</p>
+</details>
+
+<div class="check" id="check-fanout">
+  <p class="q">A page fans out to 50 services in parallel. Each service's p99 is 200 ms. Roughly what share of page loads take at least 200 ms?</p>
+  <div class="opts">
+    <button>1%, the same as each service</button>
+    <button data-correct>About 40%</button>
+    <button>50%, one per service</button>
+  </div>
+  <div class="fb right"><p>Right. Each service is under 200 ms with chance 0.99, so all 50 are with chance 0.99⁵⁰ ≈ 0.605. About 40% of pages wait 200 ms or more. To bring the page's p99 under 200 ms, each service would need 200 ms at roughly its p99.98.</p></div>
+  <div class="fb wrong"><p>A page is fast only when every one of its 50 services is fast. Each one is fast 99% of the time, and independent chances multiply: 0.99 × 0.99 × … fifty times = 0.99⁵⁰ ≈ 0.6. So 40% of pages are slow. "1%" forgets there are 50 chances to be unlucky; "50%" adds 1% fifty times, which is a fine first guess when the total is small, but here it overshoots.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>The birthday paradox: how long must an ID be?</h2>
+
+<p>You want random IDs for photos: no central counter, every server picks its own. How many random bits does an ID need so that two photos never get the same one? The intuition most people have ("2³² is 4 billion, we'll have far fewer photos than that") is wrong by a lot, and the classic party puzzle shows why.</p>
+
+<h3>23 people, 365 birthdays</h3>
+<p>In a room of 23 people, the chance that two share a birthday is just over <b>50%</b>. It sounds impossible, because you're imagining <em>your</em> birthday matching someone's: 22 chances out of 365. But a match can be between <em>any two</em> people, and 23 people make 23 × 22 / 2 = <b>253 pairs</b>. Each pair matches with chance 1/365. By linearity (section 8), the expected number of matching pairs is 253 / 365 ≈ 0.69. The number of pairs grows like n², which is why matches show up so early.</p>
+
+<p>The exact chance of no match: person 2 avoids person 1 (364/365), person 3 avoids both (363/365), and so on. Each factor is about e<sup>−i/m</sup> when i is small next to m, so the product is about e<sup>−(1 + 2 + … + (n−1))/m</sup>:</p>
+<p style="text-align:center" class="big-number">P(some collision) ≈ 1 − e<sup>−n(n−1)/2m</sup> ≈ n² / 2m when small</p>
+<p>Here n is the number of items and m the number of possible values. For 23 and 365, the formula gives 50.0%; the exact answer is 50.7%. The formula gets better as m grows, and m is huge for IDs.</p>
+
+<h3>The square-root rule</h3>
+<p>Collisions become likely when n² / 2m approaches 1, so when n is around <b>√m</b>. For a 50% chance, solve 1 − e<sup>−n²/2m</sup> = ½: n²/2m = ln 2 ≈ 0.69, so n ≈ √(2 ln 2) × √m ≈ 1.18 √m. With b random bits, m = 2ᵇ and √m = 2<sup>b/2</sup>: <b>you get only half the bits' worth of safety</b>.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>random bits</th><th>possible IDs m</th><th>50% chance of a collision at</th><th>1-in-a-million chance at</th></tr></thead>
+  <tbody>
+    <tr><td>32</td><td>4.3 × 10⁹</td><td>77,000 items</td><td>93 items</td></tr>
+    <tr><td>64</td><td>1.8 × 10¹⁹</td><td>5 × 10⁹ items</td><td>6 × 10⁶ items</td></tr>
+    <tr><td>122 (a random UUID)</td><td>5.3 × 10³⁶</td><td>2.7 × 10¹⁸ items</td><td>3 × 10¹⁵ items</td></tr>
+  </tbody>
+</table></div>
+
+<p>So 32-bit random IDs collide after tens of thousands of items, and even 64 bits is a coin flip at 5 billion items. That's why random IDs are 128 bits (a UUIDv4 has 122 random bits; the other 6 mark its version and variant). Working backwards: to keep the chance below p with n items, you need m ≥ n² / 2p, so b ≥ log₂(n² / 2p) bits. That uses the small-chance shortcut, so trust it for small p; near the edge of a power of two, compute the exact chance for the candidate b, as exercise 5 does.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <label class="small">random bits <input type="range" id="bd-b" min="8" max="128" step="1" value="32" style="width:150px"></label><b id="bd-b-v"></b>
+      <label class="small">items n <input type="range" id="bd-n" min="0" max="120" step="1" value="49" style="width:170px"></label><b id="bd-n-v"></b>
+    </div>
+    <svg class="viz" id="bd-svg" viewBox="0 0 640 230" style="margin-top:8px"></svg>
+    <div class="viz-caption" id="bd-msg"></div>
+  </div>
+  <div class="cap">The chance of at least one collision as the number of items grows (horizontal axis: each tick is 10× more items). Move the bits and the whole S-curve slides: every 2 extra bits shift it right by one doubling of items, not two. The dot is your n; the dashed line is 50%.</div>
+</div>
+
+<h3>Where it shows up</h3>
+<ul>
+  <li><b>Short links.</b> 7 random characters from a–z, A–Z, 0–9 give 62⁷ ≈ 3.5 × 10¹² codes. With 100 million links, the expected number of colliding pairs is (10⁸)² / 2 / 3.5 × 10¹² ≈ 1,400. Collisions are certain, so the insert must check and retry.</li>
+  <li><b>Hash fingerprints.</b> Git shortens commit hashes to at least 7 hex characters (28 bits) and lengthens them as a repository grows; the Linux kernel asks for 12 (48 bits) in commit references, because with millions of objects, 28-bit prefixes are shared by many pairs.</li>
+  <li><b>Hash tables and caches.</b> Put n keys into m buckets and some bucket gets two keys long before the table is full. That's why hash tables plan for collisions instead of hoping to avoid them.</li>
+</ul>
+
+<div class="keyidea"><p><b>Birthday bound:</b> n random values from m possible ones collide with chance about 1 − e<sup>−n²/2m</sup>, about n²/2m when small, because there are n²/2 pairs. Collisions start near √m: b random bits give only b/2 bits of safety. Need risk ≤ p with n items: b ≥ log₂(n²/2p).</p></div>
+
+<div class="check" id="check-birthday">
+  <p class="q">You'll store 10 million objects under random 48-bit IDs (m ≈ 2.8 × 10¹⁴). About how likely is at least one collision?</p>
+  <div class="opts">
+    <button>About 0.000004%, because 10⁷ / 2.8 × 10¹⁴ is tiny</button>
+    <button data-correct>About 16%</button>
+    <button>Essentially 100%</button>
+  </div>
+  <div class="fb right"><p>Right. n² / 2m = 10¹⁴ / (5.6 × 10¹⁴) ≈ 0.18, and 1 − e<sup>−0.18</sup> ≈ 16%. A one-in-six chance is far too high for IDs, so you'd use 64 bits at the very least, and 128 if you want to stop thinking about it.</p></div>
+  <div class="fb wrong"><p>The ratio n / m counts how likely <em>one</em> new item hits an existing one. But collisions can be between any two items, and there are n² / 2 = 5 × 10¹³ pairs. Each pair matches with chance 1/m = 1 / 2.8 × 10¹⁴, so the expected number of matching pairs is 5 × 10¹³ / 2.8 × 10¹⁴ ≈ 0.18, and the chance of at least one is 1 − e<sup>−0.18</sup> ≈ 16%. Not tiny, but not certain either.</p></div>
+</div>
+
+<details class="aside another">
+  <summary>Explain it another way: filling an empty parking lot</summary>
+  <p>Cars park in random spots of a lot with m spots, without looking. The first car always finds an empty spot. The 100th car finds 99 taken, so it hits one with chance 99/m. Add up those small risks over all cars: 0 + 1 + 2 + … + (n − 1) ≈ n²/2, all divided by m. The risk per car grows as the lot fills, which is why the total grows like n², not n. When n²/2 reaches m, a crash is about as likely as not.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s12"><span class="sec-num">12</span>How even is random load? Balls into bins</h2>
+
+<p>A load balancer sends each request to a random server out of 1,000. On average every server gets the same. But "on average" hides the question that matters: how busy is the <b>busiest</b> server? Picture throwing balls into bins at random.</p>
+
+<ul>
+  <li><b>Few balls per bin:</b> throw 1,000 requests at 1,000 servers. The average is 1 each, but the busiest server typically gets 5 or 6, while about 37% get none (the chance a server is missed by all 1,000 throws is (1 − 1/1000)¹⁰⁰⁰ ≈ e⁻¹, from section 8). The maximum grows slowly with n, like log n / log log n.</li>
+  <li><b>Many balls per bin:</b> 1,000,000 requests at 1,000 servers is 1,000 each on average, with a swing of about √1,000 ≈ 32 (section 7's square-root rule). The busiest of 1,000 servers typically lands around 1,100, about 10% above average. A quick upper estimate is average + √(2 × average × ln n) = 1,000 + √(2 × 1,000 × ln 1,000) ≈ 1,120. Plan capacity for the busiest, not the average.</li>
+  <li><b>Power of two choices:</b> pick two random servers and send the request to the less busy one. For the 1,000-into-1,000 case the maximum drops from 5–6 to about 3, and in theory it grows like log log n instead. One extra look buys most of the benefit of perfect balancing.</li>
+  <li><b>Coupon collector:</b> how many random requests until <em>every</em> server has seen at least one (for example, to warm every cache shard)? About n × ln n, plus a little: for 1,000 servers n ln n ≈ 6,900, and the exact average is n × (1 + 1/2 + … + 1/n) ≈ 7,500. The last few empty bins take the longest to hit.</li>
+</ul>
+
+<p>The same math decides how even <a href="consistent-hashing.html">consistent hashing</a> is. With one point per server on the ring, the arcs between points vary wildly, and some servers own several times the average share; giving each server many virtual points averages those arcs out, the square-root rule again.</p>
+
+<div class="keyidea"><p>Random placement is even on average but not at the top: with many requests per server the busiest is about √(2 · avg · ln n) above the average; with few, it's several times the average. "Pick the less loaded of two random choices" fixes most of it.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="s13"><span class="sec-num">13</span>What to say in the interview</h2>
+
+<p>When the interviewer says "let's do some estimates", a strong answer sounds like this:</p>
+<ol>
+  <li><b>State the assumptions out loud and round them:</b> "100 million daily users, 50 reads and 0.1 writes each, peak factor 3, photos 2 MB, feed-sized copies 200 KB. I'll use 10⁵ seconds a day."</li>
+  <li><b>Traffic:</b> "5 × 10⁹ reads a day is 50,000 a second on average, 150,000 at peak. Writes are about 100 a second. Read-heavy: caches and a CDN."</li>
+  <li><b>Storage and bandwidth:</b> "10⁷ photos × 2 MB = 20 TB a day, about 7 PB a year, 22 PB with 3 replicas. Peak egress around 300 Gbit/s, so the bytes come from a CDN."</li>
+  <li><b>Machines and pools:</b> "At 2,000 requests per machine and 60% target utilization, about 125 machines, plus spares for a zone outage. At 50 ms per request that's 7,500 requests in flight at peak by Little's law, so I'd size pools for that."</li>
+  <li><b>Chance at scale:</b> "With fan-out to 100 shards, a 1% slow tail per shard makes 63% of requests slow, so I'd hedge requests and track each shard's p99.9. IDs are random 128-bit, because 64 bits collide at a few billion."</li>
+</ol>
+<p>Then sanity-check one number against something you know ("300 Gbit/s is a few big CDN nodes, not one server") and say what you'd measure first.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-ups interviewers like</summary>
+  <ul>
+    <li><b>"What if the estimate is off by 10×?"</b> Say which design choices change: 10× fewer users fits on one database; 10× more means sharding the metadata and a second region. Estimates decide the <em>shape</em> of the design, so name the thresholds.</li>
+    <li><b>"How many shards?"</b> Divide by the per-shard limit (storage per node, writes per node), then add room to grow and to rebalance: "One year is 22 PB; at 20 TB usable per node that's about 1,100 nodes. Two years of data is 44 PB, about 2,200 nodes, so plan around 2,500 to leave room to rebalance."</li>
+    <li><b>"Why not run at 90% to save money?"</b> The 1 / (1 − ρ) curve, plus losing one of three zones moves its traffic onto the other two, so each survivor's load goes up by half: 60% becomes 90%, already on the steep part of the curve. Headroom is what absorbs failures.</li>
+    <li><b>"Users double every year."</b> Then storage isn't linear: this year adds as much as all earlier years together (1 + 2 + 4 + … is just under twice the last term). Plan for "the last year × 2", and revisit the plan before each doubling.</li>
+    <li><b>"Your p99 got worse after we added shards. Why?"</b> More fan-out: each extra shard is another chance to be slow.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Round to one significant digit, multiply leading digits, add exponents. 2¹⁰ ≈ 10³; a day ≈ 10⁵ s (86,400); a year ≈ 3 × 10⁷ s; 1 million/day ≈ 12/s.</li>
+  <li>QPS = DAU × actions per user / 86,400. Plan for the peak (2–3× average, more for events), and split reads from writes.</li>
+  <li>Storage = writes/day × bytes × days × replicas. Bandwidth = requests/s × bytes, × 8 for bits. Get the biggest term right.</li>
+  <li>Latency orders of magnitude: memory 100 ns, SSD read 100 µs, data center round trip 0.5 ms, disk seek 10 ms, across an ocean 100+ ms. Light in fiber: 200 km per ms. Quote them as of today's hardware.</li>
+  <li>Little's law: in flight = arrival rate × time inside. Slowdowns multiply concurrency; a pool of L held for W serves at most L / W per second.</li>
+  <li>Random arrivals bunch (swing ≈ √average). Time in system ≈ service / (1 − utilization): 10× at 90%. Plan 50–70% at peak.</li>
+  <li>Expected values add. P(at least one of n fails) = 1 − (1 − p)ⁿ ≈ np when small, 1 − e<sup>−np</sup> otherwise. It assumes independence; correlated failures break it.</li>
+  <li>Use percentiles, not means; merge histograms, never average percentiles. Fan-out to n turns the request's q-quantile into each backend's q<sup>1/n</sup>: page p99 at 100 backends = backend p99.99.</li>
+  <li>Birthday bound: P ≈ 1 − e<sup>−n²/2m</sup>; collisions start near √m, so b bits give b/2 bits of safety. Random IDs are 128 bits for a reason.</li>
+  <li>Random load is uneven at the top; two random choices fix most of it.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first; for estimates, write your rounded numbers before checking. The coding exercises are in <code>exercises/capacity_estimate.py</code>, <code>exercises/birthday_bound.py</code> and <code>exercises/fanout_latency.py</code>. They check numbers against values worked out by hand or offline to many digits, catch the unit and float traps, and cap each test at 2–3 seconds, so a loop where a formula belongs fails.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Estimate a chat app</h4>
+  <p>500 million daily users. Each sends 40 messages a day and reads 400. A stored message with its metadata is 200 bytes; there are 3 replicas; messages are kept 5 years; the peak factor is 3. Estimate average and peak write QPS, peak read QPS, and total storage. Then redo the write QPS with 86,400 instead of 10⁵: how far off was the round number?</p>
+  <details class="aside another"><summary>Answers</summary>
+    <p>Writes: 5 × 10⁸ × 40 = 2 × 10¹⁰ a day, / 10⁵ = <b>200,000/s</b> average, <b>600,000/s</b> at peak. Reads: 10× that, <b>6 million/s</b> at peak. Storage: 2 × 10¹⁰ × 200 B = 4 × 10¹² B = 4 TB a day; × 365 ≈ 1.5 PB a year; × 3 replicas × 5 years ≈ <b>22 PB</b>. With 86,400: 231,000/s, so the round number was about 14% low. Fine for a design; say it out loud.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Little's law and a slow database</h4>
+  <p>An API serves 3,000 requests a second at peak. Each spends 40 ms inside it, 10 ms of which is one database query. (a) How many requests are in flight? (b) How many database connections are busy on average? (c) The database slows to 100 ms per query. Same traffic. Now what are (a) and (b)? (d) The connection pool has 50 connections. What happens?</p>
+  <details class="aside another"><summary>Answers</summary>
+    <p>(a) 3,000 × 0.04 = <b>120</b>. (b) 3,000 × 0.01 = <b>30</b>. (c) Each request now takes 30 + 100 = 130 ms: 3,000 × 0.13 = <b>390</b> in flight, and 3,000 × 0.1 = <b>300</b> connections busy. (d) 50 connections held 100 ms each serve at most 50 / 0.1 = 500 queries a second, against 3,000 arriving. Requests queue for a connection, time inside grows, threads fill up, and the API fails even though only the database got slower. Timeouts, a bounded queue and shedding load are the fixes.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Chance drills</h4>
+  <p>(a) A deploy goes to 200 servers; each fails its health check with probability 0.5%, independently. Chance at least one fails? (b) A page fans out to 40 services, each with a 300 ms p99. What share of page loads wait 300 ms or more, and what percentile must each service hit at 300 ms for the page's p99 to be 300 ms? (c) You'll create 10 billion objects with random IDs and want the collision chance below one in a billion. How many random bits?</p>
+  <details class="aside another"><summary>Answers</summary>
+    <p>(a) np = 1, so about 1 − e⁻¹ ≈ <b>63%</b> (exactly 1 − 0.995²⁰⁰ = 63.3%). (b) 1 − 0.99⁴⁰ ≈ <b>33%</b>. Each needs 0.99<sup>1/40</sup> ≈ 0.99975: its <b>p99.975</b>. (c) m ≥ n² / 2p = 10²⁰ / (2 × 10⁻⁹) = 5 × 10²⁸. 2⁹⁶ ≈ 7.9 × 10²⁸ and 2⁹⁵ ≈ 4 × 10²⁸, so <b>96 bits</b>. A UUIDv4's 122 random bits are comfortably enough.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>capacity_estimate</code>: a calculator you can trust</h4>
+  <p>Write <code>in_flight</code> (Little's law), <code>machines_needed</code> (peak / (per-machine × utilization), rounded up) and <code>estimate(spec)</code>, which turns a service description into the eight numbers from sections 3–6. The tests check each against hand-worked values and catch one trap at a time: 10⁵ instead of 86,400, forgotten replicas, bytes instead of bits, and a float like 270 / 100 / 0.3 = 9.000000000000002 that a plain round-up turns into 10 machines.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>birthday_bound</code>: collision chance and ID length</h4>
+  <p><code>collision_probability(n, m)</code> must be accurate to one part in a million everywhere from 23 people and 365 days to a billion 64-bit IDs. Neither approach alone works: multiplying n factors is too slow for n = 10⁹ (each test is capped at 2 seconds) and loses every digit when 1 − i/2⁶⁴ rounds to 1.0, while the closed form is 1.4% off for small rooms. Then <code>bits_needed(n, p)</code> on top. Values in the tests were worked out offline with 60-digit arithmetic.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>fanout_latency</code>: the tail at scale</h4>
+  <p><code>prob_any_slow(p, n)</code> (precise even for p = 10⁻¹²), <code>max_fanout(p, max_prob)</code> (answers up to 10¹¹ under a 3-second cap, so no loop over n), and <code>fanout_quantile(samples, n, q)</code>: the q-quantile of the slowest of n backends, from one backend's measured latencies. The samples count every read with a budget of 3N + 100, so it's "sort once, pick one rank", not a scan per candidate; and the answers are exact ranks, which a simulation can't hit.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure</div>
+  <h4>7. Check the formulas with a simulation</h4>
+  <p>Outside the tests, write a Monte Carlo simulation (repeat a random experiment many times and count) with <code>random.Random(42)</code>: (a) put 23 random birthdays in a set, many times, and count how often a duplicate appears; (b) draw 100 backend latencies from the 99%-fast/1%-slow mix and take the max, many times, and read off the p99. How many trials do you need before (a) is within 1% of 50.7%? Why does estimating a p99.99 by simulation need about 100 times more trials than a p99? (Hint: count how many samples land beyond the percentile you're estimating.)</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>8. Say it out loud</h4>
+  <p>Set a 4-minute timer. Estimate servers, storage and bandwidth for a video upload service with 5 million uploads a day of 100 MB each, watched 200 times each on average, out loud, as in section 13. Then explain why the p99 got worse when the team split the video index into 4 times as many shards. Did you state assumptions, round, find the biggest term, plan for peak, and name fan-out?</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k "capacity_estimate or birthday_bound or fanout_latency"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="consistent-hashing.html"><small>← Previous</small>Which server holds this key?</a>
+  <a class="next" href="../../03-concurrency/index.html"><small>Next →</small>Chapter 3: Concurrency and parallelism</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  // Small seeded generator (mulberry32): same pictures on every load, no low-bit patterns.
+  function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const expo = (r, mean) => -Math.log(1 - r()) * mean;
+  const SUP = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
+  const pow10 = (e) => "10" + String(e).split("").map((c) => SUP[c]).join("");
+  const sci = (v) => {
+    if (v === 0) return "0";
+    if (v >= 1e-3 && v < 1e6) return v.toLocaleString(undefined, { maximumSignificantDigits: 3 });
+    const e = Math.floor(Math.log10(v)), mnt = v / 10 ** e;
+    return mnt.toFixed(1) + " × " + pow10(e);
+  };
+
+  // ---------- Little's law (section 6) ----------
+  (function () {
+    const W = 640, L0 = 40, R0 = 620, top = 10, bottom = 215, T = 120;
+    const x = (t) => L0 + (t / T) * (R0 - L0);
+    function draw() {
+      const rate = Number($("ll-rate").value), stay = Number($("ll-stay").value), t0 = Number($("ll-t").value);
+      $("ll-rate-v").textContent = rate; $("ll-stay-v").textContent = stay; $("ll-t-v").textContent = t0;
+      const r = rng(7 + rate * 101 + stay), lam = rate / 60, people = [];
+      let t = -60;
+      while (true) {
+        t += expo(r, 1 / lam);
+        if (t > T) break;
+        const d = stay * (0.5 + r());                 // stays vary around the average
+        if (t + d > 0) people.push([t, t + d]);
+      }
+      // lanes: each bar goes on the first lane that's free
+      const ends = [], lane = people.map(([a, b]) => { let k = ends.findIndex((e) => e <= a); if (k < 0) { k = ends.length; ends.push(0); } ends[k] = b; return k; });
+      const lanes = Math.max(ends.length, 1), lh = Math.min(14, (bottom - top) / lanes);
+      const svg = $("ll-svg"); svg.replaceChildren();
+      let area = 0, inside = 0;
+      people.forEach(([a, b], i) => {
+        const a2 = Math.max(a, 0), b2 = Math.min(b, T);
+        area += Math.max(0, b2 - a2);
+        const now = a <= t0 && t0 < b; if (now) inside++;
+        svg.append(V.s("rect", { x: x(a2), y: top + lane[i] * lh, width: Math.max(1, x(b2) - x(a2)), height: Math.max(1, lh - 1.5), rx: 1.5, fill: now ? "var(--warn)" : "var(--accent)", opacity: now ? 1 : 0.55 }));
+      });
+      for (let m = 0; m <= T; m += 20) svg.append(V.s("text", { class: "label", x: x(m), y: 235, "text-anchor": m === T ? "end" : m === 0 ? "start" : "middle", text: m === T ? m + " min" : String(m) }));
+      svg.append(V.s("line", { class: "axis", x1: L0, x2: R0, y1: bottom + 4, y2: bottom + 4 }));
+      svg.append(V.s("line", { x1: x(t0), x2: x(t0), y1: top - 4, y2: bottom + 4, stroke: "var(--text)", "stroke-dasharray": "4 3" }));
+      const avg = area / T, pred = lam * stay;
+      $("ll-msg").innerHTML = `At minute ${t0}, <b>${inside}</b> people are inside. Over the two hours the shop averaged <b>${avg.toFixed(1)}</b> people inside. ` +
+        `Little's law: λ × W = ${lam.toFixed(2)} per minute × ${stay} min = <b>${pred.toFixed(1)}</b>.`;
+    }
+    ["ll-rate", "ll-stay", "ll-t"].forEach((id) => ($(id).oninput = draw));
+    draw();
+  })();
+
+  // ---------- Queue at a given utilization (section 7) ----------
+  (function () {
+    const L0 = 44, R0 = 620, top = 12, bottom = 190, span = 300; // 300 service-times of 10 ms = 3 s
+    function draw() {
+      const rho = Number($("q-rho").value) / 100;
+      $("q-rho-v").textContent = Math.round(rho * 100) + "%";
+      const r = rng(1234 + Math.round(rho * 100)), N = 50000, arr = new Float64Array(N), dep = new Float64Array(N);
+      let t = 0, free = 0, total = 0;
+      for (let i = 0; i < N; i++) {
+        t += expo(r, 1 / rho);                         // arrivals: rate rho per service-time
+        const start = Math.max(t, free);
+        free = start + expo(r, 1);                     // service: 1 unit (10 ms) on average
+        arr[i] = t; dep[i] = free; total += free - t;
+      }
+      // number inside over the first `span` units, sampled every 0.5
+      const pts = []; let ia = 0, id = 0, peak = 1;
+      for (let s = 0; s <= span; s += 0.5) {
+        while (ia < N && arr[ia] <= s) ia++;
+        while (id < N && dep[id] <= s) id++;
+        const k = ia - id; pts.push([s, k]); peak = Math.max(peak, k);
+      }
+      const ymax = Math.max(40, Math.ceil(peak / 10) * 10);   // fixed scale, so higher load looks higher
+      const x = (s) => L0 + (s / span) * (R0 - L0), y = (k) => bottom - (k / ymax) * (bottom - top);
+      const svg = $("q-svg"); svg.replaceChildren();
+      for (let k = 0; k <= ymax; k += ymax / 5) svg.append(V.s("line", { class: "grid-line", x1: L0, x2: R0, y1: y(k), y2: y(k) }), V.s("text", { class: "label", x: L0 - 6, y: y(k) + 4, "text-anchor": "end", text: String(k) }));
+      let d = `M${x(0)},${y(0)}`;
+      pts.forEach(([s, k]) => (d += `L${x(s).toFixed(1)},${y(k).toFixed(1)}`));
+      d += `L${x(span)},${y(0)}Z`;
+      svg.append(V.s("path", { d, fill: "var(--accent-soft)", stroke: "var(--accent)", "stroke-width": 1.5 }));
+      [0, 1, 2, 3].forEach((sec) => svg.append(V.s("text", { class: "label", x: x(sec * 100), y: 210, "text-anchor": sec === 0 ? "start" : sec === 3 ? "end" : "middle", text: sec + " s" })));
+      svg.append(V.s("text", { class: "label", x: L0, y: 234, text: "requests inside the server, over 3 seconds" }));
+      const measured = (total / N) * 10, formula = 10 / (1 - rho);
+      $("q-msg").innerHTML = `At ${Math.round(rho * 100)}% busy, a request spends on average <b>${measured.toFixed(0)} ms</b> inside (measured), ` +
+        `against 10 ms / (1 − ${rho.toFixed(2)}) = <b>${formula.toFixed(0)} ms</b> from the formula. Only 10 ms of that is work; the rest is waiting.`;
+    }
+    $("q-rho").oninput = draw; draw();
+  })();
+
+  // ---------- Fan-out (section 10) ----------
+  (function () {
+    const r = rng(2013);
+    const backend = (p) => (r() < p ? 300 + 700 * r() : 8 + 4 * r());
+    function one() {
+      const n = Number($("fo-n").value), p = Number($("fo-p").value);
+      const lat = Array.from({ length: n }, () => backend(p)), worst = Math.max(...lat), slow = lat.filter((v) => v > 100).length;
+      $("fo-grid").replaceChildren(...lat.map((v) => V.el("span", { title: v.toFixed(0) + " ms", style: `width:14px;height:14px;border-radius:3px;background:${v > 100 ? "var(--bad)" : "var(--ok)"}` })));
+      $("fo-msg").innerHTML = slow ? `${slow} of ${n} backends were slow, so this request took <b>${worst.toFixed(0)} ms</b>: the slowest one decides.` :
+        `All ${n} backends were fast: this request took <b>${worst.toFixed(0)} ms</b>. The chance of that is (1 − ${p})<sup>${n}</sup> = ${(100 * Math.pow(1 - p, n)).toFixed(1)}%.`;
+    }
+    function many() {
+      const n = Number($("fo-n").value), p = Number($("fo-p").value), reqs = [];
+      for (let k = 0; k < 1000; k++) { let w = 0; for (let j = 0; j < n; j++) w = Math.max(w, backend(p)); reqs.push(w); }
+      reqs.sort((a, b) => a - b);
+      const slowShare = reqs.filter((v) => v > 100).length / 10, formula = 100 * (1 - Math.pow(1 - p, n));
+      $("fo-grid").replaceChildren(...reqs.filter((_, i) => i % 10 === 0).map((v) => V.el("span", { style: `width:14px;height:14px;border-radius:3px;background:${v > 100 ? "var(--bad)" : "var(--ok)"}` })));
+      $("fo-msg").innerHTML = `1,000 requests (each square is 10 of them, sorted): <b>${slowShare.toFixed(1)}%</b> waited on at least one slow backend; 1 − (1 − ${p})<sup>${n}</sup> = <b>${formula.toFixed(1)}%</b>. ` +
+        `Request median <b>${reqs[499].toFixed(0)} ms</b>, p99 <b>${reqs[989].toFixed(0)} ms</b>.`;
+    }
+    $("fo-n").oninput = () => { $("fo-n-v").textContent = $("fo-n").value; one(); };
+    $("fo-p").onchange = one; $("fo-one").onclick = one; $("fo-many").onclick = many;
+    $("fo-n-v").textContent = $("fo-n").value; one();
+  })();
+
+  // ---------- Birthday bound (section 11) ----------
+  (function () {
+    const L0 = 44, R0 = 620, top = 12, bottom = 180, maxE = 12;
+    const nOf = (k) => Math.round(10 ** (k / 10));
+    function prob(n, m) {
+      if (n <= 1) return 0;
+      if (n > m) return 1;
+      if (n <= 5000) { let s = 0; for (let i = 1; i < n; i++) s += Math.log1p(-i / m); return -Math.expm1(s); }
+      return -Math.expm1(-(n * (n - 1)) / 2 / m);
+    }
+    function draw() {
+      const b = Number($("bd-b").value), n = nOf(Number($("bd-n").value)), m = 2 ** b;
+      $("bd-b-v").textContent = b; $("bd-n-v").textContent = sci(n);
+      const x = (lg) => L0 + (lg / maxE) * (R0 - L0), y = (p) => bottom - p * (bottom - top);
+      const svg = $("bd-svg"); svg.replaceChildren();
+      [0, 0.25, 0.5, 0.75, 1].forEach((p) => svg.append(V.s("line", { class: "grid-line", x1: L0, x2: R0, y1: y(p), y2: y(p) }), V.s("text", { class: "label", x: L0 - 6, y: y(p) + 4, "text-anchor": "end", text: p * 100 + "%" })));
+      for (let e = 0; e <= maxE; e += 2) svg.append(V.s("text", { class: "label", x: x(e), y: 200, "text-anchor": e === 0 ? "start" : e === maxE ? "end" : "middle", text: pow10(e) }));
+      svg.append(V.s("line", { x1: L0, x2: R0, y1: y(0.5), y2: y(0.5), stroke: "var(--text)", "stroke-dasharray": "5 4", opacity: 0.6 }));
+      let d = "";
+      for (let k = 0; k <= 10 * maxE; k++) d += (k ? "L" : "M") + x(k / 10).toFixed(1) + "," + y(prob(nOf(k), m)).toFixed(1);
+      svg.append(V.s("path", { d, fill: "none", stroke: "var(--accent)", "stroke-width": 2.4 }));
+      const p = prob(n, m);
+      svg.append(V.s("circle", { cx: x(Math.log10(Math.max(n, 1))), cy: y(p), r: 5, fill: "var(--warn)" }));
+      svg.append(V.s("text", { class: "label", x: L0, y: 224, text: "items n (log scale)" }));
+      const pairs = (n * (n - 1)) / 2 / m, half = 1.1774 * Math.sqrt(m);
+      $("bd-msg").innerHTML = `${b} random bits give m = 2<sup>${b}</sup> ≈ ${sci(m)} IDs. With <b>${sci(n)}</b> items there are ${sci(n * (n - 1) / 2)} pairs, ` +
+        `so about <b>${sci(pairs)}</b> colliding pairs on average and a <b>${p >= 0.001 ? (100 * p).toFixed(1) + "%" : sci(p)}</b> chance of at least one. ` +
+        `The 50% point is near 1.18 × √m ≈ <b>${sci(half)}</b> items.`;
+    }
+    $("bd-b").oninput = draw; $("bd-n").oninput = draw; draw();
+  })();
+})();
+</script>
+</body>
+</html>
