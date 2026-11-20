@@ -40,7 +40,7 @@ the paragraph that raises its question.
 - Small inputs (5–30 items). Show the counts and compare them with the
   formula at the end.
 - Colors only through theme tokens (`var(--accent)` and friends), so Ayu Dark,
-  Mirage and Light all work.
+  Ayu Mirage, Gruvbox Dark Hard and Ayu Light all work.
 - One IIFE per figure in the script at the bottom of the page.
 
 ## 3. Check the layout

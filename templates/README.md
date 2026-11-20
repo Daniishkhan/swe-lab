@@ -47,7 +47,7 @@ Use the helpers in `assets/viz.js` (no libraries, no build step):
 - `V.graph(svg, nodes, edges, { directed })`: node-link graph with fixed coordinates.
 
 Colors come from the theme tokens in `assets/style.css`, so visuals work in all
-three Ayu themes. Cell and node states, with the same meaning in every chapter:
+four themes (Ayu Dark, Ayu Mirage, Gruvbox Dark Hard, Ayu Light). Cell and node states, with the same meaning in every chapter:
 `cmp` (being compared), `hl` (current or just written), `done` (final), `win`
 (in the window), `pivot`, `warn` (frontier), `bad` (rejected), `dim`.
 

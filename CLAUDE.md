@@ -35,9 +35,11 @@ through `write-chapter` and `visuals-and-layout`.
    other chapter 1 and 2 pages are older "box" pages waiting to be rewritten.
 3. **No external dependencies in pages.** No CDNs, frameworks or `fetch()`;
    everything works offline from `file://`. Use `assets/viz.js`.
-4. **No hard-coded colors.** Use the Ayu theme tokens from the top of
+4. **No hard-coded colors.** Use the theme tokens from the top of
    `assets/style.css` (`var(--accent)`, `--ok`, `--warn`, `--bad`,
-   `--accent-2`, `--brand`…) so Ayu Dark, Mirage and Light all work.
+   `--accent-2`, `--brand`, `--on-accent`…) so all four themes work: Ayu
+   Dark, Ayu Mirage, Gruvbox Dark Hard and Ayu Light. Fonts are bundled in
+   `assets/fonts/`: use `var(--read)` for prose, `var(--ui)`, `var(--mono)`.
    `shell.js` colors Python code blocks; give any other `<pre>`
    `class="diagram"` or `class="plain"`.
 5. **Exercise module names are unique repo-wide** (pytest imports them by
@@ -74,7 +76,7 @@ node tools/check_page.js <page.html> [--shots DIR]  # console errors, offline, 3
   stub's docstring has a `Topic: NN.MM` line.
 - `sections/15-interview-formats/mock-log.md`: one row per mock interview.
 - `assets/`: `style.css` (theme tokens, book styles), `shell.js` (top bar,
-  sidebar, theme switch, code colors), `book.js` (quick checks, review),
+  chapter sidebar, contents rail, Appearance panel, jump-to palette, code colors), `book.js` (quick checks, review),
   `viz.js` (`V.el`, `V.s`, `V.cells`, `V.player`, `V.binaryTree`, `V.graph`),
   `app.js`, `curriculum.js` (generated).
 - `templates/`: page and exercise skeletons, worksheets, and the style guide.

@@ -12,7 +12,7 @@
  * Book pages also get a markup lint: each .check has a check-* id, one
  * data-correct option and both feedback blocks; each .figure has a .cap;
  * every h2 has an id; no duplicate ids.
- * --shots DIR saves full-page screenshots: desktop in all three themes, phone in dark.
+ * --shots DIR saves full-page screenshots: desktop in all four themes, phone in dark.
  *
  * Needs Playwright (pre-installed in Claude's cloud sessions; locally: npm i -g playwright).
  * Exits 1 if anything was found.
@@ -32,7 +32,7 @@ if (!args.length) { console.error("usage: node tools/check_page.js PAGE.html [..
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
 const SIZES = [{ name: "desktop", width: 1280, height: 900 }, { name: "phone", width: 390, height: 844 }];
-const THEMES = ["dark", "mirage", "light"];
+const THEMES = ["dark", "mirage", "gruvbox", "light"];
 
 const overflow = () => {
   const over = document.documentElement.scrollWidth - innerWidth;

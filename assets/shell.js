@@ -3,16 +3,22 @@
  *
  * A page only needs:
  *   <html data-theme="dark"> + the inline theme snippet in <head>
- *   <body data-root="../../.." data-section="01" data-page="concept">
- *     <main class="content"> ... details.box panes ... </main>
+ *   <script src=".../shell.js"> in <head> (it applies saved preferences before first paint)
+ *   <body data-root="../../.." data-section="01" data-page="home|chapter|concept">
+ *     <main class="content"> ... </main>
  *
- * This script adds the top bar (sidebar toggle, collapse/expand all, theme)
- * and the sidebar (chapter navigation + "on this page" table of contents),
- * and remembers sidebar / theme / pane state in localStorage.
+ * This script adds:
+ *   - the top bar: sidebar toggle, breadcrumbs, search, theme, Appearance (Aa), contents toggle
+ *   - the left sidebar: every chapter as a collapsible tree, the current one open
+ *   - the right rail on book pages: "On this page" contents with scroll spy and reading progress
+ *   - the Appearance panel: theme, reading font, text size, line width, code font
+ *   - a jump-to palette (/ or Cmd-K) and a shortcuts sheet (?)
+ * Preferences, sidebar / rail visibility and reading progress live in localStorage.
  *
- * Shortcuts:  [  toggle sidebar    t  next theme (Ayu Dark / Mirage / Light)    e  expand all    c  collapse all
+ * Shortcuts:  [ sidebar   ] contents   t next theme   a appearance   + / - text size
+ *             / or Cmd-K jump to   e / c open / close all asides   ? shortcuts   Esc close
  *
- * It also colors Python code blocks (pre > code) with Ayu's syntax colors.
+ * It also colors Python code blocks (pre > code) with the theme's syntax colors.
  * Add class="diagram" or class="plain" to a <pre> to skip coloring.
  */
 (function () {
@@ -33,6 +39,51 @@
   };
   window.SWEStore = store;
   window.SWEh = h;
+
+  // ---- Preferences: applied right away (this script runs in <head>) so there's no flash ----
+  const THEMES = [["dark", "Ayu Dark"], ["mirage", "Ayu Mirage"], ["gruvbox", "Gruvbox Dark Hard"], ["light", "Ayu Light"]];
+  const THEME_IDS = THEMES.map((t) => t[0]);
+  const SIZES = [15, 16, 17, 18, 19.5, 21];
+  const DEFAULTS = { font: "sans", size: 2, width: "normal", code: "jetbrains" };
+  const prefs = Object.assign({}, DEFAULTS, store.get("prefs", {}));
+  const html = document.documentElement;
+  let theme = THEME_IDS.includes(store.get("theme", "dark")) ? store.get("theme", "dark") : "dark";
+  function applyPrefs() {
+    prefs.size = Math.max(0, Math.min(SIZES.length - 1, prefs.size | 0));
+    html.dataset.theme = theme;
+    html.dataset.font = prefs.font;
+    html.dataset.code = prefs.code;
+    html.dataset.width = prefs.width;
+    html.style.setProperty("--fs", SIZES[prefs.size] + "px");
+  }
+  applyPrefs();
+  const savePrefs = () => { applyPrefs(); store.set("prefs", prefs); document.dispatchEvent(new Event("swe-prefs")); };
+  const setTheme = (t) => { theme = t; store.set("theme", t); applyPrefs(); document.dispatchEvent(new Event("swe-theme")); };
+  const cycleTheme = () => setTheme(THEME_IDS[(THEME_IDS.indexOf(theme) + 1) % THEME_IDS.length]);
+
+  // ---- Icons (inline SVG, stroke = currentColor) ----
+  const ICONS = {
+    panelL: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9.5 4v16"/>',
+    panelR: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M14.5 4v16"/>',
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+    chev: '<path d="m9 6 6 6-6 6"/>',
+    home: '<path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v11.5h13V9"/>',
+    book: '<path d="M3 5h6a3 3 0 0 1 3 3v12a2.5 2.5 0 0 0-2.5-2.5H3z"/><path d="M21 5h-6a3 3 0 0 0-3 3v12a2.5 2.5 0 0 1 2.5-2.5H21z"/>',
+    flask: '<path d="M9 3h6"/><path d="M10 3v6.5L4.6 18.4A1.7 1.7 0 0 0 6.1 21h11.8a1.7 1.7 0 0 0 1.5-2.6L14 9.5V3"/><path d="M7.5 15h9"/>',
+    grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+    hash: '<path d="M5 9h15M4 15h15M10 3.5 8 20.5M16 3.5l-2 17"/>',
+    dot: '<circle cx="12" cy="12" r="3.5"/>',
+    up: '<path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/>',
+    arrow: '<path d="M5 12h14M13 5.5l6.5 6.5-6.5 6.5"/>',
+    keys: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9"/>',
+    theme: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17z" fill="currentColor"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>',
+    check: '<path d="M20 6.5 9 17.5l-5-5"/>',
+    expand: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
+  };
+  const icon = (name) => { const w = document.createElement("span"); w.className = "svg-wrap"; w.innerHTML = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`; return w; };
+
+  window.SWEicon = icon;
   document.addEventListener("DOMContentLoaded", boot);
 
   function boot() {
@@ -45,16 +96,11 @@
   const conceptHref = (s, file) => `${ROOT}/sections/${s.slug}/concepts/${file}`;
   const chapterHref = (s) => `${ROOT}/sections/${s.slug}/index.html`;
   const here = location.pathname.split("/").pop();
+  const mobile = () => window.matchMedia("(max-width: 860px)").matches;
+  const readMap = store.get("read", {});
+  const relPath = sec && PAGE === "concept" ? `sections/${sec.slug}/concepts/${here}` : null;
 
-  // ---- Theme ----
-  // Ayu Dark (default) -> Ayu Mirage -> Ayu Light. Colors live in style.css.
-  const THEMES = ["dark", "mirage", "light"];
-  const THEME_NAMES = { dark: "Ayu Dark", mirage: "Ayu Mirage", light: "Ayu Light" };
-  const currentTheme = () => (THEMES.includes(document.documentElement.dataset.theme) ? document.documentElement.dataset.theme : "dark");
-  const applyTheme = (t) => { document.documentElement.dataset.theme = t; store.set("theme", t); };
-  const toggleTheme = () => { applyTheme(THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length]); document.dispatchEvent(new Event("swe-theme")); };
-
-  // ---- Code colors: tag Python tokens so style.css can paint them in Ayu's syntax colors ----
+  // ---- Code colors: tag Python tokens so style.css can paint them in the theme's syntax colors ----
   const KEYWORDS = new Set("def class return if elif else for while in not and or is import from as with try except finally raise lambda yield pass break continue global nonlocal assert del async await".split(" "));
   const BUILTINS = new Set("len range print set dict list tuple sorted min max sum int str float bool enumerate zip abs isinstance super map filter any all reversed iter next open self object type hash id".split(" "));
   const TOKEN = /(#[^\n]*)|((?:[rRbBfFuU]{1,2})?(?:"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'))|(\b\d[\d_]*(?:\.\d+)?(?:e[+-]?\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)|([-+*/%=<>!&|^~@]+)/g;
@@ -87,120 +133,348 @@
   }
   const highlightAll = () => document.querySelectorAll("pre:not(.diagram):not(.plain) > code").forEach((c) => { if (!c.children.length) highlight(c); });
 
-  // ---- Panes ----
-  const boxes = () => [...document.querySelectorAll("details.box")];
+  // ---- Collapsibles (asides on book pages, boxes on older pages) ----
+  const collapsibles = () => [...document.querySelectorAll("details.box, details.aside")];
   const paneKey = "panes:" + location.pathname;
   const paneState = store.get(paneKey, {});
-  const setAll = (open) => { boxes().forEach((b) => (b.open = open)); };
+  const setAll = (open) => collapsibles().forEach((b) => (b.open = open));
 
-  // ---- Sidebar ----
-  const mobile = () => window.matchMedia("(max-width: 860px)").matches;
-  const setSidebar = (hidden) => { body.classList.toggle("sidebar-hidden", hidden); if (!mobile()) store.set("sidebarHidden", hidden); };
+  // ---- Sidebar & rail visibility ----
+  const toggles = { side: [], rail: [] };
+  const paintToggles = () => {
+    toggles.side.forEach((b) => b.setAttribute("aria-pressed", String(!body.classList.contains("sidebar-hidden"))));
+    toggles.rail.forEach((b) => b.setAttribute("aria-pressed", String(!body.classList.contains("rail-hidden"))));
+  };
+  const setSidebar = (hidden) => { body.classList.toggle("sidebar-hidden", hidden); if (!mobile()) store.set("sidebarHidden", hidden); paintToggles(); };
   const toggleSidebar = () => setSidebar(!body.classList.contains("sidebar-hidden"));
+  const setRail = (hidden) => { body.classList.toggle("rail-hidden", hidden); store.set("railHidden", hidden); paintToggles(); };
+  const toggleRail = () => setRail(!body.classList.contains("rail-hidden"));
 
-  function buildTopbar() {
-    const crumbs = h("nav", { class: "crumbs" });
+  // ---- Headings of this book page ----
+  const heads = [...document.querySelectorAll("main.book h2[id]")];
+  const headParts = (hd) => ({
+    num: hd.querySelector(".sec-num")?.textContent.trim() || "",
+    text: [...hd.childNodes].filter((n) => !(n.classList && n.classList.contains("sec-num"))).map((n) => n.textContent).join("").trim(),
+  });
+  function tocList(extraClass) {
+    const toc = h("div", { class: "toc" + (extraClass ? " " + extraClass : "") });
+    heads.forEach((hd) => {
+      const { num, text } = headParts(hd);
+      toc.append(h("a", { href: "#" + hd.id, "data-target": hd.id, onclick: () => { if (mobile()) setSidebar(true); } },
+        num ? h("span", { class: "n" }, num) : null, h("span", {}, text)));
+    });
+    return toc;
+  }
+
+  function iconButton(name, title, onclick, extra = {}) {
+    const b = h("button", Object.assign({ class: "ghost", title, "aria-label": title.replace(/\s+\S+$/, ""), type: "button", onclick }, extra), icon(name));
+    return b;
+  }
+
+  // ---- Top bar ----
+  function buildTopbar(hasRail) {
+    const crumbs = h("nav", { class: "crumbs", "aria-label": "Breadcrumb" });
     if (sec) {
-      crumbs.append(" / ", h("a", { href: chapterHref(sec) }, `§${sec.id} ${sec.title}`));
-      if (PAGE === "concept") crumbs.append(" / ", document.title);
+      crumbs.append(h("span", { class: "sep" }, "/"));
+      crumbs.append(PAGE === "concept" ? h("a", { href: chapterHref(sec) }, `§${sec.id} ${sec.title}`) : h("span", { class: "cur" }, `§${sec.id} ${sec.title}`));
+      if (PAGE === "concept") crumbs.append(h("span", { class: "sep" }, "/"), h("span", { class: "cur" }, document.title));
     }
-    const hasBoxes = boxes().length > 0;
-    const themeBtn = h("button", { class: "btn icon", title: "Switch theme: Ayu Dark, Mirage, Light  (t)", "aria-label": "Switch theme" });
-    const paint = () => { themeBtn.textContent = "◐ " + THEME_NAMES[currentTheme()]; };
-    themeBtn.addEventListener("click", () => { toggleTheme(); paint(); });
-    document.addEventListener("swe-theme", paint);
-    paint();
+    const sideBtn = iconButton("panelL", "Toggle sidebar  [", toggleSidebar);
+    toggles.side.push(sideBtn);
+    const search = h("button", { class: "search-trigger", type: "button", title: "Jump to a chapter or section  /", "aria-label": "Search", onclick: openPalette },
+      icon("search"), h("span", { class: "label" }, "Jump to…"), h("kbd", {}, navigator.platform.includes("Mac") ? "⌘K" : "Ctrl K"));
+    const themeBtn = iconButton("theme", "Next theme  t", cycleTheme);
+    const aaBtn = h("button", { class: "ghost", type: "button", title: "Appearance: theme, font, size  a", "aria-label": "Appearance", "aria-expanded": "false", onclick: (e) => { e.stopPropagation(); togglePop(); } },
+      h("span", { class: "aa" }, "Aa"));
+    aaBtn.id = "aa-btn";
+    let railBtn = null;
+    if (hasRail) {
+      railBtn = iconButton("panelR", "Toggle contents  ]", toggleRail);
+      railBtn.classList.add("rail-toggle");
+      toggles.rail.push(railBtn);
+    }
     return h("header", { class: "topbar" },
-      h("button", { class: "btn icon", title: "Toggle sidebar  [", "aria-label": "Toggle sidebar", onclick: toggleSidebar }, "☰"),
-      h("a", { class: "brand", href: `${ROOT}/index.html` }, "swe", h("span", {}, "/"), "prep"),
+      sideBtn,
+      h("a", { class: "brand", href: `${ROOT}/index.html` }, h("span", { class: "mark", "aria-hidden": "true" }, "s/"), h("span", {}, "swe", h("span", { class: "slash" }, "/"), "prep")),
       crumbs,
       h("div", { class: "spacer" }),
-      hasBoxes ? h("button", { class: "btn hide-sm", title: "Collapse all panes  c", onclick: () => setAll(false) }, "Collapse all") : null,
-      hasBoxes ? h("button", { class: "btn hide-sm", title: "Expand all panes  e", onclick: () => setAll(true) }, "Expand all") : null,
-      themeBtn);
+      search, themeBtn, aaBtn,
+      railBtn ? h("span", { class: "divider rail-toggle" }) : null, railBtn);
   }
 
-  function buildSidebar() {
-    const side = h("aside", { class: "sidebar", id: "sidebar" });
-    if (sec) {
-      side.append(h("h4", {}, `§${sec.id} · ${sec.title}`));
-      side.append(h("a", { href: chapterHref(sec), class: PAGE === "chapter" ? "active" : null }, "Chapter overview"));
-      for (const t of sec.topics) {
-        const pages = sec.concepts.filter((c) => c.topic === t.id);
-        if (pages.length) {
-          for (const c of pages) {
-            side.append(h("a", { href: conceptHref(sec, c.file), class: c.file === here && PAGE === "concept" ? "active" : null },
-              h("span", { class: "tag" }, t.tag), c.title));
-          }
-        } else {
-          side.append(h("a", { href: chapterHref(sec) + "#t-" + t.id, class: "pending", title: "Not written yet" },
-            h("span", { class: "tag" }, t.tag), shortTitle(t.text)));
-        }
-      }
-    }
-    const heads = document.querySelectorAll("main.book h2[id]");
-    if (heads.length) {
-      const toc = h("div", { class: "toc" });
-      heads.forEach((hd) => toc.append(h("a", { href: "#" + hd.id, "data-target": hd.id, onclick: () => { if (mobile()) setSidebar(true); } }, hd.textContent.trim())));
-      side.append(h("h4", {}, "In this chapter"), toc);
-    }
-    const bx = heads.length ? [] : boxes();
-    if (bx.length) {
-      const toc = h("div", { class: "toc" });
-      bx.forEach((b, i) => {
-        if (!b.id) b.id = "pane-" + (i + 1);
-        const label = b.querySelector(":scope > summary .label")?.textContent || b.querySelector(":scope > summary").textContent;
-        toc.append(h("a", { href: "#" + b.id, "data-target": b.id, onclick: () => { b.open = true; if (mobile()) setSidebar(true); } }, label.trim()));
-      });
-      side.append(h("h4", {}, "On this page"), toc);
-    }
-    side.append(h("h4", {}, "All chapters"));
-    for (const s of C.sections) {
-      side.append(h("a", { href: chapterHref(s), class: s.id === SECTION && PAGE !== "chapter" ? null : null },
-        h("span", { class: "tag" }, s.concepts.length ? s.concepts.length + " pg" : ""), `§${s.id} ${s.title}`));
-    }
-    return side;
-  }
-
+  // ---- Sidebar: every chapter as a tree; the current one open ----
   function shortTitle(text) {
     const cut = text.split(/[:;(]/)[0].trim();
     return cut.length > 48 ? cut.slice(0, 46) + "…" : cut;
   }
-
-  function scrollSpy() {
-    const links = [...document.querySelectorAll(".toc a")];
-    if (!links.length || !("IntersectionObserver" in window)) return;
-    const obs = new IntersectionObserver((entries) => {
-      for (const e of entries) if (e.isIntersecting) {
-        links.forEach((a) => a.classList.toggle("active", a.dataset.target === e.target.id));
+  function buildSidebar() {
+    const nav = h("nav", { class: "nav", "aria-label": "Chapters" });
+    nav.append(h("a", { class: "nav-link" + (PAGE === "home" ? " active" : ""), href: `${ROOT}/index.html` }, icon("home"), "Home"));
+    nav.append(h("div", { class: "nav-label" }, "Chapters"));
+    const openSet = new Set(store.get("openSecs", []));
+    for (const s of C.sections) {
+      const isCur = s.id === SECTION;
+      const wrap = h("div", { class: "sec" + (isCur || openSet.has(s.id) ? " open" : "") + (isCur ? " current" : "") + (s.concepts.length ? "" : " empty-sec") });
+      const chev = h("button", { class: "chev", type: "button", "aria-label": `Show topics in ${s.title}`, "aria-expanded": String(wrap.classList.contains("open")) }, icon("chev"));
+      chev.addEventListener("click", () => {
+        const open = !wrap.classList.contains("open");
+        wrap.classList.toggle("open", open);
+        chev.setAttribute("aria-expanded", String(open));
+        if (open) openSet.add(s.id); else openSet.delete(s.id);
+        store.set("openSecs", [...openSet]);
+      });
+      const link = h("a", { href: chapterHref(s), class: isCur && PAGE === "chapter" ? "active" : null, title: `§${s.id} ${s.title}` },
+        h("span", { class: "no" }, s.id), h("span", { class: "title" }, s.title),
+        s.concepts.length ? h("span", { class: "count", title: `${s.concepts.length} pages written` }, s.concepts.length) : null);
+      const kids = h("div", { class: "sec-kids" });
+      for (const t of s.topics) {
+        const pages = s.concepts.filter((c) => c.topic === t.id);
+        if (pages.length) {
+          for (const c of pages) {
+            const active = isCur && PAGE === "concept" && c.file === here;
+            const done = (readMap[`sections/${s.slug}/concepts/${c.file}`] || 0) >= 90;
+            kids.append(h("a", { class: "kid" + (active ? " active" : ""), href: conceptHref(s, c.file), title: `${t.tag} · ${t.text}`, "aria-current": active ? "page" : null },
+              h("span", { class: "dot " + t.tag }), h("span", {}, c.title), done && !active ? h("span", { class: "read-mark", title: "Read" }, "✓") : null));
+            if (active && heads.length) kids.append(tocList("toc-inline"));
+          }
+        } else {
+          kids.append(h("a", { class: "kid pending", href: chapterHref(s) + "#t-" + t.id, title: `${t.tag} · not written yet` },
+            h("span", { class: "dot " + t.tag }), shortTitle(t.text)));
+        }
       }
-    }, { rootMargin: "-20% 0px -70% 0px" });
-    const heads = document.querySelectorAll("main.book h2[id]");
-    (heads.length ? heads : boxes()).forEach((b) => obs.observe(b));
+      wrap.append(h("div", { class: "sec-row" }, chev, link), kids);
+      nav.append(wrap);
+    }
+    const foot = h("div", { class: "side-foot" },
+      h("span", { title: "Asked almost everywhere" }, h("span", { class: "dot P0" }), "P0"),
+      h("span", { title: "Often asked" }, h("span", { class: "dot P1" }), "P1"),
+      h("span", { title: "Nice to have" }, h("span", { class: "dot P2" }), "P2"),
+      h("button", { type: "button", onclick: openKeys, title: "Keyboard shortcuts  ?" }, "Shortcuts ", h("kbd", {}, "?")));
+    return h("aside", { class: "sidebar", id: "sidebar" }, nav, foot);
   }
 
+  // ---- Right rail: contents + progress ----
+  let meter = null, meterLabel = null;
+  function buildRail() {
+    meter = h("span");
+    meterLabel = h("span", {}, "0% read");
+    return h("aside", { class: "rail", "aria-label": "On this page" },
+      h("div", { class: "rail-label" }, "On this page"),
+      tocList(),
+      h("div", { class: "rail-foot" },
+        h("div", { class: "meter" }, meter), meterLabel,
+        h("a", { href: "#", onclick: (e) => { e.preventDefault(); scrollTo({ top: 0, behavior: "smooth" }); } }, icon("up"), "Back to top"),
+        document.querySelector("details.aside") ? h("a", { href: "#", onclick: (e) => { e.preventDefault(); const anyClosed = collapsibles().some((d) => !d.open); setAll(anyClosed); } }, icon("expand"), "Open / close all asides") : null));
+  }
+
+  function trackReading() {
+    if (!relPath) return;
+    store.set("last", { path: relPath, title: document.title, sec: sec.id });
+    let saved = readMap[relPath] || 0, pending = null;
+    const update = () => {
+      const max = document.documentElement.scrollHeight - innerHeight;
+      const pct = max > 0 ? Math.min(100, Math.round((100 * scrollY) / max)) : 100;
+      if (meter) { meter.style.width = pct + "%"; meterLabel.textContent = pct + "% read"; }
+      if (pct > saved) {
+        saved = pct;
+        clearTimeout(pending);
+        pending = setTimeout(() => { const m = store.get("read", {}); m[relPath] = Math.max(m[relPath] || 0, saved); store.set("read", m); }, 400);
+      }
+    };
+    addEventListener("scroll", update, { passive: true });
+    update();
+  }
+
+  function scrollSpy() {
+    if (!heads.length) return;
+    let cur = null;
+    const update = () => {
+      const line = innerHeight * 0.25;
+      let id = heads[0].id;
+      for (const hd of heads) { if (hd.getBoundingClientRect().top <= line) id = hd.id; else break; }
+      if (id === cur) return;
+      cur = id;
+      document.querySelectorAll(".toc a").forEach((a) => a.classList.toggle("active", a.dataset.target === id));
+    };
+    addEventListener("scroll", update, { passive: true });
+    update();
+  }
+
+  // ---- Appearance panel ----
+  let pop = null;
+  function buildPop() {
+    const themeGroup = h("div", { class: "themes", role: "radiogroup", "aria-label": "Theme" });
+    THEMES.forEach(([id, name]) => themeGroup.append(h("button", { class: "theme-opt", type: "button", role: "radio", "data-theme": id, "data-v": id, onclick: () => { setTheme(id); paintPop(); } },
+      h("span", { class: "preview" }, h("i"), h("i"), h("i")), h("span", { class: "name" }, name))));
+    const seg = (key, opts, label) => {
+      const s = h("div", { class: "seg", role: "radiogroup", "aria-label": label });
+      opts.forEach(([v, text, sample]) => s.append(h("button", { type: "button", role: "radio", "data-k": key, "data-v": v, onclick: () => { prefs[key] = v; savePrefs(); paintPop(); } },
+        sample ? h("span", { class: "sample", style: sample }, "Ag") : null, text)));
+      return s;
+    };
+    const ticks = h("div", { class: "ticks" });
+    SIZES.forEach((px, i) => ticks.append(h("span", { title: px + "px", onclick: () => { prefs.size = i; savePrefs(); paintPop(); } })));
+    const sizeVal = h("span", { class: "val" });
+    const step = (d) => { prefs.size = Math.max(0, Math.min(SIZES.length - 1, prefs.size + d)); savePrefs(); paintPop(); };
+    pop = h("div", { class: "pop", id: "appearance", role: "dialog", "aria-label": "Appearance", onclick: (e) => e.stopPropagation() },
+      h("h3", {}, "Appearance", h("button", { class: "ghost", type: "button", "aria-label": "Close", onclick: () => togglePop(false), style: "width:28px;height:28px" }, icon("x"))),
+      h("div", { class: "group" }, h("div", { class: "glabel" }, h("span", {}, "Theme"), h("kbd", {}, "t")), themeGroup),
+      h("div", { class: "group" }, h("div", { class: "glabel" }, "Reading font"),
+        seg("font", [["sans", "Inter", "font-family:Inter"], ["serif", "Literata", "font-family:Literata"], ["system", "System", "font-family:-apple-system,BlinkMacSystemFont,sans-serif"]], "Reading font")),
+      h("div", { class: "group" }, h("div", { class: "glabel" }, h("span", {}, "Text size"), h("span", {}, h("kbd", {}, "−"), " ", h("kbd", {}, "+"))),
+        h("div", { class: "stepper" },
+          h("button", { class: "btn icon", type: "button", "aria-label": "Smaller text", onclick: () => step(-1), style: "font-size:0.75rem;width:34px;justify-content:center" }, "A"),
+          ticks,
+          h("button", { class: "btn icon", type: "button", "aria-label": "Larger text", onclick: () => step(1), style: "font-size:1.05rem;width:34px;justify-content:center" }, "A"),
+          sizeVal)),
+      h("div", { class: "group" }, h("div", { class: "glabel" }, "Line width"), seg("width", [["narrow", "Narrow"], ["normal", "Normal"], ["wide", "Wide"]], "Line width")),
+      h("div", { class: "group" }, h("div", { class: "glabel" }, "Code font"), seg("code", [["jetbrains", "JetBrains Mono"], ["system", "SF Mono"]], "Code font")),
+      h("div", { class: "group" }, h("button", { class: "btn reset", type: "button", onclick: () => { Object.assign(prefs, DEFAULTS); savePrefs(); setTheme("dark"); paintPop(); } }, "Reset to defaults")));
+    pop._paint = () => {
+      pop.querySelectorAll(".theme-opt").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.v === theme)));
+      pop.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-checked", String(prefs[b.dataset.k] === b.dataset.v)));
+      [...ticks.children].forEach((t, i) => t.classList.toggle("on", i <= prefs.size));
+      sizeVal.textContent = SIZES[prefs.size] + "px";
+    };
+    document.body.append(pop);
+    return pop;
+  }
+  const paintPop = () => pop && pop._paint();
+  function togglePop(force) {
+    if (!pop) buildPop();
+    const open = force === undefined ? !pop.classList.contains("open") : force;
+    if (open) closeModals();
+    paintPop();
+    pop.classList.toggle("open", open);
+    document.getElementById("aa-btn")?.setAttribute("aria-expanded", String(open));
+  }
+  document.addEventListener("click", () => { if (pop?.classList.contains("open")) togglePop(false); });
+  document.addEventListener("swe-theme", paintPop);
+
+  // ---- Jump-to palette ----
+  let palette = null;
+  function paletteItems() {
+    const items = [];
+    heads.forEach((hd) => { const { num, text } = headParts(hd); items.push({ grp: "On this page", icon: "hash", title: (num ? num + ". " : "") + text, href: "#" + hd.id, where: "" }); });
+    items.push({ grp: "Chapters", icon: "home", title: "Home", href: `${ROOT}/index.html`, where: "" });
+    for (const s of C.sections) {
+      items.push({ grp: "Chapters", icon: "grid", title: `§${s.id} ${s.title}`, href: chapterHref(s), where: s.concepts.length ? `${s.concepts.length} written` : "" });
+      for (const c of s.concepts) items.push({ grp: "Reading", icon: "book", title: c.title, href: conceptHref(s, c.file), where: `§${s.id} ${s.title}` });
+      for (const t of s.topics) if (!s.concepts.some((c) => c.topic === t.id)) items.push({ grp: "Topics not written yet", icon: "dot", title: shortTitle(t.text), href: chapterHref(s) + "#t-" + t.id, where: `§${s.id} · ${t.tag}`, extra: t.text });
+    }
+    return items;
+  }
+  function buildPalette() {
+    const all = paletteItems();
+    const input = h("input", { type: "text", placeholder: "Jump to a chapter, page or section…", "aria-label": "Search", autocomplete: "off", spellcheck: "false" });
+    const results = h("div", { class: "results", role: "listbox" });
+    let shown = [], sel = 0;
+    const draw = () => {
+      const q = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      shown = all.filter((it) => {
+        if (!q.length) return it.grp !== "Topics not written yet" && (heads.length ? it.grp !== "Reading" || it.where.startsWith("§" + SECTION) : true);
+        const hay = (it.title + " " + it.where + " " + (it.extra || "")).toLowerCase();
+        return q.every((w) => hay.includes(w));
+      }).slice(0, 80);
+      sel = Math.min(sel, Math.max(0, shown.length - 1));
+      results.replaceChildren();
+      if (!shown.length) { results.append(h("div", { class: "none" }, "Nothing matches. Try fewer words.")); return; }
+      let grp = null;
+      shown.forEach((it, i) => {
+        if (it.grp !== grp) { grp = it.grp; results.append(h("div", { class: "grp" }, grp)); }
+        const a = h("a", { class: "res" + (i === sel ? " sel" : ""), href: it.href, role: "option", onmousemove: () => { if (sel !== i) { sel = i; paintSel(); } }, onclick: () => closeModals() },
+          icon(it.icon), h("span", {}, it.title), it.where ? h("span", { class: "where" }, it.where) : null);
+        results.append(a);
+      });
+    };
+    const paintSel = () => {
+      const rows = results.querySelectorAll(".res");
+      rows.forEach((r, i) => r.classList.toggle("sel", i === sel));
+      rows[sel]?.scrollIntoView({ block: "nearest" });
+    };
+    input.addEventListener("input", () => { sel = 0; draw(); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); sel = Math.min(shown.length - 1, sel + 1); paintSel(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); sel = Math.max(0, sel - 1); paintSel(); }
+      else if (e.key === "Enter" && shown[sel]) { e.preventDefault(); closeModals(); location.href = shown[sel].href; }
+    });
+    palette = h("div", { class: "modal palette", onclick: (e) => { if (e.target === palette) closeModals(); } },
+      h("div", { class: "panel-box", role: "dialog", "aria-label": "Jump to" },
+        h("div", { class: "q-row" }, icon("search"), input),
+        results,
+        h("div", { class: "hint" }, h("span", {}, h("kbd", {}, "↑"), " ", h("kbd", {}, "↓"), " move"), h("span", {}, h("kbd", {}, "↵"), " open"), h("span", {}, h("kbd", {}, "esc"), " close"))));
+    palette._open = () => { input.value = ""; sel = 0; draw(); palette.classList.add("open"); input.focus(); };
+    document.body.append(palette);
+  }
+  function openPalette() { togglePop(false); closeModals(); if (!palette) buildPalette(); palette._open(); }
+
+  // ---- Shortcuts sheet ----
+  let keysModal = null;
+  function openKeys() {
+    togglePop(false); closeModals();
+    if (!keysModal) {
+      const row = (keys, what) => [h("dt", {}, keys.map((k, i) => [i ? " " : "", h("kbd", {}, k)])), h("dd", {}, what)];
+      keysModal = h("div", { class: "modal", onclick: (e) => { if (e.target === keysModal) closeModals(); } },
+        h("div", { class: "panel-box keys", role: "dialog", "aria-label": "Keyboard shortcuts" },
+          h("h3", {}, "Keyboard shortcuts"),
+          h("dl", {},
+            row(["/"], "Jump to a chapter, page or section (also ⌘K)"),
+            row(["["], "Show or hide the chapters sidebar"),
+            row(["]"], "Show or hide the contents rail (wide screens)"),
+            row(["t"], "Next theme: Ayu Dark, Ayu Mirage, Gruvbox Dark Hard, Ayu Light"),
+            row(["a"], "Appearance: theme, font, text size, line width"),
+            row(["+", "−"], "Larger or smaller text"),
+            row(["e", "c"], "Open or close every aside on the page"),
+            row(["esc"], "Close whatever is open"),
+            row(["?"], "This sheet"))));
+      document.body.append(keysModal);
+    }
+    keysModal.classList.add("open");
+  }
+  function closeModals() { document.querySelectorAll(".modal.open").forEach((m) => m.classList.remove("open")); }
+
+  // ---- Assemble ----
   function init() {
     const main = document.querySelector("main.content");
     if (!main) return;
-    // restore pane state, then remember changes
-    boxes().forEach((b, i) => {
+    collapsibles().forEach((b, i) => {
+      if (!b.classList.contains("box")) return;
       const id = b.id || "pane-" + (i + 1);
       if (id in paneState) b.open = paneState[id];
       b.addEventListener("toggle", () => { paneState[id] = b.open; store.set(paneKey, paneState); });
     });
+    const hasRail = heads.length > 0;
     const layout = h("div", { class: "layout" });
+    const page = h("div", { class: "page" + (hasRail ? " has-rail" : "") });
     main.replaceWith(layout);
-    layout.append(buildSidebar(), main);
-    body.prepend(buildTopbar());
+    page.append(main);
+    if (hasRail) page.append(buildRail());
+    layout.append(buildSidebar(), page);
+    body.prepend(buildTopbar(hasRail));
+    body.append(h("div", { class: "scrim", onclick: () => setSidebar(true) }));
     setSidebar(mobile() ? true : store.get("sidebarHidden", false));
+    if (hasRail) setRail(store.get("railHidden", false));
+    const nav = document.querySelector(".sidebar .nav");
+    const active = nav.querySelector(".kid.active, .sec-row a.active");
+    if (active) nav.scrollTop = Math.max(0, active.offsetTop - nav.clientHeight / 3);
     scrollSpy();
+    trackReading();
     highlightAll();
     document.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); return; }
+      if (e.key === "Escape") { closeModals(); togglePop(false); if (mobile()) setSidebar(true); return; }
       if (e.metaKey || e.ctrlKey || e.altKey || /input|textarea|select/i.test(e.target.tagName)) return;
-      if (e.key === "[") toggleSidebar();
-      else if (e.key === "t") toggleTheme();
-      else if (e.key === "e") setAll(true);
-      else if (e.key === "c") setAll(false);
+      const k = e.key;
+      if (k === "[") toggleSidebar();
+      else if (k === "]" && hasRail) toggleRail();
+      else if (k === "t") cycleTheme();
+      else if (k === "a") togglePop();
+      else if (k === "/") { e.preventDefault(); openPalette(); }
+      else if (k === "?") openKeys();
+      else if (k === "+" || k === "=") { prefs.size++; savePrefs(); paintPop(); }
+      else if (k === "-" || k === "_") { prefs.size--; savePrefs(); paintPop(); }
+      else if (k === "e") setAll(true);
+      else if (k === "c") setAll(false);
     });
     if (location.hash) document.getElementById(location.hash.slice(1))?.setAttribute("open", "");
   }
