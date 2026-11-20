@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="01.10">
+  <title>Totals over any range (Segment trees and Fenwick trees)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+  <style>
+    /* Brick walls for the two tree figures: one grid column per item. */
+    .bw { display: grid; gap: 3px; min-width: 0; }
+    .bw .cell { min-width: 0; height: 34px; padding: 0 2px; font-size: 0.82rem; }
+    .bw .cell.blank { visibility: hidden; }
+    .bw-idx { display: grid; gap: 3px; margin-top: 4px; font: 0.66rem var(--mono); color: var(--faint); text-align: center; }
+    .bw-label { font: 0.72rem var(--ui); color: var(--muted); margin: 10px 0 4px; }
+    .stack { display: flex; height: 16px; border-radius: 4px; overflow: hidden; background: var(--surface-3); margin: 8px 0 4px; }
+    .stack > div { height: 100%; }
+  </style>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 1 · Part 10</div>
+  <h1>Totals over any range</h1>
+  <div class="meta"><span><span class="badge P2">P2</span> the follow-up when a range question also has updates</span><span>about 55 minutes</span><span>10 quick checks · 8 exercises</span></div>
+</header>
+
+<p>"Sum of the items from i to j" is easy once: add them up. It gets hard when the questions keep coming <em>and</em> the items keep changing. Keep only the raw items and every question re-adds thousands of them. Keep running totals and every change rewrites thousands of them. This chapter builds the two structures that get both down to about log₂ n steps: the <b>segment tree</b>, which works for sums, minimums, maximums and more, and the <b>Fenwick tree</b>, a lean version for sums in a single array of n slots, with loops five lines long.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain, with numbers, why a plain array and a running-totals array each fail once updates and range questions are mixed.</li>
+    <li>Build a segment tree, and explain why any range is covered by at most two stored blocks per level, so a query is O(log n).</li>
+    <li>Use one segment tree for any associative combine (sum, min, max, gcd, joining strings) and say what the identity is for.</li>
+    <li>Explain a Fenwick tree as "a segment tree with the right children removed", and walk its two loops using <code>i &amp; -i</code>.</li>
+    <li>Add to a whole range at once with a difference array, and describe lazy propagation.</li>
+    <li>Solve rank, k-th item and "count smaller after self" questions, and pick the right structure for a problem.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: go top to bottom. Answer each quick check before reading on; a wrong answer gets the idea explained a different way. Grey "Go deeper" boxes are optional on a first read. This chapter uses tree height from <a href="trees.html">Sorted and fast</a> and the heap's array layout from <a href="heaps.html">The most urgent thing first</a>. Sections 7, 8 and 10 use binary numbers; you only need to know that 13 is 1101 (8 + 4 + 1).</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: a million counters that won't sit still</h2>
+
+<div class="story">
+  <p>You run an analytics service. For one website it keeps a count of page views for every second of the last 12 days: 12 × 86,400 = <b>1,036,800 counters</b>, about a million. Dashboards ask questions like "how many views between Tuesday 09:00 and Friday 17:30?", any start, any end, <b>20,000 times a second</b>.</p>
+  <p>At the same time, phones that were offline upload their saved events late. Each one adds 1 to the counter of some second in the past, also about <b>20,000 times a second</b>.</p>
+</div>
+
+<p>Try the two obvious designs. Keep only the counters: a late event is one write, but a question about the last week adds up 604,800 counters, and 20,000 of those a second is about <b>12 billion additions per second</b>. Keep running totals instead (total views from the start up to each second): a question becomes one subtraction, but a late event at a random second changes the running total of every second after it, about half a million writes on average. 20,000 of those a second is about <b>10 billion writes per second</b>.</p>
+
+<p>The structures in this chapter do both jobs in about 20 to 40 steps, because log₂ of a million is about 20. That's roughly 20,000 × 40 + 20,000 × 20 = <b>1.2 million</b> steps per second for the whole service, one core, barely busy.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Design</th><th>Add 1 to one second</th><th>Total over a range</th></tr></thead>
+  <tbody>
+    <tr><td>Raw counters</td><td>O(1)</td><td>O(n)</td></tr>
+    <tr><td>Running totals (prefix sums)</td><td>O(n)</td><td>O(1)</td></tr>
+    <tr><td><b>Segment tree or Fenwick tree</b></td><td><b>O(log n)</b></td><td><b>O(log n)</b></td></tr>
+  </tbody>
+</table></div>
+
+<div class="check" id="check-problem">
+  <p class="q">The dashboards stop changing: no more late events, ever. 20,000 range questions a second keep coming. What's the best design now?</p>
+  <div class="opts">
+    <button>Still a segment tree: O(log n) is the best you can do for ranges</button>
+    <button data-correct>Running totals: build them once in O(n), then each question is one subtraction</button>
+    <button>Raw counters: with no updates there's nothing to maintain</button>
+  </div>
+  <div class="fb right"><p>Right. Running totals are only expensive to <em>change</em>. If nothing changes, you pay O(n) once and every question after that is O(1). The trees in this chapter are for the mixed case: changes and questions arriving together.</p></div>
+  <div class="fb wrong"><p>Look at what each design pays for. Raw counters pay at question time: a week is 604,800 additions, every time, updates or not. Running totals pay at change time, and with no changes that bill is zero after one O(n) pass to build them. Then "views from a to b" is total(b) minus total(a), one subtraction, which beats the tree's 20 to 40 steps. Reach for a tree only when both kinds of operation keep arriving.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Two ways that almost work</h2>
+
+<p>Shrink the problem to 8 jars of coins, so you can see every number. The jars hold 3, 1, 4, 1, 5, 9, 2 and 6 coins, numbered 0 to 7. Two kinds of request come in: "add a coin to jar 2" and "how many coins in jars 1 to 6?".</p>
+
+<p><b>Design A: write nothing down.</b> To answer a range question, open every jar in the range and count. Adding a coin is one action, but a range of 6 jars is 6 counts, and a range of a million jars is a million.</p>
+
+<p><b>Design B: running totals.</b> Tape a note to each jar with the number of coins in it <em>and every jar to its left</em>. That's a <b>prefix sum</b>: the sum of a prefix (a starting piece) of the list. With one extra 0 in front, so that "the first 0 jars" has a total too:</p>
+
+<pre class="diagram"><code> jar          0   1   2   3   4   5   6   7
+ coins        3   1   4   1   5   9   2   6
+ prefix   0   3   4   8   9  14  23  25  31     prefix[k] = coins in jars 0..k-1
+
+ coins in jars 1..6  =  prefix[7] − prefix[1]  =  25 − 3  =  22
+ check:                 1 + 4 + 1 + 5 + 9 + 2  =  22</code></pre>
+
+<p>Any range is now one subtraction: everything up to the end, minus everything before the start. Writing ranges <b>half-open</b>, as [lo, hi) meaning "from lo up to but not including hi", like a Python slice, the rule is <code>sum(lo, hi) = prefix[hi] − prefix[lo]</code>.</p>
+
+<p>Now add a coin to jar 2. The notes on jars 2, 3, 4, 5, 6 and 7 are all wrong: each of them counted jar 2. Six notes to rewrite, and for a jar near the start of a million-jar row, nearly a million.</p>
+
+<p>Here's the tension, stated in general. Each stored number is either a <b>small fact</b> (one jar), which is cheap to update but you need many of them per question, or a <b>big total</b>, which answers a question in one read but depends on many jars, so many of them change on every update. Design A stores only small facts; design B stores only big totals. What we want is a set of stored totals where:</p>
+<ol>
+  <li>every jar is counted in only a <b>few</b> stored totals (so an update rewrites few), and</li>
+  <li>every range can be built from only a <b>few</b> stored totals (so a question reads few).</li>
+</ol>
+
+<div class="keyidea"><p>Raw items make questions slow; running totals make updates slow. The goal is a middle ground: store partial totals so that each item sits in few of them and each range is made of few of them.</p></div>
+
+<div class="check" id="check-prefix">
+  <p class="q">A prefix-sum array covers 1,000,000 items. You add 5 to item 999,990. How many prefix entries change?</p>
+  <div class="opts">
+    <button>About 1,000,000: an update to a prefix-sum array always costs n</button>
+    <button>1: only the entry for item 999,990</button>
+    <button data-correct>10: the entries for prefixes that include item 999,990</button>
+  </div>
+  <div class="fb right"><p>Right. prefix[k] counts items 0..k−1, so it includes item 999,990 only when k ≥ 999,991. That's prefix[999,991] up to prefix[1,000,000]: 10 entries. Updates near the end are cheap; updates near the start cost almost n. On average, half of n.</p></div>
+  <div class="fb wrong"><p>Ask of each stored total: "did it count this item?". prefix[k] is the sum of items 0 to k − 1. Item 999,990 is in that sum only if k − 1 ≥ 999,990, so k runs from 999,991 to 1,000,000: 10 totals. An update at item 0 would hit all 1,000,000 of them. "O(n) per update" is the worst case, and the average is n/2: still far too many for the analytics service, whose late events land all over the window.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Write down a few subtotals: blocks</h2>
+
+<p>A bank teller doesn't count a pile of coins one by one. The coins come in rolls of 50, with the count printed on the paper. She counts the rolls, then the few loose coins. Do the same with the million counters: cut them into <b>blocks</b> of 1,000, and next to each block write its total.</p>
+
+<pre class="diagram"><code> counters  [ c0 … c999 ] [ c1000 … c1999 ] [ c2000 … c2999 ]  …  [ c999000 … c999999 ]
+ blocks         B0              B1                B2                    B999
+                                    ←────────── a range ──────────→
+                     loose ends ↑       whole blocks in the middle       ↑ loose ends</code></pre>
+
+<p>An update changes one counter and one block total: <b>2 writes</b>. A range question adds the loose counters at its two ends (at most 999 at each end) and the whole blocks in between (at most about 1,000 block totals). That's at most about <b>3,000 additions</b> instead of a million. For the analytics service, 20,000 questions × 3,000 is 60 million additions a second, down from 12 billion.</p>
+
+<p>Why 1,000? The block size b is a knob. Bigger blocks mean fewer block totals to add, but longer loose ends. A range costs up to about <b>2b + n/b</b> additions. The two parts balance when 2b = n/b, at b = √(n/2), about 707 for a million, and any b within a small factor of √n (1,000 here) is nearly as good. That's why this idea is called <b>square-root decomposition</b>, and why it costs O(√n) per question.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">block size b =</span><input type="range" id="blk-b" min="0" max="15" value="10" style="width:220px"><b id="blk-bval"></b></div>
+    <div id="blk-out" style="margin-top:10px"></div>
+    <div class="viz-caption" id="blk-msg"></div>
+  </div>
+  <div class="cap">One million counters cut into blocks of size b. The bar splits a worst-case range question into loose items at the two ends (orange) and whole block totals in the middle (blue). Slide b from 1 to 1,000,000 and watch the cost fall, bottom out near b = 700, and climb again.</div>
+</div>
+
+<p>Here's the flaw. The best block size still leaves about 3,000 additions per question, and look at where most of them go: adding up a run of up to 1,000 block totals. But "add up a run of block totals" is the very same problem we started with, on a list 1,000 times shorter. So use the same trick on it: group the blocks into bigger blocks. Then group those. That's the next section.</p>
+
+<div class="keyidea"><p>Blocks of size b make an update cost 2 writes and a question about 2b + n/b additions, best near b = √n. The leftover cost is a range sum over the block totals, which is the original problem again, only smaller. Repeat the trick and you get a tree.</p></div>
+
+<div class="check" id="check-blocks">
+  <p class="q">Same million counters, but blocks of 100 instead of 1,000. What does the worst range question cost now?</p>
+  <div class="opts">
+    <button>About 300: the blocks are 10 times smaller, so the cost is 10 times smaller</button>
+    <button data-correct>About 10,000: there are now 10,000 block totals to add</button>
+    <button>About 200: only the two loose ends cost anything</button>
+  </div>
+  <div class="fb right"><p>Right. Loose ends cost at most 2 × 99 = 198, but a long range crosses up to 10,000 blocks, so the total is about 10,200. Smaller blocks moved the cost from the ends into the middle. 2b + n/b is 3,000 at b = 1,000 and 10,200 at b = 100.</p></div>
+  <div class="fb wrong"><p>A range question has two parts, and shrinking the blocks helps one and hurts the other. The loose ends shrink: at most 99 counters at each end. But a range covering almost everything now crosses a million ÷ 100 = 10,000 blocks, and each one is an addition. Total: about 10,200, more than 3 times worse than blocks of 1,000. Put numbers into 2b + n/b: b = 100 gives 200 + 10,000. The figure above shows the same thing as a bar.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Blocks of blocks: the segment tree</h2>
+
+<p>Take the grouping all the way. Pair up the items into blocks of 2 and write each block's total. Pair those into blocks of 4, then 8, and so on, until one block holds everything. Picture a brick wall: the bottom row is the items, and every brick sits on exactly two bricks of the row below and holds their total.</p>
+
+<pre class="diagram"><code> [0,8)                          31
+ [0,4) [4,8)            9                  22
+ 2-wide blocks      4       5         14        8
+ items            3   1   4   1     5   9     2   6
+ index            0   1   2   3     4   5     6   7</code></pre>
+
+<p>That's a <b>segment tree</b>: a binary tree where every node stands for one block of items, written [lo, hi), and stores the total of that block. The root covers everything, each node's two children cover its left half and right half, and the leaves are the single items. Think of a company where every manager knows the total sales of their own team: the CEO knows everything, each director knows their half, and so on down to one person.</p>
+
+<h3>Answering a question</h3>
+<p>To get the total of items 1 to 6, the range [1, 7), start at the root and look at each node's block. There are only three cases:</p>
+<ul>
+  <li><b>Fully inside</b> the range: use the node's stored total, and don't look below it.</li>
+  <li><b>Fully outside</b>: it contributes nothing; ignore it.</li>
+  <li><b>Partly inside</b>: the total is no use as it is, so ask both children the same question and add their answers.</li>
+</ul>
+
+<div class="figure">
+  <div id="seg-player"></div>
+  <div class="legend"><span><i style="background:var(--accent)"></i>looking at it now</span><span><i style="background:var(--warn)"></i>partly inside: split</span><span><i style="background:var(--ok)"></i>fully inside: use its total</span><span><i style="background:var(--border-strong)"></i>outside: skipped (faded)</span></div>
+  <div class="cap">The total of [1, 7) on 8 items, then an update. Watch which bricks get used whole: [1,2), [2,4), [4,6) and [6,7). Four stored totals answer a six-item question. Then item 5 changes from 9 to 4, and only the bricks above it are fixed.</div>
+</div>
+
+<h3>Changing an item</h3>
+<p>An update changes one leaf, and the only totals that counted that leaf are the bricks directly above it: one per row. Walk down from the root to the leaf, set the new value, and on the way back up recompute each brick on the path from its two children. With about log₂ n rows, an update is <b>O(log n)</b>. Building the whole tree is <b>O(n)</b>: each of the n − 1 inner bricks is computed once, from its two children.</p>
+
+<h3>Storing it</h3>
+<p>Like a heap, a segment tree fits in a plain array with no pointers. Number the root 1 (not 0), and the children of node i are 2i and 2i + 1, its parent i // 2. Starting at 1 makes the arithmetic one step shorter than the heap chapter's 2i + 1 and 2i + 2. When n is a power of two, 2n slots are enough. For any other n, the halves are uneven and the tree gets ragged; an array of <b>4n</b> slots is always enough for this numbering.</p>
+
+<pre><code>def query(node, lo, hi, qlo, qhi):
+    # node covers items lo..hi-1; we want the total of qlo..qhi-1
+    if qhi &lt;= lo or hi &lt;= qlo:        # fully outside: adds nothing
+        return 0
+    if qlo &lt;= lo and hi &lt;= qhi:       # fully inside: use the stored total
+        return tree[node]
+    mid = (lo + hi) // 2              # partly inside: ask both halves
+    return (query(2 * node, lo, mid, qlo, qhi) +
+            query(2 * node + 1, mid, hi, qlo, qhi))
+
+# the total of items 1..6:  query(1, 0, n, 1, 7)</code></pre>
+
+<div class="keyidea"><p>A segment tree stores the total of every block in a halving hierarchy: the whole list, its two halves, their halves, down to single items. A question uses whole blocks where it can and splits only the blocks it partly overlaps. An update fixes the one block per level above the changed item. Both are O(log n); building is O(n).</p></div>
+
+<div class="check" id="check-segment">
+  <p class="q">Same tree as the diagram (8 items). Which stored totals does the question [0, 6) use, and what's the answer?</p>
+  <div class="opts">
+    <button>[0,4) and [4,8): 9 + 22 = 31</button>
+    <button data-correct>[0,4) and [4,6): 9 + 14 = 23</button>
+    <button>[0,2), [2,4) and [4,6): 4 + 5 + 14 = 23</button>
+  </div>
+  <div class="fb right"><p>Right. The root is partly inside, so split. [0,4) is fully inside: take 9 and stop. [4,8) is partly inside: split it. [4,6) is fully inside: 14. [6,8) is fully outside. Two totals: 9 + 14 = 23. Check: 3 + 1 + 4 + 1 + 5 + 9 = 23.</p></div>
+  <div class="fb wrong"><p>Two rules decide it. A block can be used only if it's <em>fully</em> inside [0, 6), so [4,8), which includes items 6 and 7, can't be used whole: it must be split. And once a block <em>is</em> fully inside, you take its total and never go below it, so [0,4) is one read of 9, not a visit to [0,2) and [2,4). The sum would come out the same, but the work wouldn't: on a million items, refusing to stop at whole blocks turns about 40 reads into one read per item in the range, up to a million. Answer: [0,4) and [4,6), 9 + 14 = 23.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Why a question touches only O(log n) blocks</h2>
+
+<p>The update cost is easy to believe: one brick per row. The question cost is the part people take on faith, and interviewers like to ask "why is it log n and not more?". After all, a range can be huge. Why doesn't a big range need many blocks?</p>
+
+<p>Picture the range as two knife cuts through the brick wall, one at its left end and one at its right end. A brick needs to be split (it's "partly inside") only if a knife passes through it. In each row of bricks, a knife at one spot passes through at most one brick, and there are only two knives. So <b>each row has at most two split bricks</b>.</p>
+
+<p>Now count. The only bricks the search ever looks at are the root and the children of split bricks. With at most 2 split bricks per row, at most 4 bricks are looked at in the row below. A million items is 20 rows, so a question looks at no more than about 4 × 20 = <b>80 bricks</b>, and uses at most about 2 per row whole, about 40 totals. A billion items: 30 rows, about 120 bricks looked at. The range's length doesn't appear anywhere in that count; only the number of rows does.</p>
+
+<pre class="diagram"><code>         cut ↓                             ↓ cut
+row 0   [                  31                  ]
+row 1   [        9         ][        22        ]
+row 2   [   4    ][   5    ][   14   ][   8    ]
+row 3   [ 3 ][ 1 ][ 4 ][ 1 ][ 5 ][ 9 ][ 2 ][ 6 ]
+index     0    1    2    3    4    5    6    7
+
+ split: the root; [0,4) and [4,8); [0,2) and [6,8)
+ used whole: [1,2), [2,4), [4,6), [6,7)
+ 1 + 5 + 14 + 2 = 22, and never more than 2 per row</code></pre>
+
+<details class="aside another">
+  <summary>Explain it another way: making change with coins</summary>
+  <p>The blocks in a segment tree come in sizes 1, 2, 4, 8, … like coins. Covering a range with blocks is like paying an amount with those coins, with one rule: a block of size 2<sup>k</sup> can only start at a multiple of 2<sup>k</sup>. Walk from the left end of the range toward the middle: you use small blocks first to reach a "round" position, then bigger ones, each at most once per size. From the middle toward the right end, the sizes shrink again, each at most once. So the cover is at most two blocks of each size, and there are only log₂ n sizes. [1, 7) is paid as 1 + 2 + 2 + 1: rising, then falling.</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: the bottom-up segment tree in 2n slots</summary>
+  <p>There's an iterative version with no recursion: put the n leaves at array positions n to 2n − 1, and fill node i (for i from n − 1 down to 1) with the combination of nodes 2i and 2i + 1. A query starts with two pointers at the leaves for lo and hi and climbs: whenever the left pointer is a right child, its node is used whole and the pointer steps right; whenever the right pointer's neighbor is a left child, it's used whole too. Both pointers move up a level each round, so it's O(log n), and it uses exactly 2n slots for any n, not 4n. It's usually faster in practice than the recursive version.</p>
+  <p>The catch: when n isn't a power of two, some inner nodes combine items that aren't next to each other. The query never uses those nodes, so answers stay right, but if the combine isn't commutative (section 6), you must keep the left pointer's answer and the right pointer's answer separately and join them at the end in the right order.</p>
+</details>
+
+<div class="check" id="check-logn">
+  <p class="q">A segment tree holds 1,048,576 items (2<sup>20</sup>). A question asks for the total of items 3 through 1,048,570. About how many blocks does the search look at, at most?</p>
+  <div class="opts">
+    <button>About 1,000,000: the range covers nearly every item</button>
+    <button>About 1,000, the square root, like blocks</button>
+    <button data-correct>About 80: at most 4 per row, over 20 rows</button>
+  </div>
+  <div class="fb right"><p>Right. Two cuts, so at most 2 split bricks per row and at most 4 bricks looked at per row. 20 rows × 4 = 80. Most of the range is covered by a few huge bricks near the top.</p></div>
+  <div class="fb wrong"><p>A long range doesn't mean many blocks: its middle is covered by a few giant blocks near the top of the tree, such as [4, 8), [8, 16), … [262,144, 524,288) on the left half and their mirror images on the right. Only the bricks a "cut" passes through get split, and the range has just two cuts: one at item 3 and one after item 1,048,570. Each row has at most 2 split bricks, so at most 4 bricks are looked at per row, and there are 20 rows: about 80. Blocks of fixed size b give √n because they have only two levels; the tree has 20.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Any combine, not just sums</h2>
+
+<p>Nothing in the segment tree cares that the bricks hold <em>sums</em>. Each manager in the company picture only has to report something that can be worked out from their two reports' answers: the total, the smallest number on the team, the largest, the number of failed orders. Swap "+" for <code>min</code> and the same tree answers "what's the smallest item in [lo, hi)?", a <b>range minimum query</b>. On our 8 items, [1, 7) uses the same four bricks as before, now holding minimums: min(1, 1, 5, 2) = 1.</p>
+
+<p>Three conditions make a combine work:</p>
+<ol>
+  <li><b>Associative:</b> grouping doesn't change the answer, so (a ⊕ b) ⊕ c = a ⊕ (b ⊕ c), where ⊕ stands for the combine. The tree groups the items its own way, along brick boundaries: [1, 7) was computed as (1 ⊕ 5) ⊕ (14 ⊕ 2), not one item at a time from the left. Sum, min, max, gcd and "join two strings" are associative. Subtraction isn't: (8 − 3) − 2 = 3 but 8 − (3 − 2) = 7.</li>
+  <li><b>An identity:</b> a value that changes nothing, returned for "no items", such as a brick fully outside the range or an empty range. It's 0 for sum, +∞ for min, −∞ for max, 0 for gcd, "" for joining strings. Pick it wrong and it silently poisons answers: with 0 as the identity for min, every range of positive numbers that touches an outside brick comes out 0.</li>
+  <li><b>Left before right:</b> associative doesn't mean <em>commutative</em> (a ⊕ b = b ⊕ a). Sum and min don't mind the order, but joining strings does: "ab" isn't "ba". Combining "applies these edits in order" or "this transformation, then that one" is the same. Always combine the left part's answer with the right part's, in that order.</li>
+</ol>
+
+<p>Some questions can't be answered from the two halves' answers alone. Take the <b>median</b> (the middle value). The halves [1, 2, 3] and [4, 5, 100] have medians 2 and 5; the whole list's median is 3.5. Now take the halves [1, 2, 9] and [4, 5, 6]: medians 2 and 5 again, but the whole median is 4.5. Same two answers in, different answer out, so no combine can exist. Counting distinct values fails the same way: {1, 2} and {2, 3} have 2 each and 3 together, while {1, 2} and {1, 2} have 2 each and 2 together.</p>
+
+<p>And here's a difference from sums that matters in the next section. A sum can be <em>undone</em>: the total of [lo, hi) is the total up to hi minus the total up to lo. A minimum can't. Say the coldest day from January to December was −10°, and the coldest day from January to March was also −10°. What was the coldest day from April to December? Anything from −10° up: those two numbers can't tell you. (They help only in the lucky case where the year's minimum is lower than the first three months', so it must fall after March.) So for min and max, the prefix-subtraction trick from section 2 doesn't work; you need blocks that sit exactly inside the range, which is what the segment tree gives you.</p>
+
+<div class="keyidea"><p>A segment tree works for any combine that is associative and has an identity, such as sum, min, max, gcd or joining strings; combine left before right in case it isn't commutative. It can't answer questions like median or "how many distinct values", where the halves' answers don't determine the whole answer.</p></div>
+
+<details class="aside deeper">
+  <summary>Go deeper: storing more per node (maximum subarray, and more)</summary>
+  <p>When the halves' answers aren't enough, sometimes a few more numbers per node are. "Largest sum of any run of adjacent items in [lo, hi)" can't be combined from two "largest run" values, because the best run might cross the middle. Store four numbers per node instead: the total, the best run starting at the left edge, the best run ending at the right edge, and the best run anywhere. Then combine(L, R) = (L.total + R.total, max(L.prefix, L.total + R.prefix), max(R.suffix, R.total + L.suffix), max(L.best, R.best, L.suffix + R.prefix)). That's associative, O(1) per combine, and the whole tree works unchanged. Interviewers like this one because it tests whether you understand <em>what</em> a node has to remember.</p>
+  <p>Other variations worth knowing by name: a <b>persistent</b> segment tree copies only the O(log n) nodes on an update's path, so every old version stays queryable; a <b>merge sort tree</b> stores each block's items sorted, for "how many items in [lo, hi) are below x" in O(log² n); and a <b>sparse table</b> answers range min or max with no updates in O(1), after O(n log n) preprocessing, by covering any range with two overlapping power-of-two blocks (overlap is fine for min, not for sum).</p>
+</details>
+
+<div class="check" id="check-combine">
+  <p class="q">Which of these can a plain segment tree answer, storing one value per node?</p>
+  <div class="opts">
+    <button>The median of items lo..hi−1</button>
+    <button data-correct>The greatest common divisor of items lo..hi−1</button>
+    <button>The number of distinct values in lo..hi−1</button>
+  </div>
+  <div class="fb right"><p>Right. gcd(a, b, c) = gcd(gcd(a, b), c) = gcd(a, gcd(b, c)), so it's associative, and 0 is its identity because gcd(0, x) = x. Median and distinct counts can't be built from the two halves' answers.</p></div>
+  <div class="fb wrong"><p>Test each one the same way: can two different pairs of halves give the same two answers but a different whole answer? Median: [1, 2, 3] + [4, 5, 100] and [1, 2, 9] + [4, 5, 6] both give medians 2 and 5, but whole medians 3.5 and 4.5. Distinct count: {1, 2} + {2, 3} and {1, 2} + {1, 2} both give 2 and 2, but 3 and 2 together. So neither can be combined. gcd passes: the gcd of the whole is the gcd of the two halves' gcds, whichever way you group it.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Sums only? Throw away half the tree</h2>
+
+<p>When all you need is sums, there's a structure that's half the size and fits in a few lines: the <b>Fenwick tree</b>, also called a <b>binary indexed tree</b> (BIT). Peter Fenwick described it in 1994 for data compression, where a coder needs running totals of symbol counts that change as it reads. You can derive it from the segment tree in three steps.</p>
+
+<p><b>Step 1: only prefixes.</b> For sums, section 2 already showed that sum(lo, hi) = prefix(hi) − prefix(lo). So we only need fast answers to prefix questions, the total of the first k items. A prefix [0, k) has just <em>one</em> cut, at its right end.</p>
+
+<p><b>Step 2: notice what prefix questions never use.</b> In a prefix question, a right child is never used whole. If a right child were fully inside [0, k), then its left sibling, which sits further left, would be inside too, so their parent would be fully inside and the search would have used the parent and never gone down. So every right child in the tree is dead weight for prefix questions. Delete them all.</p>
+
+<pre class="diagram"><code> before: the segment tree
+ [                 1..8                 ]
+ [       1..4       ][       5..8       ]
+ [  1..2  ][  3..4  ][  5..6  ][  7..8  ]
+ [ 1 ][ 2 ][ 3 ][ 4 ][ 5 ][ 6 ][ 7 ][ 8 ]
+
+ after: every right child deleted
+ [                 1..8                 ]
+ [       1..4       ]
+ [  1..2  ]          [  5..6  ]
+ [ 1 ]     [ 3 ]     [ 5 ]     [ 7 ]
+
+ kept: 1..8, 1..4, 1..2, 5..6, 1, 3, 5, 7  =  8 blocks for 8 items
+ each kept block ends at a different item: 8, 4, 2, 6, 1, 3, 5, 7</code></pre>
+
+<p><b>Step 3: one block per item.</b> Exactly n blocks are left, and each one ends at a different item: 1 ends at 1, 1..2 at 2, 3 at 3, 1..4 at 4, and so on. So store the block that ends at item j in slot j of a plain array. No tree pointers, no 4n: n slots.</p>
+
+<p>From here on, number the items from <b>1</b>, not 0; section 8 shows why 0 is a trap. Write each slot number in binary and a pattern appears:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>slot j</th><th>binary</th><th>lowest 1 bit</th><th>covers items</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>0001</code></td><td>1</td><td>1</td></tr>
+    <tr><td>2</td><td><code>0010</code></td><td>2</td><td>1–2</td></tr>
+    <tr><td>3</td><td><code>0011</code></td><td>1</td><td>3</td></tr>
+    <tr><td>4</td><td><code>0100</code></td><td>4</td><td>1–4</td></tr>
+    <tr><td>5</td><td><code>0101</code></td><td>1</td><td>5</td></tr>
+    <tr><td>6</td><td><code>0110</code></td><td>2</td><td>5–6</td></tr>
+    <tr><td>7</td><td><code>0111</code></td><td>1</td><td>7</td></tr>
+    <tr><td>8</td><td><code>1000</code></td><td>8</td><td>1–8</td></tr>
+  </tbody>
+</table></div>
+
+<p>Slot j covers the items ending at j, and the block is as long as the <b>lowest 1 bit of j</b>, written lowbit(j). Slot 6 is 110 in binary, lowest bit 2, so it covers 2 items: 5–6. Slot 12 is 1100, lowest bit 4: items 9–12. Picture the tick marks on a ruler: every inch mark is long, half-inch marks shorter, quarter-inch shorter still. A Fenwick slot is a tick mark whose length says how far left its block reaches.</p>
+
+<p>Now a prefix question. The first 13 items: 13 is 8 + 4 + 1 (1101 in binary), so split them into a block of 1, a block of 4 and a block of 8, from the right: item 13 is slot 13, items 9–12 are slot 12, items 1–8 are slot 8. Three reads. In binary, each step <b>removes the lowest 1 bit</b>: 1101 → 1100 → 1000 → 0. A number below n has at most about log₂ n one-bits, so a prefix question is <b>O(log n)</b>.</p>
+
+<div class="keyidea"><p>A Fenwick tree is a segment tree with every right child deleted, which leaves exactly one block per item. Slot j holds the total of the lowbit(j) items ending at item j. The first k items split into blocks matching k's 1 bits, so a prefix sum reads one slot per 1 bit: O(log n).</p></div>
+
+<div class="check" id="check-cover">
+  <p class="q">In a Fenwick tree (items numbered from 1), which items does slot 12 cover?</p>
+  <div class="opts">
+    <button>Only item 12</button>
+    <button data-correct>Items 9 to 12</button>
+    <button>Items 1 to 12</button>
+  </div>
+  <div class="fb right"><p>Right. 12 is 1100 in binary; its lowest 1 bit is 4, so slot 12 holds the 4 items ending at 12: 9, 10, 11, 12. A prefix of 12 items then takes slot 12 (9–12) plus slot 8 (1–8): 12 = 8 + 4.</p></div>
+  <div class="fb wrong"><p>Use the ruler picture: a slot's block is as long as its lowest 1 bit. Odd slots (lowest bit 1) cover one item each. Slot 12 is 1100 in binary, so its lowest bit is 4 and its block is 4 items long, ending at 12: items 9–12. If slot 12 covered 1–12, that's 12 items, but 12 isn't a power of two; Fenwick blocks always are. And items 1–8 are already held by slot 8, so slot 12 only needs the rest.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Walking the bits: <code>i &amp; -i</code></h2>
+
+<p>Everything in a Fenwick tree turns on one number, lowbit(j), and computers get it in one step with <code>j &amp; -j</code>. Here's why that works, using 5-bit numbers. A negative number is stored as "flip every bit, then add 1" (that's <b>two's complement</b>, how almost every CPU stores negatives, and how Python's <code>&amp;</code> treats negative ints too):</p>
+
+<pre class="diagram"><code>  12        =  0 1 1 0 0
+  flip      =  1 0 0 1 1
+  + 1       =  1 0 1 0 0   this is -12
+  12 &amp; -12  =  0 0 1 0 0   = 4</code></pre>
+
+<ul>
+  <li><b>Flip:</b> the trailing 0s become 1s, and the lowest 1 becomes 0.</li>
+  <li><b>Add 1:</b> the carry runs through those 1s, turning them back into 0s, and stops at the lowest 1's spot, which becomes 1 again.</li>
+  <li><b>AND:</b> below that spot both numbers have 0s; above it, every bit of −12 is the flip of 12's, so the AND is 0 there too.</li>
+</ul>
+
+<p>Only the lowest 1 bit survives the AND. With that, both Fenwick operations are short loops.</p>
+
+<h3>Prefix sum: strip the lowest bit</h3>
+<pre><code>def prefix(tree, k):           # total of items 1..k (tree[0] is unused)
+    total = 0
+    while k &gt; 0:
+        total += tree[k]       # slot k holds the lowbit(k) items ending at k
+        k -= k &amp; -k           # jump left past that block: 1101 -&gt; 1100 -&gt; 1000 -&gt; 0
+    return total</code></pre>
+
+<h3>Add to one item: add the lowest bit</h3>
+<p>To add 2 to item 5, find every slot whose block contains item 5. Slot 5 does (it ends at 5). The next one is the nearest slot to the right whose block reaches back past 5, a taller tick on the ruler. You get it by <b>adding</b> the lowest bit instead of removing it: 5 + 1 = 6 (covers 5–6), 6 + 2 = 8 (covers 1–8), 8 + 8 = 16 (covers 1–16). Each addition carries into a higher bit, so the lowest bit at least doubles every step, and the walk ends after at most about log₂ n slots. The slots it skips, like 7, have blocks that start after item 5.</p>
+
+<div class="figure">
+  <div id="fen-player"></div>
+  <div class="cap">A Fenwick tree over 16 items. Each bar is one slot: it ends above its own item number and is lowbit(j) long. Pick "prefix sum" and a k to watch k lose its lowest bit at each step, or "add 2 to item p" to watch p gain it. Try k = 15 (four 1 bits, four reads) and k = 16 (one read).</div>
+</div>
+
+<p><b>The trap at 0.</b> lowbit(0) is 0 &amp; −0 = 0, so the add loop <code>j += j &amp; -j</code> adds nothing and spins forever, and the prefix loop never runs. That's why slots start at 1. If your interface counts items from 0, like a Python list, shift once at the door: item i lives in slot i + 1. Forgetting that shift is the most common Fenwick bug, and it hangs instead of crashing.</p>
+
+<p><b>Building.</b> n adds cost O(n log n). There's an O(n) way: each slot's whole total belongs inside exactly one bigger slot, the next one that includes all of its items. Exercise 4 asks you to find which one.</p>
+
+<details class="aside another">
+  <summary>Explain it another way: paying with powers of two</summary>
+  <p>Say k = 13. In binary that's 8 + 4 + 1. A Fenwick prefix sum pays for "the first 13 items" with one bill of each of those sizes, laid out from the right: the last 1 item (slot 13), the 4 before it (slot 12), the 8 before those (slot 8). Every number has exactly one such binary breakdown, so every prefix has exactly one set of slots, and the number of slots is the number of 1 bits. An add is the reverse question: "which of these bills contain item 5?" The bills that end at 5, 6, 8 and 16 do, and each is at least twice as long as the one before, so there are only about log₂ n of them.</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: Fenwick or segment tree in practice</summary>
+  <ul>
+    <li><b>Size and speed:</b> a Fenwick tree is n + 1 numbers and two tight loops, with no recursion. A segment tree is 2n to 4n slots. Both are O(log n); the Fenwick tree is usually faster in practice and much quicker to write correctly in an interview.</li>
+    <li><b>What it can't do:</b> range questions need the combine to be undoable (sum, count, xor), because a range is prefix(hi) "minus" prefix(lo). For min or max over arbitrary ranges, use a segment tree. A Fenwick tree can keep a prefix maximum if values only ever go up.</li>
+    <li><b>Two dimensions:</b> a Fenwick tree of Fenwick trees answers "sum over a rectangle of a grid" with point updates in O(log² n), with the same two loops nested.</li>
+  </ul>
+</details>
+
+<div class="check" id="check-walk">
+  <p class="q">A Fenwick tree has 16 slots. Which slots does prefix(11), the total of the first 11 items, read?</p>
+  <div class="opts">
+    <button>11, 12, 16</button>
+    <button>11, 5, 2, 1</button>
+    <button data-correct>11, 10, 8</button>
+  </div>
+  <div class="fb right"><p>Right. 11 = 1011. Strip the lowest bit: 1010 = 10. Strip again: 1000 = 8. Again: 0, stop. Slot 11 covers item 11, slot 10 covers 9–10, slot 8 covers 1–8: 1 + 2 + 8 = 11 items, each counted once.</p></div>
+  <div class="fb wrong"><p>A prefix goes <em>left</em>: it needs blocks that end at or before item 11 and fit together with no gaps. Removing the lowest 1 bit does that: 11 (1011) covers item 11, then 10 (1010) covers 9–10, then 8 (1000) covers 1–8. 11, 12, 16 is the <em>add</em> walk (adding the lowest bit), which goes right to every slot that contains item 11. Halving (11, 5, 2, 1) is a heap's parent rule, not a Fenwick's: slot 5 covers only item 5, which would leave a gap.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Changing a whole range at once</h2>
+
+<p>A hotel tracks how many rooms are booked on each night of the year. A booking from night 40 to night 70 adds 1 to 30 nights. With the trees so far that's 30 separate point updates, each O(log n), so the cost grows with the length of the booking: a range of a million items would be a million updates. The question is "add x to every item in [lo, hi)" in one O(log n) step.</p>
+
+<h3>Range add, single-item read: mark where changes start and stop</h3>
+<p>Instead of writing on every night, put a +1 marker on the night the booking starts and a −1 marker on the night it ends (the check-out night isn't booked). To get the count for night d, add up every marker from night 0 to night d. Each booking that started on or before d and hasn't ended yet contributes +1 with no matching −1 so far. Three bookings over 8 nights, [1, 4), [2, 6) and [3, 5):</p>
+
+<pre class="diagram"><code> night         0   1   2   3   4   5   6   7
+ markers       0  +1  +1  +1  −1  −1  −1   0      +1 at each start, −1 at each end
+ running sum   0   1   2   3   2   1   0   0      = rooms booked that night
+
+ night 3: inside all three bookings → 3.   night 5: only inside [2, 6) → 1.</code></pre>
+
+<p>The markers form a <b>difference array</b>: each entry is the difference between one night and the night before. A range add changes just 2 markers, and reading one night is a prefix sum of the markers. Prefix sums with point updates are exactly what a Fenwick tree does: put the markers in one, and <b>range add</b> and <b>single-item read</b> are both O(log n). It's the same +1 / −1 trick as the sweep line in <a href="intervals.html">Intervals</a>; the Fenwick tree lets the markers keep changing while you read.</p>
+
+<h3>Range add and range question: sticky notes</h3>
+<p>If you need both "add 5 to every item in [lo, hi)" and "total (or minimum) of [lo, hi)", use a segment tree with <b>lazy propagation</b>. Picture a manager receiving the memo "everyone on your team gets +5". A lazy manager doesn't walk the floor telling each person. She updates her own team total (+5 × team size, or +5 for a minimum), sticks a note on her door saying "+5 for everyone below me, not passed on yet", and stops. The range add uses the same O(log n) whole bricks a question would.</p>
+
+<p>Later, if some question or update has to look <em>inside</em> her team, she first passes the note down: each of her two direct reports applies +5 to their own total and gets their own note, and her note comes off. Notes only travel along paths the search was walking anyway, so every operation stays O(log n), however wide the ranges. The same trick handles "set every item in [lo, hi) to x".</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: range add and range sum with two Fenwick trees</summary>
+  <p>There's a Fenwick-only way to get range add <em>and</em> range sum. With markers d (the difference array, items from 1), the sum of the first k items is d₁·k + d₂·(k − 1) + … + d<sub>k</sub>·1, because marker j is counted in items j through k. That rearranges to (k + 1)·(d₁ + … + d<sub>k</sub>) − (1·d₁ + 2·d₂ + … + k·d<sub>k</sub>). So keep two Fenwick trees, one over d<sub>j</sub> and one over j·d<sub>j</sub>: a range add changes 2 entries in each, and prefix(k) = (k + 1)·S₁(k) − S₂(k). It's shorter than lazy propagation, but it only works for sums.</p>
+</details>
+
+<div class="check" id="check-range">
+  <p class="q">You need "add x to every item in [lo, hi)" and "what is item i right now?", both fast, on a million items. What's the simplest structure that does it?</p>
+  <div class="opts">
+    <button>A Fenwick tree over the items, adding x to each item in the range</button>
+    <button data-correct>A Fenwick tree over the difference array: two point adds, and item i is a prefix sum</button>
+    <button>A segment tree with lazy propagation: nothing simpler can do range adds</button>
+  </div>
+  <div class="fb right"><p>Right. A range add is +x at lo and −x at hi, and item i is the sum of markers 0..i: a prefix sum. Both O(log n). Lazy propagation also works, but it's much more code, and you only need it when you also ask range questions about min, max or (without the two-tree trick) sums.</p></div>
+  <div class="fb wrong"><p>Think about what a single item's value is in terms of the markers. If every change to a range is written as "+x where it starts, −x where it stops", then item i's value is the sum of all markers at or before i: a prefix sum. So a plain Fenwick tree over the markers does everything: range add = 2 point adds, read = 1 prefix sum. Adding x item by item is O(length × log n), a million times worse for a full-width range. Lazy propagation works too, but it's the heavy tool for when you also need range questions.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>Patterns: rank, k-th, and "how many smaller"</h2>
+
+<p>Most interview uses of these trees count things. The trick is to index the tree by <b>value</b> instead of by position: slot v holds "how many items have value v".</p>
+
+<h3>"What's my rank?"</h3>
+<p>A game has scores from 0 to 1,000,000 and millions of players. Keep a Fenwick tree of 1,000,001 counts, one per possible score. A player going from 300 to 950 is two point adds: −1 at 300, +1 at 950. A player's rank is 1 + the number of players with a higher score, which is "all players minus the players with score ≤ mine": one prefix sum. Both are about 20 steps, because log₂ of a million is about 20.</p>
+
+<h3>"Who's at rank k?" Walk down by powers of two</h3>
+<p>The reverse question: the k-th lowest score is the first score where the running count reaches k. Binary search over prefix sums works, but costs O(log n) prefix sums of O(log n) each: O(log² n). The Fenwick layout allows better: decide the answer one bit at a time, from the top. Use the 16 counts from section 8's figure (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3) and look for where the running count first reaches 40:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>at</th><th>still need</th><th>try slot</th><th>it holds</th><th>decision</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>40</td><td>0 + 16 = 16 (items 1–16)</td><td>80</td><td>80 ≥ 40: too far, don't jump</td></tr>
+    <tr><td>0</td><td>40</td><td>0 + 8 = 8 (items 1–8)</td><td>31</td><td>31 &lt; 40: jump to 8, still need 9</td></tr>
+    <tr><td>8</td><td>9</td><td>8 + 4 = 12 (items 9–12)</td><td>21</td><td>21 ≥ 9: too far</td></tr>
+    <tr><td>8</td><td>9</td><td>8 + 2 = 10 (items 9–10)</td><td>8</td><td>8 &lt; 9: jump to 10, still need 1</td></tr>
+    <tr><td>10</td><td>1</td><td>10 + 1 = 11 (item 11)</td><td>5</td><td>5 ≥ 1: too far</td></tr>
+  </tbody>
+</table></div>
+
+<p>The walk ends at 10, so the answer is the next item, <b>11</b>. Check: the running count is 39 through item 10 and 44 through item 11.</p>
+
+<p>Each try adds the next smaller power of two to where you are, and the slot you land on always covers exactly the items you'd be skipping over. One slot read per bit: <b>O(log n)</b>. This only works when every count is ≥ 0, so the running count never goes down.</p>
+
+<h3>Values too big to index: coordinate compression</h3>
+<p>If values go up to 10<sup>18</sup>, you can't have a slot per value. But you only care about their <em>order</em>. If you know all the values up front, sort the distinct ones and replace each value with its position in that sorted list: 10<sup>18</sup>, −5, 42 become 3, 1, 2. The tree now needs one slot per distinct value. This is <b>coordinate compression</b>, and it only works <em>offline</em> (all values known in advance). If values arrive one at a time and can be anything, use a balanced BST that stores subtree sizes (an "order-statistic tree") or a skip list that stores link spans, which is how Redis answers <code>ZRANK</code> on a sorted set (topic 01.11). A third option is a segment tree over the whole value range, 0 to 10<sup>18</sup>, that creates a node only when an update first reaches it. The range has about 60 levels (log₂ 10<sup>18</sup> ≈ 60), so each update creates at most about 60 nodes, and memory grows with the number of updates, not with the size of the range.</p>
+
+<h3>"How many smaller numbers are to my right?"</h3>
+<p>For each item, count the items to its right that are smaller. Comparing every pair is O(n²). Instead, walk from the <b>right</b>, and keep a Fenwick tree of counts of the values you've already passed. Each value you pass is to the left of everything you've seen, so "how many seen values are smaller than mine?" is exactly the answer: a prefix sum up to my rank minus one. Then add my own value. For [5, 2, 6, 1] the ranks are 5 → 3, 2 → 2, 6 → 4, 1 → 1:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>next item (from the right)</th><th>its rank</th><th>ranks seen so far</th><th>smaller ones seen = prefix(rank − 1)</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>1</td><td>none</td><td>0</td></tr>
+    <tr><td>6</td><td>4</td><td>1</td><td>1</td></tr>
+    <tr><td>2</td><td>2</td><td>1, 4</td><td>1</td></tr>
+    <tr><td>5</td><td>3</td><td>1, 2, 4</td><td>2</td></tr>
+  </tbody>
+</table></div>
+
+<p>Read back left to right, the answer is [2, 1, 1, 0]: O(n log n) instead of O(n²).</p>
+
+<p>Add the answers up and you get the number of <b>inversions</b> (pairs that are out of order), a measure of how unsorted a list is. Merge sort can count them too, while it merges.</p>
+
+<div class="check" id="check-dupes">
+  <p class="q">Walking [3, 3, 1] from the right, you've passed 1 and the second 3, and now you're at the first 3. Which query counts the smaller items to its right?</p>
+  <div class="opts">
+    <button>prefix(rank of 3): everything seen with a rank up to 3's</button>
+    <button data-correct>prefix(rank of 3 − 1): everything seen with a rank below 3's</button>
+    <button>total seen − prefix(rank of 3)</button>
+  </div>
+  <div class="fb right"><p>Right. Ranks: 1 → 1, 3 → 2. prefix(1) counts only the 1, giving 1. The other 3 is equal, not smaller, so it must not count. The full answer is [1, 1, 0].</p></div>
+  <div class="fb wrong"><p>Plug in the numbers. Ranks are 1 → 1 and 3 → 2; you've seen ranks {1, 2}. prefix(2) counts both, giving 2, but one of them is the other 3, which isn't smaller. total − prefix(2) = 0 counts the seen values that are <em>bigger</em>. prefix(2 − 1) = prefix(1) counts just the 1: the right answer, 1. "Strictly smaller" means stopping one rank short; with "smaller or equal" you'd use the full rank.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: the same ideas in real systems</summary>
+  <ul>
+    <li><b>Rollups:</b> monitoring tools such as RRDtool and Graphite's Whisper store one series at several resolutions (per-minute and per-hour totals, for example), so a month-long chart reads hundreds of stored totals instead of millions of raw points. That's section 3's blocks with a few fixed levels.</li>
+    <li><b>Rank in a database:</b> PostgreSQL's B-tree indexes don't keep a count per subtree, so <code>COUNT(*)</code> over a range of keys reads every matching entry. Keeping counts would make every insert and delete update a count on every level up to the root, and every writer would contend for the same few pages. That's the price of the "big total" a counted tree keeps.</li>
+    <li><b>Redis sorted sets</b> do keep counts: their skip list stores, on each link, how many items it jumps over, so <code>ZRANK</code> is O(log n). That's topic 01.11.</li>
+    <li><b>Data compression:</b> Fenwick's original use. An adaptive arithmetic coder needs, for every symbol it encodes, the total count of all symbols that come before it in the alphabet, and the counts change after every symbol: prefix sums with point updates.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>Which one to use</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Structure</th><th>Change one item</th><th>Range question</th><th>Range change</th><th>Memory</th><th>Works for</th></tr></thead>
+  <tbody>
+    <tr><td>Prefix-sum array</td><td>O(n)</td><td>O(1)</td><td>O(n)</td><td>n + 1</td><td>sums (anything you can subtract)</td></tr>
+    <tr><td>Sparse table</td><td>rebuild</td><td>O(1)</td><td>rebuild</td><td>n log n</td><td>min, max, gcd, with no updates</td></tr>
+    <tr><td>√n blocks</td><td>O(1) to O(√n)</td><td>O(√n)</td><td>O(√n)</td><td>n + √n</td><td>any associative combine</td></tr>
+    <tr><td>Fenwick tree</td><td>O(log n)</td><td>O(log n)</td><td>O(log n) via differences</td><td>n + 1</td><td>sums, counts, xor</td></tr>
+    <tr><td>Segment tree</td><td>O(log n)</td><td>O(log n)</td><td>O(log n) with lazy notes</td><td>2n to 4n</td><td>any associative combine</td></tr>
+    <tr><td>BST with subtree sizes</td><td>O(log n)</td><td>O(log n)</td><td>no</td><td>a node per item</td><td>rank and k-th while items are inserted and deleted anywhere</td></tr>
+  </tbody>
+</table></div>
+
+<p>In words: if nothing changes, precompute (prefix sums, or a sparse table for min and max). If items change and you need sums or counts, use a Fenwick tree: shortest code, smallest memory. If you need min, max or a custom combine, or range changes together with range questions, use a segment tree. If the <em>set</em> of items changes, with inserts in the middle and not just updates to fixed positions, and the values aren't known in advance, use an ordered tree with sizes instead. Square-root blocks are the fallback when the combine is awkward and n is moderate: easy to write, and √(10<sup>6</sup>) = 1,000 is often fast enough.</p>
+
+<div class="keyidea"><p>Fixed positions with changing values: Fenwick for sums, segment tree for everything else. No changes: precompute. Items inserted anywhere: an ordered tree that keeps subtree sizes.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="s12"><span class="sec-num">12</span>What to say in the interview</h2>
+
+<p>For "an array gets point updates and range-sum queries, both frequent", a strong answer:</p>
+<div class="story">
+  <p>"With only queries I'd precompute prefix sums, O(1) each. With only updates, the plain array. Mixed, each of those is O(n) on one side. I'll use a Fenwick tree: slot j stores the sum of the lowbit(j) items ending at j, so a prefix sum strips the lowest bit and an update adds it, both O(log n), and a range sum is two prefix sums. That's n + 1 ints of memory and about 20 steps per operation for a million items. It's 1-indexed inside, because lowbit(0) is 0 and the update loop would never move. If they ask for range minimum instead, sums' subtraction trick doesn't work, so I'd switch to a segment tree, which handles any associative combine with an identity. If they add range updates, a Fenwick over the difference array gives range add with point reads; range add with range queries needs lazy propagation."</p>
+</div>
+<p>Habits that make you sound senior:</p>
+<ul>
+  <li>Name the trade-off first: raw values make queries O(n), prefix sums make updates O(n).</li>
+  <li>Say why it's log n: one block per level for updates, at most two split blocks per level for queries.</li>
+  <li>Say what the combine needs: associative, an identity, left before right.</li>
+  <li>Mention the off-by-one traps: half-open ranges and the 1-based Fenwick.</li>
+  <li>Know when it's the wrong tool: static data (precompute), or inserts in the middle (an ordered tree with sizes).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Raw items: O(1) update, O(n) range sum. Prefix sums: O(n) update, O(1) range sum. Mixed workloads need a middle ground.</li>
+  <li>Blocks of size √n give O(√n). Blocks of blocks give a segment tree: O(log n) for both.</li>
+  <li>Segment tree: each node holds its block's total; a query uses whole blocks and splits only the at most two per level that a range end cuts through. Update: one node per level. Build: O(n). Array of 2n to 4n.</li>
+  <li>Any associative combine with an identity works (sum, min, max, gcd, strings); combine left then right. Median and distinct counts don't.</li>
+  <li>Fenwick tree: a segment tree with the right children removed. Slot j covers the lowbit(j) items ending at j, with lowbit(j) = <code>j &amp; -j</code>.</li>
+  <li>Prefix: <code>k -= k &amp; -k</code>. Add: <code>j += j &amp; -j</code>. Slots start at 1, or the add loop never ends. Range = prefix(hi) − prefix(lo), so sums only.</li>
+  <li>Range add: +x and −x in a difference array, read with a prefix sum. Range add plus range question: lazy propagation.</li>
+  <li>Index by value for rank, k-th (walk down by powers of two) and "count smaller after"; compress big values to ranks first.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do them in order. Warm-ups are pen and paper: commit to an answer before you open it. Core exercises are code in <code>exercises/</code>, and their tests <b>measure how much work your code does</b> (additions, comparisons and combine calls, counted through wrapper objects), so a correct but slow answer fails.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Build a Fenwick tree by hand</h4>
+  <p>Items 1 to 8 are 3, 1, 4, 1, 5, 9, 2, 6. Write the 8 Fenwick slots. Then compute the sum of the first 7 items from the slots, listing which slots you read. Then add 2 to item 3: which slots change, and to what?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>Slots 1 to 8: 3, 4, 4, 9, 5, 14, 2, 31 (slot 2 = 3 + 1, slot 4 = 3 + 1 + 4 + 1, slot 6 = 5 + 9, slot 8 = everything). The first 7: 7 = 111, so read slots 7, 6, 4: 2 + 14 + 9 = 25, and 3 + 1 + 4 + 1 + 5 + 9 + 2 = 25. Add 2 to item 3: 3 → 3 + 1 = 4 → 4 + 4 = 8 → 16, past the end. Slot 3 becomes 6, slot 4 becomes 11, slot 8 becomes 33.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Trace a segment tree query</h4>
+  <p>Use the 8-item tree from section 4 (items 3, 1, 4, 1, 5, 9, 2, 6, indexed 0 to 7). For the query [3, 8), list every node the search looks at, and say for each one whether it's fully inside, fully outside or split. Which totals are added, and what's the answer?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>[0,8) split. [0,4) split. [0,2) outside. [2,4) split. [2,3) outside. [3,4) inside: 1. [4,8) inside: 22. Seven nodes looked at, two totals used: 1 + 22 = 23, and 1 + 5 + 9 + 2 + 6 = 23. Notice [4,8) was taken whole without looking at its four items.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Pick the structure</h4>
+  <p>Name the structure and the cost per operation: (a) 10 million prices that never change, then a million "total from day i to day j" questions; (b) a million temperatures, with updates, and "coldest reading between i and j" questions; (c) a ticketing site's seat map: "book seats lo to hi" and "is seat s taken?"; (d) "how many earlier orders were cheaper than this one?" for each of 5 million orders, all known in advance.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Prefix sums: O(n) once, then O(1) per question. (b) Segment tree with min, O(log n) for both; a Fenwick tree can't, because a min can't be subtracted away. (A sparse table would give O(1) questions, but only if there were no updates.) (c) A Fenwick tree over the difference array: booking is two point adds, "is seat s taken?" is a prefix sum, both O(log n). (d) Compress prices to ranks, walk from the left with a Fenwick tree of counts, and ask prefix(rank − 1) before adding each order: O(n log n) in total.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>FenwickTree</code> from scratch</h4>
+  <p>In <code>exercises/fenwick_tree.py</code>: <code>add</code>, <code>prefix_sum</code>, <code>range_sum</code> and <code>find_prefix</code> (the walk down by powers of two from section 10), plus <code>from_list</code> in O(n). The interface counts items from 0, so you'll shift once at the door. The tests hand you numbers that count every +, − and comparison: an add or prefix sum on 65,536 items may cost at most about log₂ n + 2, <code>from_list</code> under 3n (n adds cost about 8.5n), and <code>find_prefix</code> under 3 log₂ n + 6 (a binary search calling <code>prefix_sum</code> costs about 100).</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>SegmentTree</code> for any combine</h4>
+  <p>In <code>exercises/segment_tree.py</code>: a segment tree built from a list, a combine function and its identity, with <code>query(lo, hi)</code> and <code>update(i, value)</code>. The tests run it with sum, min, max and string joining (which catches answers combined in the wrong order), and count every call to combine: under 2n to build, at most 4 log₂ n + 4 per query (about 66 for 50,000 items, where √n blocks cost about 270) and 2 log₂ n + 4 per update.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. Count smaller after, and add to a range</h4>
+  <p>In <code>exercises/range_query_patterns.py</code>: <code>count_smaller_after(nums)</code> for any ints (compress them first), and a <code>RangeAdder</code> with <code>add(lo, hi, delta)</code> and <code>get(i)</code>, both O(log n). The tests run 100,000 values with values up to 10<sup>18</sup> under a 10 s cap (comparing every pair takes about two minutes in Python), and count the + and − on the deltas: a range add on 65,536 items may cost at most about 38, a read about 19.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · build</div>
+  <h4>7. Lazy propagation</h4>
+  <p>Write a segment tree with <code>range_add(lo, hi, x)</code> and <code>range_min(lo, hi)</code>, both O(log n), using section 9's sticky notes. Check it against a plain list with random operations. Then answer: why must a note be pushed down before a node is split, and what goes wrong if you push it after? What changes if you want range sums instead of minimums?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>8. Say it out loud</h4>
+  <p>Set a 2-minute timer and answer: "Design the leaderboard for a game with 10 million players and scores from 0 to a million, where players ask for their own rank and for who holds any given rank k." Did you mention counts indexed by score, two point adds per score change, rank as one prefix sum, k-th by walking down powers of two, about 20 steps each, and what you'd do if scores weren't bounded (an ordered tree with subtree sizes, or a skip list with spans)?</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k "fenwick_tree or segment_tree or range_query_patterns"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="intervals.html"><small>← Previous</small>Where things overlap</a>
+  <a class="next" href="skip-lists.html"><small>Next →</small>Express lanes for a linked list</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (x) { return x.toLocaleString("en-US"); };
+
+  // ---- Block size slider (section 3) ----
+  (function () {
+    var n = 1000000, opts = [1, 2, 5, 10, 20, 50, 100, 200, 500, 707, 1000, 2000, 5000, 10000, 100000, 1000000];
+    function show() {
+      var b = opts[Number($("blk-b").value)];
+      var blocks = Math.ceil(n / b);
+      var ends = blocks >= 2 ? 2 * (b - 1) : n;
+      var mid = blocks >= 2 ? blocks - 2 : 0;
+      if (b === 1) { ends = 0; mid = n; }
+      var cost = ends + mid;
+      $("blk-bval").textContent = fmt(b);
+      var row = function (k, v) { return V.el("tr", {}, V.el("td", {}, k), V.el("td", {}, v)); };
+      $("blk-out").replaceChildren(
+        V.el("div", { class: "stack" },
+          V.el("div", { style: "width:" + (100 * ends / cost) + "%;background:var(--warn)" }),
+          V.el("div", { style: "width:" + (100 * mid / cost) + "%;background:var(--accent)" })),
+        V.el("div", { class: "table-wrap" }, V.el("table", {},
+          row("blocks", fmt(blocks)),
+          row("loose items at the two ends (orange)", "up to " + fmt(ends)),
+          row("whole block totals in the middle (blue)", "up to " + fmt(mid)),
+          row("additions per range question", fmt(cost)),
+          row("writes per update", b === 1 ? "1" : "2"))));
+      var note = b === 1 ? "Blocks of 1 are just the raw counters: a question adds up to a million of them."
+        : blocks === 1 ? "One block holding everything: the block total helps only for the whole range, so a question scans up to a million loose items."
+        : b === 707 ? "This is about the best: 2b + n/b is smallest when b = √(n/2) ≈ 707."
+        : b < 707 ? "Small blocks: most of the cost is the long run of block totals in the middle."
+        : "Big blocks: most of the cost is the loose items at the two ends.";
+      $("blk-msg").innerHTML = "Worst case <b>" + fmt(cost) + "</b> additions per question, against 1,000,000 for raw counters. " + note;
+    }
+    $("blk-b").oninput = show; show();
+  })();
+
+  // ---- Segment tree stepper (section 4) ----
+  (function () {
+    var n = 8, a = [3, 1, 4, 1, 5, 9, 2, 6], t = {}, depth = {};
+    function build(lo, hi, d) {
+      var k = lo + "," + hi; depth[k] = d;
+      if (hi - lo === 1) return (t[k] = a[lo]);
+      var m = (lo + hi) >> 1;
+      return (t[k] = build(lo, m, d + 1) + build(m, hi, d + 1));
+    }
+    build(0, n, 0);
+    var frames = [], st = {};
+    var name = function (k) { var p = k.split(","); return "[" + p[0] + "," + p[1] + ")"; };
+    var snap = function (cur, msg) { frames.push({ t: Object.assign({}, t), st: Object.assign({}, st), cur: cur, msg: msg }); };
+    snap(null, "The question: the total of <b>[1, 7)</b>, items 1 to 6. Start at the root, which covers all 8.");
+    var qlo = 1, qhi = 7, total = 0, used = [], seen = 0;
+    (function q(lo, hi) {
+      var k = lo + "," + hi; seen++;
+      if (qhi <= lo || hi <= qlo) { st[k] = "dim"; snap(k, name(k) + " is fully outside [1, 7): it adds nothing. Skip it."); return; }
+      if (qlo <= lo && hi <= qhi) { st[k] = "done"; total += t[k]; used.push(t[k]); snap(k, name(k) + " is fully inside: use its total <b>" + t[k] + "</b> and don't look below it. Running total: " + total + "."); return; }
+      st[k] = "warn"; snap(k, name(k) + " is partly inside, so its total " + t[k] + " is no use as it is. Ask both halves.");
+      var m = (lo + hi) >> 1; q(lo, m); q(m, hi);
+    })(0, n);
+    snap(null, "Answer: " + used.join(" + ") + " = <b>" + total + "</b>, from " + used.length + " stored totals. The search looked at " + seen + " bricks, never at items 2, 3, 4 or 5 one by one.");
+    st = {};
+    var path = [];
+    (function d(lo, hi) { path.push(lo + "," + hi); if (hi - lo === 1) return; var m = (lo + hi) >> 1; if (5 < m) d(lo, m); else d(m, hi); })(0, n);
+    path.forEach(function (k) { st[k] = "warn"; });
+    snap(null, "Now set item 5 from 9 to <b>4</b>. Only the bricks above item 5 counted it, one per row: " + path.map(name).join(" → ") + ".");
+    a[5] = 4; t["5,6"] = 4; st["5,6"] = "done";
+    snap("5,6", "Set the leaf [5,6) to 4.");
+    path.slice(0, -1).reverse().forEach(function (k) {
+      var p = k.split(",").map(Number), m = (p[0] + p[1]) >> 1, L = p[0] + "," + m, R = m + "," + p[1], old = t[k];
+      t[k] = t[L] + t[R]; st[k] = "done";
+      snap(k, name(k) + " = " + t[L] + " + " + t[R] + " = <b>" + t[k] + "</b> (was " + old + "), recomputed from its two children.");
+    });
+    snap(null, "Done: 4 bricks changed, one per row (log₂ 8 + 1 = 4). Every other total still counts the same items, so it's still right.");
+    var keys = Object.keys(t);
+    V.player($("seg-player"), {
+      frames: frames, speed: 1100,
+      draw: function (f, stage) {
+        var grid = V.el("div", { class: "bw", style: "grid-template-columns:repeat(" + n + ",minmax(0,1fr))" });
+        keys.forEach(function (k) {
+          var p = k.split(",").map(Number);
+          var cls = k === f.cur ? "hl" : (f.st[k] || "");
+          grid.append(V.el("div", { class: "cell " + cls, title: name(k), style: "grid-column:" + (p[0] + 1) + " / " + (p[1] + 1) + ";grid-row:" + (depth[k] + 1) }, String(f.t[k])));
+        });
+        var idx = V.el("div", { class: "bw-idx", style: "grid-template-columns:repeat(" + n + ",minmax(0,1fr))" });
+        for (var i = 0; i < n; i++) idx.append(V.el("span", {}, String(i)));
+        stage.append(grid, idx);
+      },
+    });
+  })();
+
+  // ---- Fenwick stepper (section 8) ----
+  (function () {
+    var A = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3], N = 16;
+    var lb = function (j) { return j & -j; };
+    var bin = function (x) { var s = x.toString(2); while (s.length < 5) s = "0" + s; return s; };
+    var span = function (lo, hi) { return lo === hi ? "item " + hi : "items " + lo + "–" + hi; };
+    function base() { var t = [0]; for (var j = 1; j <= N; j++) { var s = 0; for (var i = j - lb(j) + 1; i <= j; i++) s += A[i - 1]; t.push(s); } return t; }
+    var op = "prefix", k = 13;
+    function framesFor() {
+      var t = base(), fr = [], st = {}, items = {};
+      var push = function (msg) { fr.push({ t: t.slice(), st: Object.assign({}, st), items: Object.assign({}, items), msg: msg }); };
+      var settle = function () { Object.keys(st).forEach(function (x) { st[x] = "done"; }); };
+      if (op === "prefix") {
+        push("prefix(" + k + "): the total of items 1 to " + k + ". In binary, " + k + " is " + bin(k) + ".");
+        var j = k, total = 0, used = [];
+        while (j > 0) {
+          var lo = j - lb(j) + 1, nj = j - lb(j);
+          total += t[j]; used.push(t[j]); settle(); st[j] = "hl";
+          for (var i = lo; i <= j; i++) items[i] = "win";
+          push("slot " + j + " (" + bin(j) + ") covers " + span(lo, j) + ": add " + t[j] + ", total " + total + ". Strip the lowest 1 bit: " + bin(j) + " → " + bin(nj) + " = " + nj + ".");
+          j = nj;
+        }
+        settle();
+        push("Done: " + used.length + " slot" + (used.length > 1 ? "s" : "") + ", one per 1 bit of " + bin(k) + ". " + used.join(" + ") + " = <b>" + total + "</b>, the same as adding the first " + k + " items one by one.");
+      } else {
+        items[k] = "cmp";
+        push("add 2 to item " + k + ": every slot whose bar covers item " + k + " must change. Start at slot " + k + " (" + bin(k) + "), which ends at item " + k + ".");
+        var j2 = k, changed = [];
+        while (j2 <= N) {
+          var lo2 = j2 - lb(j2) + 1, nj2 = j2 + lb(j2);
+          t[j2] += 2; changed.push(j2); settle(); st[j2] = "hl";
+          push("slot " + j2 + " (" + bin(j2) + ") covers " + span(lo2, j2) + ", which includes item " + k + ": " + (t[j2] - 2) + " + 2 = <b>" + t[j2] + "</b>. Add the lowest 1 bit: " + j2 + " + " + lb(j2) + " = " + nj2 + ".");
+          j2 = nj2;
+        }
+        settle();
+        push("Slot " + j2 + " is past 16: stop. " + changed.length + " slot" + (changed.length > 1 ? "s" : "") + " changed (" + changed.join(", ") + "). No other slot's bar reaches item " + k + ".");
+      }
+      return fr;
+    }
+    var opSel = V.el("select", { title: "Operation" },
+      V.el("option", { value: "prefix" }, "prefix sum of the first k items"),
+      V.el("option", { value: "add" }, "add 2 to item k"));
+    var kSel = V.el("select", { title: "k" });
+    for (var i = 1; i <= N; i++) kSel.append(V.el("option", { value: i }, "k = " + i));
+    kSel.value = String(k);
+    var api = V.player($("fen-player"), {
+      frames: framesFor(), speed: 1200, extraControls: [opSel, kSel],
+      draw: function (f, stage) {
+        var cols = "grid-template-columns:repeat(" + N + ",minmax(0,1fr))";
+        var grid = V.el("div", { class: "bw", style: cols });
+        for (var j = 1; j <= N; j++) {
+          var len = lb(j), row = 5 - Math.round(Math.log2(len));
+          grid.append(V.el("div", { class: "cell " + (f.st[j] || ""), title: "slot " + j + ": " + span(j - len + 1, j), style: "grid-column:" + (j - len + 1) + " / " + (j + 1) + ";grid-row:" + row }, String(f.t[j])));
+        }
+        var items = V.el("div", { class: "bw", style: cols });
+        for (var i = 1; i <= N; i++) items.append(V.el("div", { class: "cell " + (f.items[i] || "") }, String(A[i - 1])));
+        var idx = V.el("div", { class: "bw-idx", style: cols });
+        for (var m = 1; m <= N; m++) idx.append(V.el("span", {}, String(m)));
+        stage.append(V.el("div", { class: "bw-label", style: "margin-top:0" }, "slots: each bar holds the total of the items under it"), grid,
+          V.el("div", { class: "bw-label" }, "items"), items, idx);
+      },
+    });
+    var reload = function () { op = opSel.value; k = Number(kSel.value); api.load(framesFor()); };
+    opSel.onchange = reload; kSel.onchange = reload;
+  })();
+})();
+</script>
+</body>
+</html>

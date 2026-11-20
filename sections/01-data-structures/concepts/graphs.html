@@ -405,7 +405,7 @@ def build(edges, directed=False):
   <h4>3. Spot the graph</h4>
   <p>Say what the vertices and edges are, and whether it's directed or weighted: (a) "Given flights with prices, find the cheapest route with at most k stops." (b) "Given a list of accounts with emails, merge accounts that share an email." (c) "Given a beginWord, endWord and a dictionary, find the shortest transformation sequence."</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) Airports are vertices; flights are directed, weighted edges (price). (b) Accounts (or emails) are vertices; an undirected edge joins two accounts that share an email, and each merged account is a connected component (union-find, topic 01.07, also fits). (c) Words are vertices; an undirected, unweighted edge joins words one letter apart. Implicit: generate the neighbors, don't compare every pair.</p>
+    <p>(a) Airports are vertices; flights are directed, weighted edges (price). (b) Accounts (or emails) are vertices; an undirected edge joins two accounts that share an email, and each merged account is a connected component (union-find, <a href="union-find.html">topic 01.07</a>, also fits). (c) Words are vertices; an undirected, unweighted edge joins words one letter apart. Implicit: generate the neighbors, don't compare every pair.</p>
   </details>
 </div>
 
@@ -438,7 +438,7 @@ def build(edges, directed=False):
 
 <nav class="chapter-nav">
   <a href="heaps.html"><small>← Previous</small>The most urgent thing first</a>
-  <a class="next" href="../index.html"><small>Next →</small>Chapter 1 overview</a>
+  <a class="next" href="tries.html"><small>Next →</small>Words that share a path</a>
 </nav>
 
 </main>

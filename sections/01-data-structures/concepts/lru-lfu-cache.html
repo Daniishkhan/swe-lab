@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="01.08">
+  <title>What to forget first (LRU and LFU caches)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 1 · Part 8</div>
+  <h1>What to forget first</h1>
+  <div class="meta"><span><span class="badge P1">P1</span> a classic coding and low-level design question</span><span>about 55 minutes</span><span>10 quick checks · 9 exercises</span></div>
+</header>
+
+<p>Every fast system keeps a small copy of its slow data close by: a <b>cache</b>. The copy is small because fast memory is expensive, so the cache is always full, and every new item means throwing an old one out. Which one you throw out decides how often the cache saves you. "Build an LRU cache" is one of the most asked coding questions there is, because the answer combines two structures you already know, a hash map and a doubly linked list, into something neither can do alone. Its cousin, the LFU cache, is the harder follow-up. This chapter builds both from the question "who should leave?", then shows where each one fails and what real systems do instead.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain hit rate, and why going from 90% to 99% cuts the load behind the cache by 10&times;.</li>
+    <li>Say what the perfect eviction choice would be, and why LRU is a guess at it.</li>
+    <li>Build an LRU cache with O(1) <code>get</code> and <code>put</code> from a hash map and a doubly linked list, and say what each part is for.</li>
+    <li>Show the workloads where LRU fails (scans and loops) and where LFU fails (popularity that shifts).</li>
+    <li>Build an O(1) LFU cache with one list per use count, and explain why the minimum count never needs a search.</li>
+    <li>Answer the follow-ups: expiry, threads, memory limits, and what Redis, Postgres, Linux and Caffeine really do.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom. Answer each quick check before reading on; a wrong answer gets the idea explained a different way. "Go deeper" boxes are optional on a first read. This chapter leans on hash maps from <a href="hash-maps.html">Find anything in one step</a>, doubly linked lists and sentinel nodes from <a href="linear-structures.html">Who goes next?</a>, and lazy deletion from <a href="heaps.html">The most urgent thing first</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: a small, fast box in front of a slow one</h2>
+
+<div class="story">
+  <p>An online store has <b>50 million</b> products. The product page service gets <b>20,000 requests a second</b>, and every page needs the product's details. Reading them from the database takes about <b>5 ms</b>, and the database can serve about <b>4,000 reads a second</b> before it falls over.</p>
+  <p>20,000 is five times 4,000. So the team puts a box of RAM in front of the database. Reading from it takes about a microsecond, but it only has room for <b>1 million</b> products: 2% of the catalog. Every request checks the box first, and only goes to the database if the product isn't there.</p>
+</div>
+
+<p>Two words first. A request that finds its item in the cache is a <b>hit</b>. One that doesn't is a <b>miss</b>, and only misses reach the database. The <b>hit rate</b> is the fraction of requests that hit. Now plug in numbers. With a hit rate h, the database sees 20,000 &times; (1 &minus; h) reads a second, and the average request waits about (1 &minus; h) &times; 5 ms, since a hit costs next to nothing:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Hit rate</th><th>Misses (the miss rate)</th><th>Database reads per second</th><th>Average wait</th></tr></thead>
+  <tbody>
+    <tr><td>0%</td><td>100%</td><td>20,000 (it falls over)</td><td>5 ms</td></tr>
+    <tr><td>80%</td><td>20%</td><td>4,000 (right at its limit)</td><td>1 ms</td></tr>
+    <tr><td>90%</td><td>10%</td><td>2,000</td><td>0.5 ms</td></tr>
+    <tr><td>99%</td><td>1%</td><td>200</td><td>0.05 ms</td></tr>
+  </tbody>
+</table></div>
+
+<p>Look at the last two rows. The hit rate barely moved, from 90 to 99. But the database load fell from 2,000 to 200: <b>ten times less</b>. What the database feels is the <em>miss</em> rate, and that went from 10% to 1%. Every point of hit rate near the top is worth a lot.</p>
+
+<p>How can 2% of the products give a hit rate anywhere near 90%? Because people don't look at products evenly. A small set of popular items gets most of the views, today's deals and bestsellers, while most of the catalog is rarely opened. If the box holds the <em>right</em> million, most requests hit.</p>
+
+<p>But the box is always full. The moment a request misses, the product is read from the database and should go into the box, and to make room, something has to come out. Choosing what comes out is called <b>eviction</b>, and the rule that chooses is the <b>eviction policy</b>. That rule is what this chapter is about, along with the data structure that makes the rule fast: at 20,000 requests a second, the bookkeeping on every request has to cost a few steps, not a million.</p>
+
+<div class="keyidea"><p>A cache is a small, fast copy of slow data. Only misses reach the slow layer, so the miss rate is what matters: 90% &rarr; 99% hits is 10&times; less load. The cache is always full, so every miss forces an eviction, and the eviction policy decides the hit rate.</p></div>
+
+<div class="check" id="check-hitrate">
+  <p class="q">A tuning change lifts the hit rate from 90% to 99%. With 20,000 requests a second, what happens to the database?</p>
+  <div class="opts">
+    <button>Its load drops by about 10%, from 2,000 to 1,800 reads a second</button>
+    <button data-correct>Its load drops 10&times;, from 2,000 to 200 reads a second</button>
+    <button>Not much: the cache was already absorbing almost everything</button>
+  </div>
+  <div class="fb right"><p>Right. The database only sees misses. 10% of 20,000 is 2,000; 1% is 200. A 9-point change in hit rate is a 10&times; change in miss rate, which is why teams fight for every point near the top.</p></div>
+  <div class="fb wrong"><p>Count the requests that get through instead of the ones that are stopped. Picture a goalkeeper facing 20,000 shots. Saving 90% lets 2,000 in. Saving 99% lets 200 in. The keeper only got "9% better", but the net sees 10&times; fewer balls. The database is the net: its load is 20,000 &times; the miss rate, and the miss rate fell from 10% to 1%.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Who leaves? Guessing the future from the past</h2>
+
+<p>Picture a desk with room for three binders, and an archive in the basement that takes five minutes to walk to. You need a binder that isn't on the desk. You fetch it, and one of the three on the desk has to go back down. Which one?</p>
+
+<p>If someone handed you tomorrow's schedule, the answer would be easy: send back the binder you'll need <b>latest</b>, the one whose next use is farthest away. Every other choice brings a needed binder back sooner. László Bélády at IBM described this rule in 1966, and it gives the fewest misses possible (a proof is sketched in the "Go deeper" box below). It's called <b>Bélády's algorithm</b>, also MIN or OPT (for optimal).</p>
+
+<p>Let's run it. The desk holds 3 binders and the requests are <code>A B C A D B A E B A</code>. At step 5, D arrives on a full desk holding A, B and C. Look ahead: B is next needed at step 6, A at step 7, C never again. OPT sends C back. At step 8, E arrives on a desk of A, B, D: A comes back at step 10, B at step 9, D never. D goes. Every other request hits: <b>5 hits out of 10</b>, and no rule can do better on this sequence.</p>
+
+<p>There's one problem: a real cache can't see the future. It only knows the past. So every practical policy is a <em>guess</em> about the future based on the past. The most natural guess is that the near future looks like the recent past. Something you used a minute ago is more likely to be needed again than something nobody has touched all week. This tendency is called <b>temporal locality</b>, and it holds for most real workloads: a user who opens a product page often refreshes it, opens it again from the cart, and so on.</p>
+
+<p>Turn OPT around and use the past instead of the future. OPT evicts the item whose next use is farthest <em>ahead</em>. Instead, evict the item whose last use is farthest <em>behind</em>: the one that has gone untouched the longest. That's <b>LRU</b>, <b>least recently used</b>. Here's the same sequence under LRU, listing the desk from most to least recently used:</p>
+
+<pre class="diagram"><code>step  request  result   desk after (most recent first)   sent back
+ 1    A        miss     A
+ 2    B        miss     B A
+ 3    C        miss     C B A
+ 4    A        hit      A C B
+ 5    D        miss     D A C                            B   (unused longest)
+ 6    B        miss     B D A                            C
+ 7    A        hit      A B D
+ 8    E        miss     E A B                            D
+ 9    B        hit      B E A
+10    A        hit      A B E
+
+ LRU: 4 hits.  OPT: 5 hits.  FIFO (evict whatever arrived first): 3 hits.</code></pre>
+
+<p>LRU lost one hit to OPT, at step 5. It sent B back because B had gone unused the longest, and B was needed at the very next step. OPT knew C was never coming back. That's the price of guessing. The third rule in the last line, <b>FIFO</b> (first in, first out), evicts the item that <em>arrived</em> first, whether or not it's been used since. At step 5 it would evict A, even though A was just used at step 4. Ignoring use completely costs it another hit.</p>
+
+<div class="keyidea"><p>The perfect rule (Bélády's OPT) evicts the item needed farthest in the future. Nobody knows the future, so real policies guess from the past. LRU guesses that the item unused for the longest time is the one needed latest. It's a good guess whenever recent use predicts future use.</p></div>
+
+<div class="check" id="check-lru-trace">
+  <p class="q">An LRU cache holds 3 items. The requests are <code>A B C A D</code>. Which item is evicted when D arrives?</p>
+  <div class="opts">
+    <button>A, because it was the first to arrive</button>
+    <button data-correct>B</button>
+    <button>C, because it arrived most recently before D</button>
+  </div>
+  <div class="fb right"><p>Right. After step 4 the order of last use is A (step 4), C (step 3), B (step 2). B has gone unused the longest. The re-read of A at step 4 is exactly what saves it.</p></div>
+  <div class="fb wrong"><p>LRU doesn't care when an item <em>arrived</em>; it cares when it was last <em>used</em>. Write the last-use time next to each item when D arrives: A was used at step 4 (it arrived at step 1, but was read again), B at step 2, C at step 3. The smallest last-use time is B's. Evicting A would be FIFO, which forgets that A was just read. Evicting C throws out an item that was used more recently than B.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: why OPT is optimal, and Bélády's anomaly</summary>
+  <p><b>Why farthest-next-use is best</b>, in one exchange argument. Take any rule that, at some miss, evicts X, while OPT would evict Y, whose next use is later than X's. Build a second rule that evicts Y instead and from then on copies the first rule's moves, swapping the roles of X and Y. The two desks differ only in X vs Y. If the first rule evicts Y before X comes back, the second rule evicts X at that moment, and from then on the desks are identical. Otherwise X is requested first: the first rule misses and the second rule hits. Either way the second rule never has more misses. Do this at every miss, one at a time, and you turn any rule into OPT without adding a single miss.</p>
+  <p><b>More room can mean more misses, for FIFO.</b> Run the requests <code>1 2 3 4 1 2 5 1 2 3 4 5</code> through FIFO. With 3 slots you get 3 hits. With 4 slots you get only 2. Bigger cache, fewer hits. That's <b>Bélády's anomaly</b> (1969). LRU and OPT can never do this: an LRU cache of size k always holds exactly the k most recently used items, so a cache of size k + 1 holds everything the smaller one holds, plus one. Policies with that property are called <b>stack algorithms</b>, and for them more memory never hurts.</p>
+  <p><b>Where OPT is used for real:</b> as a yardstick. You record a real request log, replay it through OPT offline, and compare. If LRU gets 85% and OPT gets 88%, a smarter policy can win at most 3 points, and your time is better spent on a bigger cache.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>The obvious designs, and why each one is slow</h2>
+
+<p>We know the rule. Now we need a structure that runs it fast. Every request is a <code>get(key)</code>, and every miss is followed by a <code>put(key, value)</code> that may evict. With 1 million entries and 20,000 requests a second, each operation should cost a handful of steps. Let's try the obvious designs and see where each one breaks.</p>
+
+<h3>Attempt 1: a hash map with timestamps</h3>
+<p>Keep a dict from key to <code>(value, last_used)</code>, where <code>last_used</code> is a counter that goes up by one on every request. Finding a key is O(1). Marking it as used is O(1): overwrite the counter. Evicting is the problem:</p>
+
+<pre><code>cache = {}                     # key -> (value, last_used)
+tick = 0
+
+def touch(key):
+    global tick
+    tick += 1
+    value, _ = cache[key]
+    cache[key] = (value, tick)   # O(1): stamp the time
+
+def evict():
+    oldest = min(cache, key=lambda k: cache[k][1])   # looks at all n entries
+    del cache[oldest]</code></pre>
+
+<p>The dict has no idea which entry is oldest, so <code>min</code> looks at all of them. At a 90% hit rate the service has 2,000 misses a second, each scanning 1 million entries: <b>2 billion steps a second</b>, just for bookkeeping.</p>
+
+<h3>Attempt 2: a list in order of use</h3>
+<p>Keep the keys in a Python list, least recent at the front. Eviction is <code>order.pop(0)</code>, and a use moves the key to the back. But a Python list is an array. <code>pop(0)</code> shifts every remaining item one slot left, and finding the key to move (<code>order.remove(key)</code>) walks the list until it finds it. Both are O(n): about half a million steps per request, on average. Worse than attempt 1, because now even hits are slow.</p>
+
+<h3>Attempt 3: a heap of timestamps</h3>
+<p>The least recently used entry is the one with the smallest <code>last_used</code>, and "give me the smallest" is what a min-heap does. The catch is that every hit <em>changes</em> a key's timestamp, and a heap can't change an item's priority in place. The fix from the heaps chapter is lazy deletion: push a fresh <code>(tick, key)</code> on every use and skip stale entries when they surface at the top. That works, at O(log n) amortized per operation: about 20 steps for a million entries, plus a heap that fills up with stale entries, one per hit, until you rebuild it. Not bad. But can we get to O(1)?</p>
+
+<h3>What do we actually need?</h3>
+<p>Look at how the recency order changes. It never needs a real sort. Only three things ever happen to it:</p>
+<ol>
+  <li>A new key arrives and becomes the <b>newest</b>.</li>
+  <li>An existing key is used: it's pulled out from <b>wherever it is</b> and becomes the newest.</li>
+  <li>The <b>oldest</b> key is removed.</li>
+</ol>
+<p>So the order behaves like a line at a counter: people join at one end and leave from the other, except that someone in the middle can step out and rejoin at the back. A line where anyone can step out without the others shuffling forward one by one is a linked list. And "pulled out from wherever it is" needs us to <em>find</em> that person in the line fast, which is what a hash map does.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Design</th><th>Find a key</th><th>Mark it newest</th><th>Evict the oldest</th></tr></thead>
+  <tbody>
+    <tr><td>Hash map with timestamps</td><td>O(1)</td><td>O(1)</td><td>O(n) scan</td></tr>
+    <tr><td>List in order of use</td><td>O(n) walk</td><td>O(n) shift</td><td>O(n) shift</td></tr>
+    <tr><td>Heap of timestamps (lazy)</td><td>O(1) with a dict</td><td>O(log n)</td><td>O(log n) amortized</td></tr>
+    <tr><td><b>Hash map + doubly linked list</b></td><td><b>O(1)</b></td><td><b>O(1)</b></td><td><b>O(1)</b></td></tr>
+  </tbody>
+</table></div>
+
+<div class="keyidea"><p>The recency order only ever changes in three ways: add at the newest end, remove from the oldest end, and move one item from anywhere to the newest end. A linked list does all three in O(1), as long as something can hand it the right node. A hash map hands it the node.</p></div>
+
+<div class="check" id="check-timestamps">
+  <p class="q">A teammate proposes: "Keep a dict of key &rarr; last-used time. Hits are O(1). On eviction, call <code>min()</code> over the dict." For a 1-million-entry cache with 2,000 misses a second, what's wrong with it?</p>
+  <div class="opts">
+    <button>Nothing: dict operations are O(1), so the whole cache is O(1)</button>
+    <button>Timestamps can tie, so it evicts the wrong key</button>
+    <button data-correct>Each eviction scans all 1 million entries: about 2 billion steps a second</button>
+  </div>
+  <div class="fb right"><p>Right. Hits are cheap, but the dict keeps no order, so finding the oldest means looking at everyone. 2,000 evictions &times; 1,000,000 entries = 2 &times; 10<sup>9</sup> steps a second. The fix keeps the entries in recency order all the time, so the oldest is always at one end.</p></div>
+  <div class="fb wrong"><p>A dict is O(1) for "give me the entry for this key". Eviction asks a different question: "which entry has the smallest timestamp?" The dict has no idea; it would have to look at every value. Picture a coat check that stores coats by ticket number: finding coat 4,712 is instant, but "which coat has been here longest?" means walking every rack. With a million coats and 2,000 such questions a second, that's 2 billion looks a second. (Ties can't happen here, since the counter goes up by one on every use.)</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Two structures, each covering the other's weakness</h2>
+
+<p>Picture a pile of magazines on a coffee table. Every time you read one, you pull it out of the pile and put it on top. You never sort anything, yet the pile is always in order of use: the top is the one you read last, and the bottom is the one you haven't touched in the longest time. When the table is full and a new magazine arrives, the bottom one goes in the recycling.</p>
+
+<p>Pulling a magazine out of the middle is easy on a real table: the ones above it drop down to close the gap. That's what a <b>doubly linked list</b> gives us. Each entry is a <b>node</b> that knows its neighbor on each side (<code>prev</code> and <code>next</code>). To pull a node out, its two neighbors point at each other: two pointer writes, no shifting, whether the list holds 10 entries or 10 million. Why <em>doubly</em> linked? With only <code>next</code> pointers, a node can't reach the node in front of it, and that node's <code>next</code> is what has to change. Finding it means walking from the head: O(n) again. The <code>prev</code> pointer is what makes "pull it out from wherever it is" O(1). A Python list (an array) can't do this; it has to shift everything after the gap.</p>
+
+<p>Where the coffee table picture breaks: you can <em>see</em> the magazine you want in the pile. A computer can't. Holding only the list, finding key "A" means walking from the top. So we add an index: a <b>hash map from each key to its node</b>. The map answers "where is A?" in O(1); the list answers "who is oldest?" and "move A to the top" in O(1). Each covers exactly what the other can't do.</p>
+
+<pre class="diagram"><code> hash map:    "D" ─┐            "A" ─┐            "C" ─┐
+                   ▼                 ▼                 ▼
+ [HEAD] ◄──► [ D | 4 ] ◄──► [ A | 1 ] ◄──► [ C | 3 ] ◄──► [TAIL]
+             most recent                     least recent
+
+ Each node holds its key, its value, and prev / next pointers.
+ HEAD and TAIL are sentinels: dummy nodes that hold no data.</code></pre>
+
+<p>The two <b>sentinels</b> are the trick from the linked-list chapter. They are permanent dummy nodes, one at each end. Every real node always has a real node or a sentinel on both sides, so "pull a node out" and "put a node after HEAD" never need an <code>if</code> for the first node, the last node or an empty list. The most recent entry is <code>HEAD.next</code>; the least recent is <code>TAIL.prev</code>. An empty cache is HEAD and TAIL pointing at each other.</p>
+
+<p>Step through a cache of capacity 3. Watch two things: the map lookup that finds a node without walking the list, and the node that falls off the TAIL end when a new key arrives on a full cache.</p>
+
+<div class="figure">
+  <div id="lru-player"></div>
+  <div class="cap">An LRU cache of capacity 3. Top row: the hash map (key &rarr; node). Bottom row: the doubly linked list, most recent next to HEAD. Yellow: found by a map lookup. Blue: just moved or inserted. Red: evicted. Step with ▶| and read the caption at every step.</div>
+</div>
+
+<p>Here are the only two list moves the whole cache needs. Each is a few pointer writes with no loop:</p>
+
+<pre><code>class Node:
+    __slots__ = ("key", "value", "prev", "next")
+    def __init__(self, key=None, value=None):
+        self.key, self.value = key, value   # the key too: eviction needs it
+        self.prev = self.next = None
+
+def unlink(node):              # O(1): the neighbors point past it
+    node.prev.next = node.next
+    node.next.prev = node.prev
+
+def push_front(head, node):    # O(1): right after the HEAD sentinel
+    node.prev, node.next = head, head.next
+    head.next.prev = node      # the old first node points back at us
+    head.next = node</code></pre>
+
+<p>Mind the order in <code>push_front</code>: read <code>head.next</code> (the old first node) before you overwrite it. Moving a node to the front is <code>unlink</code> then <code>push_front</code>: six pointer writes in total, no matter how long the list is.</p>
+
+<div class="keyidea"><p>An LRU cache is a hash map from key to node, plus a doubly linked list of those nodes in order of use, with sentinels at both ends. The map finds any node in O(1). The list moves a node to the front, and removes the oldest from the back, in O(1).</p></div>
+
+<div class="check" id="check-store-key">
+  <p class="q">The cache is full, so it unlinks the node before TAIL. It must also delete that entry from the hash map. How does it know which key to delete?</p>
+  <div class="opts">
+    <button>It scans the hash map for the entry that points at this node</button>
+    <button data-correct>The node stores its own key, so it reads <code>node.key</code></button>
+    <button>It doesn't need to: the map entry disappears when the node is unlinked</button>
+  </div>
+  <div class="fb right"><p>Right. That's why each node holds the key as well as the value: the list knows <em>which node</em> is oldest, but only the key can remove it from the map. <code>del cache[node.key]</code>, O(1).</p></div>
+  <div class="fb wrong"><p>Picture a coat check where the coats hang in order of arrival, and a ticket book maps ticket numbers to hooks. To clear the oldest coat, you take it off the last hook, but you also have to tear out its ticket, or someone can later hand in that ticket and be pointed at an empty hook. If the coat has no tag with its ticket number, you'd have to search the whole book: O(n). So every coat carries its ticket number. In code, unlinking a node changes only the <code>prev</code>/<code>next</code> pointers; the dict still maps the key to the detached node until you delete it with <code>node.key</code>. Forget that, and a later <code>get</code> "hits" a value that was evicted.</p></div>
+</div>
+
+<details class="aside another">
+  <summary>Explain it another way: a library with a returns cart</summary>
+  <p>A small library branch has one shelf with room for 100 books, ordered by when each was last borrowed: the most recent at the left end. The catalog card for each book says exactly which slot it's in (the hash map). When someone borrows a book, the librarian looks up its card, pulls the book out, and puts it at the left end; the books to its right stay where they are, because the shelf is really a chain of book-ends that can open anywhere (the linked list). When a new book arrives and the shelf is full, the rightmost book goes to the warehouse, and its catalog card is thrown away, which is why each book has its title on the spine (the key in the node).</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span><code>get</code> and <code>put</code>, and the details that bite</h2>
+
+<p>With the two list moves, both operations are a few lines. In words:</p>
+
+<pre class="diagram"><code>get(key):
+  1. node = map.get(key). Not there?  return the default. Change nothing.
+  2. unlink(node), push_front(node)      it's now the most recent
+  3. return node.value
+
+put(key, value):
+  1. key already in the map?  update node.value, move it to the front, done.
+                              (an update never evicts anything)
+  2. map is full?             lru = TAIL.prev
+                              unlink(lru); delete map[lru.key]
+  3. node = Node(key, value); map[key] = node; push_front(node)</code></pre>
+
+<p>Every step is O(1): dict operations are O(1) on average, and the list moves are a fixed number of pointer writes. Memory is O(capacity): one map slot and one node per entry. The node's two pointers are the price of the O(1) moves: 16 bytes per entry with 8-byte pointers. In Python a node with four slots is about 64 bytes on its own.</p>
+
+<p>That's the whole algorithm. Interviewers rarely fail people on the idea. They fail them on these details, so say each one out loud as you code:</p>
+<ul>
+  <li><b>An update is not an insert.</b> If the key is already there, change the value and move it to the front. Evicting first would throw out an innocent entry and leave the cache one short.</li>
+  <li><b>Evict both halves.</b> Unlink the node <em>and</em> delete its map entry. A map entry pointing at a detached node is a memory leak and a ghost: later <code>get</code>s "hit" a value that's no longer in the order.</li>
+  <li><b>A miss changes nothing.</b> <code>get</code> on a missing key returns the default. It doesn't evict and doesn't reorder.</li>
+  <li><b>Evict before or after inserting, but be consistent.</b> "Full? evict, then insert" and "insert, then evict if over capacity" both work. Mixing them gives an off-by-one capacity.</li>
+  <li><b>Capacity 1 and the empty cache.</b> With sentinels these need no special code. Without them they're where the bugs hide: the node you evict is also the head, or the tail, or both.</li>
+  <li><b>A <code>None</code> value is still a hit.</b> Don't write <code>if cache.get(k):</code> to test presence. Test the map.</li>
+</ul>
+
+<div class="check" id="check-update">
+  <p class="q">An LRU cache of capacity 2 holds A and B (B used last). You call <code>put("A", new_value)</code>. What gets evicted?</p>
+  <div class="opts">
+    <button>A, because the old A must be removed before the new A goes in</button>
+    <button>B, because the cache is full and B is now the least recent</button>
+    <button data-correct>Nothing</button>
+  </div>
+  <div class="fb right"><p>Right. A is already in the cache, so this is an update: change its value and move it to the front. The cache still holds 2 entries, A (most recent) and B. B would only be evicted by the next <em>new</em> key.</p></div>
+  <div class="fb wrong"><p>Count the entries after the call. A was there before and is there after; nothing new arrived, so the count is still 2, which fits. Eviction exists only to make room, and an update needs no room. Treating the update as "remove A, insert A" works only if you remove A <em>first</em>; checking "is the cache full?" before noticing that A is already in it evicts B for nothing.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: is it really O(1)?</summary>
+  <p>The list moves are O(1) in the worst case: a fixed number of pointer writes. The hash map is O(1) <em>on average</em>, as the hash-maps chapter showed: a bad hash or an attacker who picks colliding keys can make lookups slow, and a resize occasionally costs O(n), spread over many inserts. So the honest answer is "O(1) average per operation, O(capacity) memory". A cache facing untrusted keys should use a hash with a random seed (Python does this for strings) or a structure with a guaranteed bound.</p>
+  <p>On real hardware the cost is also memory traffic. Every <code>get</code> writes pointers in up to five nodes (the node, its two old neighbors, the HEAD sentinel and the old first node), scattered around memory. For a CPU cache, or an operating system tracking millions of memory pages, that's far too slow, which is why hardware and kernels approximate LRU instead (section 10).</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Python already has one</h2>
+
+<p>In real Python code you'd rarely build the list yourself. Two tools in the standard library already are a hash map plus a doubly linked list:</p>
+
+<pre><code>from collections import OrderedDict
+od = OrderedDict()
+od["a"] = 1; od["b"] = 2; od["c"] = 3
+od.move_to_end("a")          # O(1): order is now b, c, a
+od.popitem(last=False)       # O(1): removes ("b", 2), the oldest
+
+from functools import lru_cache
+@lru_cache(maxsize=1000)     # the default maxsize is 128
+def load_product(product_id):
+    ...                      # repeat calls with the same id skip the body</code></pre>
+
+<p><code>OrderedDict</code> remembers the order keys were added and lets you move a key to either end. In CPython it's a dict plus a doubly linked list of its keys, the same structure as section 4. <code>functools.lru_cache</code> wraps a function: its arguments become the key, the return value the value, and its C implementation is a dict plus a circular doubly linked list with one sentinel. Call <code>load_product.cache_info()</code> to see its hits and misses. In Java, <code>LinkedHashMap</code> built with <code>accessOrder = true</code>, plus an override of <code>removeEldestEntry</code>, is an LRU cache in a few lines.</p>
+
+<p>In an interview, ask whether you may use them. The usual answer to "build an LRU cache" is "build the list yourself", because the list is the point. Knowing that <code>OrderedDict</code> is the same idea is still worth a sentence: it shows you know where the structure lives in real code.</p>
+
+<div class="keyidea"><p><code>OrderedDict</code> (<code>move_to_end</code>, <code>popitem(last=False)</code>) and <code>functools.lru_cache</code> are the same hash map + doubly linked list. Use them at work; expect to build the list yourself in an interview.</p></div>
+
+<div class="check" id="check-od">
+  <p class="q">You build an LRU cache on an <code>OrderedDict</code>, newest at the end. Which two calls do a hit and an eviction?</p>
+  <div class="opts">
+    <button data-correct><code>move_to_end(key)</code> on a hit, <code>popitem(last=False)</code> to evict</button>
+    <button><code>move_to_end(key)</code> on a hit, <code>popitem()</code> to evict</button>
+    <button><code>od[key] = od[key]</code> on a hit, <code>popitem(last=False)</code> to evict</button>
+  </div>
+  <div class="fb right"><p>Right. A hit moves the key to the newest end; eviction pops from the oldest end. <code>last=False</code> means "from the front", which is where the oldest key sits.</p></div>
+  <div class="fb wrong"><p>Line up the two ends: the newest key is at the end (that's where <code>move_to_end</code> puts it), so the oldest is at the front. Plain <code>popitem()</code> pops from the end, so it would evict the key you just used, the opposite of LRU. And assigning to an existing key keeps its position: in any Python dict, updating a value doesn't move the key, so <code>od[key] = od[key]</code> doesn't record the use at all.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: why not a plain dict?</summary>
+  <p>Since Python 3.7 a plain <code>dict</code> keeps insertion order too, so it's tempting to fake LRU with one: on a hit, <code>value = d.pop(key); d[key] = value</code> moves the key to the end, and <code>del d[next(iter(d))]</code> evicts the oldest. It gives correct answers. But in CPython, deleting from the front of a dict leaves an empty slot at the front of its internal entry array, and <code>next(iter(d))</code> has to step over every such slot until the dict next resizes and compacts. In one measurement, 300,000 inserts into a full 100,000-entry "dict LRU" took about 7 seconds, over 100&times; longer than a linked list. <code>OrderedDict</code> doesn't have this problem: its own linked list knows where the oldest key is. The <code>lru_cache</code> exercise has a test for exactly this.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>When recency lies: scans and loops</h2>
+
+<p>LRU rests on one guess: recently used means soon used again. Two common access patterns break that guess badly.</p>
+
+<p><b>The scan.</b> At 2 a.m. a reporting job reads every one of the 50 million products, once each. Under LRU, each one-off read becomes the most recent entry, so it pushes a popular product out of the cache. After a million of them, the cache is full of products nobody will look at again, and every popular product has been evicted. In the morning the hit rate collapses, and the database takes most of the 20,000 reads a second until the cache warms back up. One job that read each item <em>once</em> wiped out a cache full of items read thousands of times.</p>
+
+<p><b>The loop.</b> A job repeatedly walks the same 1,000,001 items, with a cache of 1,000,000. When item 1,000,001 arrives, the least recent entry is item 1, so item 1 is evicted. Then item 1 is requested again: miss, and it evicts item 2, which is requested next: miss. Every request evicts exactly the item that will be needed soonest. LRU gets <b>zero hits</b>, the worst possible, while OPT would keep most of the loop and hit on almost every request.</p>
+
+<p>Try both in the playground, along with two patterns where the policies trade places. Each dot is one request: time runs left to right, and each key has its own row. Green dots hit, red dots miss, for the policy you pick.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <select id="pg-trace" aria-label="Access pattern"></select>
+      <span class="small">cache size</span><input type="range" id="pg-cap" min="2" max="30" value="10" style="width:160px" aria-label="Cache size"><b id="pg-capval"></b>
+      <span class="small">color dots by</span><select id="pg-pol" aria-label="Policy to color by"><option>LRU</option><option>LFU</option><option>FIFO</option><option>OPT</option></select>
+    </div>
+    <div id="pg-plot" style="margin-top:12px"></div>
+    <div id="pg-bars" style="margin-top:6px"></div>
+    <div class="viz-caption" id="pg-msg"></div>
+  </div>
+  <div class="cap">Four access patterns, four policies. FIFO evicts the oldest arrival, LRU the least recently used, LFU the least often used (ties: least recent), OPT the one needed farthest in the future (the best possible). Try "A loop of 15 keys" and slide the cache size from 14 to 15. Then compare LRU and LFU on "Hot keys, with a scan" and on "Popularity shifts".</div>
+</div>
+
+<p>At a cache size of 10, the playground shows the pattern:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Pattern (cache size 10)</th><th>FIFO</th><th>LRU</th><th>LFU</th><th>OPT</th></tr></thead>
+  <tbody>
+    <tr><td>Hot keys, with a scan in the middle</td><td>49%</td><td>52%</td><td>68%</td><td>68%</td></tr>
+    <tr><td>A loop of 15 keys, over and over</td><td>0%</td><td>0%</td><td>0%</td><td>62%</td></tr>
+    <tr><td>Popularity shifts halfway</td><td>97%</td><td>97%</td><td>63%</td><td>97%</td></tr>
+    <tr><td>A few keys are very popular (Zipf)</td><td>41%</td><td>45%</td><td>56%</td><td>66%</td></tr>
+  </tbody>
+</table></div>
+
+<p>On the scan, even OPT tops out at 68%: the 150 scanned keys are each requested once, so each one is a miss no policy can avoid. (A miss on an item's first request is called a <b>compulsory miss</b>.) LRU loses another 16 points because the scan keys push the 8 hot keys out. LFU doesn't: a scanned key has been used once, while every hot key has been used many times, so the scan keys evict <em>each other</em> and the hot keys stay. On the loop, nothing but OPT gets a single hit until the cache holds all 15 keys. The "Zipf" pattern is what real popularity usually looks like: a few keys get most of the requests, and the request rate falls off steeply down the list. There, remembering <em>how often</em> beats remembering only <em>how recently</em>.</p>
+
+<div class="keyidea"><p>LRU fails when recent use doesn't predict future use. A one-time scan flushes the hot items out, and a loop just bigger than the cache gets zero hits. Counting how <em>often</em> each key is used protects frequently used keys from one-off traffic. That's LFU, next.</p></div>
+
+<div class="check" id="check-loop">
+  <p class="q">A function decorated with <code>@lru_cache(maxsize=100)</code> is called in a loop with arguments 0, 1, 2, …, 100, then 0, 1, …, 100 again, many times. What's the hit rate?</p>
+  <div class="opts">
+    <button>About 99%: only one argument doesn't fit</button>
+    <button>About 50%</button>
+    <button data-correct>0%</button>
+  </div>
+  <div class="fb right"><p>Right. There are 101 distinct arguments and 100 slots. When 100 is called, the least recent is 0, so 0 is evicted, and 0 is exactly what's called next. Its insert evicts 1, which is called next, and so on forever. Raising <code>maxsize</code> to 101 takes the hit rate to nearly 100% in one step.</p></div>
+  <div class="fb wrong"><p>Trace the first few calls after the cache fills. It holds 0 to 99. Call 100: miss, and LRU evicts the least recently used, 0. Next call: 0. Miss, so evict the least recent, which is now 1. Next call: 1. Miss. Each miss throws out exactly the key needed next, so every call misses. "Only one doesn't fit" sounds like 1 miss per lap, but with LRU the one that doesn't fit keeps <em>changing</em>: it's always the next one. OPT would evict the key needed farthest ahead and miss only about once per lap.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>LFU: count uses, not just time</h2>
+
+<p>The scan hurt LRU because LRU forgets everything about a key except its last use. A product read 40,000 times yesterday and a product read once by a reporting job look the same if their last reads were at the same moment. So keep one more number per key: how many times it has been used. Then evict the key used the <b>fewest</b> times. That's <b>LFU</b>, <b>least frequently used</b>.</p>
+
+<p>Picture a small library deciding which books stay on the front shelf: the ones with the most checkouts. A book that one class borrowed once for a project doesn't push out a book that's borrowed every week.</p>
+
+<p>Two keys can tie on the count, and the rule needs a tie-break. The usual one is recency: among the keys with the fewest uses, evict the <b>least recently used</b>. That's what "LFU" means in the classic interview problem, and in the playground above. Work through it with capacity 2:</p>
+
+<pre class="diagram"><code>put a        a:1
+put b        a:1  b:1
+get a        a:2  b:1
+put c        full. Fewest uses: b (1). Evict b.        a:2  c:1
+get c        a:2  c:2            (tie, and a is now the less recent)
+put d        full. a and c tie at 2; a is less recent. Evict a.   c:2  d:1</code></pre>
+
+<h3>First try: a heap</h3>
+<p>"Evict the smallest (count, last use)" sounds like a min-heap keyed by <code>(count, last_used)</code>. The trouble is the same as attempt 3 in section 3: every hit changes a key's count, and a heap can't change a priority in place. With lazy deletion (push a new entry, skip stale ones at the top) it works at O(log n) amortized per operation, and the heap fills with stale entries, one per hit, until you rebuild it. Fine for a first answer. The interviewer will then ask for O(1), and the way there comes from one small fact about how counts change.</p>
+
+<div class="keyidea"><p>LFU evicts the key with the fewest uses, breaking ties by least recent use. A heap of (count, last use) does it in O(log n) with lazy deletion; O(1) needs a structure built around how counts change.</p></div>
+
+<div class="check" id="check-lfu-tie">
+  <p class="q">An LFU cache of capacity 2: <code>put a</code>, <code>put b</code>, <code>get b</code>, <code>get a</code>, <code>put c</code>. Which key is evicted?</p>
+  <div class="opts">
+    <button>a, because it was inserted first</button>
+    <button data-correct>b</button>
+    <button>Neither: c has the fewest uses, so c is rejected</button>
+  </div>
+  <div class="fb right"><p>Right. a and b both have 2 uses, so the tie-break decides: b was last used at step 3, a at step 4. b is the less recent. c then goes in with 1 use.</p></div>
+  <div class="fb wrong"><p>Write each key's count and last use when c arrives: a has 2 uses (put at step 1, get at step 4), b has 2 uses (put at step 2, get at step 3). Same count, so the tie-break looks at <em>last use</em>, not first insert: b's last use (step 3) is older than a's (step 4). Evicting a would be a FIFO tie-break. And eviction happens <em>before</em> c goes in, to make room: c isn't a candidate. (Whether a newcomer should be let in at all is a real question, called admission. Section 10 comes back to it.)</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>LFU in O(1): one list per use count</h2>
+
+<p>Here's the small fact. A key's count only ever changes by <b>+1</b>, a new key always starts at <b>1</b>, and an evicted key leaves completely. Counts never jump, never go down. That's what lets us drop the heap.</p>
+
+<p>Picture a hotel where the floor number is a guest's use count. A new guest checks in on floor 1. Every time a guest is used, they move up exactly one floor. On each floor the guests stand in a line, most recently used at the front. To evict, go to the <b>lowest occupied floor</b> and take the guest at the <b>back</b> of its line: fewest uses, and among those the least recent. Each floor's line is the LRU list from section 4.</p>
+
+<pre class="diagram"><code> map:  key → node (value, count)
+
+ counts:  1 │ [HEAD] ⇄ e ⇄ [TAIL]          ← min_count = 1
+          2 │ [HEAD] ⇄ c ⇄ b ⇄ [TAIL]
+          3 │ [HEAD] ⇄ a ⇄ [TAIL]
+                     most      least
+                    recent     recent
+
+ evict:  the node at the back of the list for min_count
+ a use:  unlink from list k, push to the front of list k + 1</code></pre>
+
+<p>So the cache has three parts: a <b>map from key to node</b> (each node holds its key, value and count), a <b>map from each count to a doubly linked list</b> of the nodes with that count, and one integer, <b><code>min_count</code></b>, the lowest floor that has anyone on it. A use is two O(1) list moves. An eviction is "back of list <code>min_count</code>", also O(1), <em>if</em> we always know <code>min_count</code> without looking.</p>
+
+<h3>Why <code>min_count</code> never needs a search</h3>
+<p>This is the part people get stuck on, and the part interviewers probe. You might expect that when the lowest floor empties out, you'd have to climb floors until you find someone. You never do. Look at every way <code>min_count</code> can change:</p>
+<ol>
+  <li><b>A new key arrives.</b> It goes on floor 1, and no floor is lower than 1. So <code>min_count = 1</code>. No search.</li>
+  <li><b>A key on floor <code>min_count</code> is used</b> and was the last one there. It moves up to floor <code>min_count + 1</code>, so that floor now has someone, and nothing was below <code>min_count</code> before. So the new minimum is exactly <code>min_count + 1</code>. No search. (If the floor still has other guests, or the key used was on a higher floor, the minimum doesn't change.)</li>
+  <li><b>An eviction empties floor <code>min_count</code>.</b> Now we really don't know the next occupied floor. But look at <em>when</em> evictions happen: only inside <code>put</code> of a new key, right before that key is inserted on floor 1. Case 1 sets <code>min_count = 1</code> a moment later, so the unknown value is never read.</li>
+</ol>
+<p>A use touches two floors, an eviction touches one, an insert sets the minimum to 1. Every operation is O(1). The idea of one bucket per use count was published as "An O(1) algorithm for implementing the LFU cache eviction scheme" (Shah, Mitra and Matani, 2010), and it's what interviewers mean by "LFU in O(1)".</p>
+
+<div class="figure">
+  <div id="lfu-player"></div>
+  <div class="cap">An O(1) LFU cache of capacity 3. One row per use count, most recent at the left of each row. Blue: the key just used or inserted, shown in its new row. Red: the key about to be evicted. Watch the min_count marker: it moves up by exactly one when its row empties, and drops to 1 whenever a new key arrives.</div>
+</div>
+
+<p>The heart of it is the move on every hit. With a doubly linked list class of your own for each count (it needs <code>remove</code>, <code>push_front</code> and a length), it's this:</p>
+
+<pre><code>def touch(self, node):                  # one more use of an existing key
+    k = node.count
+    self.lists[k].remove(node)          # O(1) unlink, as in section 4
+    if len(self.lists[k]) == 0:
+        del self.lists[k]               # don't keep empty floors around
+        if k == self.min_count:
+            self.min_count = k + 1      # case 2: the lowest floor emptied
+    node.count = k + 1
+    self.lists.setdefault(k + 1, DList()).push_front(node)</code></pre>
+
+<div class="keyidea"><p>O(1) LFU: a map from key to node, a map from count to a doubly linked list (most recent first), and <code>min_count</code>. A use moves a node from list k to the front of list k + 1. Evict from the back of list <code>min_count</code>. <code>min_count</code> never needs a search: a new key resets it to 1, and a use can only raise it by exactly 1.</p></div>
+
+<div class="check" id="check-min-count">
+  <p class="q">An eviction can leave the lowest-count list empty. Why doesn't the O(1) LFU cache have to search upward for the next non-empty list?</p>
+  <div class="opts">
+    <button>Because it keeps the counts in a heap, so the next minimum is at the top</button>
+    <button data-correct>Because an eviction only happens just before a new key is inserted with count 1, which makes 1 the new minimum</button>
+    <button>Because the next list up, min_count + 1, is always non-empty</button>
+  </div>
+  <div class="fb right"><p>Right. Eviction exists only to make room for a new key, and the new key's count is 1, the lowest possible. So the minimum after any <code>put</code> of a new key is 1, whatever the eviction emptied.</p></div>
+  <div class="fb wrong"><p>Look at when the cache evicts: only inside <code>put</code>, only for a brand-new key, only right before inserting it. The new key has 1 use, and no count can be lower, so <code>min_count</code> becomes 1. Whatever the eviction emptied doesn't matter. "The next list up is non-empty" is true after a <em>use</em> (the used key just moved there), but not after an eviction: if the counts were 1 and 7, evicting the only key with 1 leaves list 2 empty. And there's no heap at all; that was the O(log n) design this one replaces.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>LFU's own flaws, and what real systems do</h2>
+
+<p>LFU fixed the scan. It has two flaws of its own, and the playground showed the first one.</p>
+<ul>
+  <li><b>It never forgets.</b> In "Popularity shifts", the first 8 keys pile up dozens of uses each, then nobody asks for them again. Their counts stay high forever, so they sit in the cache while the new popular keys fight over the slots that are left. At cache size 10, LFU gets 63% where LRU gets 97%. Think of a news site where last week's big story, with 50,000 uses, never leaves.</li>
+  <li><b>Newcomers are first in line to go.</b> A new key starts at 1, the lowest count there is, so it's first in line for the next eviction, along with every other key that has only 1 use, unless it gets used again before then. A key that will be very popular can be thrown out before it has the chance to show it.</li>
+</ul>
+
+<p>Real systems don't run pure LRU or pure LFU. They blend recency and frequency, forget old counts, and approximate to save memory and locking. The main tricks:</p>
+
+<ul>
+  <li><b>Aging:</b> make old counts fade. Halve every count once in a while, or decay a key's count based on how long it's been idle. Yesterday's 50,000 becomes 25,000, then 12,500, and eventually a new story can beat it.</li>
+  <li><b>Two segments (2Q, segmented LRU):</b> a new key enters a small <em>probation</em> list. Only a second use promotes it to the main, <em>protected</em> list. A scan touches each key once, so it only churns probation, and the protected keys survive. <b>ARC</b> (adaptive replacement cache, from IBM, used by ZFS) goes one step further: it keeps a recency list and a frequency list, remembers the keys it recently evicted from each, and shifts room toward whichever list those "ghost" keys show was too small.</li>
+  <li><b>Admission:</b> before letting a newcomer in, compare its estimated popularity with the key it would evict, and keep the better one. The estimate comes from a compact count of recent requests (a Count-Min Sketch, topic 01.12).</li>
+  <li><b>Approximate LRU:</b> moving a node on every read costs six pointer writes and, with threads, a lock. <b>CLOCK</b> replaces the list with one bit per entry:</li>
+</ul>
+
+<pre class="diagram"><code>  entries in a circle, each with a "used" bit:
+
+         hand
+          ▼
+   [A 1] [B 0] [C 1] [D 1] [E 0]  → back to A
+
+  a hit:    set the entry's bit to 1        (no list moves at all)
+  evict:    look at the entry under the hand
+              bit 1 → clear it to 0 (a second chance), move the hand on
+              bit 0 → evict this one
+  Here: B has bit 0, so the hand clears nothing and evicts B.</code></pre>
+
+<p>An entry used since the hand last passed gets a second chance; one that wasn't is evicted. That's roughly "not used recently", for one bit per entry and nothing to update on a hit except the bit. Operating systems have used CLOCK and its variants for page replacement for decades.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>System</th><th>What it does</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Redis (<code>maxmemory-policy</code>)</td><td><code>allkeys-lru</code> samples a few keys (<code>maxmemory-samples</code>, default 5) and evicts the least recently used of the sample (since 3.0 it also keeps a small pool of the best candidates seen across rounds). <code>allkeys-lfu</code> (since 4.0) keeps an 8-bit logarithmic counter per key that decays over time.</td><td>No linked list: no pointers per key, no list surgery on reads. Sampling gets close to true LRU for far less memory.</td></tr>
+    <tr><td>PostgreSQL shared buffers</td><td>Clock sweep with a small usage count per buffer (capped at 5), and a small ring of buffers for big sequential scans.</td><td>The ring keeps one huge table scan from flushing the whole buffer pool.</td></tr>
+    <tr><td>MySQL InnoDB buffer pool</td><td>LRU with "midpoint insertion": new pages enter an <em>old</em> sublist (37% of the pool by default) and move to the <em>young</em> part only if read again after a delay.</td><td>Scan protection, the segmented-LRU idea.</td></tr>
+    <tr><td>Linux page cache</td><td>Active and inactive lists: a page must be used again while on the inactive list to be promoted. Since 6.1 there's also a multi-generational LRU.</td><td>Scan protection, with cheap reference bits instead of moving pages on every access.</td></tr>
+    <tr><td>Caffeine (Java)</td><td>W-TinyLFU: a small LRU window for newcomers, a segmented main area, and an admission filter built on a frequency sketch whose counts are halved periodically.</td><td>LFU's hit rate on popular keys, LRU's quick reaction, and aging so old popularity fades.</td></tr>
+  </tbody>
+</table></div>
+
+<div class="keyidea"><p>LFU never forgets old popularity and evicts newcomers too quickly. Real caches blend the two signals and approximate: aging counts, a probation segment against scans, an admission filter for newcomers, and CLOCK bits or sampling instead of a list move on every read.</p></div>
+
+<div class="check" id="check-newcomer">
+  <p class="q">A news site uses a pure LFU cache with no aging. Last week's stories have about 50,000 uses each and fill 90% of the cache. A big story breaks today. What goes wrong?</p>
+  <div class="opts">
+    <button>Nothing: the new story gets so many requests that it quickly has the highest count</button>
+    <button data-correct>Last week's stories hold 90% of the cache for good, and today's stories fight over the last 10%, evicting each other</button>
+    <button>LFU evicts last week's stories first, because they're the oldest</button>
+  </div>
+  <div class="fb right"><p>Right. Their counts never drop, so nothing new can outrank them. Every new story starts at 1 and competes only with the other new stories for the leftover slots. The fix is aging: halve or decay the counts over time, so last week's 50,000 shrinks and today's story can win.</p></div>
+  <div class="fb wrong"><p>Follow one new story. It enters with 1 use, the lowest count in the cache, so it's the first candidate for eviction. Even if it survives and climbs to 1,000 uses, it's still far below 50,000, so it can never displace an old story; only other new stories can be evicted to make room for it. LFU has no idea how <em>old</em> a use is: "oldest" is an LRU idea, and LFU ignores it except to break ties. So the old stories keep 90% of the cache forever, unless counts age.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>The follow-ups: expiry, threads, memory, many machines</h2>
+
+<p>After "build an LRU cache", the follow-ups are predictable. Each one has a short, solid answer.</p>
+
+<h3>"Entries should expire after 60 seconds"</h3>
+<p>Expiry and eviction answer different questions. Eviction asks "who leaves to make room?". Expiry asks "is this copy too old to trust?", because the database may have changed since. A <b>TTL</b> (time to live) stamps each entry with an expiry time. Two ways to remove expired entries, and real caches use both:</p>
+<ul>
+  <li><b>Lazily:</b> on every <code>get</code>, check the entry's expiry; if it's past, delete it and report a miss. Cheap, but an expired key nobody reads stays in memory forever.</li>
+  <li><b>Actively:</b> a background sweep removes expired entries. Redis does both: a key is checked when it's read, and a background job repeatedly checks a small batch of the keys that have a TTL and deletes the expired ones.</li>
+</ul>
+<p>If every entry gets the <em>same</em> TTL, the order in which entries expire is the order in which they were last written. That's a second linked list, ordered by write time, so the next entry to expire is always at its front: O(1) to find. The least recently <em>used</em> entry and the next entry to <em>expire</em> are generally different (an old entry that was just read is recent but about to expire), so each node sits in both lists. With a different TTL per entry, expiry order is a priority queue: a heap, or a timing wheel (the heaps chapter). Exercise 6 builds the same-TTL version.</p>
+
+<h3>"Make it thread-safe"</h3>
+<p>Here's the catch: in an LRU cache <b>every read is a write</b>. <code>get</code> moves a node, which rewrites pointers in up to five nodes. Two threads doing it at once can corrupt the list, so even reads need the lock, and a read-write lock doesn't help (topic 03.03). One lock around the whole cache is correct and is the right first answer. At high request rates it becomes the bottleneck, and the standard fixes are:</p>
+<ul>
+  <li><b>Shard it:</b> split the cache into 16 or 64 independent LRU caches, picked by a hash of the key, each with its own lock. Threads only collide when they hit the same shard. The price: eviction is LRU <em>within a shard</em>, so the global order is only approximate.</li>
+  <li><b>Don't move on read:</b> use CLOCK bits or Redis-style sampling, so a hit only sets a bit or a timestamp.</li>
+  <li><b>Buffer the reads:</b> record hits in a small buffer and apply the list moves in batches under the lock. Caffeine does this.</li>
+</ul>
+
+<h3>"Cap it at 500 MB, not 1 million entries"</h3>
+<p>Entries have different sizes. Keep a running total of bytes; on <code>put</code>, evict from the LRU end until the new entry fits. One put may evict several entries, and an entry bigger than the whole budget shouldn't be cached at all.</p>
+
+<h3>"The cache has to run on 20 machines"</h3>
+<p>Split the keys across machines by a hash of the key, so each key has one home (consistent hashing, topic 02.15), and run an LRU cache on each machine. Then the interesting problems are about the slow layer behind the cache: when a hot key expires, a thousand requests can miss at the same moment and all hit the database (a <b>cache stampede</b>). Fixes include letting one request reload the key while the others wait for it, and adding random jitter to TTLs so keys don't all expire together (topics 04.05 and 03.14).</p>
+
+<div class="keyidea"><p>Expiry is about freshness, eviction about room: use both, removing expired entries lazily on read and actively in the background. In an LRU cache every get is a write, so it needs a lock; shard it, or stop moving nodes on reads, when that lock gets hot. Real caches budget bytes, not entries.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="s12"><span class="sec-num">12</span>What to say in the interview</h2>
+
+<p>For "design an LRU cache with O(1) get and put", a strong answer:</p>
+<div class="story">
+  <p>"I need three operations in O(1): find a key, mark it most recently used, and remove the least recently used. A hash map finds keys but has no order. A doubly linked list keeps the order and moves or removes a node in O(1), but can't find one. So I combine them: the map goes from key to list node, and the list runs from most recent at the head to least recent at the tail, with sentinel nodes so there are no edge cases. A get looks up the node and moves it to the front. A put updates and moves an existing key, or, if the cache is full, unlinks the tail node and deletes its key from the map, which is why each node stores its key, then inserts the new node at the front. Everything is O(1) on average, with O(capacity) memory. LRU's weak spot is scans and loops: a one-off scan flushes the hot keys. If that matters I'd use LFU, which in O(1) needs a list per use count and a min-count pointer, or a segmented LRU like the ones databases use. In production I'd also think about TTLs, and about locking, since every get is a write."</p>
+</div>
+<ol>
+  <li><b>Clarify:</b> capacity in entries or bytes? Does <code>put</code> on an existing key count as a use? Threads? Expiry?</li>
+  <li><b>Build the design from the operations:</b> say what each structure gives you and what it can't do.</li>
+  <li><b>Code the two list moves first</b> (<code>unlink</code>, <code>push_front</code>), then <code>get</code> and <code>put</code> on top of them.</li>
+  <li><b>Say the traps out loud:</b> the key in the node, update vs insert, delete from both structures, sentinels.</li>
+  <li><b>Close with trade-offs:</b> where LRU fails, LFU and its O(1) trick, what real systems approximate, and thread safety.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Only misses reach the slow layer: 90% &rarr; 99% hits is 10&times; less load. The eviction policy decides the hit rate.</li>
+  <li>The perfect policy (Bélády's OPT) evicts the item needed farthest in the future. LRU guesses it from the past: evict the item unused the longest.</li>
+  <li>LRU = hash map (key &rarr; node) + doubly linked list in recency order, with sentinels. get, put and evict are O(1) average.</li>
+  <li>Each node stores its key, so eviction can delete it from the map. An update never evicts. A miss changes nothing.</li>
+  <li><code>OrderedDict</code> and <code>functools.lru_cache</code> are the same structure. A plain dict with <code>next(iter(d))</code> is a trap in CPython.</li>
+  <li>LRU fails on scans (they flush hot keys) and on loops just bigger than the cache (0 hits).</li>
+  <li>LFU evicts the fewest uses, ties by recency. O(1): a list per count plus <code>min_count</code>, which a new key resets to 1 and a use raises by at most 1.</li>
+  <li>LFU never forgets and is hard on newcomers. Real systems blend and approximate: aging, probation segments, admission filters, CLOCK, sampling.</li>
+  <li>Follow-ups: TTL (lazy plus active removal; same TTL means expiry order is write order), every get is a write so locking is needed (sharding helps), byte budgets, stampedes.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do them in order. Warm-ups are pen and paper: commit to an answer before you open it. Core exercises are code in <code>exercises/</code>, and their tests <b>measure how much work your code does</b> (hash and equality calls on the keys, comparisons on the clock, a time cap at sizes where a scan takes minutes), so a correct but slow answer fails.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Run an LRU cache by hand</h4>
+  <p>Capacity 3. Run <code>put a, put b, put c, get a, put d, get b, get c, put e, get a, get d</code>. After each step, write the cache from most to least recent, and mark every hit and every eviction. How many hits?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>put a: [a]. put b: [b a]. put c: [c b a]. get a: hit, [a c b]. put d: full, evict b (the least recent), [d a c]. get b: miss, nothing changes. get c: hit, [c d a]. put e: evict a, [e c d]. get a: miss. get d: hit, [d e c]. <b>3 hits</b> (a, c, d); evicted b and a.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. The same requests through LFU</h4>
+  <p>Same capacity and the same ten operations, now with LFU (ties: least recently used). After each step, draw the lists per use count (most recent first) and write <code>min_count</code>. Which evictions differ from exercise 1, and why?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>put a, b, c: count 1 = [c b a], min 1. get a: hit; 1 = [c b], 2 = [a], min stays 1 (list 1 isn't empty). put d: evict the back of list 1, b; then d goes in: 1 = [d c], 2 = [a], min 1. get b: miss. get c: hit; 1 = [d], 2 = [c a]. put e: evict the back of list 1, <b>d</b>; 1 = [e], 2 = [c a], min 1. get a: hit; 2 = [c], 3 = [a]. get d: miss. <b>3 hits</b> (a, c, a). At <code>put e</code>, LRU evicted a (unused the longest), while LFU evicted d, which had only 1 use while a had 2. Then a's next request hit under LFU and missed under LRU, and d's next request did the opposite.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Pick the policy</h4>
+  <p>For each, say LRU, LFU (with aging?) or something else, and why: (a) a database buffer pool where analysts run full-table scans every night; (b) a video service where a few hundred titles stay popular for months; (c) a news site where popularity changes every hour; (d) a batch job that loops over 1.2 million records with a 1-million-entry cache; (e) a cache for user sessions that must disappear 30 minutes after the last write.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Scan-resistant: segmented LRU or midpoint insertion, as Postgres and InnoDB do, or LFU with aging. Plain LRU would be flushed every night. (b) LFU (with slow aging): popularity is stable, and frequency protects the hits from one-off views. (c) LRU, or LFU with fast aging: plain LFU keeps old stories forever. (d) No recency policy helps: LRU, FIFO and LFU all get about 0 hits on a loop bigger than the cache. Make the cache hold the whole loop, or pin a fixed 1 million records and let the rest miss (that gets about 1/1.2 &asymp; 83% hits). (e) A TTL decides correctness here; pair it with LRU for space. Sessions all get the same TTL, so the expiry order is the write order.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>LRUCache</code> from scratch</h4>
+  <p>In <code>exercises/lru_cache.py</code>: <code>get</code>, <code>put</code>, <code>peek</code>, <code>delete</code>, <code>keys</code>, <code>in</code> and <code>len</code>, with your own doubly linked list (no <code>OrderedDict</code>, no <code>functools</code>). The tests use keys that count every <code>__hash__</code> and <code>__eq__</code> call and allow 8 per operation, so a Python list of keys fails. They run 300,000 operations at capacity 50,000 under a time cap, so scanning for the oldest timestamp fails, and they push 800,000 evictions through a 200,000-entry cache, which catches the plain-dict trick from section 6.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>LFUCache</code> in O(1)</h4>
+  <p>In <code>exercises/lfu_cache.py</code>: <code>get</code>, <code>put</code>, <code>frequency</code>, <code>in</code> and <code>len</code>, built as section 9: one doubly linked list per use count, and <code>min_count</code>. The tests check ties by recency (not insertion order), that an update counts as a use, that a new key resets the minimum, and a randomized run against a slow model. They count hash and equality calls and put a time cap on 300,000 operations at capacity 50,000, so finding the victim by scanning fails. A heap with lazy deletion would pass the tests at O(log n), but it isn't the answer the interviewer wants.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>TTLCache</code>: LRU with expiry</h4>
+  <p>In <code>exercises/ttl_cache.py</code>: an LRU cache where every entry expires a fixed <code>ttl</code> after it was last written, with a clock passed in so the tests can move time. Expired entries must go before any live entry is evicted, and <code>purge_expired()</code> and <code>len()</code> must cost O(1 + number expired). The test clock's times count every comparison: purging 5 expired entries out of 20,000 gets 60 comparisons, so checking every entry's expiry fails, and the recency order is shuffled so that walking the LRU list doesn't find the expired entries either (section 11 has the idea).</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure</div>
+  <h4>7. Rebuild the playground</h4>
+  <p>In a scratch file, write simulators for FIFO, LRU, LFU, CLOCK and OPT that take a list of requests and a capacity and return the hit count. Generate a Zipf-like trace (100,000 requests over 10,000 keys) and add a scan of 20,000 new keys in the middle. Plot or print hit rate against capacity for each policy. Where does CLOCK land relative to LRU? How far is the best practical policy from OPT? Then confirm Bélády's anomaly for FIFO on <code>1 2 3 4 1 2 5 1 2 3 4 5</code> with 3 and 4 slots.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>8. A cache for 16 cores</h4>
+  <p>Your LRU cache is called 200,000 times a second by 16 threads. Explain why a single lock becomes the bottleneck even though 95% of calls are reads. Sketch a sharded design: how many shards, how a key picks its shard, what happens to the global LRU order, and how a byte budget is split between shards. Then say what changes if you switch to CLOCK.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>9. Say it out loud</h4>
+  <p>Set a 3-minute timer and answer: "Design an LRU cache. Now make it LFU." Did you say why each structure is there, that the node stores its key, why <code>min_count</code> needs no search, and one way each policy fails?</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k "lru_cache or lfu_cache or ttl_cache"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="union-find.html"><small>← Previous</small>Same group or not?</a>
+  <a class="next" href="intervals.html"><small>Next →</small>Where things overlap</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var label = function (t) { return V.el("div", { class: "small muted", style: "margin:4px 0 2px" }, t); };
+
+  // A row of list nodes with arrows between them. items: [{text, cls, ptr}]
+  function chain(items) {
+    var kids = [];
+    items.forEach(function (it, i) {
+      if (i) kids.push(V.el("span", { class: "muted", style: "align-self:center;padding:0 2px" }, "⇄"));
+      kids.push(V.el("div", { class: "cell " + (it.cls || "") }, it.ptr ? V.el("span", { class: "ptr" }, it.ptr) : null, it.text));
+    });
+    return V.el("div", { class: "cells with-ptrs", style: "align-items:center" }, kids);
+  }
+
+  // ---------- LRU stepper (section 4) ----------
+  (function () {
+    var cap = 3, list = [], frames = [];   // list: most recent first, items {k, v}
+    var snap = function (msg, mark, extra) { frames.push({ list: list.map(function (n) { return { k: n.k, v: n.v }; }), mark: mark || {}, extra: extra || null, msg: msg }); };
+    var find = function (k) { for (var i = 0; i < list.length; i++) if (list[i].k === k) return i; return -1; };
+    snap("An empty cache: just the two sentinels, HEAD and TAIL, pointing at each other. The hash map is empty.");
+    var ops = [["put", "A", 1], ["put", "B", 2], ["put", "C", 3], ["get", "A"], ["put", "D", 4], ["get", "B"], ["get", "C"], ["put", "A", 9], ["put", "E", 5]];
+    ops.forEach(function (op) {
+      var k = op[1], i = find(k), m = {};
+      if (op[0] === "get") {
+        if (i < 0) { snap("<b>get(" + k + ")</b>: the map has no " + k + ". A miss: return the default and change nothing. (" + k + " was evicted earlier.)", {}); return; }
+        m[k] = "cmp"; snap("<b>get(" + k + ")</b>: the map finds " + k + "'s node in one step, at position " + (i + 1) + " of " + list.length + ". No walking the list.", m);
+        var n = list.splice(i, 1)[0]; list.unshift(n);
+        m = {}; m[k] = "hl"; snap("Unlink " + k + " (its neighbors now point at each other) and push it right after HEAD. Return " + n.v + ". " + k + " is now the most recent.", m);
+        return;
+      }
+      if (i >= 0) {
+        m[k] = "cmp"; snap("<b>put(" + k + ", " + op[2] + ")</b>: " + k + " is already in the map. This is an update, not an insert, so nothing is evicted.", m);
+        list[i].v = op[2]; var u = list.splice(i, 1)[0]; list.unshift(u);
+        m = {}; m[k] = "hl"; snap("Set its value to " + op[2] + " and move it to the front. Still " + list.length + " entries.", m);
+        return;
+      }
+      var evicted = false;
+      if (list.length === cap) {
+        evicted = true;
+        var old = list[list.length - 1];
+        m[old.k] = "bad"; snap("<b>put(" + k + ", " + op[2] + ")</b>: new key, and the cache is full. The victim is TAIL.prev: <b>" + old.k + "</b>, the least recently used.", m);
+        list.pop();
+        snap("Unlink " + old.k + " and delete map[" + old.k + "]. The node stores its key, which is how we know which map entry to delete.", {}, { gone: old.k });
+      }
+      list.unshift({ k: k, v: op[2] });
+      m = {}; m[k] = "hl";
+      snap((evicted ? "" : "<b>put(" + k + ", " + op[2] + ")</b>: new key. ") + "Create a node for " + k + ", add map[" + k + "], and push it right after HEAD. Size " + list.length + " of " + cap + ".", m);
+    });
+    frames[frames.length - 1].msg += " Done: every step was a map lookup plus a few pointer writes, O(1) however big the cache.";
+    V.player($("lru-player"), {
+      frames: frames, speed: 1100,
+      draw: function (f, stage) {
+        var keys = f.list.map(function (n) { return n.k; }).sort();
+        stage.append(label("hash map (key → node)"),
+          keys.length ? V.cells(keys, { idx: false, label: function (k) { return k + " →"; }, cls: function (i, k) { return f.mark[k] || ""; } }) : V.el("div", { class: "small", style: "height:38px" }, "(empty)"));
+        var items = [{ text: "HEAD", cls: "pivot" }];
+        f.list.forEach(function (n, i) {
+          items.push({ text: n.k + ":" + n.v, cls: f.mark[n.k] || "", ptr: i === 0 ? "newest" : (i === f.list.length - 1 ? "oldest" : "") });
+        });
+        items.push({ text: "TAIL", cls: "pivot" });
+        stage.append(label("doubly linked list"), chain(items));
+        if (f.extra && f.extra.gone) stage.append(V.el("div", { class: "small", style: "margin-top:4px" }, "evicted: ", V.el("b", {}, f.extra.gone)));
+      },
+    });
+  })();
+
+  // ---------- LFU stepper (section 9) ----------
+  (function () {
+    var cap = 3, lists = {}, cnt = {}, val = {}, minC = 0, t = 0, frames = [];
+    var size = function () { return Object.keys(cnt).length; };
+    var snap = function (msg, mark, gone) {
+      var copy = {}; Object.keys(lists).forEach(function (c) { copy[c] = lists[c].slice(); });
+      var cc = {}; Object.keys(cnt).forEach(function (k) { cc[k] = cnt[k]; });
+      frames.push({ lists: copy, cnt: cc, min: minC, mark: mark || {}, gone: gone || null, msg: msg });
+    };
+    var take = function (k) { var c = cnt[k], L = lists[c]; L.splice(L.indexOf(k), 1); if (!L.length) delete lists[c]; return c; };
+    var place = function (k, c) { (lists[c] = lists[c] || []).unshift(k); cnt[k] = c; };
+    snap("An empty LFU cache of capacity 3. One list per use count; min_count isn't set yet.");
+    var ops = [["put", "A"], ["put", "B"], ["get", "A"], ["get", "A"], ["put", "C"], ["get", "B"], ["get", "C"], ["put", "D"], ["get", "D"], ["put", "E"]];
+    ops.forEach(function (op) {
+      var k = op[1], m = {};
+      if (cnt[k] != null) {
+        var c = take(k), emptied = !lists[c], wasMin = c === minC;
+        place(k, c + 1);
+        var note;
+        if (emptied && wasMin) { minC = c + 1; note = "List " + c + " is now empty and it was the minimum, so min_count goes up by exactly one, to " + minC + ". No search: " + k + " itself is on list " + minC + "."; }
+        else if (wasMin) note = "List " + c + " still has keys, so min_count stays " + minC + ".";
+        else note = "min_count stays " + minC + ".";
+        m[k] = "hl";
+        snap("<b>" + op[0] + "(" + k + ")</b>: a hit. " + k + " moves from list " + c + " to the front of list " + (c + 1) + ". " + note, m);
+        return;
+      }
+      var gone = null;
+      if (size() === cap) {
+        var L = lists[minC], victim = L[L.length - 1];
+        m[victim] = "bad";
+        snap("<b>put(" + k + ")</b>: new key, cache full. Go to list min_count = " + minC + " and take the key at its back, the least recent of the least used: <b>" + victim + "</b>" + (L.length > 1 ? " (it ties with " + L.slice(0, -1).join(", ") + " on count, but was used longer ago)." : "."), m);
+        take(victim); delete cnt[victim]; gone = victim;
+      }
+      place(k, 1); minC = 1; m = {}; m[k] = "hl";
+      snap("<b>put(" + k + ")</b>: " + (gone ? gone + " is gone. " : "") + k + " goes to the front of list 1 with 1 use, so min_count = 1. A new key always resets the minimum to 1.", m, gone);
+    });
+    frames[frames.length - 1].msg += " Every step touched at most two lists and one integer: O(1).";
+    V.player($("lfu-player"), {
+      frames: frames, speed: 1200,
+      draw: function (f, stage) {
+        var keys = Object.keys(f.cnt).sort();
+        stage.append(label("hash map (key · uses)"),
+          keys.length ? V.cells(keys, { idx: false, label: function (k) { return k + "·" + f.cnt[k]; }, cls: function (i, k) { return f.mark[k] || ""; } }) : V.el("div", { class: "small", style: "height:38px" }, "(empty)"));
+        for (var c = 1; c <= 4; c++) {
+          var L = f.lists[c] || [];
+          var row = V.el("div", { style: "display:flex;align-items:center;gap:10px;margin:4px 0" },
+            V.el("span", { class: "small muted", style: "width:58px;flex:none" }, "uses " + c),
+            L.length ? V.cells(L, { idx: false, cls: function (i, k) { return f.mark[k] || ""; } }) : V.el("span", { class: "small muted", style: "height:38px;display:flex;align-items:center" }, "(empty)"),
+            c === f.min ? V.el("b", { class: "small", style: "color:var(--accent)" }, "← min_count") : null);
+          stage.append(row);
+        }
+        if (f.gone) stage.append(V.el("div", { class: "small" }, "evicted: ", V.el("b", {}, f.gone)));
+      },
+    });
+  })();
+
+  // ---------- Policy playground (section 7) ----------
+  (function () {
+
+  function rng(seed) { let s = seed >>> 0; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296); }
+  function zipfPick(r, n) { let tot = 0; for (let i = 1; i <= n; i++) tot += 1 / i; let u = r() * tot; for (let i = 1; i <= n; i++) { u -= 1 / i; if (u <= 0) return i - 1; } return n - 1; }
+  const TRACES = {
+    scan: { name: "Hot keys, with a scan in the middle", make() { const r = rng(7), t = []; for (let i = 0; i < 100; i++) t.push(Math.floor(r() * 8)); for (let k = 0; k < 150; k++) { t.push(Math.floor(r() * 8)); t.push(8 + k); } for (let i = 0; i < 100; i++) t.push(Math.floor(r() * 8)); return t; } },
+    loop: { name: "A loop of 15 keys, over and over", make() { const t = []; for (let rep = 0; rep < 20; rep++) for (let k = 0; k < 15; k++) t.push(k); return t; } },
+    shift: { name: "Popularity shifts halfway", make() { const r = rng(3), t = []; for (let i = 0; i < 250; i++) t.push(Math.floor(r() * 8)); for (let i = 0; i < 250; i++) t.push(8 + Math.floor(r() * 8)); return t; } },
+    zipf: { name: "A few keys are very popular (Zipf)", make() { const r = rng(11), t = []; for (let i = 0; i < 500; i++) t.push(zipfPick(r, 60)); return t; } },
+  };
+  function simulate(policy, tr, cap) {
+    const hit = new Array(tr.length).fill(false);
+    if (policy === "OPT") {
+      const nextUse = new Array(tr.length), seen = new Map();
+      for (let i = tr.length - 1; i >= 0; i--) { nextUse[i] = seen.has(tr[i]) ? seen.get(tr[i]) : Infinity; seen.set(tr[i], i); }
+      const inCache = new Map();
+      tr.forEach((k, i) => {
+        if (inCache.has(k)) { hit[i] = true; inCache.set(k, nextUse[i]); return; }
+        if (inCache.size >= cap) { let worst = null, far = -1; for (const [kk, nu] of inCache) if (nu > far) { far = nu; worst = kk; } inCache.delete(worst); }
+        inCache.set(k, nextUse[i]);
+      });
+      return hit;
+    }
+    const m = new Map(); let t = 0;
+    tr.forEach((k, i) => {
+      t++;
+      if (m.has(k)) { hit[i] = true; const e = m.get(k); e.f++; if (policy !== "FIFO") e.last = t; return; }
+      if (m.size >= cap) {
+        let victim = null, best = null;
+        for (const [kk, e] of m) {
+          const score = policy === "LFU" ? [e.f, e.last] : [e.last, 0];
+          if (!best || score[0] < best[0] || (score[0] === best[0] && score[1] < best[1])) { best = score; victim = kk; }
+        }
+        m.delete(victim);
+      }
+      m.set(k, { f: 1, last: t });
+    });
+    return hit;
+  }
+
+    var sel = $("pg-trace");
+    Object.keys(TRACES).forEach(function (id) { sel.append(V.el("option", { value: id }, TRACES[id].name)); });
+    var POL = ["FIFO", "LRU", "LFU", "OPT"];
+    function show() {
+      var tr = TRACES[sel.value].make(), cap = Number($("pg-cap").value), pol = $("pg-pol").value;
+      $("pg-capval").textContent = cap;
+      var res = {}; POL.forEach(function (p) { res[p] = simulate(p, tr, cap); });
+      var keys = Array.from(new Set(tr)).sort(function (a, b) { return a - b; }), row = new Map(keys.map(function (k, i) { return [k, i]; }));
+      var W = 600, H = 150, h = Math.max(1.5, Math.min(6, H / keys.length)), w = Math.max(1.5, W / tr.length);
+      var svg = V.s("svg", { viewBox: "0 0 " + (W + 10) + " " + (H + 10), style: "width:100%;max-width:760px;display:block", role: "img", "aria-label": "requests over time" });
+      svg.append(V.s("rect", { x: 0, y: 0, width: W + 10, height: H + 10, style: "fill:var(--surface)" }));
+      tr.forEach(function (k, i) {
+        svg.append(V.s("rect", { x: 5 + i * (W / tr.length), y: 5 + row.get(k) * (H / keys.length), width: w, height: h, style: "fill:" + (res[pol][i] ? "var(--ok)" : "var(--bad)") }));
+      });
+      $("pg-plot").replaceChildren(V.el("div", { class: "small muted" }, "time → (" + tr.length + " requests), one row per key (" + keys.length + " keys). Colored by " + pol + ": green hit, red miss."), svg);
+      var pct = {}; POL.forEach(function (p) { pct[p] = Math.round(100 * res[p].filter(Boolean).length / tr.length); });
+      $("pg-bars").replaceChildren.apply($("pg-bars"), POL.map(function (p) {
+        return V.el("div", { style: "display:flex;align-items:center;gap:10px;margin:5px 0" },
+          V.el("span", { class: "small", style: "width:42px;flex:none" }, p),
+          V.el("div", { style: "flex:1;max-width:420px;height:14px;border-radius:4px;background:var(--surface-3);overflow:hidden" },
+            V.el("div", { style: "height:100%;width:" + pct[p] + "%;background:" + (p === "OPT" ? "var(--accent-2)" : "var(--accent)") })),
+          V.el("span", { class: "small", style: "width:44px;flex:none;font-variant-numeric:tabular-nums" }, pct[p] + "%"));
+      }));
+      var first = keys.length;
+      $("pg-msg").innerHTML = "Cache size <b>" + cap + "</b>: LRU <b>" + pct.LRU + "%</b>, LFU <b>" + pct.LFU + "%</b>, FIFO " + pct.FIFO + "%, OPT (the ceiling) <b>" + pct.OPT + "%</b>. " + first + " of the " + tr.length + " requests are a key's first request, a miss for every policy.";
+    }
+    sel.onchange = show; $("pg-cap").oninput = show; $("pg-pol").onchange = show;
+    show();
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="01.09">
+  <title>Where things overlap (Intervals: merge, sweep line, interval trees)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 1 · Part 9</div>
+  <h1>Where things overlap</h1>
+  <div class="meta"><span><span class="badge P1">P1</span> meetings, bookings, sessions, any time range</span><span>about 55 minutes</span><span>10 quick checks · 8 exercises</span></div>
+</header>
+
+<p>A meeting from 9 to 10. A hotel stay from the 3rd to the 7th. A user session from login to logout, a range of IP addresses, a stretch of DNA. Anything with a start and an end is an <b>interval</b>, and the questions people ask about intervals come in three shapes: what time is covered, how many are going on at once, and which ones touch this one. Each has a naive answer that compares everything with everything, and a much faster answer that begins with the same move: sort by start. This chapter builds all three answers from that one move, and then the tree you need when the questions never stop coming.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Test whether two intervals overlap with two comparisons, and say why <code>[start, end)</code> is the usual convention.</li>
+    <li>Merge intervals in one pass after sorting, and explain why the sort key is the start and the new end is a max.</li>
+    <li>Find the most intervals that overlap at one moment (the meeting-rooms question) with a sweep line, and get ties at equal times right.</li>
+    <li>Reuse the sweep for total covered time, counts at given moments, and know when a counting array beats sorting.</li>
+    <li>Explain why a list sorted by start can't quickly answer "what covers time t?", and how an interval tree's <code>max_end</code> fixes it.</li>
+    <li>Pick the right tool for an interval question, and say what changes on a stream, on disk, or across machines.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: go top to bottom. Answer each quick check before reading on; a wrong answer gets the idea explained a different way. Grey "Go deeper" boxes are optional on a first read. This chapter leans on <a href="../../02-algorithms/concepts/sorting.html">sorting</a>, <a href="../../02-algorithms/concepts/binary-search.html">binary search</a>, prefix sums from <a href="../../02-algorithms/concepts/two-pointers-sliding-window.html">two pointers and sliding windows</a>, <a href="heaps.html">heaps</a>, and balanced trees from <a href="trees.html">Sorted and fast</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: 100,000 bookings</h2>
+
+<div class="story">
+  <p>You run room booking for a big office campus: <b>2,000 meeting rooms</b> and <b>100,000 bookings</b> for tomorrow. Three teams want something from you.</p>
+  <p><b>Facilities</b> wants to know when the campus is in use at all, so the air conditioning runs only then. <b>Planning</b> wants to know how many rooms are in use at the busiest moment, to decide whether a floor can close. And the <b>booking app</b> must check every new booking, and every "who's in a meeting at 14:05?", against everything already there: about 2,000 requests a second at peak, each answered in a few milliseconds.</p>
+</div>
+
+<p>The first idea for all three is to compare bookings with each other. Two bookings either overlap or they don't, so check every pair. 100,000 bookings make 100,000 × 99,999 / 2 ≈ <b>5 billion pairs</b>. A Python loop that checks about 10 million pairs a second needs over 8 minutes, for one question, once. The booking app is worse: scanning all 100,000 bookings for each request, 2,000 times a second, is <b>200 million checks every second</b>, all day.</p>
+
+<p>The fix for the first two questions is one sort. Sorting 100,000 bookings by start time takes about n log₂ n ≈ 1.7 million comparisons, and after that each question is one walk from left to right. The third question needs something that stays sorted while bookings keep arriving: a tree. Here's where the chapter is going:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Question</th><th>Naive</th><th>After this chapter</th></tr></thead>
+  <tbody>
+    <tr><td>When is anything booked? (busy blocks)</td><td>compare every pair: ~5 billion checks</td><td>sort by start, one pass: ~1.7 million (section 3)</td></tr>
+    <tr><td>Most bookings at one moment?</td><td>at each start, count the others: ~10 billion</td><td>sort 200,000 start/end events, one pass: ~3.5 million (section 5)</td></tr>
+    <tr><td>What overlaps this new booking?</td><td>scan all 100,000, per request</td><td>a tree that skips whole branches: ~17 steps plus the answers (section 8)</td></tr>
+  </tbody>
+</table></div>
+
+<div class="check" id="check-problem">
+  <p class="q">Checking every pair of 100,000 bookings took about 8 minutes. Tomorrow there are 200,000 bookings. About how long does the same pair-checking job take?</p>
+  <div class="opts">
+    <button>About 16 minutes: twice the bookings, twice the time</button>
+    <button data-correct>About 32 minutes</button>
+    <button>About 17 minutes: a bit more than double, since it grows like n log n</button>
+  </div>
+  <div class="fb right"><p>Right. The number of pairs is n(n − 1)/2, which grows like n². Double n and the pairs go from about 5 billion to about 20 billion: four times the work, 4 × 8 = 32 minutes. Sorting 200,000 instead of 100,000 costs only a bit more than twice as much, which is why the sort-first methods win by more and more as n grows.</p></div>
+  <div class="fb wrong"><p>Count the pairs instead of guessing. Each booking is checked against every other booking, so each of the 200,000 has 199,999 partners: 200,000 × 199,999 / 2 ≈ 20 billion pairs, against about 5 billion before. Twice the bookings means each one has twice as many partners, and there are twice as many of them: 2 × 2 = 4 times the work. n log n is what the sorted approach costs; the pair check never sorts anything.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Two numbers and a convention</h2>
+
+<p>An interval is two numbers, a start and an end. Draw it as a bar on a timeline. Two bars overlap if some moment lies under both of them. Before any algorithm, two small questions decide whether the algorithms come out right: what exactly the end means, and how to test overlap without missing a case.</p>
+
+<h3>Does the end belong to the interval?</h3>
+<p>Is a meeting from 9:00 to 10:00 in conflict with one from 10:00 to 11:00? Everyone says no: the first group walks out as the second walks in. So the end moment is not part of the meeting. We write it <code>[9, 10)</code>: the square bracket means 9 is included, the round one means 10 is not. This is a <b>half-open interval</b>, and it's the usual convention in code. Python's <code>range(9, 10)</code> and slices <code>a[9:10]</code> work exactly this way.</p>
+
+<p>Half-open intervals make three things clean:</p>
+<ul>
+  <li><b>Back-to-back intervals don't clash.</b> <code>[9, 10)</code> and <code>[10, 11)</code> share no moment.</li>
+  <li><b>Length is end − start.</b> <code>[9, 10)</code> lasts 1 hour, with no "+1".</li>
+  <li><b>Cutting is exact.</b> Cut <code>[a, c)</code> at b and you get <code>[a, b)</code> and <code>[b, c)</code>. Every moment lands in exactly one piece, never both, never neither.</li>
+</ul>
+
+<p>This is a convention, not a law. A sale that runs "Monday to Friday" includes Friday: that's a <b>closed</b> interval, [Mon, Fri], with both ends inside. With whole days you can convert it to half-open, [Mon, Sat). What matters is to pick one, say it out loud in the interview, and use it everywhere. This chapter uses half-open throughout.</p>
+
+<h3>Testing overlap: count the ways not to</h3>
+<p>Fix one interval a and slide another one, b, past it. There are six ways they can sit:</p>
+
+<pre class="diagram"><code> a:               [=========)
+ b1:  [=====)                          ends before a starts      no
+ b2:          [=======)                sticks into a's left side yes
+ b3:                 [===)             inside a                  yes
+ b4:            [=================)    covers all of a           yes
+ b5:                    [==========)   sticks out a's right side yes
+ b6:                          [=====)  starts after a ends       no</code></pre>
+
+<p>Four ways to overlap and two ways not to. Listing the four is where people make mistakes: the classic bug forgets b4, the interval that covers a completely, because neither of b4's ends is inside a. The two "no" cases are easier to list. Either b ends at or before a's start (<code>b.end ≤ a.start</code>), or b starts at or after a's end (<code>b.start ≥ a.end</code>). Overlap is everything else, so flip both and require both:</p>
+
+<pre class="diagram"><code> overlap  ⇔  a.start &lt; b.end   and   b.start &lt; a.end
+             "you start before I end", both ways round</code></pre>
+
+<p>Two comparisons cover all four overlapping cases. The part they share runs from the later start to the earlier end, <code>[max(starts), min(ends))</code>, and it's real only if that max is smaller than that min. Try it:</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <svg class="viz" id="ov-svg" role="img" aria-label="Two intervals on a timeline and their overlap"></svg>
+    <div class="viz-controls"><span class="small">B starts at</span><input type="range" id="ov-s" min="0" max="14" value="7" style="width:150px"><b id="ov-sval"></b><span class="small">B lasts</span><input type="range" id="ov-len" min="1" max="8" value="5" style="width:120px"><b id="ov-lval"></b></div>
+    <div class="viz-caption" id="ov-msg"></div>
+  </div>
+  <div class="cap">A is fixed at [4, 9). Slide B across it and watch the two comparisons. Try B starting at 9 (touching A's end), and B starting at 2 lasting 8 (covering all of A, the case people forget).</div>
+</div>
+
+<pre><code>def overlaps(a, b):                    # a and b are (start, end), half-open
+    return a[0] &lt; b[1] and b[0] &lt; a[1]  # you start before I end, both ways
+
+def shared(a, b):
+    s, e = max(a[0], b[0]), min(a[1], b[1])
+    return (s, e) if s &lt; e else None     # touching gives s == e: nothing shared</code></pre>
+
+<p>With closed intervals the test becomes <code>a.start ≤ b.end and b.start ≤ a.end</code>, since touching ends do share a moment. One character decides whether back-to-back meetings clash. That's why the convention comes first.</p>
+
+<div class="keyidea"><p>Use half-open intervals <code>[start, end)</code>: back-to-back ones don't overlap and length is end − start. Two intervals overlap exactly when <code>a.start &lt; b.end and b.start &lt; a.end</code>. Derive it from the two ways they can miss each other, and you can't forget a case.</p></div>
+
+<div class="check" id="check-overlap">
+  <p class="q">A teammate writes the overlap test as <code>a.start &lt;= b.start &lt; a.end</code> ("b starts inside a"). Which pair does it get wrong?</p>
+  <div class="opts">
+    <button>a = [1, 5), b = [5, 8): it says they overlap</button>
+    <button data-correct>a = [3, 6), b = [1, 10): it says they don't overlap</button>
+    <button>a = [1, 5), b = [2, 3): it says they don't overlap</button>
+  </div>
+  <div class="fb right"><p>Right. b starts at 1, before a, so "b starts inside a" is false, yet b covers all of a. The test is also lopsided: it only catches b starting inside a, never a starting inside b. The two-sided test checks 3 &lt; 10 and 1 &lt; 6: overlap.</p></div>
+  <div class="fb wrong"><p>Plug the numbers in. For a = [1, 5), b = [5, 8): is 1 ≤ 5 &lt; 5? No, so the teammate's test says "no overlap", which is correct for half-open intervals. For a = [1, 5), b = [2, 3): 1 ≤ 2 &lt; 5, yes: correct again. Now a = [3, 6), b = [1, 10): is 3 ≤ 1? No, so it says "no overlap", but b runs right over a. "Starts inside" misses every interval that starts earlier and covers the other one. That's why the safe test is built from the two ways to miss, not from the ways to hit.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Sort by start: merging in one pass</h2>
+
+<p>Facilities' question: when is anything booked? We want the <b>busy blocks</b>, the stretches where at least one booking is running, with no gap inside. The pairwise way: find two intervals that overlap, glue them into one, and repeat. But each glue can create a new overlap with something you already checked, so you go round again and again until nothing changes. That's at least n² work, and on 100,000 bookings, billions of checks.</p>
+
+<p>Picture painting a fence from left to right. You hold the brush down while there's any booking under it and lift it at a gap. You never walk back, because once you've passed a spot, nothing new will start there. That only works if you meet the bookings in the order they start, which is exactly what sorting by start gives you.</p>
+
+<p>Sort by start. Keep the current block <code>[s, e)</code>. For each next interval:</p>
+<ul>
+  <li>If it <b>starts at or before e</b>, it's part of the same stretch. Extend the block: <code>e = max(e, its end)</code>.</li>
+  <li>If it <b>starts after e</b>, there's a gap. The current block is finished: output it and start a new block with this interval.</li>
+</ul>
+
+<p>Why can we call a block finished and never look at it again? Every interval later in the sorted order starts at or after this one's start, which is already past e. So nothing can ever reach back into the closed block. That's the whole reason we sort: it turns "could anything, anywhere, still overlap this block?" into one comparison with the next interval.</p>
+
+<div class="figure">
+  <div id="merge-player"></div>
+  <div class="cap">Merging 8 bookings. Yellow: the interval being looked at. Blue (bottom row): the block being built. Green: finished blocks. Watch for three moments: [5, 7) pushing the block's end from 6 to 7, [16, 17) sitting inside a block (the end stays 18), and [18, 20) starting exactly where a block ends.</div>
+</div>
+
+<p>"At or before e" means touching intervals merge: <code>[15, 18)</code> and <code>[18, 20)</code> share no moment, but together they cover <code>[15, 20)</code> with no gap, so for busy blocks we want one block. That's a different question from "do they clash?" (section 2), where touching is not overlapping. Say which question you're answering.</p>
+
+<pre class="diagram"><code> sort intervals by start
+ block = the first interval
+ for each next interval (s, e):
+     s ≤ block.end  →  block.end = max(block.end, e)    same stretch: grow it
+     s &gt; block.end  →  output block;  block = (s, e)      a gap: block is final
+ output the last block</code></pre>
+
+<h3>Why max, and not the new end?</h3>
+<p>Take <code>[1, 10)</code>, <code>[2, 3)</code>, <code>[4, 8)</code>, already sorted. The block starts as [1, 10). [2, 3) starts inside it. If you set the end to 3, "the new interval's end", the block shrinks to [1, 3), and then [4, 8) looks like it starts after a gap. You'd report [1, 3) and [4, 8), claiming the room is free from 3 to 4 and from 8 to 10, when the first booking runs the whole time. An interval can sit entirely inside the block, so the block's end only ever moves right: max.</p>
+
+<h3>Why the start, and not the end?</h3>
+<p>Sort the same three by end instead: <code>[2, 3)</code>, <code>[4, 5)</code>, <code>[1, 10)</code>. The pass starts a block at [2, 3), sees [4, 5) start after 3, and closes [2, 3) for good. Then [1, 10) arrives and reaches back over [2, 3), a block already output as final. You get [2, 3) and [4, 10) instead of one block [1, 10). Sorting by end promises that later intervals <em>end</em> later, but says nothing about where they <em>start</em>, and the start is what decides whether something reaches back. "Nothing behind me can come back" needs starts in order.</p>
+
+<p><b>Cost:</b> O(n log n) for the sort and O(n) for the pass, so the sort is the whole bill. If the intervals already arrive sorted by start (log lines and event streams often do), merging is O(n) and works on a stream with O(1) extra memory: you only ever hold the current block.</p>
+
+<div class="keyidea"><p>Merge = sort by start, then one pass holding a current block. A next interval that starts at or before the block's end grows it to <code>max(end, its end)</code>; one that starts later proves the block is finished, because everything after it starts later still. O(n log n), all of it in the sort.</p></div>
+
+<details class="aside another">
+  <summary>Explain it another way: merging is counting</summary>
+  <p>Stand at each moment of the day and ask "how many bookings cover me right now?". A busy block is a stretch where the answer is at least 1, and a gap is where it's 0. Merging throws the number away and keeps only "zero or not". Section 5 keeps the number, and that's the sweep line. Both start the same way: put the starts in order.</p>
+</details>
+
+<div class="check" id="check-merge-max">
+  <p class="q">A merge sets the block's end to the new interval's end instead of the max. What does it return for <code>[1, 10), [2, 3), [4, 8)</code>?</p>
+  <div class="opts">
+    <button>[1, 10), the right answer, because the input is sorted</button>
+    <button data-correct>[1, 3) and [4, 8)</button>
+    <button>[1, 8)</button>
+  </div>
+  <div class="fb right"><p>Right. [2, 3) starts inside [1, 10), and the buggy update shrinks the block's end to 3. Then [4, 8) starts after 3, so [1, 3) is closed and [4, 8) starts a new block. The output claims gaps at [3, 4) and [8, 10) that don't exist. Sorting by start doesn't help with an interval sitting inside another one; only max does.</p></div>
+  <div class="fb wrong"><p>Run it step by step and write the block down each time. Start: [1, 10). Next is [2, 3): 2 ≤ 10, so it joins, and the buggy code sets the end to 3: block [1, 3). Next is [4, 8): is 4 ≤ 3? No, so [1, 3) is output and the new block is [4, 8). End of input: output [4, 8). The first booking covers 1 to 10 the whole time, so both gaps are wrong. The block's end must never move left; that's what max guarantees.</p></div>
+</div>
+
+<div class="check" id="check-sort-key">
+  <p class="q">Why does merging sort by start rather than by end?</p>
+  <div class="opts">
+    <button>Sorting by end is slower</button>
+    <button data-correct>In end order, a later interval can start earlier and reach back into a block already closed</button>
+    <button>Either key works, as long as you use max for the end</button>
+  </div>
+  <div class="fb right"><p>Right. The pass closes a block the moment it sees a gap, and that's safe only if nothing later can start before the gap. Start order guarantees it; end order doesn't. Example: [2, 3), [4, 5), [1, 10) is sorted by end. [2, 3) is closed when [4, 5) arrives, and then [1, 10) comes last and covers it.</p></div>
+  <div class="fb wrong"><p>Both keys cost the same O(n log n) sort, so speed isn't the issue, and max can't save a block that was already output. Think of the fence painter: they lift the brush at a gap and never walk back. That's only safe if no booking still to come starts back there. Sorting by end lets a long booking that started early come last: [2, 3), [4, 5), [1, 10). By the time [1, 10) shows up, [2, 3) has already been output as a finished block, yet [1, 10) covers it. The output is [2, 3), [4, 10) instead of [1, 10).</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>More from one sorted walk</h2>
+
+<p>Once intervals are sorted, or already merged into blocks, a whole family of interview questions becomes one walk. Here are the four you'll meet most.</p>
+
+<h3>Free time: read the gaps</h3>
+<p>"Find a 30-minute slot tomorrow when 5 people are all free." Pool everyone's busy intervals (say 5 people × 8 meetings = 40), merge them, and the free time is the gaps between consecutive blocks: from one block's end to the next block's start, plus the edges of the working day. Keep the gaps that last at least 30 minutes. Sorting 40 intervals is nothing; the idea is the same at 40 million.</p>
+
+<h3>Insert one interval into merged blocks</h3>
+<p>The blocks are sorted and don't touch, so a new interval <code>[s, e)</code> can only touch a run of neighboring blocks. Binary search (from <a href="../../02-algorithms/concepts/binary-search.html">binary search</a>) for the first block that ends at or after s, walk right while blocks start at or before e, and replace that run with one block that runs from the smallest start to the largest end. That's O(log n + k) comparisons for k touched blocks. In a Python list, building the new list still copies the other blocks, O(n) moves; a balanced tree removes that cost too (section 7).</p>
+
+<h3>Intersect two block lists: two pointers</h3>
+<p>"When are Alice and Bob both busy?" Each has a sorted list of blocks. Put a finger on the first block of each list. Record the overlap of the two blocks under your fingers, if any. Then move the finger whose block <b>ends first</b>.</p>
+
+<p>Why that one? Say Alice's block ends first. Every later block of Bob's starts after Bob's current block ends, which is at or after Alice's end. So Alice's block can't touch anything further along Bob's list: it's done. Bob's block might still reach Alice's next block, so his finger stays. Each step moves one finger, so it's O(m + n) for lists of m and n blocks.</p>
+
+<pre class="diagram"><code> A: [0,2)  [5,10)            B: [1,5)  [8,12)
+
+ [0,2)  vs [1,5)   share [1,2)   A ends first (2 &lt; 5)   → move A
+ [5,10) vs [1,5)   share nothing (5 is not &lt; 5)          B ends first (5 &lt; 10)  → move B
+ [5,10) vs [8,12)  share [8,10)  A ends first (10 &lt; 12) → move A: A is used up, stop
+
+ both busy: [1,2)  [8,10)</code></pre>
+
+<h3>A different question needs a different key</h3>
+<p>"One room, many meeting requests: accept as many as possible without overlaps." Here you sort by <b>end</b>, and take each meeting that starts at or after the end of the last one you took. Finishing earliest leaves the most room for everything else. Its twin, "remove the fewest meetings so the rest don't overlap", is the same algorithm: n minus the number you keep. The proof that this greedy choice is optimal belongs to greedy algorithms (topic 02.10). Notice the split: merging asks "what is connected?", so it needs starts in order; selection asks "what leaves the most room?", so it needs ends in order.</p>
+
+<div class="keyidea"><p>After sorting: free time is the gaps between merged blocks; inserting into merged blocks is a binary search plus a short walk; intersecting two block lists is two pointers, always advancing the block that ends first. To keep the most non-overlapping intervals, sort by end instead.</p></div>
+
+<div class="check" id="check-intersect">
+  <p class="q">Intersecting two block lists, your fingers are on A's [2, 8) and B's [5, 6). You record [5, 6). Which finger moves?</p>
+  <div class="opts">
+    <button>A's, because A's block started first</button>
+    <button data-correct>B's, because B's block ends first</button>
+    <button>Both, because their overlap has been recorded</button>
+  </div>
+  <div class="fb right"><p>Right. B's [5, 6) ends at 6, and A's later blocks all start after 8, so [5, 6) is finished. A's [2, 8) still runs from 6 to 8, where B's next block might be, say [7, 9). Moving A would lose [7, 8).</p></div>
+  <div class="fb wrong"><p>Ask which block could still matter. A's [2, 8) runs until 8. If B's next block is [7, 9), then A and B are both busy during [7, 8), and you'd only see it if A's finger is still on [2, 8). B's [5, 6), on the other hand, ends at 6, and every later block of A starts after 8: nothing left for it to meet. Where a block started doesn't matter any more; the one that ends first is used up, and only that finger moves.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>How many at once? The sweep line</h2>
+
+<p>Planning's question: how many rooms are in use at the busiest moment? Merging can't answer it: a busy block from 9 to 17 might hold one meeting or two hundred. We need the count, not just "zero or not".</p>
+
+<p>The naive way: the count only goes up when a meeting starts, so the busiest moment is at some start. For each meeting, count how many meetings are running at its start. That's n checks for each of n meetings: n² = 10 billion for 100,000 bookings.</p>
+
+<p>Now picture standing at the door of a hall with a clicker counter. Click up when someone walks in, click down when someone walks out. You never need to know <em>who</em> is inside. The highest number the clicker ever shows is the most people at once. Where the picture breaks: at a real door, people arrive in time order for free. We have a pile of bookings, so we build that order ourselves. Each booking becomes two <b>events</b>, <code>(start, +1)</code> and <code>(end, −1)</code>, and we sort the 2n events by time.</p>
+
+<p>This is a <b>sweep line</b>. Picture a vertical line moving left to right across the timeline. It only needs to stop at events, because between two events nothing changes. At each stop it updates a small state, here one counter, and the answer is read from that state.</p>
+
+<div class="figure">
+  <div id="sweep-player"></div>
+  <div class="cap">Six meetings, A to F, from 9:00 to 15:00. The vertical line is the sweep, stopping at each event. Blue: in progress. Faded: over. Play it once, then switch the menu to "ties: starts first" and play again: the answer changes, though the meetings didn't.</div>
+</div>
+
+<h3>The tie that decides the answer</h3>
+<p>This is the bug interviewers wait for. Take <code>[9, 10)</code> and <code>[10, 11)</code>. At time 10 there are two events: an end and a start. Process the start first and the counter reads 2 for an instant, so you report 2 rooms for two meetings that never overlap. Process the end first: 1 room. With half-open intervals, the moment 10 belongs only to the second meeting, so <b>at equal times, ends go before starts</b>. (With closed intervals, [9, 10] and [10, 11] really do share the moment 10, and you'd put starts first. The convention from section 2 decides it.)</p>
+
+<p>In Python, a tuple trick gets the order for free:</p>
+
+<pre><code>events = []
+for start, end in meetings:
+    events.append((start, +1))   # someone walks in
+    events.append((end, -1))     # someone walks out
+events.sort()                    # by time; at equal times -1 &lt; +1, so leaving comes first</code></pre>
+
+<p>Then walk the events with one counter and remember its highest value. Sorting 2n events costs O(n log n), the walk is O(n), and memory is the 2n events. For 100,000 bookings: 200,000 events, about 200,000 × log₂ 200,000 ≈ 3.5 million comparisons, against 10 billion for the naive count.</p>
+
+<div class="keyidea"><p>Sweep line: turn each interval into a +1 event at its start and a −1 event at its end, sort the events by time, and walk them with a counter. The highest count is the most intervals at one moment. With half-open intervals, ends go before starts at equal times. O(n log n).</p></div>
+
+<details class="aside another">
+  <summary>Explain it another way: rooms as a heap of end times</summary>
+  <p>Sort the meetings by start. Keep a min-heap (from <a href="heaps.html">heaps</a>) of the end times of rooms currently in use. For each meeting, look at the root: the room that frees up soonest. If it's free by this meeting's start (root ≤ start), reuse it: replace the root with this meeting's end. Otherwise every room is busy, so push this end: a new room. The heap's size at the end is the number of rooms.</p>
+  <p>Same O(n log n), same tie rule (≤, not &lt;, because a room that frees at 10 can host a 10:00 start). The bonus: store a room number next to each end time, as <code>(end, room)</code> pairs, and you know <em>which</em> room each meeting gets, which a bare counter can't tell you. That's the version to reach for when the interviewer asks "now assign the rooms".</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: why the most at once is exactly the number of rooms</summary>
+  <p>You need at least as many rooms as the most meetings at one moment: each of those meetings needs its own room. The surprise is that you never need more. Hand out rooms greedily in start order, giving each meeting any room that's free. Suppose the greedy opens a new room, number r, for meeting m. It only does that when all r − 1 existing rooms are busy at m's start. So at that moment, r − 1 meetings plus m are all running: the overlap is at least r. Every room the greedy opens is matched by a moment with that many meetings, so rooms used = maximum overlap. (In graph terms, from <a href="graphs.html">graphs</a>: color the "these two overlap" graph of intervals; for intervals, the fewest colors always equals the biggest group that all overlap each other. That's false for graphs in general.)</p>
+</details>
+
+<div class="check" id="check-ties">
+  <p class="q">Meetings <code>[9, 10)</code>, <code>[10, 11)</code> and <code>[10, 11)</code>. How many rooms do you need?</p>
+  <div class="opts">
+    <button>3: at 10:00 all three meetings are in the picture</button>
+    <button data-correct>2</button>
+    <button>1: no meeting overlaps the 9:00 one</button>
+  </div>
+  <div class="fb right"><p>Right. At 10 the first meeting ends, then the two others start: the counter goes 1 → 0 → 1 → 2. The two 10:00 meetings overlap each other for the whole hour, so 2 rooms, and the 9:00 room is free in time to be reused.</p></div>
+  <div class="fb wrong"><p>Line the events up: (9, +1), (10, −1), (10, +1), (10, +1), (11, −1), (11, −1). Ends before starts at 10, because the first meeting is over at 10. Counter: 1, 0, 1, 2, 1, 0. The peak is 2. Counting 3 means treating the 9:00 meeting as still running at 10:00, the start-first bug. Answering 1 forgets that the two 10:00 meetings overlap <em>each other</em>: overlap is about every pair, not just about the first meeting.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>The sweep, generalized</h2>
+
+<p>The sweep line is a pattern, not one algorithm: <b>events in time order, plus a small state you update at each one</b>. Change the state and you answer a different question.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Question</th><th>State</th><th>At each event</th></tr></thead>
+  <tbody>
+    <tr><td>Most intervals at one moment</td><td>a counter</td><td>add ±1, keep the maximum</td></tr>
+    <tr><td>Total time covered by at least k intervals</td><td>a counter and the previous event's time</td><td>if the counter is ≥ k, add (now − previous time); then add ±1</td></tr>
+    <tr><td>Busy blocks (merge, again)</td><td>a counter</td><td>a block opens when it goes 0 → 1 and closes when it goes 1 → 0 (put starts first at equal times here, so touching intervals glue into one block, as in section 3)</td></tr>
+    <tr><td>Skyline: the tallest building at each x</td><td>a max-heap of heights</td><td>push at a start, remove at an end; the top is the skyline's height</td></tr>
+  </tbody>
+</table></div>
+
+<p>The second row is worth tracing once. Intervals <code>[0, 10)</code>, <code>[5, 15)</code>, <code>[8, 9)</code>, and k = 2. Events: 0 (+1), 5 (+1), 8 (+1), 9 (−1), 10 (−1), 15 (−1). Between two events the count can't change, so each stretch is all-or-nothing. From 5 to 8 the count is 2: add 3. From 8 to 9 it's 3: add 1. From 9 to 10 it's 2: add 1. Total: 5, which is <code>[5, 10)</code>. The counter turns "where do at least two overlap?" into adding up stretches.</p>
+
+<h3>Counting at given moments, with two sorted lists</h3>
+<p>"How many bookings are running at 14:05?" for thousands of different times. Sort all the starts into one list and all the ends into another. Every interval that has started by t (start ≤ t) has either ended by t (end ≤ t) or is still running. So:</p>
+
+<pre class="diagram"><code> running at t  =  (number of starts ≤ t)  −  (number of ends ≤ t)
+
+ intervals [1,5) [2,3) [4,8),  t = 4
+ starts 1 2 4  → 3 are ≤ 4        ends 3 5 8 → 1 is ≤ 4        running: 3 − 1 = 2   ([1,5) and [4,8))</code></pre>
+
+<p>Each count is one binary search, so q questions cost O(q log n) after an O(n log n) sort. Notice what this gives you: <em>how many</em>, not <em>which ones</em>. Hold on to that; section 7 runs into it.</p>
+
+<h3>When you don't need to sort at all</h3>
+<p>If the times are small whole numbers, say minutes in one day (0 to 1,440), skip the sort. Make an array with one counter per minute, add 1 at each start and subtract 1 at each end, then take running sums: the running sum at minute m is the number of bookings in progress at m. That's a <b>difference array</b>, the reverse of the prefix sums from <a href="../../02-algorithms/concepts/two-pointers-sliding-window.html">two pointers and sliding windows</a>.</p>
+
+<pre><code>def busiest_minute(bookings):       # times are whole minutes, 0..1440
+    diff = [0] * 1441
+    for start, end in bookings:
+        diff[start] += 1            # count goes up when a booking starts
+        diff[end] -= 1              # and down when it ends (end is free: half-open)
+    best = cur = at = 0
+    for minute in range(1440):
+        cur += diff[minute]         # running sum = bookings in progress at this minute
+        if cur &gt; best:
+            best, at = cur, minute
+    return best, at</code></pre>
+
+<p>The cost is O(n + T), where T is the number of time slots. For 100,000 bookings by the minute: 200,000 updates plus 1,440 sums, about 200,000 steps, against about 3.5 million comparisons to sort the events. Ties need no thought: the −1 and +1 at the same minute land in the same counter. But T is the catch. Make the times nanoseconds and one day has 8.64 × 10¹³ slots; at 8 bytes each, that's about 691 TB of counters. When T is small, count; when T is huge, sort the events. (In between, you can replace each time by its rank among the distinct times, called coordinate compression, but finding the ranks is a sort again.)</p>
+
+<div class="keyidea"><p>A sweep is events in time order plus a small state. A counter gives the maximum overlap or the time covered by at least k; two sorted lists give "how many at t" by binary search. When times are small integers, a difference array skips the sort: O(n + T) instead of O(n log n).</p></div>
+
+<div class="check" id="check-diff">
+  <p class="q">50,000 user sessions over one year, with times in milliseconds (about 3.2 × 10¹⁰ of them). You want the peak number of concurrent sessions. Which approach?</p>
+  <div class="opts">
+    <button>A difference array, because it's O(n + T) with no sort</button>
+    <button data-correct>Sort the 100,000 start and end events and sweep</button>
+    <button>Merge the sessions, then count the blocks</button>
+  </div>
+  <div class="fb right"><p>Right. Sorting 100,000 events is about 1.7 million comparisons and takes well under a second. A difference array would need one counter per millisecond: 3.2 × 10¹⁰ counters, about 250 GB at 8 bytes each, and a pass over all of them.</p></div>
+  <div class="fb wrong"><p>Put numbers on T. O(n + T) sounds cheap, but T here is the number of milliseconds in a year, about 32 billion: you'd allocate and sum 32 billion counters to place 100,000 events. The sort costs only about 100,000 × 17 comparisons. Merging is the wrong tool for another reason: a block says "someone was online from 9 to 17", not how many, so it throws away exactly the number you want. Count when T is small; sort the events when T is big.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Questions that keep coming: one room's calendar</h2>
+
+<p>The booking app is a different kind of problem. The data changes all day, and 2,000 times a second someone asks "does this clash?" or "what's running at 14:05?". Re-sorting and sweeping 100,000 bookings per request is 1.7 million comparisons each time, billions a second. We need a structure that we keep up to date with each booking and that answers each question in about log n steps.</p>
+
+<h3>The easy case: one room</h3>
+<p>Start with a single room. Its bookings never overlap each other: that's what an accepted booking means. Picture books on one shelf: none of them overlap, so they sit in a row, and sorted by start they're also sorted by end (each booking ends before the next one starts). So a new booking <code>[s, e)</code> can only clash with one booking: the last one that starts before e. Everything after it starts at e or later, so it can't overlap. And everything before it ends even earlier, so if that one ends by s, they all do.</p>
+
+<pre><code>from bisect import bisect_left
+
+def can_book(starts, ends, s, e):       # one room: sorted by start, never overlapping
+    i = bisect_left(starts, e)           # bookings 0..i-1 start before e; the rest don't
+    return i == 0 or ends[i - 1] &lt;= s    # of those, the last one ends latest</code></pre>
+
+<p>For 100,000 bookings, that's about 17 comparisons for the binary search and one more for the check. Recording the booking is the weak spot: inserting into a Python list shifts every later item, O(n) moves. Those moves are fast memory copies, fine for thousands of bookings and slow for millions. A balanced binary search tree, or BST (from <a href="trees.html">Sorted and fast</a>), makes the insert O(log n) as well. In Java this is the standard answer: a <code>TreeMap</code> from start to end, where <code>floorEntry(s)</code> and <code>ceilingEntry(s)</code> hand you the two neighbors to check.</p>
+
+<h3>Where sorting by start stops working</h3>
+<p>Now put the whole campus in one structure, so bookings overlap each other, and ask "who is in a meeting at 14:05?". That's a <b>stabbing query</b>: which intervals contain the point t?</p>
+
+<p>Picture a hotel's guest list sorted by check-in date, and the question "who is staying tonight, March 5?". Everyone who checks in after tonight is out, and binary search finds where they begin. But look at the guests before that point. The guest who checked in on March 4 for one night is gone. The guest who checked in on February 1 for five weeks is still here. Sorted by check-in, a long stay can hide anywhere to the left, so there's no place to stop: you check every earlier guest, O(n).</p>
+
+<p>Could a second list, sorted by check-out, help? It tells you who has left. Section 6 used exactly that to <em>count</em> tonight's guests: (checked in by tonight) − (checked out by tonight), two binary searches. But to <em>list</em> them you need the guests who satisfy both conditions at once, "checked in by tonight" from one order and "still here" from the other. No single sorted order has them in one contiguous run, so listing them is O(n) again. Counting is cheap; finding needs a new structure.</p>
+
+<div class="keyidea"><p>When intervals never overlap each other (one room), sorted by start is also sorted by end, so a new interval only needs to be checked against one neighbor: O(log n). When they do overlap, a long interval that started early can cover t from anywhere to the left, and a sorted list can't say where to stop.</p></div>
+
+<div class="check" id="check-stab">
+  <p class="q">Bookings that overlap each other are sorted by start. To find all bookings running at t, you walk left from where t would go, checking each one. Can you stop at the first booking that ended before t?</p>
+  <div class="opts">
+    <button>Yes: everything further left started even earlier, so it ended earlier too</button>
+    <button data-correct>No: a booking further left can have started earlier and still be running at t</button>
+    <button>Yes, as long as the bookings were merged first</button>
+  </div>
+  <div class="fb right"><p>Right. Starting earlier says nothing about ending earlier: [8:00, 18:00) starts before [14:00, 14:01) and is still running at 14:05. In a sorted-by-start list of overlapping intervals, there is no point where you can stop safely.</p></div>
+  <div class="fb wrong"><p>Try two bookings: [8:00, 18:00) and [14:00, 14:01). Sorted by start, the all-day one comes first. Walking left from 14:05, you meet [14:00, 14:01) first; it ended at 14:01, before t. Stop there and you miss the all-day booking, which is running at 14:05. "Started earlier, so ended earlier" only holds when intervals don't overlap, as in one room. And merging doesn't rescue it: merged blocks tell you the room is busy, not <em>which</em> bookings are running.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>The interval tree: a BST that knows how far right it reaches</h2>
+
+<p>Go back to the hotel. Split the guest list into wings, and on each wing's door hang one sign: "latest check-out of anyone in this wing: March 3". You're asking about tonight, March 5. Without knocking on a single door in that wing, you know nobody in it is still here. One number per group lets you skip the whole group.</p>
+
+<p>That's the fix. Keep the intervals in a balanced BST keyed by start, as in <a href="trees.html">Sorted and fast</a>. In every node, store one extra number, <b>max_end</b>: the latest end anywhere in that node's subtree, its own included. A BST whose nodes carry a summary of their subtree is called an <b>augmented</b> tree, and this one is an <b>interval tree</b>. To find everything overlapping <code>[a, b)</code>, two rules skip whole subtrees:</p>
+
+<ol>
+  <li><b>Too early:</b> if a subtree's max_end ≤ a, everything in it ends by a. Skip the whole subtree. (That's the sign on the wing's door.)</li>
+  <li><b>Too late:</b> if a node starts at or after b, it doesn't overlap, and nothing in its right subtree can either, because those start at the same time or later. Don't go right. (That's the ordinary BST order. Its left subtree may still hold answers.)</li>
+</ol>
+
+<p>Everywhere else, check the node with the two-comparison test from section 2 and keep going down. Here's a tree of 9 intervals. Each node shows its interval and, below, its max_end:</p>
+
+<div class="figure">
+  <div id="tree-player"></div>
+  <div class="cap">An interval tree built from 9 intervals, balanced, keyed by start. Pick a query from the menu. Blue: visiting. Green: overlaps the query. Red: visited, doesn't overlap. Faded: skipped by a rule without being looked at. [16, 17) skips by max_end on the left; [2, 4) skips by start on the right; [9, 12) uses both.</div>
+</div>
+
+<p><b>What a query costs.</b> Look at a node that starts before b. If its left subtree passes rule 1 (max_end &gt; a), the interval that ends at that max_end starts no later than the node, so before b, and ends after a: it overlaps. So the search only ever goes down both sides of a node when the left side is guaranteed to hold an answer. A query that finds nothing walks a single path, O(log n) in a balanced tree. One that reports k intervals walks roughly one path per answer: at most O(k log n) nodes, and never more than all n. For 100,000 bookings and a query that finds 3, that's at most a few times 3 × 17 node visits, instead of 100,000.</p>
+
+<h3>Keeping max_end right</h3>
+<p>A summary is only useful if it stays true when the tree changes. Three cases:</p>
+<ul>
+  <li><b>Insert:</b> the new node goes in at the bottom of one path, and every node on that path gains it as a descendant. So on the way down, set <code>max_end = max(max_end, new end)</code> at each node. Nodes off the path don't change.</li>
+  <li><b>Delete:</b> walk back up the path and recompute each node from its children.</li>
+  <li><b>Rotation</b> (how a balanced tree keeps its height, <a href="trees.html">Sorted and fast</a>, section 8): only two nodes get new children. Recompute those two, the lower one first. O(1).</li>
+</ul>
+
+<pre><code>class Node:
+    def __init__(self, start, end):
+        self.start, self.end = start, end   # the BST is keyed by start
+        self.max_end = end                  # latest end anywhere in this subtree
+        self.left = self.right = None
+
+def fix(node):                              # after node's children changed
+    node.max_end = node.end
+    for child in (node.left, node.right):
+        if child and child.max_end &gt; node.max_end:
+            node.max_end = child.max_end</code></pre>
+
+<p>So every cost of the balanced tree survives the extra number: insert and delete stay O(log n). "Store a summary of the subtree in each node, and repair it along the path you touched" is a reusable idea. With subtree sizes as the summary you can find the k-th smallest key in O(log n); with subtree sums you're most of the way to a segment tree (topic 01.10).</p>
+
+<div class="keyidea"><p>Interval tree = balanced BST keyed by start, plus max_end (the latest end in each subtree). A query skips any subtree whose max_end ≤ a and never goes right of a node that starts at or after b. Insert, delete and rotations repair max_end along one path, so updates stay O(log n).</p></div>
+
+<details class="aside deeper">
+  <summary>Go deeper: finding just one overlap in one path, and faster trees</summary>
+  <p><b>"Is there any clash?"</b> needs only one answer, and the tree can find it walking a single path. At each node: if it overlaps <code>[a, b)</code>, done. Otherwise, if the left child exists and its max_end &gt; a, go left; else go right. Going right is safe because the left subtree ends too early (rule 1). Going left looks risky: what if the left subtree has no answer but the right does? It can't happen. Let L be the interval in the left subtree that ends at max_end &gt; a. If L starts before b, L overlaps, so the left subtree has an answer. If L starts at or after b, then every interval in the right subtree starts no earlier than L (BST order), so at or after b too, and none of them overlaps either. Either way, going left loses nothing. O(log n). This is the version in the classic Cormen et al. textbook.</p>
+  <p><b>Faster reporting.</b> O(k log n) for k answers is the price of this simple design. A <b>centered interval tree</b> (store each interval at the highest node whose center point it contains, in two lists sorted by start and by end) answers stabbing queries in O(log n + k), and a <b>segment tree</b> (topic 01.10) gets the same for fixed sets of intervals. In two dimensions (map rectangles), the same "bounding summary per subtree" idea becomes the <b>R-tree</b>, where each node stores the box around everything below it.</p>
+</details>
+
+<div class="check" id="check-prune">
+  <p class="q">You're looking for everything that overlaps <code>[15, 20)</code>. A node's left child has max_end = 14. What do you do with that left subtree?</p>
+  <div class="opts">
+    <button>Visit it: an interval in there might start before 15 and run into the query</button>
+    <button data-correct>Skip it entirely</button>
+    <button>Visit it, but skip the node's right subtree instead</button>
+  </div>
+  <div class="fb right"><p>Right. max_end = 14 means every interval in that subtree has ended by 14, before the query starts at 15. However early they start, none can reach 15. One comparison, a whole subtree skipped.</p></div>
+  <div class="fb wrong"><p>Read max_end as the sign on the wing's door: "nobody in here stays past 14". The query asks about 15 to 20. An interval that starts early is exactly the kind max_end is about: whatever its start, its end is at most 14, so it's gone before 15. That's why the subtree can be skipped without looking inside. The right subtree is a separate question, answered by rule 2: you'd skip it only if this node started at or after 20.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Choosing the tool, and what changes at scale</h2>
+
+<p>Every interval question in this chapter comes down to two things: is the data fixed or changing, and do you want what's covered, how many, or which ones?</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Question</th><th>Tool</th><th>Cost</th></tr></thead>
+  <tbody>
+    <tr><td>Covered time, free gaps, merging calendars</td><td>sort by start, one pass</td><td>O(n log n); O(n) if already sorted</td></tr>
+    <tr><td>Most at once: rooms, peak concurrency</td><td>sweep over ±1 events (or a heap of end times)</td><td>O(n log n); O(n + T) with a counting array</td></tr>
+    <tr><td>Time covered by at least k; counts at many moments</td><td>sweep, or two sorted lists + binary search</td><td>O((n + q) log n)</td></tr>
+    <tr><td>One resource, no overlaps allowed: can I book this?</td><td>sorted list or balanced BST, check one neighbor</td><td>O(log n) per check</td></tr>
+    <tr><td>Overlapping intervals, updates and queries keep coming</td><td>interval tree (balanced BST + max_end)</td><td>O(log n) per update; O(log n) to find one; O(k log n) to list k</td></tr>
+    <tr><td>Fixed intervals, many "what covers t?" queries</td><td>centered interval tree, or a segment tree (topic 01.10)</td><td>O(log n + k)</td></tr>
+  </tbody>
+</table></div>
+
+<p>Interviewers then push on scale. Three follow-ups, with answers that come straight from the mechanisms:</p>
+<ul>
+  <li><b>"The intervals arrive as a stream."</b> If they arrive sorted by start (logs usually do), merging keeps only the current block: O(1) memory. The sweep needs to know when running intervals end, so it keeps a min-heap of their end times, as big as the current overlap. If the stream isn't sorted, you have to buffer before you can answer, because a late arrival can start earlier than anything you've seen.</li>
+  <li><b>"It doesn't fit in memory."</b> Sort the events on disk with an external merge sort (topic 02.13), then sweep them in one sequential read. The sweep itself needs only the counter.</li>
+  <li><b>"It's spread over 100 machines."</b> Split <em>time</em> into shards, say one per hour, and send each interval to every shard it touches, clipped to that shard. The global peak is the largest of the shards' peaks, because every moment belongs to exactly one shard. For merging, merge per shard, then glue blocks that meet at a shard boundary. Split by booking id instead and each machine's peak means nothing on its own; you'd have to bring all the events back together in time order (a k-way merge, from <a href="heaps.html">heaps</a>).</li>
+</ul>
+
+<details class="aside deeper">
+  <summary>Go deeper: where these structures run in real systems</summary>
+  <ul>
+    <li><b>PostgreSQL</b> has range types (<code>tstzrange</code>, <code>daterange</code>, <code>int4range</code> and more) with an overlap operator <code>&amp;&amp;</code>. Building a range from two values gives <code>[)</code> bounds by default, the half-open convention again. An <b>exclusion constraint</b> such as <code>EXCLUDE USING gist (room_id WITH =, during WITH &amp;&amp;)</code> makes the database itself refuse two overlapping bookings of one room, using a GiST index (Postgres's general-purpose search tree) on the ranges (the <code>=</code> on a plain column needs the <code>btree_gist</code> extension). That's the one-room calendar of section 7, enforced even when two app servers insert at the same moment.</li>
+    <li>The <b>Linux kernel</b> has a generic interval tree built on its red-black tree, where each node stores the largest end point in its subtree: exactly the max_end augmentation of section 8. Its intervals are closed, <code>[start, last]</code>, a reminder that the convention is a choice. One use is finding every memory mapping that covers part of a file.</li>
+    <li><b>Genomics</b> tools ask "which genes overlap this region?" over millions of intervals. <code>bedtools intersect</code>, for example, has a <code>-sorted</code> mode that sweeps two inputs already sorted by position in one pass, instead of building an index in memory: section 4's two pointers at the scale of a genome.</li>
+  </ul>
+</details>
+
+<div class="check" id="check-tool">
+  <p class="q">A billing job runs every night over 10 million streaming sessions from the day before, and reports the peak number of concurrent sessions. Which tool fits?</p>
+  <div class="opts">
+    <button>An interval tree, so each session can be checked against the others in O(log n)</button>
+    <button data-correct>Sort the 20 million start/end events and sweep once with a counter</button>
+    <button>Merge the sessions into blocks and report the longest block</button>
+  </div>
+  <div class="fb right"><p>Right. The data is fixed by the time the job runs, and the question is "how many at once", once. One sort and one sweep: about 20 million × 24 ≈ 500 million comparisons, minutes at most in Python and far less in a compiled language, and it can run on disk if it has to. A tree only pays off when queries and updates keep arriving.</p></div>
+  <div class="fb wrong"><p>Ask the two questions: is the data changing, and what is being asked? Here the data is a fixed batch and the question is a count. A tree is built for answering many questions while the data changes, and here there's one question. Building it is itself O(n log n) and you'd still have to find the peak. Merging answers a different question: a block from 8:00 to 23:00 could be one session or a million. The sweep's counter is exactly "how many at once".</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>What to say in the interview</h2>
+
+<p>For "what's the minimum number of meeting rooms?", a strong answer:</p>
+<div class="story">
+  <p>"I'll treat each meeting as half-open, [start, end), so a meeting ending at 10 and one starting at 10 can share a room. The rooms needed equal the most meetings running at one moment. Brute force counts the running meetings at every start: O(n²). Instead I turn each meeting into a +1 event at its start and a −1 event at its end, sort the events by time with ends before starts at equal times, and sweep with a counter. The maximum is the answer: O(n log n) time, O(n) space. If you also want which room each meeting gets, I'd sort by start and keep a min-heap of (end time, room) pairs instead. If times are minutes in one day, a counting array makes it O(n + 1,440). And if bookings keep arriving and we need 'what's running at 14:05?', I'd use an interval tree: a balanced BST by start where each node stores the latest end in its subtree, so a query skips whole subtrees."</p>
+</div>
+<p>Habits that make you sound senior:</p>
+<ul>
+  <li>State the convention first: half-open or closed. It decides every tie.</li>
+  <li>Write the overlap test as <code>a.start &lt; b.end and b.start &lt; a.end</code>, and say it covers containment.</li>
+  <li>Name the sort key and why: start to merge, end to select the most non-overlapping.</li>
+  <li>Separate batch from online: sort and sweep for a fixed set, a tree when updates and queries keep coming.</li>
+  <li>Separate counting from listing: two sorted lists count what covers t; listing them needs the tree.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Half-open <code>[start, end)</code>: back-to-back intervals don't overlap, length is end − start. It's a convention: pick it and say it.</li>
+  <li>Overlap ⇔ <code>a.start &lt; b.end and b.start &lt; a.end</code>. The shared part is <code>[max start, min end)</code>.</li>
+  <li>Merge: sort by start, one pass; grow the block with max; a later start proves the block is final. O(n log n).</li>
+  <li>After sorting: gaps are free time; insert is binary search plus a short walk; intersection is two pointers, advancing whichever ends first.</li>
+  <li>Sweep: +1 at starts, −1 at ends, sort, walk with a counter. Max = rooms needed. Ends before starts at ties for half-open.</li>
+  <li>The sweep is events plus a state: time covered by at least k, counts at t as (starts ≤ t) − (ends ≤ t), and a difference array when times are small integers.</li>
+  <li>Sorted by start can't list what covers t: a long interval can hide anywhere to the left.</li>
+  <li>Interval tree: balanced BST by start + max_end per subtree. Skip subtrees with max_end ≤ a; don't go right of a node starting at or after b. Updates repair max_end along one path: O(log n).</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do them in order. Warm-ups are pen and paper: commit to an answer before you open it. Core exercises are code in <code>exercises/</code>, and their tests <b>count the comparisons your code makes</b>, through time values that tally every <code>&lt;</code>, <code>&lt;=</code> and <code>==</code>. A correct answer that compares every pair, or scans everything per query, fails.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Merge and sweep by hand</h4>
+  <p>Intervals (half-open): <code>[4, 7), [1, 2), [6, 9), [3, 4), [12, 13), [9, 11)</code>. (a) Sort them and merge them into busy blocks, writing the block after each step. (b) List the 12 sweep events in order, with the counter after each one. How many rooms, and during which stretch is that many in use?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Sorted: [1, 2), [3, 4), [4, 7), [6, 9), [9, 11), [12, 13). Block [1, 2). [3, 4) starts after 2: output [1, 2), block [3, 4). [4, 7) starts at 4 = the end: touching, block [3, 7). [6, 9): 6 ≤ 7, block [3, 9). [9, 11): touching, block [3, 11). [12, 13): 12 &gt; 11, output [3, 11), block [12, 13). Result: [1, 2), [3, 11), [12, 13).</p>
+    <p>(b) Ends before starts at ties: (1, +1) 1, (2, −1) 0, (3, +1) 1, (4, −1) 0, (4, +1) 1, (6, +1) 2, (7, −1) 1, (9, −1) 0, (9, +1) 1, (11, −1) 0, (12, +1) 1, (13, −1) 0. Two rooms, during [6, 7), when [4, 7) and [6, 9) are both running.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Break the naive versions</h4>
+  <p>Find a small input that breaks each one, and say what it outputs instead of the right answer. (a) Merge that sorts by end. (b) A rooms sweep that puts starts before ends at equal times. (c) "What's running at t?" that walks left through a list sorted by start and stops at the first interval that ended before t. (d) Intersecting two block lists, but always advancing the block that <em>started</em> first.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) [2, 3), [4, 5), [1, 10): it outputs [2, 3) as final when it meets [4, 5), then [1, 10) joins the [4, 5) block, giving [2, 3), [4, 10) instead of [1, 10). (b) [9, 10), [10, 11): the counter hits 2 at 10, so 2 rooms instead of 1. (c) [0, 100), [50, 51), t = 60: walking left from 60 it meets [50, 51), which ended at 51, stops, and misses [0, 100). (d) A = [0, 10), B = [2, 3), [5, 6): after recording [2, 3), A started first, so A's finger moves and A is used up. It reports only [2, 3) and misses [5, 6).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Pick the tool and the cost</h4>
+  <p>(a) The peak number of users online yesterday, from 1 million login/logout pairs. (b) A 30-minute slot tomorrow when 5 people are all free. (c) A firewall with 50,000 IP ranges that never overlap, answering 1 million "which range is this address in?" lookups a second. (d) A genome browser with 3 million gene annotations that overlap each other; users drag a window and want every annotation that overlaps it.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Sweep over 2 million ±1 events: O(n log n), about 2 × 10⁶ × 21 ≈ 42 million comparisons, once. (b) Pool and merge the 5 people's busy intervals, then scan the gaps (and the edges of the working day) for one of at least 30 minutes: O(m log m) for m meetings. (c) The ranges don't overlap, so this is the one-room case: sorted starts plus binary search, then check one neighbor's end: about log₂ 50,000 ≈ 16 comparisons per lookup. (d) Overlapping intervals and many window queries: an interval tree, O(k log n) per window with k answers (and the annotations rarely change, so a centered interval tree or a segment tree gets O(log n + k)).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. Merge, insert, intersect</h4>
+  <p>In <code>exercises/interval_merge.py</code>: <code>merge</code> (sections 3 and 4), <code>insert</code> one interval into merged blocks with binary search, and <code>intersect</code> two block lists with two pointers. The tests count comparisons: merging 2,000 intervals must stay near n log₂ n (gluing pairs until nothing changes needs millions); inserting into 100,000 blocks must cost about log₂ n plus the blocks it touches (scanning from the left, or appending and merging again, costs n); intersecting two lists of 1,000 must stay under 6 (m + n).</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. Rooms, coverage and counts with a sweep</h4>
+  <p>In <code>exercises/interval_sweep.py</code>: <code>min_rooms</code>, <code>covered_at_least(intervals, k)</code> (time during which at least k overlap), and <code>count_at(intervals, times)</code> (sections 5 and 6). The tests include ties at equal times, fractional times and times around 10¹⁵ (so marking unit cells won't do), and count comparisons: 2,000 intervals must stay near n log₂ n, where counting at every start costs about 8 million.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. An interval tree</h4>
+  <p>In <code>exercises/interval_tree.py</code>: a BST keyed by start with max_end in every node (section 8). Build it balanced from a list, <code>add</code> one interval while keeping max_end right, and report everything that overlaps <code>[start, end)</code>. On 20,000 intervals, each query that finds k must use under 6 (k + 1) log₂ n comparisons. Queries near the left edge fail if you only use max_end, queries past the right edge fail if you only use the start rule, and building by n adds from sorted input makes a chain and fails.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>7. "Find a time" for a calendar service</h4>
+  <p>Design the backend for "find the earliest 30-minute slot next week when these 8 people are all free", at 5,000 requests a second over 1 million users with about 20 meetings a week each. What do you store per user, and in what order? What does one request cost? What changes when people book and cancel all the time, and when users span time zones? Where would you put a cache, and what invalidates it?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>8. Say it out loud</h4>
+  <p>Set a 2-minute timer and answer: "Given a list of meetings, how many rooms do you need, and how would you change your answer if meetings keep being booked and you must answer 'who's in a meeting at 14:05?' instantly?" Did you state the half-open convention, the tie rule, O(n log n), the heap variant, and the interval tree with max_end and both skip rules?</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k "interval_merge or interval_sweep or interval_tree"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="lru-lfu-cache.html"><small>← Previous</small>What to forget first</a>
+  <a class="next" href="segment-fenwick-trees.html"><small>Next →</small>Totals over any range</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  // Bar and box styles by state (same meaning as cells: hl current, cmp compared, done final, bad rejected, dim skipped).
+  var ST = {
+    "": "fill:var(--surface-3);stroke:var(--border-strong)",
+    hl: "fill:color-mix(in srgb, var(--accent) 24%, var(--surface));stroke:var(--accent)",
+    cmp: "fill:color-mix(in srgb, var(--warn) 24%, var(--surface));stroke:var(--warn)",
+    done: "fill:color-mix(in srgb, var(--ok) 22%, var(--surface));stroke:var(--ok)",
+    bad: "fill:color-mix(in srgb, var(--bad) 18%, var(--surface));stroke:var(--bad)",
+    dim: "fill:var(--surface-2);stroke:var(--border)"
+  };
+  var txt = function (p) { return "[" + p[0] + ", " + p[1] + ")"; };
+  var tc = function (p) { return "[" + p[0] + "," + p[1] + ")"; };  // compact label for bars
+
+  // A timeline: rows of bars over an axis, with an optional vertical sweep line and shaded stretches.
+  function timeline(svg, o) {
+    var W = 440, L = o.labelW == null ? 44 : o.labelW, R = 12, RH = o.rowH || 25, top = 6;
+    var base = top + o.rows.length * RH + 4, H = base + 22;
+    var x = function (t) { return L + (t - o.lo) / (o.hi - o.lo) * (W - L - R); };
+    svg.replaceChildren();
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.style.maxWidth = "640px";
+    svg.style.minWidth = "400px";  // on a phone the stage scrolls sideways instead of shrinking the labels
+    (o.shade || []).forEach(function (sh) {
+      svg.append(V.s("rect", { x: x(sh[0]), y: 0, width: x(sh[1]) - x(sh[0]), height: base, style: "fill:color-mix(in srgb, var(--warn) 16%, transparent)" }));
+    });
+    for (var t = o.lo; t <= o.hi; t += o.step) {
+      svg.append(V.s("line", { class: "grid-line", x1: x(t), x2: x(t), y1: 0, y2: base }));
+      svg.append(V.s("text", { class: "label", x: x(t), y: H - 6, "text-anchor": "middle", text: String(t) }));
+    }
+    svg.append(V.s("line", { class: "axis", x1: L, x2: W - R, y1: base, y2: base }));
+    o.rows.forEach(function (row, r) {
+      var y = top + r * RH;
+      if (row.label) svg.append(V.s("text", { class: "label", x: L - 7, y: y + RH / 2, "text-anchor": "end", "dominant-baseline": "central", text: row.label }));
+      row.bars.forEach(function (b) {
+        var x1 = x(b.s), w = Math.max(3, x(b.e) - x1), cls = b.cls || "";
+        var g = V.s("g", { style: cls === "dim" ? "opacity:0.45" : null });
+        g.append(V.s("rect", { x: x1, y: y + 3, width: w, height: RH - 6, rx: 4, style: ST[cls] + ";stroke-width:1.5" }));
+        var tw = 6.3 * b.text.length, inside = w >= tw + 6;  // does the label fit inside the bar?
+        var right = x1 + w + 4 + tw <= W - 2;                 // else: beside it, right if there's room, left if not
+        g.append(V.s("text", { x: inside ? x1 + w / 2 : right ? x1 + w + 4 : x1 - 4, y: y + RH / 2 + 0.5, "text-anchor": inside ? "middle" : right ? "start" : "end", "dominant-baseline": "central", style: "fill:var(--text-strong);font-size:11px", text: b.text }));
+        svg.append(g);
+      });
+    });
+    if (o.line != null) svg.append(V.s("line", { x1: x(o.line), x2: x(o.line), y1: 0, y2: base + 3, style: "stroke:var(--accent);stroke-width:2.5" }));
+    return svg;
+  }
+
+  // ---- Overlap playground (section 2) ----
+  (function () {
+    var A = [4, 9];
+    function show() {
+      var s = Number($("ov-s").value), len = Number($("ov-len").value), B = [s, s + len];
+      $("ov-sval").textContent = s; $("ov-lval").textContent = len;
+      var t1 = A[0] < B[1], t2 = B[0] < A[1], ov = t1 && t2;
+      var is = Math.max(A[0], B[0]), ie = Math.min(A[1], B[1]);
+      timeline($("ov-svg"), { lo: 0, hi: 22, step: 2, rows: [
+        { label: "A", bars: [{ s: A[0], e: A[1], cls: "hl", text: tc(A) }] },
+        { label: "B", bars: [{ s: B[0], e: B[1], cls: ov ? "cmp" : "", text: tc(B) }] },
+        { label: "both", bars: ov ? [{ s: is, e: ie, cls: "done", text: tc([is, ie]) }] : [] }
+      ] });
+      var mark = function (ok) { return ok ? "✓" : "✗"; };
+      var msg = "A.start &lt; B.end: 4 &lt; " + B[1] + " " + mark(t1) + " · B.start &lt; A.end: " + B[0] + " &lt; 9 " + mark(t2) + ". ";
+      if (ov) msg += "<b>Overlap</b>: they share " + txt([is, ie]) + ", from the later start to the earlier end" + (B[0] < A[0] && B[1] > A[1] ? ". B covers all of A, though neither of B's ends is inside A." : ".");
+      else if (B[1] === A[0] || B[0] === A[1]) msg += "<b>No overlap</b>: they touch at " + (B[1] === A[0] ? A[0] : A[1]) + ", but with half-open intervals that moment belongs to only one of them.";
+      else msg += "<b>No overlap</b>: B " + (t1 ? "starts after A ends" : "ends before A starts") + ".";
+      $("ov-msg").innerHTML = msg;
+    }
+    $("ov-s").oninput = show; $("ov-len").oninput = show; show();
+  })();
+
+  // ---- Merge stepper (section 3) ----
+  (function () {
+    var input = [[8, 10], [1, 3], [15, 18], [2, 6], [18, 20], [9, 12], [16, 17], [5, 7]];
+    var iv = input.slice().sort(function (p, q) { return p[0] - q[0]; });
+    var fr = [], out = [], cur = null, state = iv.map(function () { return ""; });
+    var snap = function (msg) { fr.push({ st: state.slice(), out: out.map(function (b) { return b.slice(); }), cur: cur && cur.slice(), msg: msg }); };
+    snap("8 bookings arrived in the order " + input.map(txt).join(" ") + ". Here they are sorted by start. The bottom row will hold the busy blocks.");
+    iv.forEach(function (p, i) {
+      if (i > 0) state[i - 1] = "dim";
+      state[i] = "cmp";
+      if (!cur) { cur = p.slice(); snap("Start a block with " + txt(p) + "."); return; }
+      if (p[0] <= cur[1]) {
+        var old = cur[1]; cur[1] = Math.max(cur[1], p[1]);
+        var why = p[0] === old ? "exactly where the block ends: they touch with no gap, so it joins" : "at or before the block's end, " + old + ", so it joins";
+        snap(txt(p) + " starts at " + p[0] + ", " + why + ". New end = max(" + old + ", " + p[1] + ") = <b>" + cur[1] + "</b>" + (cur[1] === old ? ": unchanged, because " + txt(p) + " sits inside the block." : "."));
+      } else {
+        out.push(cur.slice());
+        snap(txt(p) + " starts at " + p[0] + ", after the block's end, " + cur[1] + ". Everything still to come starts at " + p[0] + " or later, so nothing can reach back: block <b>" + txt(cur) + "</b> is final.");
+        cur = p.slice(); snap("Start a new block with " + txt(p) + ".");
+      }
+    });
+    state[iv.length - 1] = "dim"; out.push(cur.slice()); cur = null;
+    snap("No intervals left: close the last block. <b>" + out.length + " blocks</b> from " + iv.length + " intervals: one sort, then one pass that looked at each interval once.");
+    V.player($("merge-player"), {
+      frames: fr, speed: 1300,
+      draw: function (f, stage) {
+        var rows = iv.map(function (p, i) { return { label: "", bars: [{ s: p[0], e: p[1], cls: f.st[i], text: tc(p) }] }; });
+        var blocks = f.out.map(function (b) { return { s: b[0], e: b[1], cls: "done", text: tc(b) }; });
+        if (f.cur) blocks.push({ s: f.cur[0], e: f.cur[1], cls: "hl", text: tc(f.cur) });
+        rows.push({ label: "blocks", bars: blocks });
+        stage.append(timeline(V.s("svg", { class: "viz", role: "img", "aria-label": "Intervals on a timeline being merged" }), { lo: 0, hi: 21, step: 3, rows: rows, labelW: 52 }));
+      }
+    });
+  })();
+
+  // ---- Sweep stepper with a tie-order switch (section 5) ----
+  (function () {
+    var names = ["A", "B", "C", "D", "E", "F"];
+    var M = [[9, 11], [10, 12], [11, 13], [11, 12], [12, 14], [13, 15]];
+    function build(endsFirst) {
+      var ev = [];
+      M.forEach(function (m, i) { ev.push({ t: m[0], d: 1, i: i }); ev.push({ t: m[1], d: -1, i: i }); });
+      ev.sort(function (p, q) { return p.t - q.t || (endsFirst ? p.d - q.d : q.d - p.d) || p.i - q.i; });
+      var fr = [], cur = 0, best = 0, bestAt = null, inside = {}, gone = {};
+      var snap = function (t, msg) { fr.push({ t: t, cur: cur, best: best, inside: Object.assign({}, inside), gone: Object.assign({}, gone), msg: msg }); };
+      snap(null, "Six meetings become 12 events: +1 at each start, −1 at each end, sorted by time. At equal times " + (endsFirst ? "the ends (−1) go first." : "this version puts the starts (+1) first."));
+      ev.forEach(function (e) {
+        cur += e.d;
+        if (e.d > 0) inside[e.i] = 1; else { delete inside[e.i]; gone[e.i] = 1; }
+        var rec = cur > best;
+        if (rec) { best = cur; bestAt = e.t; }
+        snap(e.t, "t = " + e.t + ": " + names[e.i] + " " + txt(M[e.i]) + (e.d > 0 ? " starts, +1" : " ends, −1") + ". In use: <b>" + cur + "</b>" + (rec ? ", a new maximum." : ". Most so far: " + best + "."));
+      });
+      var last = fr[fr.length - 1];
+      if (endsFirst) {
+        last.shade = [[11, 12]];
+        last.msg += " Answer: <b>" + best + " rooms</b>, needed during [11, 12) when B, C and D all run (shaded).";
+      } else {
+        last.msg += " This order claims <b>" + best + " rooms</b>, but no real moment has " + best + " meetings: at t = " + bestAt + ", C and D were counted before A, which ends at " + bestAt + ", had left. The right answer is 3.";
+      }
+      return fr;
+    }
+    var sel = V.el("select", { title: "Order of events at equal times" },
+      V.el("option", { value: "1" }, "ties: ends first"),
+      V.el("option", { value: "0" }, "ties: starts first (bug)"));
+    var player = V.player($("sweep-player"), {
+      frames: build(true), speed: 1300, extraControls: [sel],
+      draw: function (f, stage) {
+        var rows = M.map(function (m, i) { return { label: names[i], bars: [{ s: m[0], e: m[1], cls: f.gone[i] ? "dim" : f.inside[i] ? "hl" : "", text: tc(m) }] }; });
+        stage.append(
+          V.el("div", { class: "small", style: "margin-bottom:6px" }, "in use now: ", V.el("b", {}, String(f.cur)), "   ·   most so far: ", V.el("b", {}, String(f.best))),
+          timeline(V.s("svg", { class: "viz", role: "img", "aria-label": "Meetings on a timeline with a sweep line" }), { lo: 8, hi: 16, step: 1, rows: rows, line: f.t, shade: f.shade, labelW: 26 }));
+      }
+    });
+    sel.onchange = function () { player.load(build(sel.value === "1")); };
+  })();
+
+  // ---- Interval tree query stepper (section 8) ----
+  (function () {
+    var data = [[1, 4], [3, 9], [5, 6], [7, 10], [8, 15], [11, 13], [12, 20], [14, 16], [17, 19]];
+    function build(lo, hi) {
+      if (lo >= hi) return null;
+      var mid = (lo + hi) >> 1, n = { s: data[mid][0], e: data[mid][1], id: mid, left: build(lo, mid), right: build(mid + 1, hi) };
+      n.max = Math.max(n.e, n.left ? n.left.max : -Infinity, n.right ? n.right.max : -Infinity);
+      return n;
+    }
+    var root = build(0, data.length);
+    var count = function (n) { return n ? 1 + count(n.left) + count(n.right) : 0; };
+    var nm = function (n) { return txt([n.s, n.e]); };
+    function frames(a, b) {
+      var st = {}, found = [], fr = [], q = txt([a, b]);
+      var snap = function (msg) { fr.push({ st: Object.assign({}, st), found: found.slice(), msg: msg }); };
+      var dimAll = function (n) { if (!n) return; st[n.id] = "dim"; dimAll(n.left); dimAll(n.right); };
+      snap("Find every interval that overlaps " + q + ". Each node shows its interval and max, the latest end in its subtree.");
+      (function go(n) {
+        if (!n) return;
+        if (n.max <= a) {
+          dimAll(n);
+          var c = count(n);
+          snap("Subtree at " + nm(n) + ": max = " + n.max + " ≤ " + a + ", so everything in it ends by " + a + ". Skip " + (c > 1 ? "all " + c + " of them" : "it") + " without looking inside.");
+          return;
+        }
+        st[n.id] = "hl";
+        var ov = n.s < b && a < n.e;
+        snap("Visit " + nm(n) + " (max " + n.max + " &gt; " + a + ": something here may still be running). " + (ov ? n.s + " &lt; " + b + " and " + a + " &lt; " + n.e + ": <b>it overlaps</b>." : "It doesn't overlap " + q + (n.s >= b ? ": it starts at " + n.s + ", not before " + b + "." : ": it ends at " + n.e + ", not after " + a + ".")));
+        st[n.id] = ov ? "done" : "bad";
+        if (ov) found.push(nm(n));
+        go(n.left);
+        if (n.s < b) go(n.right);
+        else if (n.right) {
+          dimAll(n.right);
+          var k = count(n.right);
+          snap(nm(n) + " starts at " + n.s + " ≥ " + b + ", and everything to its right starts even later: skip its right subtree (" + k + " node" + (k > 1 ? "s" : "") + ").");
+        }
+      })(root);
+      var visited = Object.keys(st).filter(function (k) { return st[k] !== "dim"; }).length;
+      snap("Done: found " + (found.length ? "<b>" + found.join(", ") + "</b>" : "nothing") + ". Visited " + visited + " of " + data.length + " nodes; the other " + (data.length - visited) + " were skipped by a rule.");
+      return fr;
+    }
+    function drawTree(svg, st) {
+      var items = V.layoutTree(root), dx = 58, dy = 62, W = 76 + (items.length - 1) * dx;
+      var depth = Math.max.apply(null, items.map(function (it) { return it.y; }));
+      var pos = new Map(items.map(function (it) { return [it.node, { x: 38 + it.x * dx, y: 24 + it.y * dy }]; }));
+      svg.replaceChildren();
+      svg.setAttribute("viewBox", "0 0 " + W + " " + (48 + depth * dy));
+      svg.style.maxWidth = "640px";
+      svg.style.minWidth = "470px";
+      items.forEach(function (it) {
+        if (!it.parent) return;
+        var p = pos.get(it.parent), c = pos.get(it.node), s = st[it.node.id];
+        svg.append(V.s("line", { class: "edge" + (s && s !== "dim" ? " hl" : ""), x1: p.x, y1: p.y, x2: c.x, y2: c.y }));
+      });
+      items.forEach(function (it) {
+        var p = pos.get(it.node), cls = st[it.node.id] || "";
+        svg.append(V.s("g", { style: cls === "dim" ? "opacity:0.4" : null },
+          V.s("rect", { x: p.x - 26, y: p.y - 19, width: 52, height: 38, rx: 8, style: ST[cls] + ";stroke-width:1.6" }),
+          V.s("text", { x: p.x, y: p.y - 6, "text-anchor": "middle", "dominant-baseline": "central", style: "fill:var(--text-strong);font-size:12px;font-weight:600", text: "[" + it.node.s + "," + it.node.e + ")" }),
+          V.s("text", { x: p.x, y: p.y + 9, "text-anchor": "middle", "dominant-baseline": "central", style: "fill:var(--muted);font-size:10px", text: "max " + it.node.max })));
+      });
+      return svg;
+    }
+    var queries = [[16, 17], [2, 4], [9, 12]];
+    var sel = V.el("select", { title: "Query" }, queries.map(function (qq, i) { return V.el("option", { value: i }, "query " + txt(qq)); }));
+    var player = V.player($("tree-player"), {
+      frames: frames(16, 17), speed: 1500, extraControls: [sel],
+      draw: function (f, stage) {
+        stage.append(drawTree(V.s("svg", { class: "viz", role: "img", "aria-label": "An interval tree with max_end in each node" }), f.st),
+          V.el("div", { class: "small muted", style: "margin-top:8px" }, "found"),
+          V.cells(f.found.length ? f.found : [null], { idx: false, cls: function () { return f.found.length ? "done" : ""; } }));
+      }
+    });
+    sel.onchange = function () { var qq = queries[Number(sel.value)]; player.load(frames(qq[0], qq[1])); };
+  })();
+})();
+</script>
+</body>
+</html>

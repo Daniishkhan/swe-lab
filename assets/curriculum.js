@@ -146,6 +146,11 @@ window.CURRICULUM = {
    ],
    "concepts": [
     {
+     "file": "concurrent-structures.html",
+     "topic": "01.14",
+     "title": "Many threads, one structure (Concurrent structures)"
+    },
+    {
      "file": "graphs.html",
      "topic": "01.05",
      "title": "Dots and lines (Graphs and how to store them)"
@@ -161,17 +166,75 @@ window.CURRICULUM = {
      "title": "The most urgent thing first (Heaps and priority queues)"
     },
     {
+     "file": "intervals.html",
+     "topic": "01.09",
+     "title": "Where things overlap (Intervals: merge, sweep line, interval trees)"
+    },
+    {
      "file": "linear-structures.html",
      "topic": "01.02",
      "title": "Who goes next? (Linked lists, stacks, queues, deques and monotonic stacks)"
     },
     {
+     "file": "lru-lfu-cache.html",
+     "topic": "01.08",
+     "title": "What to forget first (LRU and LFU caches)"
+    },
+    {
+     "file": "probabilistic-structures.html",
+     "topic": "01.12",
+     "title": "Almost right, in almost no memory (Bloom filters, Count-Min Sketch, HyperLogLog)"
+    },
+    {
+     "file": "segment-fenwick-trees.html",
+     "topic": "01.10",
+     "title": "Totals over any range (Segment trees and Fenwick trees)"
+    },
+    {
+     "file": "skip-lists.html",
+     "topic": "01.11",
+     "title": "Express lanes for a linked list (Skip lists)"
+    },
+    {
+     "file": "storage-structures.html",
+     "topic": "01.13",
+     "title": "Built for the disk (B-trees, LSM trees and the write-ahead log)"
+    },
+    {
      "file": "trees.html",
      "topic": "01.03",
      "title": "Sorted and fast (Trees, binary search trees, balancing and traversals)"
+    },
+    {
+     "file": "tries.html",
+     "topic": "01.06",
+     "title": "Words that share a path (Tries and radix trees)"
+    },
+    {
+     "file": "union-find.html",
+     "topic": "01.07",
+     "title": "Same group or not? (Union-find)"
     }
    ],
    "exercises": [
+    {
+     "file": "bloom_filter.py",
+     "module": "bloom_filter",
+     "title": "Bloom filter",
+     "topics": [
+      "01.12"
+     ],
+     "result": null
+    },
+    {
+     "file": "bplus_tree.py",
+     "module": "bplus_tree",
+     "title": "B+tree on a page store",
+     "topics": [
+      "01.13"
+     ],
+     "result": null
+    },
     {
      "file": "bst.py",
      "module": "bst",
@@ -187,6 +250,24 @@ window.CURRICULUM = {
      "title": "Clone a graph",
      "topics": [
       "01.05"
+     ],
+     "result": null
+    },
+    {
+     "file": "count_min_sketch.py",
+     "module": "count_min_sketch",
+     "title": "Count-Min Sketch and heavy hitters",
+     "topics": [
+      "01.12"
+     ],
+     "result": null
+    },
+    {
+     "file": "fenwick_tree.py",
+     "module": "fenwick_tree",
+     "title": "Fenwick tree (binary indexed tree)",
+     "topics": [
+      "01.10"
      ],
      "result": null
     },
@@ -227,6 +308,51 @@ window.CURRICULUM = {
      "result": null
     },
     {
+     "file": "hyperloglog.py",
+     "module": "hyperloglog",
+     "title": "HyperLogLog",
+     "topics": [
+      "01.12"
+     ],
+     "result": null
+    },
+    {
+     "file": "interval_merge.py",
+     "module": "interval_merge",
+     "title": "Merge, insert and intersect intervals",
+     "topics": [
+      "01.09"
+     ],
+     "result": null
+    },
+    {
+     "file": "interval_sweep.py",
+     "module": "interval_sweep",
+     "title": "Sweep line: rooms, coverage and point counts",
+     "topics": [
+      "01.09"
+     ],
+     "result": null
+    },
+    {
+     "file": "interval_tree.py",
+     "module": "interval_tree",
+     "title": "An interval tree: a BST that remembers how far right each subtree reaches",
+     "topics": [
+      "01.09"
+     ],
+     "result": null
+    },
+    {
+     "file": "lfu_cache.py",
+     "module": "lfu_cache",
+     "title": "LFU cache in O(1): a list of keys per use count",
+     "topics": [
+      "01.08"
+     ],
+     "result": null
+    },
+    {
      "file": "linked_lists.py",
      "module": "linked_lists",
      "title": "Linked list moves: reverse, middle, cycle",
@@ -238,9 +364,18 @@ window.CURRICULUM = {
     {
      "file": "lru_cache.py",
      "module": "lru_cache",
-     "title": "LRU cache",
+     "title": "LRU cache: a hash map plus a doubly linked list",
      "topics": [
       "01.08"
+     ],
+     "result": null
+    },
+    {
+     "file": "lsm_store.py",
+     "module": "lsm_store",
+     "title": "LSM key-value store",
+     "topics": [
+      "01.13"
      ],
      "result": null
     },
@@ -263,6 +398,15 @@ window.CURRICULUM = {
      "result": null
     },
     {
+     "file": "mpmc_queue.py",
+     "module": "mpmc_queue",
+     "title": "Lock-free MPMC queue (Michael and Scott), on simulated threads",
+     "topics": [
+      "01.14"
+     ],
+     "result": null
+    },
+    {
      "file": "probing_map.py",
      "module": "probing_map",
      "title": "Hash map with open addressing (linear probing and tombstones)",
@@ -272,11 +416,74 @@ window.CURRICULUM = {
      "result": null
     },
     {
+     "file": "radix_tree.py",
+     "module": "radix_tree",
+     "title": "Radix tree (compressed trie)",
+     "topics": [
+      "01.06"
+     ],
+     "result": null
+    },
+    {
+     "file": "range_query_patterns.py",
+     "module": "range_query_patterns",
+     "title": "Range query patterns: count smaller after, add to a whole range",
+     "topics": [
+      "01.10"
+     ],
+     "result": null
+    },
+    {
      "file": "ring_deque.py",
      "module": "ring_deque",
      "title": "RingDeque: a double-ended queue on a ring buffer",
      "topics": [
       "01.02"
+     ],
+     "result": null
+    },
+    {
+     "file": "segment_tree.py",
+     "module": "segment_tree",
+     "title": "Segment tree for any combine (sum, min, max, ...)",
+     "topics": [
+      "01.10"
+     ],
+     "result": null
+    },
+    {
+     "file": "skip_list.py",
+     "module": "skip_list",
+     "title": "Skip list: a sorted set with express lanes",
+     "topics": [
+      "01.11"
+     ],
+     "result": null
+    },
+    {
+     "file": "skip_list_rank.py",
+     "module": "skip_list_rank",
+     "title": "A mini Redis sorted set: skip list with spans, plus a dict",
+     "topics": [
+      "01.11"
+     ],
+     "result": null
+    },
+    {
+     "file": "spsc_ring_buffer.py",
+     "module": "spsc_ring_buffer",
+     "title": "SPSC ring buffer: one producer, one consumer, no lock",
+     "topics": [
+      "01.14"
+     ],
+     "result": null
+    },
+    {
+     "file": "striped_hash_map.py",
+     "module": "striped_hash_map",
+     "title": "Striped hash map: many locks instead of one",
+     "topics": [
+      "01.14"
      ],
      "result": null
     },
@@ -299,11 +506,47 @@ window.CURRICULUM = {
      "result": null
     },
     {
+     "file": "trie_patterns.py",
+     "module": "trie_patterns",
+     "title": "Trie patterns: top suggestions, longest prefix match, maximum XOR",
+     "topics": [
+      "01.06"
+     ],
+     "result": null
+    },
+    {
+     "file": "ttl_cache.py",
+     "module": "ttl_cache",
+     "title": "LRU cache with expiry (TTL)",
+     "topics": [
+      "01.08"
+     ],
+     "result": null
+    },
+    {
      "file": "union_find.py",
      "module": "union_find",
-     "title": "Union-find (disjoint set union)",
+     "title": "Union-find (disjoint set union) from scratch",
      "topics": [
       "01.07"
+     ],
+     "result": null
+    },
+    {
+     "file": "union_find_patterns.py",
+     "module": "union_find_patterns",
+     "title": "Union-find patterns: linked accounts, growing islands, minimum spanning tree",
+     "topics": [
+      "01.07"
+     ],
+     "result": null
+    },
+    {
+     "file": "wal_log.py",
+     "module": "wal_log",
+     "title": "Write-ahead log",
+     "topics": [
+      "01.13"
      ],
      "result": null
     }
@@ -1539,5 +1782,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-20 10:43"
+ "generated": "2026-11-20 19:53"
 };

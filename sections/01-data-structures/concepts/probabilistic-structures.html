@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="01.12">
+  <title>Almost right, in almost no memory (Bloom filters, Count-Min Sketch, HyperLogLog)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+  <style>
+    /* Page-local: fit the 16-bit Bloom filter row inside the figure on desktop. */
+    #bloom-player .cells { gap: 3px; }
+    #bloom-player .cell { min-width: 31px; padding: 0 4px; }
+    @media (max-width: 640px) { #bloom-player .cells { flex-wrap: wrap; row-gap: 44px; } }
+  </style>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 1 · Part 12</div>
+  <h1>Almost right, in almost no memory</h1>
+  <div class="meta"><span><span class="badge P2">P2</span> system design follow-ups: "what if it doesn't fit in memory?"</span><span>about 60 minutes</span><span>10 quick checks · 9 exercises</span></div>
+</header>
+
+<p>Every structure so far gave exact answers. A hash set knows for certain whether it holds an item, because it stores the item. That stops working when the data is huge: a billion items don't fit on one machine, and they don't fit in a message you can send between machines. This chapter builds three structures that give up a <em>little</em> exactness, in a direction you choose and by an amount you can calculate, and in return shrink gigabytes to megabytes or even kilobytes. In system design interviews, "use a Bloom filter" or "use HyperLogLog" is a common move. The credit goes to saying what you give up, how much memory it saves, and what happens when it's wrong.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Say why exact answers cost memory that grows with the data, and what you trade to shrink it.</li>
+    <li>Build a Bloom filter from a bit array and k hash functions, and explain why its "no" is certain and its "yes" is only a "maybe".</li>
+    <li>Size a Bloom filter for a target error rate (about 10 bits per item for 1%), and explain why there's a best number of hashes.</li>
+    <li>Build a Count-Min Sketch, and explain why it only overcounts, why it takes the minimum, and why its error is a share of the <em>total</em>.</li>
+    <li>Explain HyperLogLog from coin flips: leading zeros, many registers, the harmonic mean, and 12 KB for a billion distinct items.</li>
+    <li>Merge sketches from many machines, and pick the right structure (or an exact one) in a design question.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: go top to bottom. Answer each quick check before reading on; a wrong answer gets the idea explained a different way. Grey "Go deeper" boxes are optional on a first read. This chapter builds on hash functions from <a href="hash-maps.html">Find anything in one step</a> and uses the top-k heap from <a href="heaps.html">The most urgent thing first</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: three questions, too much to remember</h2>
+
+<div class="story">
+  <p>You work on a website with 300 million visitors a day and 5 billion requests a day. Three teams come to you with three questions.</p>
+  <p><b>Security:</b> "When someone signs up, is their password one of the 1 billion passwords leaked in past breaches?" <b>Operations:</b> "Which IP addresses are hammering us? How many requests did each one send today?" <b>Product:</b> "How many <em>different</em> people visited today? This week? This month?"</p>
+  <p>Each has an exact answer from the first chapter: a hash set or a hash map. Then you do the memory math.</p>
+</div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Question</th><th>Exact tool</th><th>Exact memory (raw data, no overhead)</th><th>This chapter's tool</th><th>Its memory</th><th>What you give up</th></tr></thead>
+  <tbody>
+    <tr><td>Is this password leaked?</td><td>set of 1 billion 20-byte password hashes</td><td>20 GB</td><td>Bloom filter</td><td>1.2 GB</td><td>1 in 100 safe passwords gets a "maybe leaked"</td></tr>
+    <tr><td>Requests per IP today?</td><td>map of 200 million IPs to counts (16-byte address + 8-byte count)</td><td>4.8 GB</td><td>Count-Min Sketch</td><td>5.4 MB</td><td>a count can be up to 50,000 too high (more, 1 time in 100)</td></tr>
+    <tr><td>Distinct visitors this month?</td><td>a set of 8-byte visitor IDs per day: 300 million × 8 bytes, kept for 30 days</td><td>2.4 GB a day, 72 GB a month</td><td>HyperLogLog</td><td>12 KB a day, 12 KB for the month</td><td>the count is typically off by about 0.8%</td></tr>
+  </tbody>
+</table></div>
+
+<p>Those exact numbers are the floor. A Python <code>set</code> or <code>dict</code> adds pointers, object headers and empty slots, and usually costs several times the raw size. And the last row has a twist: you can't add up the daily counts to get the monthly count, because someone who visited on Monday and Tuesday would be counted twice. To get the monthly number exactly, you need the actual IDs from all 30 days.</p>
+
+<p>The right-hand column is what this chapter builds. Notice two things. The memory no longer grows the way the data does (for the last two, it doesn't grow at all). And each structure is wrong in a <em>known direction</em> by a <em>known amount</em>. That's the trade, and every design decision in this chapter is about choosing it on purpose.</p>
+
+<div class="keyidea"><p>Exact answers have to remember every distinct item, so their memory grows with the data. Probabilistic structures remember a small, fixed-size summary instead, and pay with a small error whose direction and size you choose in advance.</p></div>
+
+<div class="check" id="check-problem">
+  <p class="q">What, at bottom, makes the exact answers so expensive?</p>
+  <div class="opts">
+    <button>Hashing a billion items takes too long</button>
+    <button data-correct>To answer exactly, you must remember every distinct item, so memory grows with the number of distinct items</button>
+    <button>Python's overhead; rewriting the set in C would fix it</button>
+  </div>
+  <div class="fb right"><p>Right. Hashing is fast (millions of items a second), and C would cut the overhead, but not below the raw 20 GB of password hashes. As long as the answer must be exact, some trace of every distinct item has to be kept. The only way down is to stop being exact.</p></div>
+  <div class="fb wrong"><p>Look at the "raw data, no overhead" column: those numbers already assume a perfect, zero-overhead set written in any language. 20 GB is just 1 billion × 20 bytes. Hashing isn't the cost either; a modern core hashes millions of short strings a second. The cost is that an exact "have I seen X?" needs to distinguish X from every other item ever added, so it has to keep something for each of them. Memory grows with the number of distinct items, and only giving up exactness breaks that link.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Give up "yes", keep "no": a wall of switches</h2>
+
+<p>Start with the password question. A hash set stores each password (or its 20-byte hash). What if we stored much less than that per password? Not the item, just a mark that says "something landed here".</p>
+
+<p>Picture a long wall of light switches, all off. When a leaked password arrives, you hash it to pick one switch, and you flip that switch on. Later, a new user picks a password. You hash it the same way and look at that one switch:</p>
+<ul>
+  <li><b>Off:</b> this password was <em>never</em> added. If it had been, its switch would be on, and nothing ever turns a switch off.</li>
+  <li><b>On:</b> <em>maybe</em> it was added. Or some other password happened to hash to the same switch and flipped it.</li>
+</ul>
+
+<pre class="diagram"><code>switch:     0  1  2  3  4  5  6  7  8  9  10 11
+state:      ·  ·  ON ·  ·  ·  ON ·  ·  ON ·  ·      (3 leaked passwords added)
+
+"hunter2"        → hash → switch 2:  ON   → maybe leaked (it was added, or a stranger shares switch 2)
+"tulip-canoe-77" → hash → switch 4:  off  → definitely never added</code></pre>
+
+<p>The wall is a <b>bit array</b>: m bits, each 0 or 1, stored 8 to a byte. Each switch costs one bit, not 20 bytes. And the answers have a special shape. An "off" is always right. An "on" can be wrong. A wrong "on" is called a <b>false positive</b> (the structure says yes, the truth is no). The other kind of mistake, a <b>false negative</b> (it says no, the truth is yes), can't happen here.</p>
+
+<p>That shape fits the password problem well. A false positive means a user with a safe password is told "this one looks leaked, please pick another". Annoying, rare, harmless. A false negative would let a leaked password through, and that's the one mistake we can't afford. It never happens.</p>
+
+<h3>How often is it wrong?</h3>
+<p>Give the wall m = 10 billion switches for n = 1 billion passwords: 10 bits per password, 1.25 GB. Each password flips one switch at random. A given switch stays off only if all 1 billion passwords miss it. Each one misses it with chance 1 − 1/m, so all of them miss with chance (1 − 1/m)<sup>n</sup>, which works out to about 0.905 here. (For large m that expression is very close to e<sup>−n/m</sup>, where e ≈ 2.718 is the constant that shows up whenever many tiny chances multiply together; e<sup>−0.1</sup> ≈ 0.905.) So about <b>9.5%</b> of the switches are on.</p>
+<p>A password that was never added lands on a random switch, so it gets a false "maybe" 9.5% of the time. That's too many. Could we buy our way out with more switches? To get down to 1% we'd need only 1% of the switches on, which takes about 100 bits per password: 12.4 GB. That's most of the 20 GB we were trying to avoid. One switch per item is the right idea with the wrong shape.</p>
+
+<div class="keyidea"><p>Hash each item to one bit in a bit array and set it. A 0 means "definitely never added"; a 1 means "maybe". No false negatives, only false positives. With one bit per item, though, the false positive rate is the fraction of bits that are set, and pushing that down takes far too many bits.</p></div>
+
+<div class="check" id="check-onebit">
+  <p class="q">A new user's password hashes to a switch that is <b>off</b>. What do you know?</p>
+  <div class="opts">
+    <button>It's probably not leaked, with about 90% confidence</button>
+    <button data-correct>It's definitely not in the leaked list</button>
+    <button>Nothing yet: a leaked password's switch could have been turned back off by a later password</button>
+  </div>
+  <div class="fb right"><p>Right. If the password had been added, the same hash would have picked the same switch and set it, and switches only ever go from off to on. "Off" is a proof. The uncertainty lives only on the "on" side.</p></div>
+  <div class="fb wrong"><p>Run it backwards. Suppose the password <em>were</em> in the leaked list. When it was added, it was hashed (same function, same answer) and its switch was turned on. Nothing in this structure ever turns a switch off: other passwords can only turn more switches on. So its switch would be on now. It's off, so the password was never added. Percentages like 90% belong to the other case: only a switch that is <em>on</em> leaves doubt, because someone else's password might have flipped it.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Ask several switches: the Bloom filter</h2>
+
+<p>The flaw: a stranger only has to be unlucky once to fool a single switch. So make them be unlucky several times. Give each item <b>k</b> switches instead of one, picked by k different hash functions. To add an item, turn on all k. To check an item, look at all k:</p>
+<ul>
+  <li><b>Any of them off:</b> definitely never added (if it had been, all k would be on).</li>
+  <li><b>All of them on:</b> maybe. A stranger now needs all k of its switches to have been turned on by other items.</li>
+</ul>
+
+<p>This is a <b>Bloom filter</b>, named after Burton Bloom, who described it in 1970. Step through one: 16 bits, k = 3, three animals added, then three questions.</p>
+
+<div class="figure">
+  <div id="bloom-player"></div>
+  <div class="cap">A 16-bit Bloom filter with 3 hash functions (h1, h2, h3 mark each item's bits). Blue: bits being set. Yellow: bits being checked. Red: a 0 that proves "never added". Green: bits already on. Watch "rat": each of its three bits was set by a different word.</div>
+</div>
+
+<p>Two things to notice in the animation. First, items share bits: "emu", "hen" and "ram" all use bit 1. Sharing is what makes the filter small, and also what makes it wrong sometimes. Second, "cat" was rejected by a <em>single</em> 0, even though two of its three bits were on. One 0 is a proof; k 1s are only evidence.</p>
+
+<h3>The same memory, ten times fewer mistakes</h3>
+<p>Back to 1 billion passwords in 10 billion bits, now with k = 7. Each password turns on 7 bits, so 7 billion flips land on 10 billion bits. The share of bits still off is about e<sup>−7/10</sup> ≈ 0.50, so about <b>half</b> the bits are on. A stranger needs all 7 of its bits on: 0.50<sup>7</sup> ≈ <b>0.82%</b>. Same 1.25 GB, and the false positive rate dropped from 9.5% to under 1%.</p>
+
+<p>In code, the mechanism is short. Here's a toy that keeps one Python bool per bit to stay readable (the exercise packs 8 bits into each byte):</p>
+
+<pre><code>import hashlib
+
+def positions(item, k, m):
+    # k bit positions for item: hash it k times with a different prefix each time
+    return [int.from_bytes(hashlib.sha256(f"{i}:{item}".encode()).digest()[:8], "big") % m
+            for i in range(k)]
+
+bits = [False] * 16
+for word in ["emu", "hen", "ram"]:
+    for p in positions(word, 3, 16):
+        bits[p] = True                      # add: turn on all k switches
+
+def might_contain(word):
+    return all(bits[p] for p in positions(word, 3, 16))   # any 0 means "never added"</code></pre>
+
+<div class="keyidea"><p>A Bloom filter sets k bits per item, chosen by k hash functions. A lookup checks the same k bits: any 0 means "definitely not added", all 1s mean "probably added". Requiring k matches is what drives false positives down without adding memory.</p></div>
+
+<details class="aside another">
+  <summary>Explain it another way: a witness who remembers three details</summary>
+  <p>A witness saw a thief and remembers three things: red hat, beard, glasses. The police line up suspects. Anyone missing even one of the three is cleared for certain. Someone with all three might be the thief, or an unlucky lookalike. The more details the witness remembers, the fewer innocent lookalikes, as long as the details are independent of each other.</p>
+  <p>Where the analogy breaks: the witness remembers one person. A Bloom filter crams every item's "details" into one shared wall of bits, so the more items you add, the more details are "remembered" by accident. That's why it fills up (section 4).</p>
+</details>
+
+<div class="check" id="check-bloom">
+  <p class="q">A Bloom filter with k = 3 checks "yak". Two of its bits are 1 and one is 0. What's the answer?</p>
+  <div class="opts">
+    <button>Probably added: 2 out of 3 is a strong match</button>
+    <button>Added, but then removed, which cleared one bit</button>
+    <button data-correct>Definitely never added</button>
+  </div>
+  <div class="fb right"><p>Right. Adding "yak" would have set all 3 of its bits, and bits never go back to 0. One 0 is enough to prove it. The two 1s were set by other items.</p></div>
+  <div class="fb wrong"><p>A Bloom filter isn't a vote. Think about what adding "yak" would have done: set all three of its bits to 1. Nothing in a Bloom filter ever sets a bit back to 0 (there is no remove; section 5 explains why). So if "yak" had ever been added, all three would read 1 today. One of them reads 0, so "yak" was never added, no matter how many of the others are 1. Those 1s just belong to other items.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How many bits, how many hashes?</h2>
+
+<p>Two knobs control a Bloom filter: how many bits per item (m/n), and how many hash functions (k). Bits per item is easy to reason about: more bits, fewer collisions, fewer mistakes. The number of hashes is the interesting one, because it pulls in two directions at once.</p>
+
+<ul>
+  <li><b>More hashes make each check pickier.</b> A stranger must hit k set bits, and each extra bit it needs is another chance to land on a 0.</li>
+  <li><b>More hashes fill the wall faster.</b> Every item you add turns on k bits, so with a large k most of the wall is on, and a stranger lands on set bits easily.</li>
+</ul>
+
+<p>Here's the tug of war with real numbers, at 10 bits per item:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>hashes k</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th></tr></thead>
+  <tbody>
+    <tr><td>bits that are on</td><td>9.5%</td><td>18%</td><td>26%</td><td>33%</td><td>39%</td><td>45%</td><td>50%</td><td>55%</td><td>59%</td><td>63%</td></tr>
+    <tr><td>false positive rate</td><td>9.5%</td><td>3.3%</td><td>1.7%</td><td>1.2%</td><td>0.94%</td><td>0.84%</td><td><b>0.82%</b></td><td>0.85%</td><td>0.91%</td><td>1.02%</td></tr>
+  </tbody>
+</table></div>
+
+<p>The rate falls, bottoms out at k = 7, then rises again. And look at the bits that are on at the bottom: about <b>50%</b>. That's not a coincidence. A half-full bit array is the most informative one. If far fewer than half the bits are on, you're carrying memory you're barely using, and an extra hash per item would make checks pickier almost for free. If far more than half are on, each check passes too easily. The best k is the one that leaves the wall half on.</p>
+
+<h3>Turning that into formulas</h3>
+<p>The same three steps from section 2, now with k bits per item:</p>
+<ol>
+  <li>n items each turn on k bits, so the wall takes kn random flips. One bit is missed by all of them with chance about e<sup>−kn/m</sup>.</li>
+  <li>So the share of bits that are on is q = 1 − e<sup>−kn/m</sup>.</li>
+  <li>A stranger needs all k of its bits on. Treating those as independent (a close approximation when m is large): <b>false positive rate p ≈ (1 − e<sup>−kn/m</sup>)<sup>k</sup></b>.</li>
+</ol>
+<p>Setting q to one half gives the best k, and plugging that back in gives the sizing rules everyone uses:</p>
+<ul>
+  <li><b>Best number of hashes:</b> k = (m/n) · ln 2 ≈ 0.69 × bits per item. For 10 bits per item, about 7.</li>
+  <li><b>At that k:</b> p ≈ (1/2)<sup>k</sup>, since each of the k bits is on with chance one half.</li>
+  <li><b>Bits per item for a target p:</b> m/n = −ln p / (ln 2)<sup>2</sup> ≈ 1.44 × log<sub>2</sub>(1/p). (Take p = (1/2)<sup>k</sup>, put in k = (m/n) · ln 2, and solve for m/n.)</li>
+</ul>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>target false positive rate</th><th>bits per item</th><th>hashes</th><th>for 1 billion items</th></tr></thead>
+  <tbody>
+    <tr><td>10%</td><td>4.8</td><td>3</td><td>0.6 GB</td></tr>
+    <tr><td>1%</td><td>9.6</td><td>7</td><td>1.2 GB</td></tr>
+    <tr><td>0.1%</td><td>14.4</td><td>10</td><td>1.8 GB</td></tr>
+    <tr><td>0.01%</td><td>19.2</td><td>13</td><td>2.4 GB</td></tr>
+  </tbody>
+</table></div>
+
+<p>Two things to take from that table. Each <b>10× fewer mistakes costs the same 4.8 more bits per item</b>, so very low error rates are cheap. And the item's size appears nowhere. A 2 KB URL and an 8-byte ID both cost about 10 bits at 1%. That's where the savings come from: the filter never stores the item, only a few bits of evidence that it was there.</p>
+
+<p>Try the knobs yourself. The figure below builds a real filter in your browser: it adds 1,000 items, then asks about 20,000 items it never added and counts the false "maybe"s.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <span class="small">bits per item</span><input type="range" id="bs-bpi" min="1" max="20" value="10" style="width:120px"><b id="bs-bpi-v"></b>
+      <span class="small">hashes k</span><input type="range" id="bs-k" min="1" max="15" value="3" style="width:120px"><b id="bs-k-v"></b>
+      <button class="btn" id="bs-best">Use the best k</button>
+    </div>
+    <div class="bars" id="bs-bars" style="height:120px;margin-top:14px"></div>
+    <div id="bs-ticks" style="display:flex;gap:3px;font:0.66rem var(--mono);color:var(--faint);margin-top:4px"></div>
+    <div class="viz-caption" id="bs-msg"></div>
+  </div>
+  <div class="cap">Each bar is the formula's false positive rate for one value of k (1 to 15) at the chosen bits per item; taller is worse. Blue: your k. Green: the best k. The caption compares the formula with a measured run. Try 10 bits with k = 1, then press "Use the best k". Then slide bits per item down to 5 and watch the best k move.</div>
+</div>
+
+<div class="keyidea"><p>For n items and a target false positive rate p, use m = 1.44 · n · log<sub>2</sub>(1/p) bits and k = 0.69 · m/n hashes. That's about 9.6 bits and 7 hashes per item for 1%, and 4.8 more bits for each further 10× improvement. At the best k, about half the bits are on. The size of the items doesn't matter.</p></div>
+
+<div class="check" id="check-size">
+  <p class="q">You need a Bloom filter for 50 million URLs (average 100 bytes each) with a 0.1% false positive rate. About how much memory?</p>
+  <div class="opts">
+    <button>About 5 GB: 50 million × 100 bytes, since the filter must cover the whole URL</button>
+    <button data-correct>About 90 MB: 50 million × 14.4 bits</button>
+    <button>About 62 MB: 50 million × 10 bits</button>
+  </div>
+  <div class="fb right"><p>Right. 0.1% needs about 14.4 bits per item, whatever the item's size: 50,000,000 × 14.4 = 720 million bits = 90 MB, with 10 hash functions. 10 bits per item would give about 1%, not 0.1%.</p></div>
+  <div class="fb wrong"><p>Two separate ideas. First, item size: the filter hashes the URL down to k positions and keeps only those bits, so a 100-byte URL costs exactly what an 8-byte ID costs. Second, the rate: 10 bits per item buys about 1%; each 10× improvement costs another 4.8 bits, so 0.1% needs about 14.4. Then 50 million × 14.4 bits = 720 million bits, and dividing by 8 gives 90 MB.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: how close to perfect is a Bloom filter?</summary>
+  <p>Any structure that answers membership with false positive rate p, for any set of n items, needs at least n · log<sub>2</sub>(1/p) bits. That's an information-theory floor, like the n log n floor for comparison sorts. A Bloom filter uses 1.44 times that. The 44% overhead is the price of letting items share bits at random.</p>
+  <p>Newer filters get closer to the floor. A <b>cuckoo filter</b> (Fan and others, 2014) stores a short fingerprint of each item in a cuckoo hash table; it supports deletion and uses less space than a Bloom filter at low error rates. <b>Xor filters</b> (Graf and Lemire, 2020) are built once from a fixed set and come closer still, but can't take new items. In interviews, "Bloom filter" is the expected answer; naming a cuckoo filter when deletion comes up is a strong extra.</p>
+  <p>Speed matters too. k bits in k random places means up to k cache misses per lookup, each a trip to main memory. Production filters, RocksDB's among them, put all k bits of an item inside one 64-byte cache line (a <b>blocked Bloom filter</b>): one memory access per lookup, for a slightly higher false positive rate at the same memory.</p>
+  <p>One more practical point: the formula assumes the k positions behave like independent random choices. With a poor hash, or k positions that are too similar to each other, the real rate is higher than the formula says. The exercise measures it.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>What a Bloom filter can't do</h2>
+
+<p>The wall of switches has three limits, and interviewers ask about all three.</p>
+
+<h3>It can't delete</h3>
+<p>Say one password is removed from the leaked list. The obvious move is to turn its k switches off. But those switches are shared. In the animation, "emu", "hen" and "ram" all use bit 1. Clear "emu" and bit 1 goes off, and now "hen" and "ram", which are still in the set, get a definite "no". That's a false negative, the one mistake a Bloom filter promised never to make.</p>
+<p>The fixes all cost something. A <b>counting Bloom filter</b> replaces each bit with a small counter (4 bits is the usual choice) that goes up on add and down on remove, so it costs about 4 times the memory. A cuckoo filter supports deletes directly. Or, the most common answer in practice: never delete; rebuild the filter from the source data now and then.</p>
+
+<h3>It fills up</h3>
+<p>The sizing formula assumes you know n in advance. Keep adding past it and the wall fills: more bits on, more false positives. A filter sized for 1% does this with the same 7 hashes:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>items added, vs capacity</th><th>1×</th><th>1.5×</th><th>2×</th><th>3×</th><th>4×</th></tr></thead>
+  <tbody><tr><td>false positive rate</td><td>1.0%</td><td>5.8%</td><td>16%</td><td>44%</td><td>68%</td></tr></tbody>
+</table></div>
+
+<p>It never gives a false negative, however full it gets; it just says "maybe" to almost everything, which makes it useless. Plan for growth when you size it, rebuild into a bigger filter, or chain filters: when one fills, start a new, larger one with a tighter error rate, and check all of them (a "scalable Bloom filter"; the tighter rates keep the combined error bounded).</p>
+
+<h3>It can't list or count what's inside</h3>
+<p>It stores no items, so it can't give them back, and two different sets can leave the same bits. You can only estimate how many items it holds from how many bits are on. If you need the items, you need a real set.</p>
+
+<h3>So where is it worth it?</h3>
+<p>A Bloom filter shines as a cheap "no" in front of an expensive lookup. Most questions are about things that <em>aren't</em> there, and those get answered from memory. Only the "maybe"s pay for the real check, and a false positive just costs one wasted lookup.</p>
+<ul>
+  <li><b>Databases built on LSM trees</b> (LevelDB, RocksDB, Cassandra, HBase) store data in many sorted files on disk and usually keep a Bloom filter for each file (in LevelDB and RocksDB it's a setting you turn on). A read for a key skips every file whose filter says "no", instead of reading from disk. That's topic 01.13, the next chapter.</li>
+  <li><b>Caches and CDNs</b> use one to avoid caching things requested only once: Akamai has described caching an object only on its second request, using a Bloom filter to remember the first one, because a large share of objects are only ever requested once.</li>
+  <li><b>Our password check</b>: a "no" admits the password at once; a "maybe" can go to the full leaked list on disk to confirm, or the site can ask the user to pick another.</li>
+</ul>
+
+<div class="keyidea"><p>A Bloom filter can't delete (clearing shared bits creates false negatives), degrades when overfilled, and can't list its items. Use it as a cheap, certain "no" in front of something exact and expensive.</p></div>
+
+<div class="check" id="check-delete">
+  <p class="q">A password is removed from the leaked list, so you clear its 7 bits in the filter. What goes wrong?</p>
+  <div class="opts">
+    <button>Nothing: each password has its own bits</button>
+    <button>The false positive rate goes up</button>
+    <button data-correct>Some passwords still in the list now get a definite "no"</button>
+  </div>
+  <div class="fb right"><p>Right. Bits are shared, so some other leaked passwords used one of those 7 bits. Now they have a 0 among their bits, and the filter "proves" they were never added. Clearing bits trades a guaranteed property for a broken one. (The false positive rate actually goes slightly <em>down</em>: fewer bits are on.)</p></div>
+  <div class="fb wrong"><p>Remember the 16-bit animation: "emu", "hen" and "ram" all used bit 1. With 1 billion passwords on 10 billion bits and half the bits on, nearly every bit that is on was set by several passwords. Clear one password's 7 bits and every other password sharing any of them now has a 0 where it needs a 1: a definite "no" for a password that's still leaked. That's a false negative, which a Bloom filter is supposed to never produce. Fewer bits on means fewer false positives, not more; the damage is on the other side.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Counting, not just seeing: the Count-Min Sketch</h2>
+
+<p>Now the operations team's question: how many requests did each IP send today? A Bloom filter only says "seen" or "not seen". We need a number.</p>
+
+<h3>First try: a row of counters</h3>
+<p>Swap each switch for a counter. Keep a row of w counters, all 0. When a request arrives, hash its IP to one counter and add 1. To ask "how many from this IP?", hash it again and read that counter.</p>
+<p>Picture a tally sheet with w columns. The clerk doesn't write names; she hashes each name to a column and adds a tick. Several IPs share each column, so a column's tally is <em>this</em> IP's requests plus everyone else's who landed there. Two consequences follow, the same way they did for the switches:</p>
+<ul>
+  <li><b>It never undercounts.</b> Every request from this IP added a tick to this column, and ticks are never removed.</li>
+  <li><b>It overcounts by whatever else landed there.</b> On average that's (N − this IP's count) / w, where N is the total of all requests. A light IP that shares a column with a heavy one looks heavy.</li>
+</ul>
+
+<pre class="diagram"><code>one row of 8 counters:   [ 3 | 0 | 905 | 1 | 0 | 2 | 0 | 7 ]
+                                    ↑
+ a home user (really sent 5) hashes here, and so did a bot that sent 900:
+ the counter reads 905, and the home user looks like an attacker</code></pre>
+
+<h3>The fix: several rows, believe the smallest</h3>
+<p>Same trick as the Bloom filter: don't depend on one hash. Keep <b>d rows</b> of w counters, each row with its own hash function. Adding an item adds 1 to one counter in every row. To estimate, read the item's counter in each row. Every one of them is at least the true count, and each is polluted by a <em>different</em>, random set of neighbors. The least polluted one is the closest, and you can spot it, because it's the smallest. So the estimate is the <b>minimum</b> over the rows.</p>
+
+<p>This is the <b>Count-Min Sketch</b> (Cormode and Muthukrishnan, published in 2005): a d × w grid of counters, "count" on the way in, "min" on the way out. A <b>sketch</b> is the general name for a small summary of a big stream that answers some questions approximately.</p>
+
+<div class="figure">
+  <div id="cms-player"></div>
+  <div class="cap">A Count-Min Sketch with 3 rows of 8 counters. Each name has one column in each row (its own hash per row). Blue: counters just incremented. Yellow: the counters read for a query; green marks the minimum. Watch "ana": two of its three rows are polluted, but the minimum is exact. Then "oz" is overcounted in every row, and "hal", never seen, still gets 1.</div>
+</div>
+
+<p>The mechanism really is this small. (The exercise adds sizing, merging and the hashing.)</p>
+
+<pre><code># rows: d lists of w counters; col(r, item) is row r's hash of item, in 0..w-1
+def add(rows, item, count=1):
+    for r in range(len(rows)):
+        rows[r][col(r, item)] += count      # one counter per row goes up
+
+def estimate(rows, item):
+    # every row's counter is >= the true count; the least polluted is the smallest
+    return min(rows[r][col(r, item)] for r in range(len(rows)))</code></pre>
+
+<div class="check" id="check-min">
+  <p class="q">Why does the Count-Min Sketch take the <b>minimum</b> of the d counters, not the average?</p>
+  <div class="opts">
+    <button>The minimum is faster to compute</button>
+    <button data-correct>Every counter is the true count plus pollution, so the smallest is the least polluted</button>
+    <button>The average would undercount too often</button>
+  </div>
+  <div class="fb right"><p>Right. Each counter = true count + (other items that hashed there), and the pollution is never negative. So every counter is an upper bound, and the tightest upper bound is the smallest. The average would mix in the most polluted rows: one row sharing a column with a heavy hitter drags the average way up.</p></div>
+  <div class="fb wrong"><p>Write each counter as "true count + pollution". Pollution can't be negative (counts only go up), so every counter overestimates. Say the true count is 5 and the three counters read 5, 7 and 905 (one row collided with a heavy hitter). The average is 305, badly wrong. The minimum is 5. Both are equally fast to compute, and since no counter is ever below the truth, neither one undercounts; the minimum is the closest of several upper bounds.</p></div>
+</div>
+
+<h3>How wrong can it be?</h3>
+<p>This is where the Count-Min Sketch is different from what most people expect, so slow down here. Pick two numbers: an error size ε (epsilon, as a share of N) and a failure chance δ (delta). Then use</p>
+<ul>
+  <li>width w = ⌈e / ε⌉ (e ≈ 2.718), and</li>
+  <li>depth d = ⌈ln(1/δ)⌉.</li>
+</ul>
+<p>(The brackets ⌈ ⌉ mean "round up to a whole number": you can't have 2,718.3 columns.)</p>
+<p>The guarantee: every estimate is <b>at least</b> the true count, and <b>at most the true count + ε·N</b>, except with chance at most δ.</p>
+
+<p>Why those sizes? One row first. The rest of the stream spreads its N counts over w columns, so the expected pollution in this item's column is at most N/w = ε·N/e. Now a fact about averages: if the average pollution is ε·N/e, at most 1 in e of the possible columns can carry pollution of ε·N or more (otherwise those columns alone would push the average above ε·N/e). So one row fails with chance at most 1/e ≈ 37%. Rows use independent hashes, so all d rows fail together with chance at most (1/e)<sup>d</sup> = e<sup>−d</sup>, and d = ln(1/δ) makes that δ. Width buys a smaller error; depth buys confidence, and confidence is cheap because each extra row cuts the failure chance by e.</p>
+
+<p>The e is a choice, not a law. With w = 2/ε, each row fails at most half the time and you need log<sub>2</sub>(1/δ) rows; with w = 10/ε, at most 1 time in 10 and log<sub>10</sub>(1/δ) rows. Any base gives the same guarantee. Base e is the one that makes the total number of counters, w × d, smallest.</p>
+
+<p>Real numbers, for the story's N = 5 billion requests a day, with 4-byte counters. None of these sizes depends on how many distinct IPs there are, a million or a billion:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ε (error share)</th><th>δ (failure chance)</th><th>width w</th><th>depth d</th><th>counters</th><th>memory</th><th>overcount at most (N = 5 billion)</th></tr></thead>
+  <tbody>
+    <tr><td>0.1%</td><td>1%</td><td>2,719</td><td>5</td><td>13,595</td><td>54 KB</td><td>5,000,000</td></tr>
+    <tr><td>0.001%</td><td>1%</td><td>271,829</td><td>5</td><td>1,359,145</td><td>5.4 MB</td><td>50,000</td></tr>
+    <tr><td>0.001%</td><td>0.1%</td><td>271,829</td><td>7</td><td>1,902,803</td><td>7.6 MB</td><td>50,000</td></tr>
+  </tbody>
+</table></div>
+
+<p>The second row is the one from section 1: 5.4 MB, and each estimate is, with 99% confidence, at most 50,000 above the truth. The third row shows how cheap confidence is: ten times less likely to fail costs two more rows.</p>
+
+<h3>The catch: the error is a share of the total</h3>
+<p>Read that last number again: within <b>50,000</b>. For an IP that sent 3 million requests, that's under 2%, which is great. For an IP that sent 12 requests, the sketch might report anything from 12 to about 50,012. The error is ε times the <em>whole stream</em>, not ε times the item's own count. So a Count-Min Sketch is excellent at the heavy items (the "heavy hitters") and nearly useless for rare ones. That matches the operations question: nobody needs the exact count for an IP that sent 12 requests; they need the ones that sent millions.</p>
+
+<h3>Heavy hitters: the sketch plus a heap</h3>
+<p>The sketch answers "how many for this IP?", but not "which IPs are the biggest?", because it doesn't store any IPs. Pair it with the size-k min-heap from <a href="heaps.html">the heaps chapter</a>: for each request, add it to the sketch, read its new estimate, and if that beats the smallest of your current top k, it joins them. Memory: the sketch plus k entries, one pass over the stream.</p>
+
+<div class="keyidea"><p>A Count-Min Sketch is d rows of w counters with one hash per row. Add: increment one counter per row. Estimate: the minimum of the item's d counters. It never undercounts, and overcounts by at most ε·N with probability 1 − δ, using w = e/ε and d = ln(1/δ). The error is a share of the total N, so it's for heavy hitters, not rare items.</p></div>
+
+<div class="check" id="check-share">
+  <p class="q">A sketch with ε = 0.001% and δ = 1% has seen N = 5 billion requests today. An IP really sent 12. What might the sketch report?</p>
+  <div class="opts">
+    <button>12, give or take 0.001%</button>
+    <button data-correct>Anything from 12 up to about 50,012 (and, 1 time in 100, more)</button>
+    <button>Anything from 0 to about 50,012</button>
+  </div>
+  <div class="fb right"><p>Right. The bound is ε·N = 0.00001 × 5,000,000,000 = 50,000, added to the true count, never subtracted. For a heavy hitter that's a small error; for a 12-request IP it can be thousands of times the real value. That's why you use it to find the big ones.</p></div>
+  <div class="fb wrong"><p>Two separate facts. Direction: counters only go up, so every estimate is at least the true 12, never below. Size: the guarantee is "at most ε times the <em>total</em> stream", and the total is 5 billion: 0.00001 × 5,000,000,000 = 50,000. It isn't a percentage of this IP's own count. So the answer is somewhere in 12 to 50,012 with 99% confidence. Great for an IP that sent 3 million, useless for one that sent 12.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: variants, and where you'll meet it</summary>
+  <ul>
+    <li><b>Conservative update</b> (Estan and Varghese, 2002): on an add, only raise the counters that need it: each of the item's counters becomes max(counter, old estimate + count). The estimate never drops below the truth, and overcounting shrinks a lot on skewed streams. The price: the counters no longer handle decrements.</li>
+    <li><b>Count Sketch</b> (Charikar, Chen and Farach-Colton, 2002): each row also hashes the item to +1 or −1 and adds that sign times the count; the estimate is the median over rows of (sign × counter). Pollution then cancels out on average instead of piling up, so estimates can be too low as well as too high.</li>
+    <li><b>Heavy hitters with k counters:</b> Misra-Gries and Space-Saving keep about k (item, count) pairs, with no hashing, and are guaranteed to keep every item that makes up more than N/k of the stream (a second pass can confirm the exact counts). A good answer when the question is only "who are the top k?".</li>
+    <li><b>Where it ships:</b> the RedisBloom module has a Count-Min Sketch (<code>CMS.INCRBY</code>, <code>CMS.QUERY</code>), Apache Spark can build one from a column (<code>df.stat.countMinSketch</code>), and network gear uses the same idea to find heavy flows at line rate.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Counting distinct things: HyperLogLog</h2>
+
+<p>The product team's question is the strangest one: how many <em>different</em> visitors? Neither tool so far fits. A Count-Min Sketch counts occurrences, so a visitor who loads 40 pages counts 40 times. A Bloom filter could work (for each visitor, if the filter says "no", add 1 to a counter and add the visitor), but it still needs about 10 bits per distinct visitor, 360 MB a day, and it quietly misses the visitors who get a false "maybe". We want memory that doesn't grow with the count at all. That sounds impossible, so start from something that looks unrelated.</p>
+
+<h3>A coin-flipping game</h3>
+<div class="story">
+  <p>A friend spends the afternoon flipping a coin. Each round, she flips until she gets tails, and notes how many heads came first. At the end she tells you just one thing: "My best round started with 10 heads in a row." How many rounds did she play?</p>
+</div>
+<p>You can make a good guess. A round starts with at least 10 heads with chance (1/2)<sup>10</sup>, about 1 in 1,000. If she'd played 20 rounds, a streak of 10 would be a big surprise. If she'd played a million, she'd almost certainly have seen a longer one. So "a thousand or two" is the natural estimate. The longest streak tells you roughly how many tries there were, because <b>rare events need many tries</b>.</p>
+
+<h3>From coins to hashes</h3>
+<p>A good hash turns each item into bits that look like fair coin flips. So hash each visitor ID and look at the start of the hash: count the 0s before the first 1. Call ρ (rho) the <b>position of the first 1</b>: a hash starting <code>1…</code> has ρ = 1, <code>01…</code> has ρ = 2, <code>001…</code> has ρ = 3. A hash has ρ ≥ r with chance (1/2)<sup>r−1</sup>, just as a round of coin flips starts with r − 1 heads:</p>
+
+<pre class="diagram"><code>hash starts with      ρ (position of the first 1)    how many hashes start like this
+1…                    1                              1 in 2
+01…                   2                              1 in 4
+001…                  3                              1 in 8
+0000000001…           10                             1 in 1,024</code></pre>
+
+<p>Keep only the largest ρ you've seen. If it's r, guess on the order of 2<sup>r</sup> distinct items (a constant fixes the exact scale later).</p>
+
+<p>And here's why this counts <em>distinct</em> items: the same visitor always hashes to the same bits, so their 41st page view has exactly the ρ of their first. Repeats can't raise the maximum. Only new, different items get new chances at a long streak. A visitor who comes back a thousand times is one coin round, not a thousand.</p>
+
+<p>Memory: one small number. For a 64-bit hash, ρ is at most 65, so the maximum fits in one byte, whether you've seen a thousand visitors or a billion.</p>
+
+<h3>The flaw: one lucky item ruins it</h3>
+<p>A single maximum is a terrible estimator. Among 1,000 visitors, one might hash to 20 zeros in a row by luck (about a 1 in 1,000 chance), and the estimate jumps from about a thousand to about two million. It can also only answer powers of 2: 1,024 or 2,048, nothing in between. One measurement is just too noisy.</p>
+
+<h3>Fix 1: many registers</h3>
+<p>Ask many friends instead of one, and average. Use the first p bits of each hash to pick one of m = 2<sup>p</sup> <b>registers</b> (small counters), and use the remaining bits for ρ. Each register keeps the largest ρ it has seen for its share of the items. Every item goes to exactly one register, so each register watches about n/m items, and each gives its own noisy guess. Here's p = 2 (4 registers) with short 12-bit hashes, made up for the example:</p>
+
+<pre class="diagram"><code>item      hash            register   rest of the bits   ρ (first 1)   register after
+ana       10 0110101011   2          0110101011         2             M[2] = 2
+bo        01 0001110010   1          0001110010         4             M[1] = 4
+cy        10 1101000111   2          1101000111         1             M[2] = 2 (1 &lt; 2)
+dee       11 0000001101   3          0000001101         7             M[3] = 7
+ana       10 0110101011   2          0110101011         2             M[2] = 2 (repeat: no change)
+
+registers M = [0, 4, 2, 7]</code></pre>
+
+<h3>Fix 2: the right kind of average</h3>
+<p>Each register's guess is 2<sup>M[j]</sup>: a guess at how many items <em>it</em> saw, about n/m. Average those guesses, then multiply by m to get the whole count. The plain average has the same flaw as before: one lucky register dominates it. Take 4 registers whose guesses are 8, 8, 8 and 1,024 (the last one got lucky). The plain average is (8 + 8 + 8 + 1,024) / 4 = 262. The <b>harmonic mean</b> averages the <em>reciprocals</em> and flips back: 4 / (1/8 + 1/8 + 1/8 + 1/1,024) ≈ 10.6. The lucky register barely moved it, because 1/1,024 is tiny next to 1/8. The harmonic mean listens to the many ordinary registers and nearly ignores one huge outlier, which is exactly what this problem needs.</p>
+
+<p>That's <b>HyperLogLog</b> (Flajolet, Fusy, Gandouet and Meunier, 2007). Its estimate is m times the harmonic mean of the registers' guesses, times a correction constant:</p>
+<p style="text-align:center"><b>E = α<sub>m</sub> · m<sup>2</sup> / (2<sup>−M[1]</sup> + 2<sup>−M[2]</sup> + … + 2<sup>−M[m]</sup>)</b></p>
+<p>where α<sub>m</sub> ≈ 0.7213 for large m fixes a known, systematic overestimate (it's derived once in the paper; you look it up, you don't rederive it). The typical error, the <b>standard error</b>, is <b>1.04 / √m</b>:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>registers m</th><th>16</th><th>256</th><th>1,024</th><th>4,096</th><th>16,384</th><th>65,536</th></tr></thead>
+  <tbody>
+    <tr><td>standard error</td><td>26%</td><td>6.5%</td><td>3.3%</td><td>1.6%</td><td>0.81%</td><td>0.41%</td></tr>
+    <tr><td>memory at 6 bits per register</td><td>12 bytes</td><td>192 bytes</td><td>768 bytes</td><td>3 KB</td><td>12 KB</td><td>48 KB</td></tr>
+  </tbody>
+</table></div>
+
+<p>The m = 16,384 column is what Redis uses for its HyperLogLog type: 12 KB per key, 0.81% standard error, for anything from a handful of items to billions. (Standard error means about two thirds of estimates land within 0.81% of the truth, and nearly all within three times that.) Notice the square root: to halve the error you need 4 times the registers.</p>
+
+<h3>Fix 3: small counts</h3>
+<p>With 16,384 registers and only 100 visitors, most registers are still 0, and the formula above is badly off (it's built for registers that have all seen many items). For that case there's a simpler, better trick: count the empty registers. It's like estimating how hard it rained from how many paving stones are still dry. If V of the m registers are still 0, the estimate is <b>m · ln(m / V)</b>, called <b>linear counting</b>. HyperLogLog switches to it when its estimate is below 2.5m and some register is still empty.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <span class="small">items</span><input type="range" id="hl-n" min="1" max="6" step="0.05" value="4" style="width:130px"><b id="hl-n-v"></b>
+      <select id="hl-p"><option value="4">16 registers</option><option value="6">64 registers</option><option value="8" selected>256 registers</option><option value="10">1,024 registers</option></select>
+      <button class="btn" id="hl-seed">New hash</button>
+      <button class="btn" id="hl-many">20 runs</button>
+    </div>
+    <div id="hl-regs" style="display:flex;flex-wrap:wrap;gap:2px;margin-top:14px"></div>
+    <div class="viz-caption" id="hl-msg"></div>
+  </div>
+  <div class="cap">Real HyperLogLog runs on items 1 to n, in your browser. Each square is a register; brighter means a larger ρ. Compare the one-maximum estimate (2 to the largest ρ seen) with HyperLogLog. Press "New hash" a few times: the one-maximum guess jumps around by factors of 2 or more, while HyperLogLog stays close. "20 runs" tries 20 different hashes and shows the spread, next to 1.04/√m.</div>
+</div>
+
+<h3>Merging: the union for free</h3>
+<p>Back to "distinct visitors this month". Keep one HyperLogLog per day. To combine two days, take the <b>larger value in each register</b>. That's exactly the register a single sketch would have if it had seen both days' visitors, because each register is a maximum, and the maximum over the union is the larger of the two maxima. A visitor who came on both days hashes to the same register with the same ρ both times, so they're counted once. The merged sketch is still 12 KB. Thirty days merged: still 12 KB, still about 0.81%.</p>
+
+<div class="keyidea"><p>HyperLogLog hashes each item, uses the first p bits to pick one of m registers, and keeps the largest "position of the first 1" seen in each. Repeats can't change a maximum, so it counts distinct items. The harmonic mean of the registers, scaled, gives the estimate with standard error 1.04/√m: 12 KB for 0.81%. Merging is a register-wise max.</p></div>
+
+<details class="aside another">
+  <summary>Explain it another way: lottery tickets</summary>
+  <p>Every distinct visitor buys exactly one lottery ticket; showing up again doesn't get them a second one, because their ticket number is their hash. You don't record who bought tickets. You only remember the rarest ticket anyone has shown you. If the rarest ticket is a one-in-a-million kind, a lot of different people must have played. One rare ticket can be luck, so you split the players into 16,384 groups by the first digits of their ticket, remember the rarest ticket in each group, and combine the groups in a way that isn't fooled by one lucky group.</p>
+  <p>Where it breaks: real lotteries don't let you merge two days by taking the rarer ticket per group. Here you can, because "rarest so far" is a maximum, and maximums combine.</p>
+</details>
+
+<div class="check" id="check-dupes">
+  <p class="q">A single visitor reloads your homepage 1,000 times today. What does that do to the day's HyperLogLog count?</p>
+  <div class="opts">
+    <button>Raises it a little: each reload is another chance at a long run of zeros</button>
+    <button data-correct>Nothing after the first visit: every reload hashes to the same register and the same ρ</button>
+    <button>Raises it by about 1,000 × 0.81%</button>
+  </div>
+  <div class="fb right"><p>Right. The hash is a fixed function of the visitor ID, so all 1,000 reloads produce identical bits, the same register and the same ρ. The register already holds at least that ρ, so nothing changes. Only <em>different</em> items get new chances at a rare hash.</p></div>
+  <div class="fb wrong"><p>The coins here aren't flipped fresh each time. The "flips" are the bits of hash(visitor ID), and hashing the same ID always gives the same bits. So reload 2 through 1,000 land in the same register with the same ρ as the first visit, and max(register, same ρ) leaves it unchanged. It's as if your friend replayed the same round of coin flips from a recording: it can't produce a longer streak. That's exactly why HyperLogLog counts <em>distinct</em> items.</p></div>
+</div>
+
+<div class="check" id="check-registers">
+  <p class="q">Your HyperLogLog has 1,024 registers (3.3% error). You want 1.6% error. What do you need?</p>
+  <div class="opts">
+    <button>2,048 registers: twice the registers, half the error</button>
+    <button data-correct>4,096 registers: the error shrinks with the square root of m</button>
+    <button>1,024 registers with 12 bits each instead of 6</button>
+  </div>
+  <div class="fb right"><p>Right. Error = 1.04/√m. Halving it means doubling √m, which means 4× the registers: 1.04/√4,096 = 1.6%, in 3 KB. Wider registers don't help; 6 bits already hold any possible ρ.</p></div>
+  <div class="fb wrong"><p>Averaging m independent noisy guesses shrinks the noise by √m, not by m, the same reason polling 4 times as many people halves a poll's margin of error. So halving 3.3% means 4 times the registers: 1.04 / √4,096 = 1.04 / 64 = 1.6%. Twice the registers only gets you to 1.04 / √2,048 ≈ 2.3%. And making registers wider changes nothing: 6 bits already hold every value ρ can take for a 64-bit hash.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: where HyperLogLog came from, and where it lives</summary>
+  <ul>
+    <li><b>History:</b> Flajolet and Martin used the first-1 trick back in 1985. LogLog (Durand and Flajolet, 2003) averaged the registers' exponents, a geometric mean, and got a standard error of about 1.30/√m. HyperLogLog's harmonic mean brought it to 1.04/√m: the same memory, about 20% less error.</li>
+    <li><b>HyperLogLog++</b> (Heule, Nunkesser and Hall at Google, 2013) uses a 64-bit hash, corrects the leftover bias in the range between linear counting and the main formula with measured tables, and stores small sketches sparsely (a short list of (register, ρ) pairs) until they grow. Google's BigQuery uses it for <code>APPROX_COUNT_DISTINCT</code> and its <code>HLL_COUNT</code> functions.</li>
+    <li><b>Redis</b> has it built in: <code>PFADD</code>, <code>PFCOUNT</code>, <code>PFMERGE</code> (the PF honors Philippe Flajolet). It starts with a sparse encoding and switches to the 12 KB dense one as the count grows.</li>
+    <li><b>Intersections are hard.</b> "Visitors on both Monday and Tuesday" by inclusion-exclusion, |A| + |B| − |A ∪ B|, subtracts large noisy numbers and can leave mostly noise when the overlap is small. Sketches designed for set operations (MinHash, or the theta sketches in Apache DataSketches) do better.</li>
+    <li><b>Why not just sample?</b> Sampling 1% of requests estimates heavy hitters well, but distinct counts from a sample are notoriously unreliable: you can't tell from a sample whether the unseen 99% holds mostly new visitors or the same ones again. HyperLogLog sees every item and keeps almost nothing of each.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Putting them to work: merging, hashing, choosing</h2>
+
+<h3>Sketches merge</h3>
+<p>Your site runs on 50 servers. Each sees part of the traffic. An exact answer would ship every server's full set or map to one place: gigabytes over the network. Each of these structures instead merges with one cheap operation, as long as both sides use the same size and the same hash functions:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>structure</th><th>merge two of them</th><th>why it's exact</th></tr></thead>
+  <tbody>
+    <tr><td>Bloom filter</td><td>bitwise OR</td><td>a bit is on in the union if either set turned it on</td></tr>
+    <tr><td>Count-Min Sketch</td><td>add the counters</td><td>each counter is a sum, and sums add</td></tr>
+    <tr><td>HyperLogLog</td><td>register-wise max</td><td>each register is a maximum, and the max of the union is the larger max</td></tr>
+  </tbody>
+</table></div>
+
+<p>"Exact" here means the merged structure is identical to the one you'd get by feeding one structure both streams. Nothing extra is lost in the merge. That's why these sketches show up in distributed systems: each server keeps kilobytes, ships kilobytes, and a central job merges them in any order, in any grouping, as often as it likes. Days merge into weeks, servers into regions.</p>
+
+<h3>Everything rests on the hash</h3>
+<p>All three structures assume the hash turns items into bits that look random and independent. Three practical consequences:</p>
+<ul>
+  <li><b>You don't need k separate hash functions.</b> Compute two hash values h<sub>1</sub> and h<sub>2</sub> once (for example, two halves of one 128-bit digest) and use position<sub>i</sub> = (h<sub>1</sub> + i · h<sub>2</sub>) mod m for i = 0 … k − 1. Kirsch and Mitzenmacher showed in 2006 that this "double hashing" gives essentially the same false positive rate as k independent hashes, for one hash computation per item.</li>
+  <li><b>The hash must be the same everywhere and forever.</b> Python's built-in <code>hash()</code> of a string changes every time Python starts (it's salted with a random per-process secret, unless you pin it with <code>PYTHONHASHSEED</code>). Use it in a filter you save to disk, or merge with another server's, and the bits mean nothing. Use a fixed function from <code>hashlib</code>, such as BLAKE2 or SHA-256, or a fast non-cryptographic hash like MurmurHash or xxHash with a fixed seed.</li>
+  <li><b>An attacker who knows your hash can aim it.</b> They can generate items that all land on the same bits or counters: a polluted Bloom filter says "maybe" to everything, a Count-Min Sketch's counts for a victim can be pushed up. It's the hash flooding attack from <a href="hash-maps.html">the hash maps chapter</a>, and the fix is the same: a keyed hash with a secret seed, shared only by your own servers.</li>
+</ul>
+
+<h3>Which one, and when none of them</h3>
+<p>All three are fast as well as small: an add touches k bits, d counters or one register, however much data came before. Only HyperLogLog's count reads all m of its registers.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>answers</th><th>error</th><th>memory</th><th>merge</th><th>delete?</th></tr></thead>
+  <tbody>
+    <tr><td><b>Bloom filter</b></td><td>"have I seen x?"</td><td>false positives only, rate p</td><td>1.44 · log<sub>2</sub>(1/p) bits per item (9.6 for 1%)</td><td>OR</td><td>no (counting variant: yes, at 4× memory)</td></tr>
+    <tr><td><b>Count-Min Sketch</b></td><td>"how many times x?"</td><td>overcounts only, by at most ε·N with probability 1 − δ</td><td>(e/ε) · ln(1/δ) counters, whatever the number of items</td><td>add</td><td>decrements work if every count stays ≥ 0</td></tr>
+    <tr><td><b>HyperLogLog</b></td><td>"how many distinct?"</td><td>either way, standard error 1.04/√m</td><td>m registers of 6 bits (12 KB for 0.81%)</td><td>max</td><td>no</td></tr>
+    <tr><td><b>Exact set or map</b></td><td>all of the above</td><td>none</td><td>grows with the number of distinct items</td><td>union, sum</td><td>yes</td></tr>
+  </tbody>
+</table></div>
+
+<p>Reach for an exact structure first, and only move to a sketch when the numbers force you. A dict of 1 million IDs fits on a laptop, so don't sketch it. And don't use a sketch where a wrong answer has no safety net: a Bloom filter can't decide alone whether a payment was already processed, because a false "seen it" drops a real payment. It can sit <em>in front of</em> the exact check, answering the certain "no"s fast and sending each "maybe" to the database.</p>
+
+<div class="keyidea"><p>Same-sized sketches with the same hashes merge exactly: OR for Bloom, + for Count-Min, max for HyperLogLog. Use a fixed, ideally keyed, hash (never Python's per-process <code>hash()</code>), and two hash values are enough for any k. Use exact structures when they fit, and sketches only where a bounded error is acceptable or something exact checks the "maybe"s.</p></div>
+
+<div class="check" id="check-merge">
+  <p class="q">Each of your 50 web servers keeps a HyperLogLog of today's visitors. How do you get the site-wide distinct count?</p>
+  <div class="opts">
+    <button>Add up the 50 counts</button>
+    <button data-correct>Take the register-wise max of all 50 sketches, then count that</button>
+    <button>Average the 50 counts and multiply by 50</button>
+  </div>
+  <div class="fb right"><p>Right. A visitor who hit 3 servers is in 3 sketches, but hashes to the same register with the same ρ in each, so the max counts them once. The merged sketch is identical to one sketch that saw all the traffic, still 12 KB.</p></div>
+  <div class="fb wrong"><p>Picture one visitor whose requests were load-balanced across 3 servers. Adding counts (or averaging and multiplying, which is the same thing) counts them 3 times. That's the same mistake as adding daily counts to get a monthly one. In the HyperLogLog world, that visitor's hash put the same ρ into the same register on all 3 servers, so taking the larger value per register keeps it once. Max the registers, then count.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>What to say in the interview</h2>
+
+<p>When a design question has data that's too big to remember, a strong answer sounds like this:</p>
+<ol>
+  <li><b>Name the question type:</b> "This is a membership question" (Bloom filter), "a frequency question" (Count-Min Sketch), or "a distinct count" (HyperLogLog).</li>
+  <li><b>Do the exact math first:</b> "300 million IDs × 8 bytes is 2.4 GB a day. If one machine can hold that, a set is simpler and exact."</li>
+  <li><b>If it doesn't fit, name the sketch, its error and its direction:</b> "A Bloom filter at 1% costs about 10 bits per item, 1.2 GB for a billion, and it never gives a false 'no'."</li>
+  <li><b>Say what happens on an error:</b> "A false positive costs one extra database read" or "the dashboard is off by under 1%, which product said is fine".</li>
+  <li><b>Cover distribution:</b> "Each server keeps its own sketch with the same hash seed; we merge them with OR / add / max, every minute, and merge minutes into days."</li>
+</ol>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"How do you delete from a Bloom filter?"</b> You don't: counting Bloom filter (4× memory), cuckoo filter, or periodic rebuild. Explain why clearing bits causes false negatives.</li>
+    <li><b>"What if you don't know n in advance?"</b> Size for the worst case, or a scalable Bloom filter: a chain of filters, each larger and with a tighter rate, checking all of them.</li>
+    <li><b>"Top 100 trending hashtags this hour?"</b> A Count-Min Sketch plus a min-heap of size 100, one pass; or Space-Saving with a few thousand counters. Then: per-minute sketches merged over a sliding hour.</li>
+    <li><b>"Distinct users in the last 7 days, updated daily?"</b> One HyperLogLog per day, merge the last 7. Per-day sketches never change after midnight, so the weekly number is a merge of 7 small blobs.</li>
+    <li><b>"How do databases use Bloom filters?"</b> An LSM tree keeps one per on-disk file so point lookups skip files that can't hold the key (topic 01.13).</li>
+    <li><b>"Can you intersect HyperLogLogs?"</b> Only roughly, by inclusion-exclusion, which is poor when the overlap is small. Mention MinHash or theta sketches.</li>
+    <li><b>"Why not just sample the traffic?"</b> Fine for heavy hitters, bad for distinct counts, and useless for membership.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Exact answers remember every distinct item, so their memory grows with the data. Probabilistic structures keep a fixed-size summary and accept a small error with a known direction and size.</li>
+  <li>Bloom filter: set k hashed bits per item; any 0 means "definitely not", all 1s mean "maybe". No false negatives.</li>
+  <li>Size it with m/n = 1.44 · log<sub>2</sub>(1/p) bits per item and k = 0.69 · m/n hashes: 9.6 bits and 7 hashes for 1%, +4.8 bits per further 10×. About half the bits end up on. Item size doesn't matter.</li>
+  <li>Bloom filters can't delete (shared bits), degrade when overfilled, and can't list their items. Use them as a fast, certain "no" in front of an exact check.</li>
+  <li>Count-Min Sketch: d rows of w counters, add to one per row, estimate with the minimum. Never under; over by at most ε·N with probability 1 − δ, with w = e/ε and d = ln(1/δ). The error is a share of the total, so it finds heavy hitters.</li>
+  <li>HyperLogLog: hash, pick a register with the first p bits, keep the largest position of the first 1. Repeats can't change a maximum, so it counts distinct items. Harmonic mean, error 1.04/√m: 12 KB for 0.81%. Linear counting for small counts.</li>
+  <li>They merge exactly: OR, add, max. Use a fixed hash shared by every machine (never Python's <code>hash()</code>), and double hashing for k positions.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do them in order. Warm-ups are pen and paper: commit to an answer before you open it. The core exercises are code in <code>exercises/</code>. Their tests <b>measure the resources these structures exist to save</b>: memory (with <code>tracemalloc</code>) and measured error rates on seeded data, so a solution that stores the items, or uses one hash where it needs several, fails even when its answers look right.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Run them by hand</h4>
+  <p>(a) A Bloom filter has 10 bits and k = 2. "a" hashes to bits 1 and 4, "b" to 4 and 7, "c" to 2 and 9. Add all three. Then check "d" (bits 1 and 7) and "e" (bits 3 and 4). Then "remove b" by clearing its bits, and check "a" again.</p>
+  <p>(b) A Count-Min Sketch has 2 rows of 4 counters. "x" maps to column 0 in row 0 and column 2 in row 1; "y" to columns 1 and 2; "z" to columns 0 and 3. Feed it x, y, x, z, x. Estimate x, y and z, and say which estimates are wrong.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Bits on: 1, 2, 4, 7, 9. "d": bits 1 and 7 are both on, so "maybe", a false positive ("d" was never added; "a" set bit 1 and "b" set bit 7). "e": bit 3 is off, so definitely not. Clearing "b" turns off bits 4 and 7. Now "a" has bit 4 off, so the filter says "a" was never added: a false negative, the reason Bloom filters don't delete.</p>
+    <p>(b) Row 0: column 0 gets x three times and z once, so 4; column 1 gets y, so 1. Row 1: column 2 gets x three times and y once, so 4; column 3 gets z, so 1. x = min(4, 4) = 4, true 3: overcounted in both rows. y = min(1, 4) = 1, exact. z = min(4, 1) = 1, exact. Only x is wrong, and only upward.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Size them</h4>
+  <p>(a) A Bloom filter for 200 million usernames at a 0.1% false positive rate: how many bits, megabytes and hash functions? (b) A Count-Min Sketch with ε = 0.01% and δ = 0.1%: width, depth, and memory with 4-byte counters. (c) The smallest HyperLogLog (a power-of-2 number of registers) with a standard error of at most 2%, and its memory at 6 bits per register.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) 14.4 bits per item × 200 million = 2.88 billion bits = about 360 MB, with 10 hashes. (The usernames themselves, at 12 bytes each, would be 2.4 GB before any overhead.) (b) w = ⌈2.718 / 0.0001⌉ = 27,183; d = ⌈ln 1,000⌉ = ⌈6.9⌉ = 7; 190,281 counters × 4 bytes = about 760 KB. (c) 1.04/√m ≤ 0.02 needs √m ≥ 52, so m ≥ 2,704; the next power of 2 is 4,096 (p = 12), with 1.6% error, in 3 KB.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Pick the tool, or refuse to</h4>
+  <p>For each, name the structure (or an exact one), and say what a mistake costs: (a) a web crawler must not fetch the same URL twice, across 5 billion URLs; (b) distinct search queries per country per day, for 200 countries, with weekly totals; (c) the 100 most-used hashtags in the last hour; (d) a bank must never process the same transaction ID twice; (e) a feed must not show a user an article they've already read, for 100 million users.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Bloom filter: a false positive means one page is never crawled, which is acceptable; about 6 GB at 1%. (b) One HyperLogLog per (country, day): 200 × 7 sketches a week; weekly totals by register-wise max. Error about 0.8%. (c) Count-Min Sketch plus a min-heap of size 100 (or Space-Saving), per minute, merged over the hour. (d) Exact: a unique constraint in the database. A Bloom filter may sit in front to answer "definitely new" fast, but every "maybe" must hit the exact store, because a false positive would drop a real payment. (e) A small Bloom filter per user (a few hundred bytes for a few hundred articles at 1%): a false positive hides one unread article, which is fine.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>BloomFilter</code></h4>
+  <p>In <code>exercises/bloom_filter.py</code>: sized from a capacity and an error rate with section 4's formulas, bits packed 8 per byte, <code>add</code>, <code>in</code>, <code>union</code> and <code>to_bytes</code>, hashed with <code>hashlib</code> and double hashing. The tests check there are no false negatives, measure the false positive rate on 50,000 to 100,000 never-added strings (it must stay under 1.5× the target; one hash function gives about 10%), cap peak memory while adding 100,000 items at 400 KB (storing the items, or one Python object per bit, takes several MB), check that 200 adds and 400 lookups on a 1.2 MB filter allocate almost nothing (each should touch k bits, not copy the array, as a Python int used as a bitset does), and run your code in two Python processes with different <code>PYTHONHASHSEED</code>s to check the bits match.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>CountMinSketch</code> and <code>heavy_hitters</code></h4>
+  <p>In <code>exercises/count_min_sketch.py</code>: the sketch from section 6 with <code>add</code>, <code>estimate</code>, <code>merge</code> and exact sizing, then <code>heavy_hitters(stream, k)</code> in one pass with a sketch and about k candidates. The tests check that estimates never undercount (averaging the rows fails), that at most 1% of items on a skewed stream are over by more than ε·N (one row of the same width misses on about 4%), that adding 100,000 distinct items peaks under 1 MB, that merging equals one sketch fed both streams, and that the heavy hitters come out right from a 185,000-item generator, including one whose copies all arrive at the very end.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>HyperLogLog</code></h4>
+  <p>In <code>exercises/hyperloglog.py</code>: registers in a <code>bytearray</code>, a 64-bit <code>hashlib</code> hash, ρ, the harmonic-mean estimate with α, linear counting for small counts, and <code>merge</code>. The tests check exact answers on tiny inputs, accuracy within 4 standard errors from 20,000 to 200,000 distinct items at three register counts (one maximum, or the plain average, is far off; skipping linear counting is off by thousands on small inputs), that duplicates change nothing, that memory stays under 300 KB while adding 200,000 items, and that a merge equals one sketch fed both streams.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>7. Unique viewers for every video</h4>
+  <p>A video site has 10 million videos and wants "unique viewers" for any video over any date range. A dense 12 KB HyperLogLog per video per day is 120 GB a day. Where does that go wrong, and what would you change? Think about: most videos get a handful of viewers (sparse sketches, or exact sets below a threshold), fewer registers for small videos (and why that makes merging harder: two sketches with different m can only merge after folding the larger one down), and how a date-range query merges days.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure</div>
+  <h4>8. Check the formulas against reality</h4>
+  <p>Using your own <code>BloomFilter</code> with k forced to each value from 1 to 15 at 10 bits per item, measure the false positive rate on 100,000 never-added strings and plot it next to (1 − e<sup>−k/10</sup>)<sup>k</sup>. Then, with your <code>HyperLogLog</code> at p = 10, count 100,000 items under 200 different string prefixes and compare the spread of the errors with 1.04/√1,024. Where do measurement and formula disagree, and why?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>9. Say it out loud</h4>
+  <p>Set a 3-minute timer and answer: "Count unique visitors per day and per month for a site with 300 million visitors a day, served by 1,000 servers." Did you do the exact memory math first, explain why counts can't be added across servers or days, name HyperLogLog with its error and memory, describe merging with max, and mention using the same hash everywhere?</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k "bloom_filter or count_min_sketch or hyperloglog"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="skip-lists.html"><small>← Previous</small>Express lanes for a linked list</a>
+  <a class="next" href="storage-structures.html"><small>Next →</small>Built for the disk</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  // A small, fixed string hash (FNV-1a, then MurmurHash3's finalizer to mix the bits).
+  const fmix = (h) => { h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return h >>> 0; };
+  const hstr = (s, seed) => { let h = (0x811c9dc5 ^ Math.imul(seed, 0x9e3779b1)) >>> 0; for (const ch of s) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193); } return fmix(h); };
+  const pct = (x) => (x >= 0.1 ? (100 * x).toFixed(0) : x >= 0.01 ? (100 * x).toFixed(1) : x >= 0.001 ? (100 * x).toFixed(2) : (100 * x).toFixed(3)) + "%";
+
+  // ---------- Bloom filter stepper (section 3) ----------
+  (function () {
+    const M = 16, K = 3;
+    const pos = (w) => { const a = hstr(w, 1), b = (hstr(w, 2) | 1) >>> 0; return Array.from({ length: K }, (_, i) => (a + i * b) % M); };
+    const bits = Array(M).fill(0), owner = Array(M).fill(null), added = [], fr = [];
+    const snap = (msg, mark = {}, ptrs = {}) => fr.push({ bits: bits.slice(), mark, ptrs, added: added.slice(), msg });
+    const tag = (ps) => Object.fromEntries(ps.map((p, i) => [p, "h" + (i + 1)]));
+    snap("An empty Bloom filter: 16 bits, all 0, and 3 hash functions.");
+    for (const w of ["emu", "hen", "ram"]) {
+      const ps = pos(w), shared = ps.filter((p) => bits[p]);
+      ps.forEach((p) => { if (!bits[p]) owner[p] = w; bits[p] = 1; });
+      added.push(w);
+      snap(`add <b>${w}</b>: its 3 hashes pick bits ${ps.join(", ")}. Turn all three on.` +
+        (shared.length ? ` Bit ${shared.join(", ")} was already on (set by ${shared.map((p) => owner[p]).join(", ")}): items share bits.` : ""),
+        Object.fromEntries(ps.map((p) => [p, "hl"])), tag(ps));
+    }
+    const on = bits.reduce((a, b) => a + b, 0);
+    for (const w of ["hen", "cat", "rat"]) {
+      const ps = pos(w), zero = ps.find((p) => !bits[p]);
+      const mark = Object.fromEntries(ps.map((p) => [p, bits[p] ? "cmp" : "bad"]));
+      let msg;
+      if (zero !== undefined) msg = `check <b>${w}</b>: bits ${ps.join(", ")}. Bit ${zero} is <b>0</b>, so ${w} was <b>definitely never added</b>. One 0 is proof, however many 1s there are.`;
+      else if (added.includes(w)) msg = `check <b>${w}</b>: bits ${ps.join(", ")} are all 1, so the answer is <b>maybe</b>. Here it's right: ${w} was added.`;
+      else msg = `check <b>${w}</b>: bits ${ps.join(", ")} are all 1, so the answer is <b>maybe</b>. But ${w} was never added: a <b>false positive</b>. Its bits were set by ${[...new Set(ps.map((p) => owner[p]))].join(", ")}.`;
+      snap(msg, mark, tag(ps));
+    }
+    snap(`${on} of 16 bits are on. A word that was never added has 3 bits that land more or less at random, so it fools the filter with chance about (${on}/16)³ ≈ ${pct(Math.pow(on / 16, 3))}. More bits per item, or a better k, pushes that down (section 4).`,
+      Object.fromEntries(bits.map((b, i) => [i, b ? "done" : ""])));
+    V.player($("bloom-player"), {
+      frames: fr, speed: 1300,
+      draw(f, stage) {
+        stage.append(V.el("div", { class: "small muted", style: "margin-bottom:6px" }, "added so far: " + (f.added.length ? f.added.join(", ") : "nothing")),
+          V.cells(f.bits, { cls: (i) => f.mark[i] || (f.bits[i] ? "done" : ""), ptrs: f.ptrs }));
+      },
+    });
+  })();
+
+  // ---------- Bloom filter sizing playground (section 4) ----------
+  (function () {
+    const n = 1000, probes = 20000, KMAX = 15;
+    const formula = (b, k) => Math.pow(1 - Math.exp(-k / b), k);
+    const h1 = (i) => fmix((Math.imul(i + 1, 0x9e3779b1) ^ 0x3c6ef372) >>> 0);
+    const h2 = (i) => (fmix((Math.imul(i + 1, 0x85ebca6b) ^ 0xa54ff53a) >>> 0) | 1) >>> 0;
+    function measure(b, k) {
+      const m = Math.max(1, Math.round(b * n)), bits = new Uint8Array(m);
+      for (let i = 0; i < n; i++) { const a = h1(i), c = h2(i); for (let j = 0; j < k; j++) bits[(a + j * c) % m] = 1; }
+      let hits = 0;
+      for (let i = n; i < n + probes; i++) { const a = h1(i), c = h2(i); let all = true; for (let j = 0; j < k && all; j++) all = bits[(a + j * c) % m] === 1; if (all) hits++; }
+      let set = 0; for (const x of bits) set += x;
+      return { hits, rate: hits / probes, on: set / m };
+    }
+    const bestK = (b) => { let kb = 1; for (let k = 2; k <= KMAX; k++) if (formula(b, k) < formula(b, kb)) kb = k; return kb; };
+    $("bs-ticks").replaceChildren(...Array.from({ length: KMAX }, (_, i) => V.el("span", { style: "flex:1;text-align:center" }, String(i + 1))));
+    function show() {
+      const b = Number($("bs-bpi").value), k = Number($("bs-k").value), kb = bestK(b);
+      $("bs-bpi-v").textContent = b; $("bs-k-v").textContent = k;
+      const fps = Array.from({ length: KMAX }, (_, i) => formula(b, i + 1));
+      const lo = Math.log(Math.min(...fps)), hi = Math.log(Math.max(...fps));
+      $("bs-bars").replaceChildren(...fps.map((p, i) => V.el("div", {
+        class: i + 1 === kb ? "done" : i + 1 === k ? "hl" : "",
+        title: `k = ${i + 1}: ${pct(p)}`,
+        style: `height:${(12 + 88 * (hi > lo ? (Math.log(p) - lo) / (hi - lo) : 1)).toFixed(1)}%`,
+      })));
+      const r = measure(b, k);
+      $("bs-msg").innerHTML = `<b>${b}</b> bits per item, k = <b>${k}</b>: the formula says <b>${pct(formula(b, k))}</b>. ` +
+        `Measured: ${r.hits.toLocaleString()} false "maybe"s in ${probes.toLocaleString()} never-added items = <b>${pct(r.rate)}</b>, with ${pct(r.on)} of the bits on. ` +
+        (k === kb ? `This is the best k for ${b} bits per item.` : `The best k here is ${kb} (${pct(formula(b, kb))}), which leaves about half the bits on.`) +
+        " Bars use a log scale.";
+    }
+    $("bs-bpi").oninput = show; $("bs-k").oninput = show;
+    $("bs-best").onclick = () => { $("bs-k").value = bestK(Number($("bs-bpi").value)); show(); };
+    show();
+  })();
+
+  // ---------- Count-Min Sketch stepper (section 6) ----------
+  (function () {
+    const W = 8, D = 3;
+    const col = (s, r) => hstr(s, 10 + r) % W;
+    const stream = ["ana", "bo", "cy", "ana", "dee", "ana", "lu", "bo", "oz", "ana"];
+    const rows = Array.from({ length: D }, () => Array(W).fill(0)), truth = {}, fr = [];
+    const snap = (msg, mark = {}, at = -1, done = false) => fr.push({ rows: rows.map((r) => r.slice()), mark, at, done, msg });
+    snap("A Count-Min Sketch: 3 rows of 8 counters, all 0. Each row has its own hash, so a name gets a different column in each row.");
+    stream.forEach((x, t) => {
+      const cs = [0, 1, 2].map((r) => col(x, r));
+      cs.forEach((c, r) => rows[r][c]++);
+      truth[x] = (truth[x] || 0) + 1;
+      snap(`<b>${x}</b>: row 0 → column ${cs[0]}, row 1 → column ${cs[1]}, row 2 → column ${cs[2]}. Add 1 to each of those 3 counters.`,
+        Object.fromEntries(cs.map((c, r) => [r + ":" + c, "hl"])), t);
+    });
+    const names = [...new Set(stream)];
+    for (const q of ["ana", "bo", "oz", "hal"]) {
+      const cs = [0, 1, 2].map((r) => col(q, r)), vals = cs.map((c, r) => rows[r][c]);
+      const est = Math.min(...vals), t = truth[q] || 0, rmin = vals.indexOf(est);
+      const mark = Object.fromEntries(cs.map((c, r) => [r + ":" + c, r === rmin ? "done" : "cmp"]));
+      const sharers = (r) => names.filter((y) => y !== q && col(y, r) === cs[r]);
+      const polluted = [0, 1, 2].filter((r) => vals[r] > t);
+      let msg = `estimate <b>${q}</b>: its counters read ${vals.join(", ")}, so the estimate is the minimum, <b>${est}</b>. True count: ${t}.`;
+      if (t === 0) msg += ` ${q} never appeared, but every one of its counters is shared (row ${rmin} with ${sharers(rmin).join(", ")}), so even the minimum is above 0.`;
+      else if (est > t) msg += ` Every row is shared (row ${rmin} with ${sharers(rmin).join(", ")}), so even the minimum is too high. An overestimate, never an underestimate.`;
+      else if (polluted.length) msg += ` ${polluted.map((r, i) => `${i ? "row" : "Row"} ${r} shares a column with ${sharers(r).join(", ")}`).join("; ")}, so ${polluted.length > 1 ? "those rows are" : "that row is"} polluted. Row ${rmin} isn't, and the minimum picks it.`;
+      snap(msg, mark, -1, true);
+    }
+    V.player($("cms-player"), {
+      frames: fr, speed: 1100,
+      draw(f, stage) {
+        stage.append(V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "stream"),
+          V.cells(stream, { idx: false, cls: (i) => (i === f.at ? "hl" : f.done || i < f.at ? "dim" : "") }));
+        f.rows.forEach((row, r) => stage.append(V.el("div", { style: "display:flex;align-items:center;gap:10px;margin-top:4px" },
+          V.el("span", { class: "small muted", style: "width:44px;flex:none" }, "row " + r),
+          V.cells(row, { cls: (c) => f.mark[r + ":" + c] || "" }))));
+      },
+    });
+  })();
+
+  // ---------- HyperLogLog playground (section 7) ----------
+  (function () {
+    let seed = 1;
+    const hashOf = (i, s) => fmix(((Math.imul(i, 0x9e3779b1) ^ s) >>> 0) ^ fmix(s + i));
+    function run(n, p, s) {
+      const m = 1 << p, reg = new Uint8Array(m), salt = Math.imul(s, 7919);
+      let best = 0;
+      for (let i = 0; i < n; i++) {
+        const h = hashOf(i, salt), j = h >>> (32 - p), rest = (h << p) >>> 0;
+        const rho = rest === 0 ? 33 - p : Math.clz32(rest) + 1;
+        if (rho > reg[j]) reg[j] = rho;
+        const r1 = h === 0 ? 33 : Math.clz32(h) + 1;
+        if (r1 > best) best = r1;
+      }
+      const alpha = m === 16 ? 0.673 : m === 32 ? 0.697 : m === 64 ? 0.709 : 0.7213 / (1 + 1.079 / m);
+      let sum = 0, zeros = 0;
+      for (const r of reg) { sum += Math.pow(2, -r); if (!r) zeros++; }
+      const raw = alpha * m * m / sum, lc = raw <= 2.5 * m && zeros > 0;
+      return { reg, est: Math.round(lc ? m * Math.log(m / zeros) : raw), lc, best, one: Math.pow(2, best) };
+    }
+    const nOf = () => Math.round(Math.pow(10, Number($("hl-n").value)));
+    const off = (e, n) => (e >= n ? "+" : "−") + (Math.abs(e - n) / n * 100).toFixed(1) + "%";
+    function show(extra) {
+      const n = nOf(), p = Number($("hl-p").value), m = 1 << p, r = run(n, p, seed);
+      $("hl-n-v").textContent = n.toLocaleString();
+      const top = Math.max(1, ...r.reg), big = m <= 64;
+      $("hl-regs").replaceChildren(...Array.from(r.reg, (v) => V.el("div", {
+        title: "ρ = " + v,
+        style: `width:${big ? 26 : 9}px;height:${big ? 26 : 9}px;border-radius:${big ? 5 : 2}px;display:grid;place-items:center;font:600 0.66rem var(--mono);color:var(--text-strong);border:1px solid var(--border);background:color-mix(in srgb, var(--accent) ${Math.round(60 * v / top)}%, var(--surface))`,
+      }, big ? String(v) : "")));
+      $("hl-msg").innerHTML = `${n.toLocaleString()} distinct items, ${m.toLocaleString()} registers (${m * 6 / 8} bytes at 6 bits each). ` +
+        `HyperLogLog: <b>${r.est.toLocaleString()}</b> (${off(r.est, n)}${r.lc ? ", by linear counting: some registers are still 0" : ""}). ` +
+        `One maximum: the largest ρ is ${r.best}, so 2<sup>${r.best}</sup> = <b>${r.one.toLocaleString()}</b> (${off(r.one, n)}). ` +
+        `Expected HyperLogLog error: about ${(104 / Math.sqrt(m)).toFixed(1)}%.` + (extra || "");
+    }
+    $("hl-n").oninput = () => show(); $("hl-p").onchange = () => show();
+    $("hl-seed").onclick = () => { seed++; show(); };
+    $("hl-many").onclick = () => {
+      const n = nOf(), p = Number($("hl-p").value), m = 1 << p, e = [], o = [];
+      for (let s = 0; s < 20; s++) { const r = run(n, p, seed + 100 + s); e.push((r.est - n) / n); o.push(r.one / n); }
+      seed++;
+      const f = (x) => (x >= 0 ? "+" : "−") + Math.abs(100 * x).toFixed(1) + "%";
+      const rms = Math.sqrt(e.reduce((a, x) => a + x * x, 0) / e.length);
+      show(`<br>Over 20 different hashes: HyperLogLog's errors ran from <b>${f(Math.min(...e))}</b> to <b>${f(Math.max(...e))}</b> (typical size ${(100 * rms).toFixed(1)}%, against 1.04/√${m} = ${(104 / Math.sqrt(m)).toFixed(1)}%). One maximum ranged from <b>${Math.min(...o).toFixed(2)}×</b> to <b>${Math.max(...o).toFixed(2)}×</b> the truth.`);
+    };
+    show();
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="01.14">
+  <title>Many threads, one structure (Concurrent structures)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 1 · Part 14</div>
+  <h1>Many threads, one structure</h1>
+  <div class="meta"><span><span class="badge P2">P2</span> Concurrent structures: lock-free queue, ring buffer, concurrent hash map</span><span>about 65 minutes</span><span>10 quick checks · 9 exercises</span></div>
+</header>
+
+<p>Every structure in this chapter's earlier parts assumed one worker at a time. Real servers run dozens of threads that touch the same queue, the same map, the same counter. Done naively, updates quietly vanish. Done with one big lock, the dozens of threads take turns and you've paid for cores you can't use. This chapter starts from a counter that can't count and rebuilds, one fix at a time, the three shared structures interviewers ask about: the lock-free ring buffer, the lock-free queue and the concurrent hash map.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain why <code>x += 1</code> loses updates when two threads run it, by listing the interleavings.</li>
+    <li>Say what a lock buys you and what it costs, with Amdahl's law and the cache line as the reasons.</li>
+    <li>Build a single-producer single-consumer ring buffer with no lock, and explain why it needs "write the item, then publish".</li>
+    <li>Explain compare-and-swap, the retry loop, and the difference between blocking, lock-free and wait-free.</li>
+    <li>Walk through the Michael-Scott lock-free queue, including why threads help each other, and name the ABA problem.</li>
+    <li>Design a concurrent hash map with lock striping, take two locks without deadlock, and say what striping can't fix.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: go top to bottom. Answer each quick check before reading on; a wrong answer gets the idea explained a different way. Grey "Go deeper" boxes are optional on a first read. This chapter uses the ring buffer and dummy nodes from <a href="linear-structures.html">Who goes next?</a> and hashing from <a href="hash-maps.html">the hash maps chapter</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: a counter that can't count</h2>
+
+<div class="story">
+  <p>You run the click counter for an ad network. Advertisers pay per click, so the count is money. Eight worker threads handle clicks, and every click runs one line on one shared number: <code>clicks += 1</code>. In a load test, each of the 8 threads counts <b>1,000,000</b> clicks. The total should be <b>8,000,000</b>.</p>
+  <p>Written in Java or C, the program prints a different total almost every run, often millions short. Nothing crashed. No error was logged. Clicks just vanished.</p>
+  <p>So you put a lock around the line. Now the total is right every time. But the 8 threads together are now often <em>slower</em> than one thread counting all 8 million clicks alone. You bought 8 cores and they spend their time waiting for each other.</p>
+</div>
+
+<p>Both halves of that story are this chapter. First, why do updates vanish? Then, how do we stay correct <em>without</em> making every thread wait in one line? The answer is not one trick. It's a short list of ideas (a lock, one writer per variable, compare-and-swap, splitting one lock into many) and the three structures built from them.</p>
+
+<div class="check" id="check-problem">
+  <p class="q">Each of the 8 threads runs <code>clicks += 1</code> exactly 1,000,000 times, and the program waits for all of them before printing. Why can the total come out short?</p>
+  <div class="opts">
+    <button>Under heavy load the CPU sometimes skips instructions</button>
+    <button data-correct>Two threads can read the same old value, both add 1, and both write back the same number</button>
+    <button>Some increments are still running when the total is printed</button>
+  </div>
+  <div class="fb right"><p>Right. <code>clicks += 1</code> is really three steps: read, add, write. If two threads both read 41 before either writes, both write 42. Two clicks happened; the number went up by one. Section 2 takes this apart.</p></div>
+  <div class="fb wrong"><p>CPUs don't skip instructions, and the program waits for every thread (it "joins" them) before printing. Picture an office whiteboard with a tally on it. Two clerks each make a sale at the same moment. Each walks to the board, reads 41, walks back to their desk to work out 41 + 1, then returns and writes 42. Two sales, and the board says 42, not 43. Each clerk did their job right. The problem is the gap between reading and writing, where someone else can read the same old number.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Read, change, write: where updates vanish</h2>
+
+<p>A <b>thread</b> is one sequence of instructions running inside a program. All threads of a program share the same memory, so they can all see <code>clicks</code>. The operating system runs threads on different cores at the same time, and it can also pause any thread between any two machine instructions and run another one.</p>
+
+<p>To the CPU, <code>clicks += 1</code> isn't one step. The number lives in memory, and arithmetic happens in a <b>register</b>, a tiny scratch slot inside one core. So the line becomes three steps:</p>
+
+<pre class="diagram"><code> 1. r = read clicks    (into my own register)
+ 2. r = r + 1          (change my private copy)
+ 3. write r to clicks  (copy it back to memory)</code></pre>
+
+<p>With two threads, A and B, each doing those three steps, the six steps can mix in many orders. Each possible mix is an <b>interleaving</b>. The result is right only if one thread writes before the other reads. Try it: you are the scheduler.</p>
+
+<div class="figure">
+  <div id="sched-viz"></div>
+  <div class="cap">Both threads add 1 to <code>x</code>, which starts at 41, so the right answer is 43. Press "Step A" and "Step B" in any order. Try A, B, A, B, A, B: one update is lost. Then switch the mode to "With a lock" and try to break it again, and finally "Atomic add".</div>
+</div>
+
+<p>Count them. Six steps, three from A and three from B, can be ordered in 20 ways (choose which 3 of the 6 positions are A's: 6 × 5 × 4 / (3 × 2 × 1) = 20). Only 2 of the 20 give 43: all of A before all of B, or all of B before all of A. The other 18 lose an update. With 8 threads doing a million each, there are millions of chances for a bad mix, so some always happen.</p>
+
+<p>The names for this: a <b>race condition</b> is a bug where the result depends on how the threads happened to interleave. An operation is <b>atomic</b> if no other thread can ever see it half done: it happened entirely or not at all. <code>clicks += 1</code> is not atomic. Each of its three steps is atomic on its own, but nothing stops another thread from slipping between them.</p>
+
+<div class="keyidea"><p>A shared update is "read, change, write". If another thread can read between your read and your write, both of you start from the same old value and one change is lost. Every fix in this chapter either makes the three steps one atomic step, or makes sure only one thread ever writes the variable.</p></div>
+
+<details class="aside deeper">
+  <summary>Go deeper: what about Python and the GIL?</summary>
+  <p>CPython (the standard Python) has a <b>global interpreter lock</b>, the GIL: only one thread runs Python bytecode at a time. That doesn't make <code>clicks += 1</code> atomic. The line compiles to several bytecodes (load, add, store), and the interpreter is allowed to switch threads between them. Recent CPython versions switch threads at fewer points, so this exact demo often prints the right total: in our runs with 8 threads on CPython 3.13 it printed 8,000,000 every time. That's luck about where switches happen, not a promise. When we put a function call between the read and the write (<code>c.v = inc(c.v)</code>), every run on CPython 3.13, 3.14 and 3.15 lost most of the 8 million updates, ending between 2 and 5 million. A thread paused while holding its stale value sleeps for a few milliseconds while the others add thousands; when it wakes, its one write wipes all of theirs out.</p>
+  <p>Since Python 3.13 there's also an optional <b>free-threaded</b> build with no GIL (PEP 703), officially supported since 3.14: threads really run in parallel on different cores. Built-in operations like a single <code>dict</code> or <code>list</code> update still lock internally and stay safe, but <code>d[k] += 1</code> is still read, change, write. The rule is the same in every language: protect read-change-write on shared data.</p>
+  <p>One more Python fact interviewers like: with the GIL, threads don't make pure-Python number crunching faster, since only one runs at a time. Threads still help when they spend their time waiting on the network or disk (the GIL is released while waiting). For CPU work, Python uses processes (<code>multiprocessing</code>) or the free-threaded build.</p>
+</details>
+
+<div class="check" id="check-race">
+  <p class="q">Two threads each run <code>x += 1</code> once, as read, add, write. <code>x</code> starts at 5. Which final values are possible?</p>
+  <div class="opts">
+    <button>Only 7</button>
+    <button data-correct>6 or 7</button>
+    <button>5, 6 or 7</button>
+  </div>
+  <div class="fb right"><p>Right. 7 if one thread writes before the other reads (2 of the 20 interleavings); 6 if both read 5 first. 5 is impossible: the last write to <code>x</code> is always someone's "value I read, plus 1", and every value read is at least 5.</p></div>
+  <div class="fb wrong"><p>List what each thread can write. A thread reads some value r and writes r + 1. The smallest r anyone can read is 5, so every write is at least 6, and the final value is whatever was written last: never 5. Can it be 6? Yes: A reads 5, B reads 5, A writes 6, B writes 6. Can it be 7? Yes: A does all three steps, then B reads 6 and writes 7. So the answer is "6 or 7", and which one you get depends on the interleaving. That dependence is exactly what "race condition" means.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Fix 1: one lock</h2>
+
+<p>The cleanest fix stops the steps from mixing at all. Picture a gas station bathroom with one key on a hook. To go in, you take the key. Anyone else who wants in waits until the key is back on the hook. Only one person is ever inside.</p>
+
+<p>That key is a <b>lock</b>, also called a <b>mutex</b> (short for "mutual exclusion"). A thread <b>acquires</b> it before touching the shared data and <b>releases</b> it after. The code between is the <b>critical section</b>. Only one thread can be inside, so the three steps of <code>x += 1</code> now run as one unit: no other thread holding the same lock can slip in between.</p>
+
+<pre><code>import threading
+
+clicks = 0
+lock = threading.Lock()
+
+def count_clicks(n):
+    global clicks
+    for _ in range(n):
+        with lock:          # take the key; other threads wait here
+            clicks += 1     # read, change, write: nobody else is inside
+        # leaving the with-block hangs the key back up, even after an exception</code></pre>
+
+<p>A lock protects more than one variable. A queue has an array and a size that must change together; hold the lock while you change both, and no other thread ever sees the array updated but the size not. The rule that keeps it correct: <b>every</b> access to the shared data, reads included, holds the lock.</p>
+
+<p>What does a thread do while it waits? Either it <b>spins</b> (keeps checking in a loop: fast if the wait is short, but it burns a core) or it <b>sleeps</b> (the operating system parks it and wakes it when the lock is free, which costs a few microseconds). Many locks spin briefly, then sleep; on Linux the sleeping part is built on a kernel feature called a futex.</p>
+
+<p>What a lock costs:</p>
+<ul>
+  <li><b>Waiting.</b> Only one thread at a time does the work inside. Section 4 puts numbers on it.</li>
+  <li><b>Stalls.</b> If the operating system pauses the thread holding the lock (to run something else for a few milliseconds), every thread that needs the lock stops too.</li>
+  <li><b>Deadlock.</b> Take two locks in the wrong order and two threads can wait for each other forever. Section 9 shows the fix.</li>
+</ul>
+
+<div class="keyidea"><p>A lock makes a group of steps atomic by letting only one thread into the critical section at a time. It's correct and simple, which is why it's the right first answer. The cost: every thread that needs it waits in one line.</p></div>
+
+<div class="check" id="check-lock">
+  <p class="q">Thread A does <code>with lock: clicks += 1</code>. Thread B, in another file, does <code>clicks += 1</code> without taking the lock. Are updates safe?</p>
+  <div class="opts">
+    <button>Yes: A holds the lock, so <code>clicks</code> is protected</button>
+    <button data-correct>No: a lock only stops threads that also try to take it</button>
+    <button>Yes, as long as only one thread skips the lock</button>
+  </div>
+  <div class="fb right"><p>Right. A lock isn't a force field around a variable. It's an agreement: everyone who touches <code>clicks</code> takes the key first. B never asks for the key, so it can read between A's read and write.</p></div>
+  <div class="fb wrong"><p>Back to the bathroom. The key on the hook only works because everyone agrees to take it before going in. Someone who climbs in through the window never checks the hook, and the key can't stop them. A lock works the same way: the computer doesn't link the lock to <code>clicks</code> at all. B reads <code>clicks</code>, A runs its whole critical section, B writes its stale value + 1, and A's update is gone. One thread skipping the lock is enough.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Why one lock doesn't scale</h2>
+
+<p>Say each request in a server spends 100 ns holding the one lock around a shared map. Only one thread holds it at a time, so at most 1 / 100 ns = <b>10 million</b> requests per second get through, whether you have 4 cores or 64. The lock is a one-lane bridge: adding cars doesn't add lanes.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Time inside the lock per operation</th><th>Most operations per second, any number of cores</th></tr></thead>
+  <tbody>
+    <tr><td>50 ns</td><td>20 million</td></tr>
+    <tr><td>100 ns</td><td>10 million</td></tr>
+    <tr><td>1 µs</td><td>1 million</td></tr>
+    <tr><td>10 µs (a slow critical section)</td><td>100,000</td></tr>
+  </tbody>
+</table></div>
+
+<p>The general version is <b>Amdahl's law</b>. If a fraction s of the work must run one thread at a time, then n cores give a speedup of at most 1 / (s + (1 − s) / n). With s = 0.25 (a quarter of each request holds the lock), 16 cores give 1 / (0.25 + 0.75/16) ≈ <b>3.4×</b>, and infinitely many cores give 4×. The serial part sets the ceiling.</p>
+
+<h3>The hidden cost: a cache line moving between cores</h3>
+
+<p>The table assumed handing the lock over is free. It isn't, and the reason is how cores share memory. Picture each core with its own notebook (its <b>cache</b>), holding copies of pages from a shared library (main memory). Reading a page you already have takes about a nanosecond. The pages are called <b>cache lines</b>, 64 bytes each on most x86 and Arm server chips (Apple's M-series uses 128).</p>
+
+<p>Copies must agree. So when one core <em>writes</em> to a line, every other core's copy of that line is torn out of its notebook. The next core that touches the line must fetch the fresh copy from the writer's cache, which takes tens of nanoseconds, more between chips in a two-socket server. This agreement protocol is called <b>cache coherence</b>.</p>
+
+<p>A lock is a few bytes of memory, so it lives in one cache line. Every acquire writes to it. With 8 threads taking turns, that line moves core to core on every hand-off, and each move costs far more than the <code>+ 1</code> it protects. That's how 8 threads end up slower than 1: the single thread keeps the line in its own cache the whole time.</p>
+
+<p>The same thing happens with no sharing at all. Two threads each increment their <em>own</em> counter, but the two counters sit next to each other in memory, on the same 64-byte line:</p>
+
+<pre class="diagram"><code>          one 64-byte cache line
+ ┌───────────┬───────────┬────────────────┐
+ │ counter_a │ counter_b │ (rest of line) │
+ └───────────┴───────────┴────────────────┘
+ core 1 writes a: core 2's copy of the
+   whole line is torn out.
+ core 2 writes b: core 1's copy is torn out.
+ Every write is a cache miss.
+
+ fix: padding, so a and b sit on different lines</code></pre>
+
+<p>That's <b>false sharing</b>: the threads share a cache line but no data. Java has an <code>@Contended</code> annotation that pads a field onto its own line (the JDK uses it internally; your own code needs a JVM flag to enable it), C++17 has <code>std::hardware_<wbr>destructive_<wbr>interference_<wbr>size</code> for the right padding, and high-performance queues pad their counters by hand. In Python you don't control memory layout, but interviewers ask about it anyway.</p>
+
+<div class="keyidea"><p>A single lock caps throughput at 1 / (time inside the lock), and a write to shared memory makes its cache line travel between cores. So the way to scale is to share less: give each variable one writer, split one lock into many, or don't share at all. The rest of the chapter does each of these.</p></div>
+
+<div class="check" id="check-scale">
+  <p class="q">In C, two threads each increment their own counter: <code>counts[0]</code> and <code>counts[1]</code>, in an array of 8-byte integers. Nothing is shared, yet it's far slower than one thread doing both. Why?</p>
+  <div class="opts">
+    <button>The compiler adds a hidden lock around arrays used by threads</button>
+    <button data-correct>Both counters sit in one cache line, and every write by one core invalidates the other core's copy</button>
+    <button>Adding integers is slower on multi-core chips</button>
+  </div>
+  <div class="fb right"><p>Right: false sharing. Bytes 0–7 and 8–15 share a 64-byte line, and cores move whole lines, not single variables. Pad each counter onto its own line and the slowdown goes away.</p></div>
+  <div class="fb wrong"><p>Nothing in C adds locks for you, and addition costs the same on any core. Think of what the cores pass around: not variables, but whole 64-byte lines. <code>counts[0]</code> is bytes 0 to 7 and <code>counts[1]</code> is bytes 8 to 15 of the same line. When core 1 writes its counter, core 2's copy of the whole line is thrown away, even though core 2 only cares about bytes 8 to 15. Then core 2 writes and throws away core 1's copy. The line ping-pongs on every write. Put 56 bytes of padding between the two counters and each one gets its own line.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>One producer, one consumer: a ring with no lock</h2>
+
+<p>A music app has two threads. A decoder thread unpacks the MP3 and produces sound samples. The audio thread must hand 128 samples to the sound card every 128 / 48,000 s ≈ <b>2.7 ms</b>, every time, or you hear a click. If the audio thread ever waits for a lock, and the decoder holding it has just been paused by the operating system, the deadline is missed. Audio programmers have a rule: never take a lock in the audio thread.</p>
+
+<p>So we need a queue between exactly one <b>producer</b> (the thread that adds items) and exactly one <b>consumer</b> (the thread that takes them out) with no lock at all. This is the <b>SPSC</b> case: single producer, single consumer.</p>
+
+<p>Start from the ring buffer of <a href="linear-structures.html">Who goes next?</a>: a fixed array of slots used in a circle. That version kept <code>head</code> and <code>size</code>. Both sides change <code>size</code> (push adds 1, pop subtracts 1), so <code>size</code> is a shared read-change-write: section 2's lost update again. The fix is to stop sharing any variable that both sides write.</p>
+
+<h3>Each counter has one writer</h3>
+
+<p>Picture a revolving sushi belt with 4 places. One cook puts plates on; one diner takes them off. The cook keeps a card, "plates placed so far". The diner keeps a card, "plates taken so far". Each writes only on their own card, and only glances at the other's. Plates on the belt = placed − taken.</p>
+
+<p>In the ring those cards are two counters that only ever grow:</p>
+<ul>
+  <li><code>tail</code>: how many items were ever pushed. Only the producer writes it.</li>
+  <li><code>head</code>: how many items were ever popped. Only the consumer writes it.</li>
+</ul>
+<p>Item number s lives in slot s % capacity. Items in the ring = <code>tail − head</code>. Empty when they're equal; full when <code>tail − head == capacity</code>. No variable has two writers, so there's no read-change-write race on any of them. And because the counters never wrap around, "full" and "empty" never look alike.</p>
+
+<pre class="diagram"><code> producer: try_push(item)
+  1. t = tail                  (my own counter)
+  2. if t − head == capacity:  full, give up
+  3. slots[t % capacity] = item
+  4. tail = t + 1              ← publish, last
+
+ consumer: try_pop()
+  1. h = head                  (my own counter)
+  2. if tail == h:             empty, give up
+  3. item = slots[h % capacity]
+  4. clear slots[h % capacity]
+  5. head = h + 1              ← free the slot, last</code></pre>
+
+<div class="figure">
+  <div id="spsc-player"></div>
+  <div class="cap">A ring of 4 slots. Green slots hold items the consumer may take: slot numbers from head up to tail. Watch each push write its slot first and move <code>tail</code> second, and each pop read and clear first and move <code>head</code> second. Then press "Show the bug" to see what happens when the producer moves <code>tail</code> first.</div>
+</div>
+
+<h3>Why reading a stale counter is safe</h3>
+
+<p>This is the part people find hard to believe. The producer reads <code>head</code> while the consumer may be changing it. So the producer can act on an old value. Is that a race?</p>
+
+<p>No, because <code>head</code> only grows. An old <code>head</code> is smaller than or equal to the real one, so the producer computes <code>tail − old head</code> ≥ the real number of items. It thinks the ring is fuller than it is. The worst case: it says "full" a moment too early, and tries again later. It can never decide a slot is free when the consumer still needs it. The same holds the other way: a consumer with an old <code>tail</code> sees fewer items than there are, and says "empty" a moment too early. <b>Stale means cautious, never wrong.</b></p>
+
+<p>That gives a speed trick. Reading the other side's counter means reading a cache line the other core keeps writing: a cache miss (section 4). So each side keeps a <b>cached copy</b> of the other side's counter and re-reads the real one only when the copy says "full" (producer) or "empty" (consumer). Fill an empty ring of 1,024 slots and the producer reads <code>head</code> at most once. High-performance rings also put <code>head</code> and <code>tail</code> on separate cache lines, so the two cores don't false-share.</p>
+
+<p>Two details that make real rings fast. Capacity is a power of two, so <code>s % capacity</code> becomes <code>s &amp; (capacity − 1)</code>: one AND instead of a division. And the counters are 64-bit unsigned integers. At a billion items per second, a 64-bit counter takes about 584 years to wrap around; and even if it did, unsigned subtraction <code>tail − head</code> still gives the right count across the wrap.</p>
+
+<details class="aside another">
+  <summary>Explain it another way: why the classic ring wastes a slot</summary>
+  <p>Many textbook rings keep wrapped indexes, both between 0 and capacity − 1. Then <code>head == tail</code> means "empty"… but a completely full ring also has <code>head == tail</code>, because the tail has gone all the way around. To tell them apart, either keep a shared <code>size</code> (two writers: not allowed here) or declare the ring full one slot early, at capacity − 1 items. Counters that never wrap carry the extra information for free: full is <code>tail − head == capacity</code>, a different number from empty's 0.</p>
+</details>
+
+<div class="keyidea"><p>An SPSC ring needs no lock because every shared variable has exactly one writer: the producer owns <code>tail</code>, the consumer owns <code>head</code>. Counters only grow, so a stale read makes the reader cautious, never wrong.</p></div>
+
+<div class="check" id="check-spsc">
+  <p class="q">The producer reads <code>head</code> = 10. A moment later the consumer advances it to 12, but the producer keeps working with 10. What can go wrong?</p>
+  <div class="opts">
+    <button>It may overwrite an item the consumer hasn't taken yet</button>
+    <button data-correct>Nothing harmful: it may think the ring is full when two slots are already free</button>
+    <button>It may put two items in the same slot</button>
+  </div>
+  <div class="fb right"><p>Right. With head 10 it believes 2 more items are in the ring than really are. It may give up on a push that would have fit, then succeed after re-reading. It never writes a slot the consumer still needs.</p></div>
+  <div class="fb wrong"><p>Plug in numbers. Capacity 4, <code>tail</code> = 14. Real items: 14 − 12 = 2, so 2 free slots. The producer's view: 14 − 10 = 4, "full". It refuses to push. It can't overwrite anything, because it only writes slot <code>tail % 4</code> when it believes there's room, and its belief is always more pessimistic than the truth. <code>head</code> only grows, so an old head can only make the ring look fuller. The cost of staleness is a wasted retry, never a lost item.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Publish last: the order of writes</h2>
+
+<p>Look again at the producer's last two steps: write the item into its slot, <em>then</em> move <code>tail</code>. The order is the whole point. Moving <code>tail</code> is the announcement "slot 5 is ready". If the announcement came first, the consumer could see <code>tail</code> = 6, read slot 5 before the item arrived, and return garbage: an old item, or in C half-written bytes. The figure's "Show the bug" button plays exactly that.</p>
+
+<p>Picture a restaurant pass. The cook puts the plate on the counter, then rings the bell. Ring the bell first and the waiter grabs an empty counter. The consumer has the same rule on its side: read and clear the slot, <em>then</em> move <code>head</code>. Move <code>head</code> first and the producer may start writing a new item into a slot the consumer is still reading.</p>
+
+<h3>The machine may reorder your writes</h3>
+
+<p>Here is the uncomfortable part. You can write the two lines in the right order and still get the bug, because neither the compiler nor the CPU promises to keep that order for other cores to see:</p>
+<ul>
+  <li>The <b>compiler</b> may swap two writes to different variables, since a single thread can't tell the difference.</li>
+  <li>The <b>CPU</b> parks writes in a small per-core <b>store buffer</b> before they reach the cache. On Arm chips (phones, Apple's M-series, AWS Graviton), writes to different addresses can become visible to other cores in a different order than they were made. x86 keeps one core's writes in order relative to each other (its rules are called TSO, total store order), which is why code like this can pass every test on an x86 laptop and then lose items on an Arm server.</li>
+</ul>
+
+<p>The fix is to tell both the compiler and the CPU which order matters, with a pair of special operations:</p>
+<ul>
+  <li>A <b>release store</b> to <code>tail</code>: every read and write before it in the program is complete, and visible to other cores, no later than the store itself.</li>
+  <li>An <b>acquire load</b> of <code>tail</code> in the consumer: no read or write after it can happen before it.</li>
+</ul>
+<p>Together: if the consumer sees <code>tail</code> = 6, it also sees everything the producer wrote before setting <code>tail</code> to 6, including the item. The same pair, on <code>head</code>, covers the consumer's side: its release store of <code>head</code> makes sure it has finished reading the slot before the producer can see the slot is free. That's why a release orders reads too, not just writes. This costs almost nothing: on x86 the release store is an ordinary store that the compiler must not reorder; on Arm it's a special store instruction.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Language</th><th>How you ask for release / acquire</th></tr></thead>
+  <tbody>
+    <tr><td>C++</td><td><code>std::atomic</code> with <code>memory_order_release</code> on the store and <code>memory_order_acquire</code> on the load</td></tr>
+    <tr><td>Rust</td><td><code>AtomicUsize</code> with <code>Ordering::Release</code> and <code>Ordering::Acquire</code></td></tr>
+    <tr><td>Java</td><td>a <code>volatile</code> field (stronger than needed), or <code>VarHandle</code>'s <code>setRelease</code> / <code>getAcquire</code></td></tr>
+    <tr><td>Go</td><td><code>sync/atomic</code> loads and stores (they're sequentially consistent, which includes release / acquire)</td></tr>
+    <tr><td>C, C++</td><td>not <code>volatile</code>: it doesn't stop the CPU from reordering and isn't meant for threads</td></tr>
+    <tr><td>Python</td><td>no documented memory model at this level; hand data between threads with <code>queue.Queue</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>The name for what goes wrong without them: a <b>data race</b> is two threads touching the same memory at the same time, at least one of them writing, with nothing (a lock, or atomic operations) ordering the two. In C and C++ a data race is undefined behavior: the compiler may assume it never happens, and anything can result.</p>
+
+<div class="keyidea"><p>Write the data, then publish it by moving the counter. Make the publishing store a release and the other side's load an acquire, or the compiler and CPU may let the other thread see the counter before the data.</p></div>
+
+<div class="check" id="check-publish">
+  <p class="q">A developer's SPSC ring passes every test on an x86 laptop but sometimes hands out garbage on an Arm server. The producer writes the slot, then <code>tail</code>, both as plain variables. Most likely cause?</p>
+  <div class="opts">
+    <button>Arm's caches are smaller, so the ring overflows</button>
+    <button data-correct>Without a release store, the tail write can become visible to the consumer before the slot write</button>
+    <button>The consumer needs a lock around its read of <code>tail</code></button>
+  </div>
+  <div class="fb right"><p>Right. x86 keeps one core's stores in order; Arm doesn't, and the compiler is free to reorder plain writes anyway. A release store on <code>tail</code> and an acquire load in the consumer fix it, with no lock.</p></div>
+  <div class="fb wrong"><p>Cache size doesn't change what's in the ring. A lock only in the consumer doesn't help either: the producer never takes it, so it can't order the producer's writes (section 3: a lock only stops threads that also take it), and locking both sides throws away the reason for the design. The order in the source code is a wish, not a promise. On Arm, the write of <code>tail</code> may reach the consumer's core before the write of the slot (both sat in the producer's store buffer, and Arm lets them drain in either order, for example when <code>tail</code>'s cache line is already at hand and the slot's isn't). The consumer sees "6 items", reads slot 5, and finds the old contents. It's the bell ringing before the plate is down. Marking the <code>tail</code> store "release" says "everything before me must be visible first"; marking the consumer's load "acquire" says "don't read ahead of me".</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Many writers: compare-and-swap</h2>
+
+<p>Now let two producers share the ring. Both read <code>tail</code> = 5. Both write their item into slot 5. Both set <code>tail</code> = 6. One item overwrote the other and is gone. It's section 2's lost update again: <code>tail</code> now has two writers. The one-writer trick can't help. We need the read-change-write itself to be atomic, without a lock. That has to come from the hardware.</p>
+
+<p>Picture the whiteboard again, with a new rule: "change 41 to 42, but only if it still says 41; if it doesn't, change nothing and tell me what it says now". Checking and writing happen as one indivisible step, so nobody can sneak in between. That's <b>compare-and-swap</b>, or <b>CAS</b>: <code>cas(location, expected, new)</code> writes <code>new</code> only if the location still holds <code>expected</code>, and reports whether it did.</p>
+
+<p>Every CPU has it. On x86 it's the <code>LOCK CMPXCHG</code> instruction: the core takes the cache line in exclusive mode, compares, writes and lets go, with no other core able to touch the line in between. Arm has a load-exclusive / store-exclusive pair that achieves the same, and a single CAS instruction since Armv8.1. On top of CAS, every lock-free algorithm repeats one shape:</p>
+
+<pre><code># Pseudocode: Python has no CAS instruction. Read cas(ref, expected, new)
+# as the hardware's compare-and-swap: one indivisible step.
+def increment(counter):
+    while True:
+        old = counter.load()           # 1. read the shared value
+        new = old + 1                  # 2. compute privately
+        if cas(counter, old, new):     # 3. write only if nobody changed it
+            return new
+        # someone changed it between 1 and 3: retry with the fresh value</code></pre>
+
+<p>A failed CAS is never a disaster. It changed nothing, and it failed only because <em>another</em> thread's CAS succeeded in between. So whenever someone retries, someone else made progress. That's the definition of <b>lock-free</b>: whatever the scheduling, some thread always completes its operation within a bounded number of steps of the whole system, even if other threads are paused forever in the middle of theirs. A lock can't promise that: pause the lock holder and nobody finishes.</p>
+
+<p>For a plain counter there's an even simpler instruction, <b>fetch-and-add</b> (x86 <code>LOCK XADD</code>, Java's <code>AtomicLong.getAndIncrement</code>, C++ <code>fetch_add</code>): add and return the old value in one atomic step, no loop. But "atomic" doesn't mean "free". Sixty-four cores incrementing one atomic counter still pass one cache line around and take turns. Java's <code>LongAdder</code> fixes that by keeping several counter cells (more appear when threads collide), spreading the threads over them, and summing the cells only when someone asks for the total. Spread the writes out; pay on the rare read.</p>
+
+<div class="keyidea"><p>Compare-and-swap writes only if the value is still what you read, as one hardware step. Wrap it in a read-compute-CAS-retry loop and lost updates can't happen. A failed CAS means someone else succeeded, so the system always moves forward: lock-free.</p></div>
+
+<div class="check" id="check-cas">
+  <p class="q">Thread A reads <code>counter</code> = 10 and computes 11. Before A's CAS runs, thread B's CAS changes <code>counter</code> to 11. What does A's <code>cas(counter, 10, 11)</code> do?</p>
+  <div class="opts">
+    <button>Writes 11: the result is the same either way</button>
+    <button data-correct>Fails and changes nothing; A re-reads 11 and tries <code>cas(counter, 11, 12)</code></button>
+    <button>Waits until B is finished, then writes 11</button>
+  </div>
+  <div class="fb right"><p>Right. The counter holds 11, not the expected 10, so the CAS fails. A's loop reads the fresh 11, computes 12, and its next CAS succeeds unless someone beats it again. Both increments count: final value 12.</p></div>
+  <div class="fb wrong"><p>If A's write of 11 went through, B's increment would be lost: two increments, and the counter went from 10 to 11. That's the bug CAS exists to prevent. CAS compares first: "is it still 10?" It's 11, so nothing is written. And CAS never waits: it answers yes or no at once, which is why no thread can block another. A then loops: reads 11, computes 12, CAS(11 → 12) succeeds. Final value 12: both increments counted.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>A lock-free queue: Michael and Scott</h2>
+
+<p>Java's <code>ConcurrentLinkedQueue</code> lets any number of threads add and remove at once, with no lock. It's based on an algorithm Maged Michael and Michael Scott published in 1996. It's the standard interview example of a lock-free structure, and it's built from just the CAS loop above.</p>
+
+<p>Start from the linked-list queue of <a href="linear-structures.html">Who goes next?</a>, with a <b>dummy node</b> at the front: the list always starts with one node that holds no item, so even an empty queue has a node, and neither adding nor removing needs a special case for "the queue is empty". Two shared pointers: <code>head</code> points at the dummy, <code>tail</code> at the last node. Items are in the nodes after the dummy.</p>
+
+<p>Picture a conga line. To join, you put your hand on the shoulder of the last dancer, but only if nobody's hand is already there. That's one CAS on the last node's <code>next</code> pointer, from empty to your node. A sign saying "END" points at the last dancer; moving it is a separate step that can fall one dancer behind. The rule that makes it lock-free: <b>anyone who sees the sign is behind moves it forward before doing anything else</b>, instead of waiting for whoever is responsible. (Where the picture breaks: a dancer can see the end of the line. A thread can only read one pointer at a time, so "the sign is behind" shows up as "the node the tail points at already has a next".)</p>
+
+<p>Enqueue, in words:</p>
+<ol>
+  <li>Make the new node. Read <code>tail</code> (call it <code>last</code>), then read <code>last.next</code>.</li>
+  <li>If <code>last.next</code> is empty: CAS it from empty to the new node. If that succeeds, the item is in the queue: this one CAS is the moment the enqueue takes effect. Then try once to CAS <code>tail</code> from <code>last</code> to the new node. If that fails, someone already moved it for you: fine.</li>
+  <li>If <code>last.next</code> is not empty, the tail is lagging. Help: CAS <code>tail</code> from <code>last</code> to <code>last.next</code>. Then start again from step 1.</li>
+</ol>
+
+<p>Dequeue is one CAS on <code>head</code>: move it from the dummy to the first real node, which becomes the new dummy, and return its item. If the dummy has no next, the queue is empty. And if <code>tail</code> still points at the dummy even though there is a next node, the tail is lagging, and dequeue helps move it first (the exercise asks you why that matters).</p>
+
+<div class="figure">
+  <div id="msq-player"></div>
+  <div class="cap">Threads A and B enqueue at the same moment into a queue holding 1. Each cell's <code>next</code> is the cell to its right. Watch B's first CAS fail because A got there first, then watch B find the tail lagging and fix it instead of waiting for A. Yellow: a pointer being read. Blue: a successful CAS. Red: a failed one.</div>
+</div>
+
+<p>Every operation has one CAS where it "happens": the link for an enqueue, the head move for a dequeue. (A dequeue that finds the queue empty happens at its read of the dummy's empty <code>next</code>.) Before that instant the operation hasn't happened; after it, it has, for every thread. An object whose operations each take effect at one instant between their start and their end is called <b>linearizable</b>, and it's the standard meaning of "this concurrent queue behaves like a queue".</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Progress guarantee</th><th>It promises</th><th>If one thread is paused forever mid-operation</th><th>Examples</th></tr></thead>
+  <tbody>
+    <tr><td><b>Blocking</b></td><td>nothing beyond correctness</td><td>every thread that needs its lock waits forever</td><td>any mutex; <code>queue.Queue</code></td></tr>
+    <tr><td><b>Lock-free</b></td><td>some thread always finishes (one unlucky thread can keep losing its CAS and retrying)</td><td>the others still finish</td><td>CAS loops; the Michael-Scott queue</td></tr>
+    <tr><td><b>Wait-free</b></td><td>every thread finishes within a bounded number of its own steps</td><td>the others still finish, with no retry loops</td><td>the SPSC ring's <code>try_push</code> and <code>try_pop</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>Lock-free is a promise about pauses and progress, <b>not about speed</b>. Under heavy contention, CAS loops retry and the same cache lines bounce between cores; a good lock, which puts waiters to sleep, can beat them. You reach for lock-free when a thread must never wait for another one that might be paused: audio and trading hot paths, interrupt handlers, code that runs while the scheduler itself is busy.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: the ABA problem and freeing nodes</summary>
+  <p>CAS asks "is it still A?". It can't tell "still A" from "changed to B, then back to A". Usually that doesn't matter. With pointers and reused memory, it does. A lock-free stack shows it: the top is node A, and A.next is B. Thread 1 reads top = A and next = B, and is about to <code>CAS(top, A → B)</code>. It pauses. Thread 2 pops A, pops B, frees B, and pushes A back (the same memory, reused). The top is A again, but now A.next is C. Thread 1 wakes, its CAS sees A and succeeds, and the top is now B: a node that was freed. The structure is corrupt.</p>
+  <p>Fixes, from simplest to most used:</p>
+  <ul>
+    <li><b>A version tag</b> next to the pointer, bumped on every change, and a CAS over both at once (x86-64 has a 16-byte CAS, <code>CMPXCHG16B</code>). The original Michael-Scott paper used counted pointers like this.</li>
+    <li><b>Hazard pointers:</b> each thread announces "I'm looking at node X", and no one frees X while it's announced.</li>
+    <li><b>Epoch-based reclamation:</b> retired nodes are freed only after every thread has passed a checkpoint. Rust's <code>crossbeam</code> library works this way.</li>
+    <li><b>A garbage collector.</b> In Java (and in Python), a node can't be freed and reused while any thread still holds a reference to it, so this form of ABA can't happen, and Java's <code>ConcurrentLinkedQueue</code> needs none of the other fixes.</li>
+  </ul>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: bounded many-producer queues</summary>
+  <p>The Michael-Scott queue is unbounded and allocates a node per item. A bounded alternative used in practice (Dmitry Vyukov's bounded MPMC queue) is a ring where each slot carries its own sequence number. A producer claims a position by CAS on a shared enqueue counter, writes the item, then sets the slot's sequence number to tell consumers "ready". No allocation, fixed memory, and each slot's sequence plays the role that <code>tail</code> played in the SPSC ring. (Strictly, it isn't lock-free: a producer paused between claiming a slot and marking it ready holds up the consumer that reaches that slot. In practice it's very fast.) The LMAX Disruptor, built for a trading exchange, is a ring in the same family: pre-allocated entries, sequence counters, and counters padded onto their own cache lines.</p>
+</details>
+
+<div class="check" id="check-lockfree">
+  <p class="q">In the Michael-Scott queue, thread A's link CAS succeeds, and then the operating system pauses A for 10 ms before it moves <code>tail</code>. What do other enqueuers do meanwhile?</p>
+  <div class="opts">
+    <button>Wait for A to come back, because <code>tail</code> is wrong</button>
+    <button data-correct>See that the tail's node already has a next, move <code>tail</code> forward themselves, and carry on</button>
+    <button>Link their node after the node <code>tail</code> points at, replacing A's node</button>
+  </div>
+  <div class="fb right"><p>Right: helping. Moving <code>tail</code> is a CAS anyone may do, and A's own CAS will fail harmlessly when it wakes. No thread ever waits for another, which is what makes the queue lock-free.</p></div>
+  <div class="fb wrong"><p>Waiting would make the queue blocking: one paused thread would stall everyone, the very thing we're avoiding. Replacing A's node can't happen either: linking is a CAS from <em>empty</em>, and the lagging node's <code>next</code> isn't empty anymore (it's A's node), so that CAS fails. What the others do is read <code>last.next</code>, find A's node there, and conclude "the tail is one behind". Any thread can fix that with <code>CAS(tail, last → last.next)</code>, then retry its own enqueue from the real end. The conga line keeps moving even with the sign-holder asleep.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>A concurrent hash map: many locks, not one</h2>
+
+<p>A login service keeps sessions in a hash map. 32 threads look up and update sessions, 200,000 times a second in total. Put one lock around a dict and section 4's ceiling applies: every thread waits in one line, though two threads touching two different users have nothing to do with each other.</p>
+
+<p>Picture a supermarket with one checkout lane versus 16. Better still, lanes assigned by the first letter of your last name: two shoppers only wait for each other if they share a lane. That's <b>lock striping</b>. Keep S locks, the <b>stripes</b>. Key k belongs to stripe <code>hash(k) % S</code>, and that stripe's lock guards every key in it. An operation on one key takes only its stripe's lock. Threads working on different stripes never wait for each other. Each stripe can even keep its own small hash table and grow it on its own.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">threads</span><input type="range" id="st-t" min="2" max="64" value="16" style="width:150px"><b id="st-tval"></b></div>
+    <div class="viz-controls"><span class="small">stripes</span><input type="range" id="st-s" min="0" max="8" value="4" style="width:150px"><b id="st-sval"></b></div>
+    <div class="viz-controls"><span class="small">share of traffic on one hot key</span><input type="range" id="st-h" min="0" max="90" step="10" value="0" style="width:150px"><b id="st-hval"></b></div>
+    <div id="st-out" style="margin-top:12px"></div>
+    <div class="viz-caption" id="st-msg"></div>
+  </div>
+  <div class="cap">Freeze time while every thread is in the middle of a map operation. What's the chance that the stripe my operation needs is already held by another thread? The cells are one random snapshot (up to 32 stripes are drawn): each number is how many threads want that stripe, red where two or more collide. Slide the stripes up and watch the chance fall; then put 50% of traffic on one hot key and watch it stop falling.</div>
+</div>
+
+<p>The numbers, for 16 threads all inside the map at once with keys spread evenly: one lock, 100% (someone is always in my way); 16 stripes, 62%; 64 stripes, 21%; 256 stripes, 5.7%. Real threads spend most of their time outside the map, so real collisions are rarer still, but the trend is what matters: more stripes, fewer collisions, and each stripe costs only one more small lock.</p>
+
+<p>Now send 50% of all traffic to one celebrity's key. With 256 stripes the chance stays above 50%, and more stripes barely help, because every one of those operations needs <em>the same</em> stripe. Striping fixes contention spread across many keys. It can't fix one <b>hot key</b>. For that you split the key itself, as <code>LongAdder</code> does for a counter (several cells, summed on read), or batch updates on each thread and apply them together.</p>
+
+<h3>Two keys at once: deadlock</h3>
+
+<p>A bank transfer touches two accounts and must hold both stripes' locks, so no one sees the money in flight. The obvious code:</p>
+
+<pre><code>def transfer(m, src, dst, amount):     # deadlock-prone: don't copy this
+    with m.lock_for(src):              # thread 1: transfer(x, y) takes x's stripe
+        with m.lock_for(dst):          # thread 2: transfer(y, x) takes y's stripe
+            ...                        # each now waits for the other's lock: forever</code></pre>
+
+<p>Two threads, each holding one lock and waiting for the other's, is a <b>deadlock</b>. Picture two cars meeting head-on on a one-lane bridge, each waiting for the other to back up. A deadlock needs a cycle of waiting: 1 waits for 2, 2 waits for 1.</p>
+
+<p>The fix is to agree on one global order: <b>always take the lower-numbered stripe first</b>. Now both threads reach for the same lock first. Whoever gets it also takes the second and finishes; the other waits while holding nothing. A thread holding stripe 9 is never waiting for stripe 3, so no cycle can form. One more trap: if both keys are in the same stripe, take that lock once. Python's <code>threading.Lock</code> isn't <b>re-entrant</b> (the thread holding it can't take it again), so a second acquire waits for itself forever.</p>
+
+<h3>Whole-map questions: size and snapshots</h3>
+
+<p>"How many keys?" and "what's the total of all balances?" touch every stripe. Add up the stripes one at a time while transfers run and you can count money twice or not at all: a transfer can move money from a stripe you haven't read yet into one you already have. A <b>consistent snapshot</b> needs every stripe lock at once, taken in order: a stop-the-world moment you want to be rare. For the size, real maps keep a count per stripe and add the counts without any lock, accepting that the answer may be a moment out of date. Java's <code>ConcurrentHashMap</code> documents its <code>size()</code> exactly that way.</p>
+
+<div class="keyidea"><p>Lock striping splits one lock into S, chosen by <code>hash(key) % S</code>, so operations on different stripes run in parallel. Take two stripes in increasing order to rule out deadlock. Striping can't help a single hot key, and whole-map snapshots still need every lock.</p></div>
+
+<details class="aside deeper">
+  <summary>Go deeper: Java's ConcurrentHashMap, then and now</summary>
+  <ul>
+    <li><b>Java 5 to 7: segments.</b> The map was split into segments (16 by default, set by <code>concurrencyLevel</code>), each a small hash table with its own lock: lock striping exactly as above. Reads mostly took no lock. <code>size()</code> first tried to add up the segments without locking (twice, checking nothing changed) and only locked every segment if the map kept changing.</li>
+    <li><b>Java 8 onwards: a lock per bucket.</b> The rewrite dropped segments. Putting a key into an empty bucket is one CAS, no lock. A non-empty bucket is locked by synchronizing on its first node, so the number of "stripes" grows with the table. Reads take no lock at all: writers publish fully built nodes, and readers use volatile reads (the acquire side from section 6). A bucket that collects 8 or more entries turns into a small balanced tree (once the table has at least 64 buckets). When the table grows, threads that run into a bucket being moved help move buckets instead of waiting. The size is kept in a <code>LongAdder</code>-style set of counter cells.</li>
+    <li><b>Other languages.</b> Go's built-in map isn't safe for concurrent writes; the runtime detects it and crashes with "concurrent map writes". Go's <code>sync.Map</code> is documented for two cases: keys written once and read many times, and goroutines working on disjoint keys. In Python, one <code>dict</code> operation is safe (the GIL, or internal locks in the free-threaded build), but read-change-write needs your own lock.</li>
+  </ul>
+</details>
+
+<div class="check" id="check-stripes">
+  <p class="q">A rate limiter keeps per-user request counters in a map with 256 stripes. One celebrity account sends 40% of all requests, and the map is a bottleneck. What would 4,096 stripes do?</p>
+  <div class="opts">
+    <button>Cut contention by about 16×</button>
+    <button data-correct>Barely help: the celebrity's key is in one stripe either way; split that counter instead</button>
+    <button>Make it worse, because more locks use more memory</button>
+  </div>
+  <div class="fb right"><p>Right. 40% of operations need the same stripe no matter how many stripes exist. Give the hot key several counter cells (each thread adds to one, reads sum them), or count locally and flush in batches.</p></div>
+  <div class="fb wrong"><p>More stripes lower the chance that two <em>different</em> keys share a lock. The celebrity's requests all use the <em>same</em> key, so they all hash to the same stripe, whether there are 256 stripes or 4,096. The slider in the figure shows it: at 50% on one key, adding stripes stops helping. The memory cost of 4,096 small locks is real but tiny, and it isn't what limits you. The fix is to stop funneling 40% of writes through one variable: split that counter into cells and add them up when someone reads it.</p></div>
+</div>
+
+<div class="check" id="check-deadlock">
+  <p class="q">Thread 1 runs <code>transfer(x, y)</code> while thread 2 runs <code>transfer(y, x)</code>. Key x is in stripe 3, y in stripe 9. Both follow "lower stripe first". What happens?</p>
+  <div class="opts">
+    <button>They can still deadlock if they start at exactly the same instant</button>
+    <button data-correct>Both reach for stripe 3 first; one gets it and finishes, the other waits holding nothing</button>
+    <button>Each takes its own source's stripe first, so they deadlock</button>
+  </div>
+  <div class="fb right"><p>Right. The direction of the transfer no longer matters: both take 3, then 9. A thread holding 9 never waits for 3, so no cycle of waiting can form.</p></div>
+  <div class="fb wrong"><p>The rule ignores which key is the source. Both threads compute the same order, 3 then 9. Only one can hold stripe 3; the other blocks on stripe 3 while holding <em>no</em> lock. The winner takes 9 (nobody else holds it), finishes, and releases both. Then the other one goes. Starting at the same instant changes who wins, not whether someone does. A deadlock needs two threads each holding a lock the other wants, and a global order makes that impossible.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>In real systems: which tool when</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>What you need</th><th>Tool</th><th>Where you'll see it</th></tr></thead>
+  <tbody>
+    <tr><td>One producer, one consumer, the consumer must never wait for a lock</td><td>SPSC ring with release / acquire counters</td><td>Linux <code>io_uring</code> (a submission ring and a completion ring shared by your program and the kernel), network card receive rings, the kernel's <code>kfifo</code>, audio engines</td></tr>
+    <tr><td>Many producers and consumers, waiting is fine</td><td>a lock, a ring or deque, and two condition variables (places where a thread sleeps until another signals it: one for "not empty", one for "not full")</td><td>Python's <code>queue.Queue</code>, Java's <code>ArrayBlockingQueue</code>, Go's buffered channels (a mutex around a ring)</td></tr>
+    <tr><td>Many producers and consumers, nobody may wait on a paused thread</td><td>Michael-Scott queue (unbounded), or a bounded ring with per-slot sequence numbers</td><td>Java's <code>ConcurrentLinkedQueue</code>; Vyukov's bounded queue; the LMAX Disruptor</td></tr>
+    <tr><td>A map many threads write</td><td>lock striping or a lock per bucket, lock-free reads</td><td>Java's <code>ConcurrentHashMap</code></td></tr>
+    <tr><td>Data read constantly, changed rarely (config, routing tables)</td><td>build a new immutable copy, then swap one reference to it</td><td>Java's <code>CopyOnWriteArrayList</code>; Linux's RCU (read-copy-update)</td></tr>
+    <tr><td>Reads far outnumber writes, and each read holds the data a while</td><td>a readers-writer lock: many readers at once, or one writer alone (every reader still writes the lock's reader count, one shared cache line, so very short reads gain little)</td><td>Java's <code>ReentrantReadWriteLock</code>, C++ <code>std::shared_mutex</code>, Go's <code>sync.RWMutex</code></td></tr>
+    <tr><td>One counter hammered by every core</td><td>per-thread or striped cells, summed on read</td><td>Java's <code>LongAdder</code></td></tr>
+    <tr><td>No sharing at all</td><td>give each key to exactly one thread, and send it messages</td><td>Redis runs commands on one main thread; Kafka gives each partition one consumer in a group</td></tr>
+  </tbody>
+</table></div>
+
+<p>The order to reach for them: first a lock, because it's simple and correct. Measure. If the lock is hot, make the critical section shorter, then share less (stripes, one writer per variable, per-thread data). Go lock-free only when a thread truly must never wait for another one, and prefer a well-tested library structure to your own: lock-free code is famously easy to get almost right.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: how people test concurrent code</summary>
+  <p>Bugs that need one unlucky interleaving out of a billion don't show up in ordinary tests. Tools that help: <b>race detectors</b> watch memory accesses at run time and report unsynchronized ones (ThreadSanitizer for C, C++ and Rust; <code>go test -race</code>, which is built on it). <b>Interleaving explorers</b> run a test under a scheduler that tries many orders deliberately: Rust's <code>loom</code>. <b>Stress harnesses</b> such as Java's <code>jcstress</code> run tiny concurrent tests millions of times on real cores and report every outcome they saw, including the "impossible" ones. <b>Model checkers</b> such as TLA+ check a design before any code exists. The <code>mpmc_queue</code> exercise below uses the explorer idea: its tests own the scheduler and choose every interleaving.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>What to say in the interview</h2>
+
+<p>For "design a thread-safe counter / queue / cache", a strong answer goes in this order:</p>
+<ol>
+  <li><b>Name what's shared and who writes it.</b> "Eight request threads write the counter; one reporter reads it once a minute."</li>
+  <li><b>Start correct:</b> one lock around the shared state, and say why the naive version breaks ("<code>+= 1</code> is read, change, write; two threads can read the same value").</li>
+  <li><b>Say where it stops scaling:</b> "every operation queues on one lock, and its cache line bounces between cores; with a quarter of the time under the lock, 16 cores give about 3.4×."</li>
+  <li><b>Share less:</b> per-thread cells summed on read for the counter; lock striping for a map; one writer per variable for a one-to-one hand-off (SPSC ring). Mention padding against false sharing.</li>
+  <li><b>Lock-free only if it's earned:</b> "if a thread must never wait on a paused one, I'd use a CAS-based queue like Michael-Scott, which is what <code>ConcurrentLinkedQueue</code> does. In C++ I'd also need to deal with ABA and memory reclamation, with hazard pointers or epochs."</li>
+</ol>
+<div class="story">
+  <p>"For the click counter: the bug is the lost update, since <code>+= 1</code> is three steps. A lock fixes it but serializes every click on one cache line. Since we read the total once a minute and write it millions of times, I'd give each thread its own counter, padded onto its own cache line, and have the reporter add them up; the sum can be a moment stale, which is fine for a dashboard. If the counts had to be exact at every instant, I'd say so and pay for the lock or an atomic add."</p>
+</div>
+<p>Habits that sound senior:</p>
+<ul>
+  <li>Name the guarantee you need: atomic, linearizable, lock-free, or just "eventually adds up".</li>
+  <li>Say what a stale read costs in your design ("it says full a moment early").</li>
+  <li>Keep the hardware in the picture: cache lines, false sharing, and that x86 hides reordering bugs Arm shows.</li>
+  <li>Know Python's limits: the GIL doesn't make <code>+=</code> atomic, and there's a free-threaded build now.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li><code>x += 1</code> is read, change, write. Two threads can read the same value and lose an update: 18 of the 20 interleavings of two increments do.</li>
+  <li>A lock makes a critical section atomic. It caps throughput at 1 / (time inside), and Amdahl's law caps speedup at 1 / (serial fraction).</li>
+  <li>Cores share memory in 64-byte cache lines. Writing a shared line makes it travel between cores; two variables on one line false-share.</li>
+  <li>SPSC ring: the producer owns <code>tail</code>, the consumer owns <code>head</code>, counters only grow, so no lock. Stale reads are cautious, never wrong.</li>
+  <li>Write the item, then publish the counter, with a release store and an acquire load. x86 keeps store order; Arm doesn't.</li>
+  <li>CAS writes only if the value is unchanged; wrap it in a retry loop. Lock-free: someone always finishes, even if others pause forever.</li>
+  <li>Michael-Scott queue: link with a CAS on <code>last.next</code>, then swing <code>tail</code>; anyone who finds the tail lagging helps. ABA needs tags, hazard pointers, epochs or a GC.</li>
+  <li>Concurrent map: stripe the locks by <code>hash(key) % S</code>, take two in increasing order, and split hot keys; whole-map snapshots need every lock.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do them in order. Warm-ups are pen and paper: commit to an answer before you open it. Core exercises are code in <code>exercises/</code>. Their tests <b>measure what your code does</b>: which locks it takes and in what order, how often it reads the other thread's counter, how many CAS it spends, and whether other threads can still finish while one is paused.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Count the interleavings</h4>
+  <p>Two threads each run <code>x += 1</code> as three steps (read, add, write), starting from x = 0. (a) How many interleavings are there, and in how many does x end at 2? (b) Same question if a thread's steps are only "read" and "write x = value read + 1". (c) Now each thread wraps its steps in a lock (take, read, add, write, release). Which interleavings are still possible, and what is x at the end?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Choose which 3 of 6 positions are thread A's: 6!/(3!·3!) = 20 interleavings. x = 2 only when one thread's write comes before the other's read, which with read as each thread's first step means all of A then all of B, or the reverse: 2 of 20. (b) 4!/(2!·2!) = 6 interleavings, again 2 correct (AABB and BBAA). (c) Once A has taken the lock, B's "take" can't complete until A releases, so B's read, add and write can't fall between A's. Only two orders of the critical sections exist, A's then B's or B's then A's, and both end at x = 2.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Run an SPSC ring by hand</h4>
+  <p>A ring of capacity 4 starts with head = tail = 0. Run: push a, push b, push c, pop, push d, push e, push f, pop, push f. For each step give head, tail, which slot was touched, and whether a push was refused. Then: with 64-bit counters and 2 billion items a second, how long until <code>tail</code> wraps?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>push a: slot 0, tail 1. push b: slot 1, tail 2. push c: slot 2, tail 3. pop: takes a from slot 0, head 1. push d: slot 3, tail 4. push e: slot 4 &amp; 3 = 0, tail 5. push f: tail − head = 5 − 1 = 4 = capacity, so refused. pop: takes b from slot 1, head 2. push f: slot 5 &amp; 3 = 1, tail 6. The ring now holds c, d, e, f in slots 2, 3, 0, 1. Wrapping: 2⁶⁴ / (2 × 10⁹ per second) ≈ 9.2 × 10⁹ s ≈ 292 years.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Pick the tool</h4>
+  <p>Name the structure and the one-line reason: (a) a video decoder thread feeding frames to the one render thread, which must never stall; (b) 32 request threads sending log lines to one disk-writer thread, where a short wait is acceptable; (c) per-endpoint request counts updated by 64 threads and read once a minute; (d) a feature-flag table read a million times a second and changed twice a day; (e) a session map with 100,000 users and 32 threads.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) SPSC ring: one producer and one consumer, no lock, so the render thread never waits on a paused decoder. (b) A bounded blocking queue (a lock and condition variables, like <code>queue.Queue(maxsize=…)</code>): many producers, waiting is allowed, and the bound gives backpressure if the disk falls behind. (c) Per-thread (or striped) counters, padded, summed by the reader: writes never contend, and a minute-old sum is fine. (d) An immutable snapshot behind one reference: readers just read, a writer builds a new table and swaps the reference. (e) A striped (or per-bucket-locked) concurrent map: 100,000 users spread over many stripes rarely collide.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>SPSCRingBuffer</code>: one producer, one consumer, no lock</h4>
+  <p>In <code>exercises/spsc_ring_buffer.py</code>: <code>try_push</code>, <code>try_pop</code> and <code>len</code> on a power-of-two ring with counters that never wrap (sections 5 and 6). The tests swap in a recording slot list and check, at the moment of every access, that the item is written before <code>tail</code> moves and read and cleared before <code>head</code> moves; that push never writes <code>head</code> and pop never writes <code>tail</code>; and that each side reads the other's counter at most twice per 64 operations (re-reading every call costs 64). Then a real producer thread and consumer thread pass 30,000 items through a ring of 8.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>StripedHashMap</code>: many locks, in order</h4>
+  <p>In <code>exercises/striped_hash_map.py</code>: get, put, delete, an atomic <code>compute(key, fn)</code>, a two-key <code>transfer</code>, a consistent <code>total()</code> and a lock-free <code>len</code> (section 9). The tests hand you locks that record every acquire: single-key operations must take exactly their stripe's lock, keys must spread over all stripes (one global lock fails), <code>transfer</code> must take its two stripes in increasing order (or one, if they're the same), and <code>total()</code> must hold all of them at once. Then 8 real threads must lose no increments, and 6 threads of random transfers must never create or destroy money, or deadlock.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>MSQueue</code>: a lock-free queue on simulated threads</h4>
+  <p>In <code>exercises/mpmc_queue.py</code>: the Michael-Scott queue (section 8), written as generators where every shared access is a <code>yield from</code> on an <code>AtomicRef</code>. The tests own the scheduler: they run seeded random interleavings of up to 6 threads and check that every value comes out once, in each producer's order, and that EMPTY is returned only when the queue could have been empty. They pause an operation forever at every possible step and require every other thread to finish within 60 steps (a spin lock, or waiting for the lagging tail, fails). With an enqueue paused just after its link, a dequeue must still return that item and must not move head past the lagging tail. Alone, an enqueue must cost exactly 2 CAS and a dequeue 1, whatever the length.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure</div>
+  <h4>7. Lose updates in your own Python</h4>
+  <p>Run section 1's counter (the code in section 3) with 8 threads on your Python, first as <code>clicks += 1</code>, then as <code>c.v = inc(c.v)</code> through a function, then with a lock. Which versions lose updates, and how often? Time the locked one against a single thread doing all the work. If you can install a free-threaded build (<code>python3.14t</code>), repeat the runs there and explain every difference.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>8. A metrics counter for 64 cores</h4>
+  <p>Design a counter library that 64 threads increment 50 million times a second in total, and a reporter reads every 10 seconds. Compare a lock, one atomic fetch-and-add, and per-thread padded cells: where does each one's cost go, and what guarantee does each give the reader? What changes if threads are created and destroyed constantly?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>9. Say it out loud</h4>
+  <p>Set a 3-minute timer and answer: "How does a lock-free queue work, and when would you not use one?" Did you cover CAS and its retry loop, the dummy node, helping a lagging tail, what lock-free promises (and that it isn't a speed promise), ABA, and a simpler alternative?</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k "spsc_ring_buffer or striped_hash_map or mpmc_queue"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="storage-structures.html"><small>← Previous</small>Built for the disk</a>
+  <a class="next" href="../index.html"><small>Next →</small>Chapter 1 overview</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- Figure 1: you are the scheduler (section 2) ----
+  (function () {
+    var box = $("sched-viz");
+    var PROGS = {
+      plain: ["r = read x", "r = r + 1", "write r to x"],
+      lock: ["take the lock", "r = read x", "r = r + 1", "write r to x", "release the lock"],
+      atomic: ["x = x + 1, as one atomic step"],
+    };
+    var mode = "plain", st;
+    var stage = V.el("div", { class: "viz-stage" });
+    var cap = V.el("div", { class: "viz-caption", "aria-live": "polite" });
+    function done(name) { return st.t[name].pc >= PROGS[mode].length; }
+    function reset() {
+      st = { x: 41, holder: null, log: "Both threads are about to add 1 to x. The right answer is 43. Step them in any order.", t: { A: { pc: 0, r: null }, B: { pc: 0, r: null } } };
+      draw();
+    }
+    function step(name) {
+      var th = st.t[name], prog = PROGS[mode], other = name === "A" ? "B" : "A";
+      if (done(name)) { st.log = "Thread " + name + " has finished. Step " + other + "."; return draw(); }
+      var line = prog[th.pc];
+      if (line === "take the lock") {
+        if (st.holder && st.holder !== name) { st.log = "Thread " + name + " <b>must wait</b>: thread " + other + " holds the lock. Only " + other + " can move."; return draw(); }
+        st.holder = name; st.log = name + " takes the lock.";
+      } else if (line === "release the lock") { st.holder = null; st.log = name + " releases the lock."; }
+      else if (line === "r = read x") { th.r = st.x; st.log = name + " reads x = " + st.x + " into its own register."; }
+      else if (line === "r = r + 1") { th.r += 1; st.log = name + " adds 1 in its register: r = " + th.r + ". Shared x is still " + st.x + "."; }
+      else if (line === "write r to x") { st.x = th.r; st.log = name + " writes " + th.r + " to x."; }
+      else { st.x += 1; st.log = name + " adds 1 to x in one indivisible step: x = " + st.x + "."; }
+      th.pc++;
+      if (done("A") && done("B")) {
+        st.log += st.x === 43 ? " Both finished: <b>x = 43</b>, correct." : " Both finished: <b>x = " + st.x + "</b>. One update was lost: both threads read 41 before either wrote.";
+      }
+      draw();
+    }
+    function threadCol(name) {
+      var th = st.t[name], prog = PROGS[mode];
+      return V.el("div", {},
+        V.el("div", { class: "small muted" }, "Thread " + name + (st.holder === name ? " · holds the lock" : "")),
+        prog.map(function (line, i) {
+          var cur = i === th.pc;
+          return V.el("div", { class: "small" + (i < th.pc ? " muted" : "") }, i < th.pc ? "✓ " : cur ? "▶ " : "· ", cur ? V.el("b", {}, line) : line);
+        }),
+        V.el("div", { class: "small" }, "register r = " + (th.r === null ? "(empty)" : th.r)));
+    }
+    function draw() {
+      var finished = done("A") && done("B");
+      stage.replaceChildren(
+        V.el("div", { class: "small muted" }, "shared memory"),
+        V.cells([st.x], { idx: false, label: function (v) { return "x = " + v; }, cls: function () { return finished ? (st.x === 43 ? "done" : "bad") : ""; } }),
+        V.el("div", { class: "cols" }, threadCol("A"), threadCol("B")));
+      cap.innerHTML = st.log;
+    }
+    var sel = V.el("select", { "aria-label": "Mode", onchange: function (e) { mode = e.target.value; reset(); } },
+      V.el("option", { value: "plain" }, "Plain x += 1"), V.el("option", { value: "lock" }, "With a lock"), V.el("option", { value: "atomic" }, "Atomic add"));
+    var controls = V.el("div", { class: "viz-controls" },
+      V.el("button", { class: "btn primary", onclick: function () { step("A"); } }, "Step A"),
+      V.el("button", { class: "btn primary", onclick: function () { step("B"); } }, "Step B"),
+      V.el("button", { class: "btn", onclick: reset }, "Reset"), sel);
+    box.append(stage, cap, controls);
+    reset();
+  })();
+
+  // ---- Figure 2: the SPSC ring, right order and the bug (sections 5 and 6) ----
+  (function () {
+    var CAP = 4, MASK = 3;
+    var mk = function (i, c) { var o = {}; o[i] = c; return o; };
+    function goodFrames() {
+      var slots = [null, null, null, null], head = 0, tail = 0, frames = [];
+      var snap = function (msg, mark) { frames.push({ slots: slots.slice(), head: head, tail: tail, mark: mark || {}, msg: msg }); };
+      snap("An empty ring of 4 slots. head = tail = 0, so it holds tail − head = 0 items.");
+      function push(v) {
+        if (tail - head === CAP) { snap("push " + v + ": tail − head = " + tail + " − " + head + " = 4 = capacity. <b>Full</b>: refuse and change nothing.", {}); return; }
+        var i = tail & MASK;
+        slots[i] = v;
+        snap("push <b>" + v + "</b>: write it into slot " + tail + " &amp; 3 = " + i + ". tail is still " + tail + ", so the consumer can't see it yet.", mk(i, "hl"));
+        tail++;
+        snap("…then publish: tail = " + tail + ". Now the consumer may take it. Items: " + tail + " − " + head + " = " + (tail - head) + ".", {});
+      }
+      function pop() {
+        if (tail === head) { snap("pop: tail = head = " + head + ". <b>Empty</b>: nothing to take.", {}); return; }
+        var i = head & MASK, v = slots[i];
+        snap("pop: read slot " + head + " &amp; 3 = " + i + ": <b>" + v + "</b>. head is still " + head + ", so the producer won't reuse this slot yet.", mk(i, "cmp"));
+        slots[i] = null; head++;
+        snap("…clear the slot, then free it: head = " + head + ". Items: " + tail + " − " + head + " = " + (tail - head) + ".", mk(i, "dim"));
+      }
+      push("a"); push("b"); push("c"); pop(); push("d"); push("e"); push("f"); pop(); push("f");
+      pop(); pop(); pop(); pop(); pop();
+      frames[frames.length - 1].msg += " The counters kept growing past 4; only <code>&amp; 3</code> wraps.";
+      return frames;
+    }
+    function bugFrames() {
+      var f = [];
+      var S = function (slots, head, tail, mark, msg) { f.push({ slots: slots, head: head, tail: tail, mark: mark, msg: msg, bug: true }); };
+      S([null, null, null, null], 0, 0, {}, "The bug: a producer that publishes first. The ring is empty, head = tail = 0.");
+      S([null, null, null, null], 0, 1, mk(0, "warn"), "The producer wants to push x into slot 0, but moves <b>tail first</b>: tail = 1. Slot 0 is still empty.");
+      S([null, null, null, null], 0, 1, mk(0, "bad"), "The consumer runs now. tail − head = 1, so it reads slot 0… which holds nothing yet (in C: whatever old bytes were there). It returns <b>garbage</b>.");
+      S([null, null, null, null], 1, 1, mk(0, "bad"), "The consumer frees the slot: head = 1. As far as it knows, it took one item.");
+      S(["x", null, null, null], 1, 1, mk(0, "bad"), "Only now does the producer write x into slot 0. Nobody will ever read it: the consumer has moved past. <b>One garbage item delivered, x lost.</b> Write first, publish last.");
+      return f;
+    }
+    var good = goodFrames(), bug = bugFrames(), showingBug = false, api;
+    var toggle = V.el("button", { class: "btn", onclick: function () {
+      showingBug = !showingBug;
+      toggle.textContent = showingBug ? "Show the right order" : "Show the bug";
+      api.load(showingBug ? bug : good);
+    } }, "Show the bug");
+    var inRing = function (f, i) { for (var s = f.head; s < f.tail; s++) if ((s & MASK) === i) return true; return false; };
+    api = V.player($("spsc-player"), {
+      frames: good, speed: 1100, extraControls: [toggle],
+      draw: function (f, stage) {
+        var ptrs = {}, h = f.head & MASK, t = f.tail & MASK;
+        if (h === t) ptrs[h] = "head, tail"; else { ptrs[h] = "head"; ptrs[t] = "tail"; }
+        stage.append(
+          V.el("div", { class: "small muted" }, "tail = " + f.tail + " (only the producer writes it) · head = " + f.head + " (only the consumer writes it)"),
+          V.cells(f.slots, { ptrs: ptrs, cls: function (i) { return f.mark[i] || (!f.bug && inRing(f, i) ? "win" : ""); } }));
+      },
+    });
+  })();
+
+  // ---- Figure 3: two enqueuers in the Michael-Scott queue (section 8) ----
+  (function () {
+    var frames = [];
+    var F = function (nodes, head, tail, mark, a, b, msg) { frames.push({ nodes: nodes, head: head, tail: tail, mark: mark, a: a, b: b, msg: msg }); };
+    var N1 = ["dummy", "1"], N2 = ["dummy", "1", "A"], N3 = ["dummy", "1", "A", "B"];
+    var o = function (i, c) { var m = {}; m[i] = c; return m; };
+    F(N1, 0, 1, {}, "wants to enqueue A", "wants to enqueue B", "The queue holds 1, after the dummy. head points at the dummy, tail at node 1. A and B have each made a node, not yet linked.");
+    F(N1, 0, 1, o(1, "cmp"), "last = 1", "wants to enqueue B", "A reads tail: last = node 1.");
+    F(N1, 0, 1, o(1, "cmp"), "last = 1", "last = 1", "B reads tail too: last = node 1.");
+    F(N1, 0, 1, o(1, "cmp"), "last = 1, and 1.next is empty", "last = 1", "A reads 1.next: empty. Node 1 really is the end.");
+    F(N1, 0, 1, o(1, "cmp"), "last = 1, and 1.next is empty", "last = 1, and 1.next is empty", "B reads 1.next: empty, for B too. Both are about to CAS the same pointer.");
+    F(N2, 0, 1, o(2, "hl"), "CAS(1.next, empty → A) ✓", "last = 1, and 1.next is empty", "A: <b>CAS(1.next, empty → A) succeeds</b>. A is in the queue: this is the instant A's enqueue happens. tail still points at 1: it's lagging.");
+    F(N2, 0, 1, o(1, "bad"), "paused by the OS", "CAS(1.next, empty → B) ✗", "B: <b>CAS(1.next, empty → B) fails</b>: 1.next is A now, not empty. Nothing changed. B starts over. Meanwhile the operating system pauses A.");
+    F(N2, 0, 1, o(1, "cmp"), "paused by the OS", "last = 1, and 1.next = A", "B reads tail: still node 1. It reads 1.next: A, not empty. So the tail is lagging.");
+    F(N2, 0, 2, o(2, "hl"), "paused by the OS", "CAS(tail, 1 → A) ✓ (helping)", "B doesn't wait for A. It <b>moves the tail itself</b>: CAS(tail, 1 → A) succeeds.");
+    F(N2, 0, 2, o(2, "cmp"), "paused by the OS", "last = A, and A.next is empty", "B starts over: tail is A, and A.next is empty.");
+    F(N3, 0, 2, o(3, "hl"), "paused by the OS", "CAS(A.next, empty → B) ✓", "B: <b>CAS(A.next, empty → B) succeeds</b>. B's enqueue happens here.");
+    F(N3, 0, 3, o(3, "hl"), "paused by the OS", "CAS(tail, A → B) ✓ · done", "B moves the tail to its own node. B is done, and it never waited for A.");
+    F(N3, 0, 3, o(2, "bad"), "CAS(tail, 1 → A) ✗ · done", "done", "A wakes and tries CAS(tail, 1 → A). It <b>fails</b>: tail has already moved on. That's fine: someone helped, and A's item was in the queue all along. A is done.");
+    F(N3, 0, 3, {}, "done", "done", "Both items are in, in the order their link CASes succeeded: A, then B. Two failed CASes, each one caused by another thread's success.");
+    V.player($("msq-player"), {
+      frames: frames, speed: 1300,
+      draw: function (f, stage) {
+        var ptrs = {};
+        if (f.head === f.tail) ptrs[f.head] = "head, tail"; else { ptrs[f.head] = "head"; ptrs[f.tail] = "tail"; }
+        stage.append(
+          V.el("div", { class: "small muted" }, "the list (each node's next is the node to its right)"),
+          V.cells(f.nodes, { idx: false, ptrs: ptrs, cls: function (i) { return f.mark[i] || ""; } }),
+          V.el("div", { class: "small" }, V.el("b", {}, "Thread A: "), f.a),
+          V.el("div", { class: "small" }, V.el("b", {}, "Thread B: "), f.b));
+      },
+    });
+  })();
+
+  // ---- Figure 4: lock striping, collisions and a hot key (section 9) ----
+  (function () {
+    var lcg = function (seed) { var s = seed >>> 0; return function () { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; };
+    var pct = function (p) { return (p * 100).toFixed(p < 0.1 ? 1 : 0) + "%"; };
+    function show() {
+      var T = Number($("st-t").value), S = Math.pow(2, Number($("st-s").value)), h = Number($("st-h").value) / 100;
+      $("st-tval").textContent = T; $("st-sval").textContent = S; $("st-hval").textContent = Math.round(h * 100) + "%";
+      var qHot = h + (1 - h) / S, qCold = (1 - h) / S;
+      var pFree = qHot * Math.pow(1 - qHot, T - 1) + (S - 1) * qCold * Math.pow(1 - qCold, T - 1);
+      var p = 1 - pFree;
+      var r = lcg(T * 7919 + S * 31 + Math.round(h * 100)), shown = Math.min(S, 32), counts = [];
+      for (var i = 0; i < shown; i++) counts.push(0);
+      for (var t = 0; t < T; t++) { var s = r() < h ? 0 : Math.floor(r() * S); if (s < shown) counts[s]++; }
+      var rows = [];
+      for (var k = 0; k < shown; k += 8) {
+        var part = counts.slice(k, k + 8);
+        rows.push(V.cells(part.map(function (c) { return c || null; }), { idx: false, ptrs: k === 0 && h > 0 ? { 0: "hot key" } : {}, cls: function (i) { return part[i] >= 2 ? "bad" : part[i] === 1 ? "win" : ""; } }));
+      }
+      var note = S > shown ? V.el("div", { class: "small muted" }, "(showing the first 32 of " + S + " stripes)") : null;
+      $("st-out").replaceChildren.apply($("st-out"), rows.concat(note ? [note] : []));
+      $("st-msg").innerHTML = "With " + T + " threads all inside the map and " + S + " stripe" + (S > 1 ? "s" : "") +
+        (h > 0 ? ", " + Math.round(h * 100) + "% of operations on one hot key" : ", keys spread evenly") +
+        ": the chance that my stripe is already held is <b>" + pct(p) + "</b>." +
+        (h > 0 && S >= 64 ? " Most of that is the hot key's one stripe: more stripes can't split it." : "");
+    }
+    ["st-t", "st-s", "st-h"].forEach(function (id) { $(id).oninput = show; });
+    show();
+  })();
+})();
+</script>
+</body>
+</html>

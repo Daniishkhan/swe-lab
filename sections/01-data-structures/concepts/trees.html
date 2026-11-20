@@ -184,7 +184,7 @@
 
 <details class="aside deeper">
   <summary>Go deeper: "what's my rank?" (order-statistic trees)</summary>
-  <p>The leaderboard also wants "you're ranked #48,213". A plain BST can't answer that without counting. The fix is to <b>augment</b> it: store in each node the size of its subtree. Then rank(x) walks down once: each time you go right, add the size of the left subtree plus one. "Who's ranked #k?" walks down the same way. Both are O(height). Inserts and deletes update sizes along their path at no extra Big-O cost. This is called an <b>order-statistic tree</b>. Redis does the same job for its sorted sets with a skip list that stores span counts (topic 01.11).</p>
+  <p>The leaderboard also wants "you're ranked #48,213". A plain BST can't answer that without counting. The fix is to <b>augment</b> it: store in each node the size of its subtree. Then rank(x) walks down once: each time you go right, add the size of the left subtree plus one. "Who's ranked #k?" walks down the same way. Both are O(height). Inserts and deletes update sizes along their path at no extra Big-O cost. This is called an <b>order-statistic tree</b>. Redis does the same job for its sorted sets with a skip list that stores span counts (<a href="skip-lists.html">topic 01.11</a>).</p>
 </details>
 
 <div class="check" id="check-successor">
@@ -339,7 +339,7 @@
 
 <details class="aside deeper">
   <summary>Go deeper: B-trees, when nodes live on disk</summary>
-  <p>A binary tree with a billion keys has 30 levels. In memory, 30 steps is nothing. On disk, each step can be a separate read, and a random read on an SSD is around 100 µs, about 1,000 times slower than RAM. So databases use fat nodes: a <b>B-tree</b> node holds hundreds of sorted keys and has hundreds of children, sized to fill one disk page (4–16 KB). With 500 children per node, a billion keys fit in about 4 levels (500⁴ = 6.25 × 10¹⁰), and the top levels stay cached in memory. Same BST rule and the same in-order sorted output, but a different way to stay balanced: when a node overflows, it splits in two and pushes its middle key up to the parent, so the tree grows at the root and every leaf stays at the same depth. (A red-black tree is secretly a B-tree with up to 4 children per node, drawn as a binary tree.) The default index in every major relational database (PostgreSQL, MySQL's InnoDB, SQLite) is a B-tree variant. Topic 01.13 covers them.</p>
+  <p>A binary tree with a billion keys has 30 levels. In memory, 30 steps is nothing. On disk, each step can be a separate read, and a random read on an SSD is around 100 µs, about 1,000 times slower than RAM. So databases use fat nodes: a <b>B-tree</b> node holds hundreds of sorted keys and has hundreds of children, sized to fill one disk page (4–16 KB). With 500 children per node, a billion keys fit in about 4 levels (500⁴ = 6.25 × 10¹⁰), and the top levels stay cached in memory. Same BST rule and the same in-order sorted output, but a different way to stay balanced: when a node overflows, it splits in two and pushes its middle key up to the parent, so the tree grows at the root and every leaf stays at the same depth. (A red-black tree is secretly a B-tree with up to 4 children per node, drawn as a binary tree.) The default index in every major relational database (PostgreSQL, MySQL's InnoDB, SQLite) is a B-tree variant. <a href="storage-structures.html">Topic 01.13</a> covers them.</p>
 </details>
 
 <div class="check" id="check-rotation">
@@ -361,7 +361,7 @@
     <li><b>Lowest common ancestor:</b> in a BST, walk down from the root until the two keys split to different sides. In a plain binary tree, use post-order: a node is the answer if its subtrees each report one of the two, or if it is one of the two and either subtree reports the other (one key is an ancestor of the other).</li>
     <li><b>Serialize a tree:</b> pre-order with markers for empty spots rebuilds it exactly. In-order alone can't: many shapes share one in-order sequence. Pre-order plus in-order (no duplicates) can.</li>
     <li><b>Duplicates:</b> decide up front (counts in the node, or "equal goes right") and say how search, delete and range treat them.</li>
-    <li><b>Other balanced trees:</b> treaps (random priorities, balanced in expectation), splay trees (recently used keys move to the root), skip lists (topic 01.11; easier to make concurrent, which is why Java has <code>ConcurrentSkipListMap</code> but no concurrent <code>TreeMap</code>).</li>
+    <li><b>Other balanced trees:</b> treaps (random priorities, balanced in expectation), splay trees (recently used keys move to the root), skip lists (<a href="skip-lists.html">topic 01.11</a>; easier to make concurrent, which is why Java has <code>ConcurrentSkipListMap</code> but no concurrent <code>TreeMap</code>).</li>
   </ul>
 </details>
 

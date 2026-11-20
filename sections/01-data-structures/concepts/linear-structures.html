@@ -169,7 +169,7 @@ head = head.next                          # pop the front: O(1), nobody moves</c
              X.next.prev = X.prev      (Y now points back to W)
  Two pointer changes. O(1), even in a list of a billion nodes.</code></pre>
 
-<p>That's a <b>doubly linked list</b>. It costs one more pointer per node and gives O(1) removal of any node you're holding. It's the reason an LRU cache (a hash map pointing into a doubly linked list) can move an item to the front in O(1); you'll build one in the <a href="../index.html">LRU cache topic</a>.</p>
+<p>That's a <b>doubly linked list</b>. It costs one more pointer per node and gives O(1) removal of any node you're holding. It's the reason an LRU cache (a hash map pointing into a doubly linked list) can move an item to the front in O(1); you'll build one in the <a href="lru-lfu-cache.html">LRU cache chapter</a>.</p>
 
 <h3>Dummy nodes remove the special cases</h3>
 <p>Those two lines above crash when X is the first node (no <code>X.prev</code>) or the last (no <code>X.next</code>). The usual code fills up with <code>if node is head</code> branches, and that's where bugs hide in an interview.</p>

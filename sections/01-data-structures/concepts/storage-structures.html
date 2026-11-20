@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="01.13">
+  <title>Built for the disk (B-trees, LSM trees and the write-ahead log)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+  <style>
+    /* Multi-key tree nodes (B-tree figures). Theme tokens only. */
+    svg.viz .bt rect { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1.5; }
+    svg.viz .bt line { stroke: var(--border-strong); stroke-width: 1; }
+    svg.viz .bt text { fill: var(--text-strong); font-size: 13px; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+    svg.viz .bt.hl rect { fill: color-mix(in srgb, var(--accent) 14%, var(--surface)); stroke: var(--accent); stroke-width: 2.4; }
+    svg.viz .bt.warn rect { fill: color-mix(in srgb, var(--warn) 16%, var(--surface)); stroke: var(--warn); stroke-width: 2.4; }
+    svg.viz .bt.done rect { fill: color-mix(in srgb, var(--ok) 13%, var(--surface)); stroke: var(--ok); stroke-width: 2.2; }
+  </style>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 1 · Part 13</div>
+  <h1>Built for the disk</h1>
+  <div class="meta"><span><span class="badge P2">P2</span> B-tree, B+tree, LSM tree, SSTable, write-ahead log</span><span>about 65 minutes</span><span>10 quick checks · 8 exercises</span></div>
+</header>
+
+<p>Every structure so far lived in memory, where reading any address costs about the same. Real databases keep most of their data on a disk, where one read costs as much as a thousand memory reads on an SSD and a hundred thousand on a hard disk, data arrives in fixed-size chunks, and the power can go out halfway through a write. This chapter rebuilds the two designs that almost every database engine uses under the hood, the <b>B-tree</b> and the <b>LSM tree</b>, from those three facts. Then it adds the <b>write-ahead log</b>, the trick that lets both of them survive a crash.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain why disk structures count page reads, not comparisons, with real latency numbers.</li>
+    <li>Search and insert in a B-tree, splits included, and explain why it grows at the root.</li>
+    <li>Say how a B+tree differs from a B-tree and why databases use it: fanout and range scans.</li>
+    <li>State the write-ahead rule, and explain fsync, group commit and crash recovery.</li>
+    <li>Trace an LSM tree: memtable, flush, SSTable, read path, tombstones and compaction.</li>
+    <li>Choose between a B-tree and an LSM tree using read, write and space amplification.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: go top to bottom. Answer each quick check before reading on; a wrong answer gets the idea explained a different way. Grey "Go deeper" boxes are optional on a first read. This chapter builds on balanced trees from <a href="trees.html">Sorted and fast</a> and the k-way merge from <a href="heaps.html">The most urgent thing first</a>. It mentions skip lists (topic 01.11) and uses Bloom filters from <a href="probabilistic-structures.html">Probabilistic structures</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: a billion rows that don't fit in memory</h2>
+
+<div class="story">
+  <p>You're building the storage layer for a user-profile service: <b>1 billion</b> profiles of about <b>100 bytes</b> each, so 100 GB. The server has 16 GB of RAM, so the data has to live on an SSD. The product wants a profile by id in about a millisecond, and every update must survive a power cut.</p>
+  <p>You know a structure that finds a key fast: a balanced binary search tree. Put one on the disk, one node per spot on the drive. A tree of a billion keys is about 30 levels deep (log₂ of a billion is about 30), so a lookup visits 30 nodes. In memory that's 30 × 100 ns = 3 microseconds. On the SSD each visit is a separate read of about 0.1 ms: <b>30 × 0.1 ms = 3 ms</b> per lookup, three times over budget. On a hard disk, at about 10 ms per read, it's <b>0.3 seconds</b>.</p>
+  <p>Then the power goes out while an insert is rebalancing the tree. It had rewritten two nodes and was about to rewrite the third. After the reboot, one node points at a child that has the old contents. Part of the tree is unreachable, and nothing says which part.</p>
+</div>
+
+<p>Two problems, and neither one is about the algorithm. The first is about <b>how the disk reads</b>: what a single trip to the disk costs, and what it brings back. The second is about <b>what survives a crash</b>. The rest of the chapter fixes both, one step at a time, and the fixes turn out to be the B-tree, the write-ahead log and the LSM tree.</p>
+
+<div class="check" id="check-problem">
+  <p class="q">A balanced binary tree with 1 billion keys lives on an SSD, every node in a different place. About how long does one lookup take?</p>
+  <div class="opts">
+    <button>About 0.1 ms: the disk is read once for the lookup</button>
+    <button data-correct>About 3 ms: 30 levels, one disk read each</button>
+    <button>About 3 µs: 30 comparisons at memory speed</button>
+  </div>
+  <div class="fb right"><p>Right. The comparisons are free compared with the trips to the disk. 30 levels, 30 separate reads of about 0.1 ms each: 3 ms. On a hard disk, 30 × 10 ms is 0.3 s.</p></div>
+  <div class="fb wrong"><p>Follow one lookup. It starts at the root: one read. The root says "go left", and the left child lives somewhere else on the drive: a second read. Every level is a new place, so a new read, and there are about log₂(10⁹) ≈ 30 levels. The comparisons happen in memory and cost nanoseconds; the 30 reads cost 0.1 ms each. 30 × 0.1 ms = 3 ms. The time is all in the trips.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>The disk reads in pages</h2>
+
+<p>Picture a warehouse across town and one delivery truck. A trip costs about the same whether the truck brings back one envelope or a full load. If you need fifty things, the dumb plan is fifty trips. The smart plan is to pack things that are used together into the same crate, so one trip brings back everything the next step needs.</p>
+
+<p>A disk works like that warehouse. Every read pays a fixed cost to get started, and then brings back a whole block of bytes, never just one. The numbers, roughly:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Where the data is</th><th>One random read</th><th>Compared with RAM</th><th>Why it costs that</th></tr></thead>
+  <tbody>
+    <tr><td>RAM</td><td>about 100 ns</td><td>1×</td><td>electrical signals on a chip</td></tr>
+    <tr><td>SSD (flash)</td><td>about 0.1 ms (100 µs)</td><td>about 1,000×</td><td>flash is read a whole page at a time, through a controller</td></tr>
+    <tr><td>Hard disk</td><td>about 10 ms</td><td>about 100,000×</td><td>an arm must move to the right track, then wait for the platter to spin round</td></tr>
+  </tbody>
+</table></div>
+
+<p>Run the primitive test on these. The hard disk's 10 ms is physics: a platter spinning 7,200 times a minute takes 8.3 ms per turn, and on average you wait half a turn, plus the arm's travel. The SSD's page-at-a-time reading is also physics: flash chips are built to read and write a page, not a byte. But the <b>page sizes</b> you'll hear about are choices. Operating systems usually use 4 KB, Postgres uses 8 KB pages, MySQL's InnoDB engine 16 KB, SQLite 4 KB by default. They're knobs: bigger pages mean fewer trips but more wasted bytes when you only needed a little.</p>
+
+<p>Two consequences shape everything in this chapter:</p>
+<ol>
+  <li><b>Count page reads and writes, not comparisons.</b> One disk read takes as long as tens of thousands of comparisons in memory (on a hard disk, millions). Once a page is in RAM, searching inside it is nearly free. So the cost of a disk structure is the number of pages it touches, usually called <b>I/Os</b> (input/output operations).</li>
+  <li><b>Sequential beats random.</b> Reading the next page after the one you just read skips the start-up cost. A hard disk reads about 150 MB/s in a straight line, but at 100 random 4 KB reads a second it manages 0.4 MB/s: about 370 times slower for the same bytes. SSDs shrink the gap for reads, but they still strongly prefer large sequential writes (section 6 shows why).</li>
+</ol>
+
+<div class="keyidea"><p>A disk hands out data in pages, and each trip costs the same whether you use one byte of the page or all of it. So a disk structure is judged by how many pages it reads and writes, and by whether those I/Os are sequential or random.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Fat nodes: the B-tree</h2>
+
+<p>Even a binary search over the pages of a sorted file doesn't fix this: 100 GB in 4 KB pages is about 24 million pages, and log₂ of 24 million is about 25 reads. The flaw is the same as the binary tree's: every read brings back a whole page and uses one key of it. The fix the warehouse suggests: pack a whole page with keys. A node that fills a 16 KB page can hold hundreds of sorted keys, with a pointer to a child page in each gap between them.</p>
+
+<p>Think of a set of printed encyclopedias. The shelf labels say which volume covers "Ka–Ki". The volume's tabs say which section. The section's running heads say which page. Three glances, each narrowing the search hundreds of times, and you're at the right page of a 30-volume set. A binary tree would ask "before or after M?", then "before or after F?", one yes-or-no question per trip.</p>
+
+<pre class="diagram"><code> the root is one page: 3 keys, 4 child pointers
+                 [ 20 | 40 | 60 ]
+              /      |      |      \
+   [5 | 9 | 14]  [22 | 31]  [44 | 52 | 57]  [63 | 70]
+
+ To find 52: in the root, 52 is between 40 and 60,
+ so take the 3rd pointer. In that page, 52 is there.
+ Two page reads. Searching inside a page is a binary
+ search in RAM: nanoseconds.</code></pre>
+
+<p>This is a <b>B-tree</b> (Rudolf Bayer and Edward McCreight, 1970). Each node is one page holding a sorted list of keys (each with its value), and between every two keys a pointer to a child whose keys all fall in that gap. The number of children a node can have is its <b>fanout</b>. With a fanout of 500, each level divides the search by 500:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Levels</th><th>Keys a fanout-500 tree can reach</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>500</td></tr>
+    <tr><td>2</td><td>250,000</td></tr>
+    <tr><td>3</td><td>125 million</td></tr>
+    <tr><td>4</td><td>62.5 billion</td></tr>
+  </tbody>
+</table></div>
+
+<p>A billion keys need 4 levels (log₅₀₀ of a billion is 3.3), instead of 30. And the top levels are few pages that every lookup touches, so they stay cached in RAM. Section 4 does the exact count; the punchline is <b>one disk read per lookup</b>.</p>
+
+<p>Searching is the binary search you know, once per page. Here it is on nodes in memory, to show the shape; in a real engine <code>node.children[i]</code> is a page id that costs a disk read.</p>
+
+<pre><code>from bisect import bisect_left
+
+def btree_search(node, key):
+    while node is not None:
+        i = bisect_left(node.keys, key)    # binary search in one page
+        if i &lt; len(node.keys) and node.keys[i] == key:
+            return node.values[i]          # found: stop, at any level
+        # go down a level: in a real engine, one more page read
+        node = node.children[i] if node.children else None
+    return None</code></pre>
+
+<h3>Inserting: split and push up</h3>
+
+<p>A new key goes into the leaf where a search for it ends. If the leaf has room, done: one page written. If the leaf is full, there's no room to grow it, because a page has a fixed size. So <b>split</b> it: the full leaf plus the new key become two half-full leaves, and the middle key moves up into the parent as the separator between them. If the parent is now too full, it splits too, and pushes its own middle key up. If the root splits, a new root is made above it with one key and two children.</p>
+
+<p>Watch it with tiny pages that hold at most 3 keys. Real pages hold hundreds, but the moves are the same.</p>
+
+<div class="figure">
+  <div id="btree-player"></div>
+  <div class="cap">Insert 10, 20, 5, 6, 12, 30, 7, 17, 3, 25, 27, 40 into a B-tree whose pages hold at most 3 keys. Blue: the page being searched or just changed. Orange: a page that overflowed (4 keys) and must split. Green: the two halves after a split. Step to the last key, 40, and watch the root split.</div>
+</div>
+
+<h3>Why it grows at the root, and why that keeps it balanced</h3>
+
+<p>This is the part people get wrong. A binary search tree grows downward: a new key hangs a new node under a leaf, and some paths get longer than others. That's why the trees chapter needed rotations. A B-tree never adds a node below a leaf. New nodes appear only <em>beside</em> existing ones (a split makes a sibling), and a new level appears only when the root splits, <em>above</em> everything. That new root sits on top of every path at once, so every leaf gets one level deeper together. All leaves are always at the same depth, with no rotations and no rebalancing pass.</p>
+
+<p>Splitting in half also bounds how empty a page can get: every page except the root stays at least about half full. So with room for m keys per page, every level multiplies the reach by at least about m/2. That's the guarantee behind "a billion keys in 4 levels".</p>
+
+<div class="keyidea"><p>A B-tree node is a whole page of sorted keys with a child pointer between each pair, so each level divides the search by hundreds, not 2. Inserts split full pages in half and push the middle key up; only a root split adds a level, at the top, so all leaves stay at the same depth.</p></div>
+
+<div class="check" id="check-split">
+  <p class="q">Pages hold at most 3 keys. You insert 7 into the leaf <code>[5, 6, 10]</code>. What happens?</p>
+  <div class="opts">
+    <button>7 goes into a new leaf hung below <code>[5, 6, 10]</code></button>
+    <button data-correct>The leaf splits into <code>[5, 6]</code> and <code>[10]</code>, and 7 moves up into the parent</button>
+    <button>The leaf grows to 4 keys; it splits later when it's read</button>
+  </div>
+  <div class="fb right"><p>Right. With 7 the leaf would hold <code>[5, 6, 7, 10]</code>, one too many. The middle key (7) moves up as the separator, and the two halves become siblings. The parent gains one key and one child pointer; if that overflows it, the parent splits the same way.</p></div>
+  <div class="fb wrong"><p>A page is a fixed-size box on the disk: it can't hold a fourth key, not even for a moment. And hanging a new node below a leaf is what a binary tree does; it makes some paths longer than others, which is exactly what a B-tree avoids. Instead, put the four keys in order, <code>[5, 6, 7, 10]</code>, cut the box in two, and send the key at the cut (7) up to the parent: "smaller than 7, go left; bigger than 7, go right" (and 7 itself is now found in the parent). The tree got wider, not deeper.</p></div>
+</div>
+
+<div class="check" id="check-grow">
+  <p class="q">Why are all the leaves of a B-tree always at the same depth?</p>
+  <div class="opts">
+    <button>A background job rebalances the tree after each insert</button>
+    <button>Inserts always go into the leftmost leaf first</button>
+    <button data-correct>New levels are only ever added at the top, when the root splits, which lengthens every path at once</button>
+  </div>
+  <div class="fb right"><p>Right. Splits make siblings, never children. The only way to get taller is a new root above the old one, and that adds one to every root-to-leaf path at the same time.</p></div>
+  <div class="fb wrong"><p>Nobody rebalances a B-tree, and inserts go wherever the key belongs. Think of a building that only gets taller by lifting the whole roof and adding a floor under it: every staircase from the roof to the ground floor gets one flight longer at once. A split adds a room beside an existing room on the same floor. Only a root split adds a floor, and it adds it for everyone.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>The B+tree: all the data in the leaves</h2>
+
+<p>Real database engines almost never use the B-tree exactly as above. They use a variant with two changes, and both come from looking at what the pages are spent on.</p>
+
+<p><b>Change 1: internal nodes hold only signposts.</b> In a B-tree, a profile's 100 bytes sit in whatever node holds its key, internal nodes included. Every value stored in an internal page takes room that could hold about six more signposts. So move every value down to the leaves. Internal pages hold only keys and child pointers: a page of 16 KB with 8-byte keys and 8-byte page ids holds about 1,000 of them. The fanout goes from hundreds to a thousand, and the tree gets shorter.</p>
+
+<p><b>Change 2: the leaves are chained.</b> Since all data now lives in the leaves, link each leaf to the next one, left to right. A query like "all orders from March" finds the first March order with one root-to-leaf walk, then reads leaf after leaf along the chain, never climbing back up.</p>
+
+<p>Picture a city. The internal nodes are road signs: "streets A to F, turn left". They don't contain any houses. The leaves are the streets, and the houses on one street sit side by side in order, with the next street continuing where this one ends. To visit every house from number 120 to 480, you follow the signs once to house 120, then walk.</p>
+
+<p>This is a <b>B+tree</b>. Here are the same eight keys as the first eight steps of the figure above, in both shapes:</p>
+
+<pre class="diagram"><code> B-tree (values everywhere)
+
+        [10 | 20]               10 and 20 live in the root,
+       /    |    \              with their values.
+ [5|6|7] [12|17]  [30]
+
+ B+tree (values only in leaves)
+
+          [10 | 20]             ← signposts only: copies of
+         /    |    \              10 and 20 as separators
+ [5|6|7] → [10|12|17] → [20|30] ← every key, with its value,
+                                   leaves chained left to right</code></pre>
+
+<p>Notice the split rule changed for leaves. When a B+tree leaf splits, its right half's first key is <b>copied</b> up as the separator, because the key and its value must stay in a leaf. When an internal page splits, its middle key <b>moves</b> up, as in a B-tree, because internal keys are only signposts anyway.</p>
+
+<h3>How many levels, really?</h3>
+
+<p>Back to the story: a billion 100-byte profiles in 16 KB pages. A leaf holds about 160 profiles (16,384 / 100 = 163, minus a little for the page header). An internal page holds about 1,000 signposts. Count from the bottom up:</p>
+
+<pre class="diagram"><code> leaves:  1,000,000,000 / 160   = 6,250,000 pages  (100 GB: the data)
+ level 2:     6,250,000 / 1,000 =     6,250 pages  (100 MB)
+ level 3:         6,250 / 1,000 =         7 pages
+ root:                                    1 page
+
+ 4 levels. Everything above the leaves is 6,258 pages × 16 KB ≈ 100 MB.</code></pre>
+
+<p>(Rounded to 160 rows and 1,000 signposts per page; the figure below does the exact division.) 100 MB fits easily in the 16 GB of RAM, so the root and the two levels under it stay cached. A lookup walks them in memory and then reads one leaf from the SSD: <b>one disk read, about 0.1 ms</b>, against 3 ms for the binary tree. Try other sizes:</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">rows</span><input type="range" id="bp-n" min="0" max="12" value="6" style="width:160px"><b id="bp-nval"></b></div>
+    <div class="viz-controls"><span class="small">row size</span><input type="range" id="bp-row" min="0" max="6" value="2" style="width:160px"><b id="bp-rowval"></b></div>
+    <div class="viz-controls"><span class="small">page size</span><input type="range" id="bp-page" min="0" max="3" value="2" style="width:160px"><b id="bp-pageval"></b></div>
+    <div id="bp-out" class="table-wrap" style="margin-top:10px"></div>
+    <div class="viz-caption" id="bp-msg"></div>
+  </div>
+  <div class="cap">A B+tree's levels for a given number of rows, assuming 8-byte keys and 8-byte page ids in the internal pages and full pages. Slide the rows up by 1,000× and watch the height grow by about one level. Shrink the page and watch it grow faster.</div>
+</div>
+
+<p>Two observations from playing with it. Height grows painfully slowly: each extra level multiplies the capacity by about 1,000. And almost all the pages are leaves; the internal levels are a rounding error, which is why caching them costs so little.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: B+trees in real engines</summary>
+  <ul>
+    <li><b>InnoDB (MySQL)</b> stores each table as a B+tree keyed by the primary key, with the whole row in the leaves: a <b>clustered index</b>. Its pages are 16 KB by default. A secondary index is a second B+tree whose leaves hold the primary key, so a lookup by a secondary key walks two trees.</li>
+    <li><b>Postgres</b> keeps rows in a separate unordered <b>heap</b> file (here "heap" just means an unordered pile of pages, nothing to do with the heaps chapter), and every index, the primary key's included, is a B+tree whose leaves point at row locations. Its pages are 8 KB. Its B-tree follows Lehman and Yao's 1981 "B-link tree", which adds a right-sibling link and a "high key" on every page so readers can keep going while another process splits a page.</li>
+    <li><b>SQLite</b> stores tables as B+trees (data only in the leaves) and its indexes as B-trees.</li>
+    <li><b>Why random UUID keys hurt:</b> with an auto-increment key, every insert lands in the rightmost leaf, which is always cached. With random UUIDs, each insert lands in a random leaf that's probably not in memory: a disk read before every write, and half-full pages after splits. Real engines also special-case ascending keys: Postgres, for one, packs pages almost full when it splits the rightmost leaf, instead of leaving two half-empty pages.</li>
+    <li><b>Deleting</b> removes the key from its leaf. A page that falls below half full can borrow a key from a sibling or merge with it, which can cascade up, the mirror image of splitting. Many engines skip or delay the merging and let pages stay sparse, because deletes are often followed by inserts into the same range.</li>
+  </ul>
+</details>
+
+<div class="check" id="check-bplus">
+  <p class="q">Why does a B+tree usually need fewer levels than a B-tree with the same page size?</p>
+  <div class="opts">
+    <button>Its leaves are linked, so a search can skip levels by walking sideways</button>
+    <button data-correct>Its internal pages hold no values, so each one fits more keys and child pointers</button>
+    <button>It splits pages less often, so it stays shorter</button>
+  </div>
+  <div class="fb right"><p>Right. Fanout is page size divided by entry size. A 16-byte signpost instead of a 116-byte key-plus-row means about 7× more children per internal page, so fewer levels for the same number of rows.</p></div>
+  <div class="fb wrong"><p>Do the division. A 16 KB page holding keys <em>with</em> 100-byte values fits about 140 entries; holding only 8-byte keys and 8-byte child pointers it fits about 1,000. Height is roughly log<sub>fanout</sub>(n), so fanout 1,000 beats fanout 140. The leaf chain doesn't help a point lookup at all: walking sideways visits leaves one at a time, which is the slow way. It's for range scans.</p></div>
+</div>
+
+<h3>Range scans</h3>
+
+<p>"Give me the 10,000 profiles with ids from 4,000,000 to 4,009,999." With 160 rows per leaf, those rows sit in about 63 consecutive leaves. A B+tree walks down once (the internal pages are cached) and then reads about 63 leaves along the chain: <b>about 63 disk reads</b>. Looking up the 10,000 ids one by one would be 10,000 reads, each a full walk. Range scans are the B+tree's home ground, and why <code>ORDER BY</code> and <code>BETWEEN</code> on an indexed column are cheap. (The leaves are logically consecutive; whether they also sit next to each other on the disk depends on how the file grew, so the reads may or may not be sequential.)</p>
+
+<div class="keyidea"><p>A B+tree keeps all data in chained leaves and only signposts above them. Small signposts mean a fanout near 1,000, so a billion rows need 4 levels and only the leaf read touches the disk. The leaf chain makes a range scan one walk down plus one read per leaf.</p></div>
+
+<div class="check" id="check-range">
+  <p class="q">A B+tree has 160 rows per leaf and its internal pages are cached. A query wants 8,000 consecutive keys. About how many disk reads?</p>
+  <div class="opts">
+    <button data-correct>About 50</button>
+    <button>About 8,000</button>
+    <button>About 32,000: 8,000 lookups of 4 levels each</button>
+  </div>
+  <div class="fb right"><p>Right. 8,000 / 160 = 50 leaves, read one after another along the chain, plus at most one extra leaf if the range starts in the middle of a page. The walk down costs nothing extra because the internal pages are in RAM.</p></div>
+  <div class="fb wrong"><p>Think in pages, not rows. Consecutive keys sit side by side in the leaves, 160 to a page, so 8,000 of them fill 8,000 / 160 = 50 leaves. Find the first one (a walk through cached internal pages, no disk), then follow <code>next</code> from leaf to leaf: 50 reads. Fetching each key separately would re-read the same leaf 160 times.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Surviving a crash: the write-ahead log</h2>
+
+<p>Now the second problem from the story. Inserting a key that splits a leaf changes three pages: the old leaf (now half of it), the new leaf, and the parent (one more separator). The disk writes them one at a time. If the power dies after the first two, the parent doesn't know the new leaf exists, and its keys are gone from every search. Worse, a single 16 KB page isn't written all at once either: a drive typically promises only that one <b>sector</b> (512 bytes or 4 KB) is written all-or-nothing. A crash in the middle of a page write can leave a <b>torn page</b>, half new and half old.</p>
+
+<p>Accountants solved this centuries ago. A bookkeeper doesn't edit the ledger accounts directly. First they write the transaction in the <b>journal</b>, a book where entries are only ever added at the end, in order: "March 3: move $500 from cash to rent." Only then do they update the ledger accounts, whenever convenient. If a ledger page gets spilled on, they rebuild it by replaying the journal. The journal is the truth; the ledger is a convenient copy.</p>
+
+<p>That's a <b>write-ahead log</b> (WAL): an append-only file of records, each describing one change. One rule makes it work:</p>
+
+<p><b>The write-ahead rule:</b> a change's log record must be on stable storage before the change counts as done, and before any page it changed is written over its old version on disk. Pages can then be written lazily, in any order, because the log can always redo them.</p>
+
+<p>Walk through the split again with a WAL. The engine appends one record ("insert key 7 into page 12; split page 12 into 12 and 40; add separator 7 to page 3"), forces it to the disk, and tells the client "done". The three changed pages stay in memory, marked <b>dirty</b> (changed in memory, not yet written to disk), and get written later. Now crash anywhere:</p>
+
+<pre class="diagram"><code> time ────────────────────────────────────────────────────────────────▶
+   append record   fsync log   "done" to client   write pages 12, 40, 3
+                                                  (later, any order)
+   ├────────── A ──────────┤├──────── B ────────┤ ├──────── C ────────┤
+
+ crash in A: the record isn't durable, and the client was never told
+             "done": the insert never happened. Fine.
+ crash in B: the record is durable. On restart, replay it and redo
+             the pages. Fine.
+ crash in C: some pages written, some not. Replay the record. Fine.</code></pre>
+
+<p>On restart, <b>recovery</b> reads the log from the last checkpoint (below) and reapplies every record. Replaying must be safe even for a change that already reached the page, so each page stores the position in the log (the <b>log sequence number</b>, LSN) of the last record applied to it. Recovery skips any record whose LSN is not newer than the page's. Applying a record twice then has the same effect as applying it once; that property is called <b>idempotent</b>.</p>
+
+<p>Why not skip the log and write the pages carefully? Because the log turns scattered random writes into one small sequential append. Changing three pages in place is three random writes; logging it is one append at the end of a file. The log is the cheapest durable write there is.</p>
+
+<h3>What "on stable storage" costs: fsync</h3>
+
+<p>When a program calls <code>write()</code>, the operating system copies the bytes into its own memory (the <b>page cache</b>) and returns at once. The data reaches the drive later. A power cut loses whatever was still in the cache. To be sure, the program calls <b>fsync</b>, which waits until the operating system has handed the file's data to the drive and the drive reports it durable.</p>
+
+<p>That wait is the real price of durability: on the order of milliseconds on a hard disk, and from tens of microseconds to a millisecond or more on SSDs, depending heavily on the drive. Say an fsync takes 2 ms. One commit per fsync means at most <b>500 commits per second</b>, no matter how fast the CPU is. The fix is <b>group commit</b>: commits that arrive while an fsync is running wait for the next one, and a single fsync makes all of them durable. With 50 commits per fsync, the same disk does <b>25,000 commits per second</b>. Each commit waits a little longer, and the throughput goes up 50×.</p>
+
+<p>A good log record also carries its length and a <b>checksum</b> (a number computed from its bytes, such as a CRC-32). A crash can leave the last record cut short, or followed by garbage. On restart, the reader stops at the first record that's incomplete or whose checksum doesn't match, and cuts the log there. Without the cut, the next record appended would land after the garbage, and the reader would never get to it.</p>
+
+<pre class="diagram"><code>   one whole record                       a torn record
+ ┌──────────┬────────┬──────────────────┐┌──────────┬────── ...
+ │ checksum │ length │ payload: op,     ││ checksum │ len
+ │          │        │ key, value       ││          │
+ └──────────┴────────┴──────────────────┘└──────────┴────── ...
+                                         ↑ cut the log here</code></pre>
+
+<h3>Checkpoints: the log can't grow forever</h3>
+
+<p>Replaying a month of log at every restart would take hours. So every few minutes the engine takes a <b>checkpoint</b>: it writes all dirty pages to their places, then notes in the log "everything before position P is safely in the pages". Recovery starts at the last checkpoint, and the log before it can be deleted or reused. How often to checkpoint is a knob: often means short recovery but more page writes; rarely means less writing and longer restarts.</p>
+
+<div class="keyidea"><p>Log first, pages later. A change is done when its log record is durable (fsynced); pages are written whenever convenient, and recovery replays the log from the last checkpoint, using LSNs so replaying twice is harmless. fsync is the real cost, and group commit shares one fsync among many commits.</p></div>
+
+<div class="check" id="check-wal">
+  <p class="q">A transaction changes one page. Which order of events is safe against a crash at any moment?</p>
+  <div class="opts">
+    <button>Write the page to disk, then append the log record, then tell the client "done"</button>
+    <button data-correct>Append the log record and fsync it, tell the client "done", write the page whenever convenient</button>
+    <button>Tell the client "done", then append the log record and write the page in the background</button>
+  </div>
+  <div class="fb right"><p>Right. Once the record is durable, any crash can be repaired by replaying it, so the page can wait. Before the record is durable, the client hasn't been told anything, so losing the change breaks no promise.</p></div>
+  <div class="fb wrong"><p>Ask, for each order, "if the power dies right now, can I end up somewhere wrong?" Page first: crash after the page write and before the log record, and the page holds a change that no log describes; if that change was half of a three-page split, nothing can finish or undo it. "Done" first: crash right after saying "done", and the change is gone after the client was promised it. Only "record durable, then done, then pages" leaves every crash point either "never happened, never promised" or "promised, and replayable".</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: how real engines handle the log and torn pages</summary>
+  <ul>
+    <li><b>Postgres</b> calls its log the WAL. To repair torn pages, the first change to each page after a checkpoint logs the whole page image (the <code>full_page_writes</code> setting), so recovery can restore the page and replay from there. <b>InnoDB</b> solves the same problem differently, with a <b>doublewrite buffer</b>: each page is written first to a side area, then to its real place, so one good copy always exists.</li>
+    <li><b>ARIES</b> (IBM, 1992) is the classic recovery algorithm behind most of this: LSNs on pages, a redo pass that replays history, and an undo pass that rolls back transactions that never committed. This chapter only needs the redo half.</li>
+    <li><b>An undo log</b> is the opposite design: copy the old page aside first, then overwrite in place, and on a crash restore the old copies. SQLite's default rollback journal works this way; its optional WAL mode is a write-ahead log.</li>
+    <li><b>Redis</b> persistence with the append-only file (AOF) lets you pick the fsync policy: <code>always</code>, <code>everysec</code> (the default) or <code>no</code>. That's the durability-versus-speed knob made explicit: with <code>everysec</code>, a crash can lose about the last second of writes.</li>
+    <li><b>Many engines don't fsync every commit by default.</b> RocksDB's <code>WriteOptions.sync</code> is false: a write reaches the operating system's cache, so a process crash loses nothing but a power cut can lose the most recent writes. Cassandra fsyncs its commit log periodically (every 10 seconds by default) and counts on replicas on other machines for durability. Postgres (<code>synchronous_commit = off</code>) and InnoDB (<code>innodb_flush_log_at_trx_commit = 2</code>) offer the same trade as an option. In an interview, say which one you're choosing and what a crash can lose.</li>
+    <li><b>Shadow paging</b> avoids a log altogether: never overwrite a page; write the changed pages to new places and then atomically switch one root pointer. LMDB's copy-on-write B+tree works this way.</li>
+    <li><b>fsync can fail.</b> In 2018 Postgres developers found that on Linux, after a failed fsync, retrying could report success even though the data never reached the disk. Postgres now treats a failed fsync of a data file as fatal and recovers from its WAL instead of retrying. Durability depends on every layer below you telling the truth. (On macOS, plain <code>fsync</code> doesn't even flush the drive's own write cache; databases call <code>fcntl(F_FULLFSYNC)</code> there.)</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>When writes dominate: never update in place</h2>
+
+<p>The B+tree is great at reads. Now a different workload: a metrics service ingests <b>200,000 data points per second</b>, about 100 bytes each, keyed by (sensor, timestamp). That's 20 MB/s of new data, written all day, and read far less often.</p>
+
+<p>Put it in a B+tree and every insert lands in some leaf. Once the data is ten times bigger than RAM, most of those leaves aren't cached: each insert first <em>reads</em> a random page, then dirties it, and eventually the whole 16 KB page is written back to change maybe 100 bytes of it. In the worst case that's a 16 KB write per 100-byte insert, 160 times more bytes written than inserted. On a hard disk, at about 100 random I/Os per second, 200,000 inserts a second is out of the question. SSDs handle far more random I/Os, but they also dislike small random writes: flash can only be erased in big blocks (often megabytes), so scattered page updates force the drive to shuffle data around internally, which costs throughput and wears out the flash.</p>
+
+<p>The disk loves one thing: big sequential writes. So design for that. Think of a mail room. You could walk every letter to its filing cabinet the moment it arrives: a trip per letter. Or you could stack today's letters on a desk, sort the stack once in the evening, and put the sorted bundle on the shelf as one new folder. Filing becomes nearly free. The cost moves to finding a letter: now you may have to check today's desk and several folders.</p>
+
+<p>That's the <b>log-structured merge tree</b> (LSM tree, Patrick O'Neil and others, 1996), the design behind LevelDB, RocksDB, Cassandra, HBase and Google's Bigtable:</p>
+<ol>
+  <li>A write goes into the <b>memtable</b>, a sorted structure in memory. LevelDB and RocksDB use a skip list (topic 01.11); a balanced tree also works. For durability, every write is <em>also</em> appended to a write-ahead log, exactly as in section 5. Memory plus one sequential append: that's the whole cost of a write.</li>
+  <li>When the memtable reaches its size limit (RocksDB's default is 64 MB), it's frozen and written out, already sorted, as one new file in a single sequential pass. That's a <b>flush</b>. A fresh memtable takes new writes meanwhile, and once the file is safely on disk, the log records it covered can be dropped.</li>
+  <li>Files are never modified after they're written. Updates and deletes are new entries in newer files.</li>
+</ol>
+
+<p>At 20 MB/s, a 64 MB memtable fills about every 3 seconds, and each flush is one 64 MB sequential write. Where the B+tree did 200,000 random page updates per second, the LSM tree does one big write every few seconds plus the log appends.</p>
+
+<div class="keyidea"><p>An LSM tree never updates data in place. Writes go to a sorted memtable in memory (and to the WAL for durability); a full memtable is flushed as a new immutable sorted file in one sequential write. Writes become cheap and sequential, and reads now have more places to look.</p></div>
+
+<div class="check" id="check-lsm-write">
+  <p class="q">Why can an LSM tree take writes much faster than a B+tree when the data is far bigger than RAM?</p>
+  <div class="opts">
+    <button data-correct>Each write is a memory insert plus a sequential log append; the disk only sees big sequential writes, never a read-modify-write of a random page</button>
+    <button>It skips the write-ahead log, so it doesn't have to fsync</button>
+    <button>Its files are compressed, so it writes fewer bytes</button>
+  </div>
+  <div class="fb right"><p>Right. A B+tree insert has to find its leaf, which means reading a random page when it isn't cached, then writing that page back. An LSM write touches no existing page at all.</p></div>
+  <div class="fb wrong"><p>An LSM tree logs every write to a WAL too; otherwise the memtable would vanish in a crash. And compression helps both designs. The difference is where a write has to go. A B+tree must put the key in its one correct leaf, wherever that is on the disk: read the page, change it, write it back, a random trip each way. An LSM tree puts the key wherever is cheapest right now, the memtable, and sorts it into place later in bulk. Mail room again: filing every letter at once versus filing a sorted bundle each evening.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>SSTables and the read path</h2>
+
+<p>The flushed file is a <b>sorted string table</b> (SSTable, a name from Bigtable): key-value pairs sorted by key, immutable, written once. Its layout is built for the read path:</p>
+
+<pre class="diagram"><code> SSTable file
+ ┌─────────┬─────────┬─────┬─────────┬─────────────┬──────────┐
+ │ block 0 │ block 1 │ ... │ block k │ index block │ Bloom    │
+ │ a..ape  │ apricot │     │ ..zebra │ first key   │ filter   │
+ │         │ ..bee   │     │         │ per block   │          │
+ └─────────┴─────────┴─────┴─────────┴─────────────┴──────────┘
+ data blocks: ~4 KB each, sorted pairs
+              (RocksDB's default block size is 4 KB)
+ index block: kept in RAM. A binary search on it says which
+              one block could hold a key.
+ fence keys:  the smallest and largest key in the file,
+              also in RAM.</code></pre>
+
+<p>The index holds one entry per block, not per key, so it's called a <b>sparse index</b>. A 64 MB file of 100-byte pairs has about 16,000 blocks; its index fits in a few hundred KB. Finding a key in one SSTable costs <b>at most one block read</b>: binary search the index in memory, read the block, scan it.</p>
+
+<h3>Reading: newest first, first hit wins</h3>
+
+<p>A key can now be in many places: the memtable, and any number of SSTables, possibly with different values in each, because an update is a new entry in a newer file. The newest one is the truth. So a read checks, in order:</p>
+<ol>
+  <li>the memtable (and a frozen memtable that's being flushed, if any);</li>
+  <li>the SSTables, from newest to oldest;</li>
+  <li>and <b>stops at the first one that knows the key</b>. Older files may hold older values; they're never read.</li>
+</ol>
+
+<h3>Deleting: tombstones</h3>
+
+<p>You can't delete a key from an immutable file. And removing it from the memtable isn't enough: an older SSTable still holds the old value, and a read would find it there. So a delete <em>writes</em> a special marker, a <b>tombstone</b>: "this key is deleted, as of now". A read that meets a tombstone stops and answers "not found", exactly like it stops at a value. The tombstone hides every older version underneath it.</p>
+
+<div class="figure">
+  <div id="lsm-player"></div>
+  <div class="cap">An LSM tree whose memtable holds 3 keys. Watch puts land in the log and the memtable, a full memtable flush to an SSTable, a delete write a tombstone (✝), and four reads: one stopped by a newer value, one by a tombstone, one that falls through to the older table, and one ruled out by fence keys without reading anything. The last steps compact the two tables into one.</div>
+</div>
+
+<h3>The price: read amplification, and Bloom filters</h3>
+
+<p>Reads got worse. A key that doesn't exist must be checked in every SSTable before the answer is "not found": with 20 files, that's up to 20 block reads, against one for a B+tree. The ratio of work done to the work one lookup needs is called <b>read amplification</b>.</p>
+
+<p>Fence keys help when files cover separate key ranges (time-ordered keys, for example), but random keys make every file span nearly everything. The real fix is a <b>Bloom filter</b> per SSTable (from <a href="probabilistic-structures.html">Probabilistic structures</a>): a small bit array kept in memory that answers "definitely not in this file" or "maybe in this file". With about 10 bits per key it says "maybe" for a missing key about 1% of the time. A lookup for a missing key across 20 files then reads on average 20 × 1% = <b>0.2 blocks</b> instead of 20. A Bloom filter can't help range scans, though: "all keys from m to p" has to merge every file whose fence keys overlap the range, with the k-way merge from the heaps chapter.</p>
+
+<div class="keyidea"><p>An SSTable is an immutable sorted file in blocks, with a sparse index, fence keys and a Bloom filter in memory, so probing it costs at most one block read. A read checks the memtable, then SSTables newest to oldest, and stops at the first value or tombstone. Deletes are tombstones because files can't change.</p></div>
+
+<div class="check" id="check-tombstone">
+  <p class="q">Key <code>k</code> was written long ago and sits in an old SSTable. Now it's deleted. Why does the delete write a tombstone instead of removing <code>k</code> from the memtable?</p>
+  <div class="opts">
+    <button>Tombstones are faster to write than a removal</button>
+    <button data-correct>Without a newer marker, a read would fall through to the old SSTable and find the old value</button>
+    <button>So the delete can be undone later</button>
+  </div>
+  <div class="fb right"><p>Right. A read stops at the first source that knows the key, newest first. The tombstone is that first source, and it says "deleted". Without it, nothing newer mentions <code>k</code>, and the old value wins.</p></div>
+  <div class="fb wrong"><p>Run the read path. A read for <code>k</code> checks the memtable: if you only removed <code>k</code> from there, the memtable now says nothing about it. Next stop, the SSTables from newest to oldest, and the old file still holds <code>k</code> with its old value, which gets returned. The deleted key is back. The old file can't be edited, so the only way to win is to be newer: write an entry that says "deleted".</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Compaction: paying the debt</h2>
+
+<p>Left alone, the files pile up. At 20 MB/s and 64 MB per flush, that's 27,000 SSTables a day. Reads check more and more files, and the disk fills with garbage: values that newer entries overwrote, and tombstones for keys deleted long ago, all still taking space.</p>
+
+<p>So a background job merges files. It reads several SSTables, which are all sorted, and merges them into new sorted files, with the k-way merge from the heaps chapter. When the same key appears in several inputs it keeps only the newest version. This is <b>compaction</b>. The last frames of the figure above show one: two files in, one file out, the overwritten <code>a=1</code> gone.</p>
+
+<p>Tombstones need care. A tombstone may only be dropped when the merge includes the <b>oldest data</b> for that key range, the bottom of the tree. If compaction merges only the two newest files and drops the tombstone for <code>k</code>, an older file that still holds <code>k</code>'s old value is no longer hidden, and the deleted key comes back from the dead. (Distributed stores add one more condition: every replica must have seen the delete. Cassandra keeps tombstones for <code>gc_grace_seconds</code>, 10 days by default, for exactly that reason.)</p>
+
+<h3>Two ways to organize the merging</h3>
+
+<p>Which files to merge, and when? Two classic answers, both used in production:</p>
+
+<div class="cols">
+  <div class="panel">
+    <h4>Size-tiered</h4>
+    <p class="small">Wait until there are several files of about the same size (say 4), then merge them into one file about 4× bigger. Bigger files collect into a next tier, and so on. Each byte is rewritten about once per tier: cheap writes. But a key can be in many files in each tier, so reads check more files, and a big merge needs room for its inputs and its output at the same time.</p>
+  </div>
+  <div class="panel">
+    <h4>Leveled</h4>
+    <p class="small">Level 0 holds fresh flushes. Every level below is one <b>sorted run</b> (a sequence of files that together hold each key at most once, in key order), cut into files whose key ranges don't overlap, and each level is about 10× bigger than the one above (RocksDB's default multiplier is 10). A key is in at most one file per level, so a read checks at most one file per level. The price: pushing data into a level 10× bigger means rewriting the overlapping part of that level, again and again.</p>
+  </div>
+</div>
+
+<p>Both are spending one resource to save another. There are three to juggle:</p>
+<ul>
+  <li><b>Write amplification</b>: bytes written to disk ÷ bytes the application wrote. Counts the WAL, the flush and every compaction rewrite.</li>
+  <li><b>Read amplification</b>: files or blocks a read touches ÷ the one it needs.</li>
+  <li><b>Space amplification</b>: bytes on disk ÷ bytes of live data. Counts overwritten values and tombstones not yet compacted away.</li>
+</ul>
+
+<p>A B+tree sits at a different point: low read amplification and modest space overhead, but high write amplification for small random updates (a whole page per change). Researchers have a name for the pattern, the <b>RUM conjecture</b> (Read, Update, Memory): a structure can be made very good at two of the three, but then pays in the third. It's a conjecture from experience, not a theorem.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">data size</span><input type="range" id="am-n" min="0" max="5" value="3" style="width:160px"><b id="am-nval"></b></div>
+    <div class="viz-controls"><span class="small">size ratio T</span><input type="range" id="am-t" min="2" max="20" value="10" style="width:160px"><b id="am-tval"></b></div>
+    <div id="am-out" class="table-wrap" style="margin-top:10px"></div>
+    <div class="viz-caption" id="am-msg"></div>
+  </div>
+  <div class="cap">A textbook model of the two compaction strategies, with 64 MB flushes and every level T times bigger than the one above. Push T up and watch leveled writes climb while its reads stay at one run per level; tiered goes the other way. These are rough upper bounds from the model, not measurements of any engine.</div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: compaction in real systems</summary>
+  <ul>
+    <li><b>RocksDB</b> defaults to leveled compaction and also offers a size-tiered style it calls "universal". Level 0 files may overlap each other (each is one flushed memtable), so a read checks all of them; every level below is non-overlapping.</li>
+    <li><b>Cassandra</b> lets you pick a strategy per table: size-tiered, leveled, a time-window strategy for time series (old windows are compacted once and then left alone, and dropped whole when their data expires), and in recent versions a unified strategy that can act like either.</li>
+    <li><b>Write stalls.</b> If writes arrive faster than compaction can merge, files pile up in level 0 and every read slows down. Engines then throttle or stop incoming writes until compaction catches up, which shows up as sudden latency spikes. A B+tree's cost is paid on each write; an LSM tree's cost is paid later, in the background, and you have to leave disk bandwidth for it.</li>
+    <li><b>Why the space win is real:</b> with leveled compaction, about 90% of the data sits in the last level, and each level above can hold at most a fraction of it, so obsolete versions are limited to roughly 10% extra. SSTables are also written once and packed full, which compresses well. Facebook moved much of its MySQL user data from InnoDB to MyRocks (RocksDB inside MySQL) mainly to use less flash space and write less to it.</li>
+    <li><b>Key-value separation</b> (WiscKey, 2016, and RocksDB's BlobDB) keeps large values in a separate log and puts only keys and pointers in the LSM tree, so compaction rewrites far fewer bytes.</li>
+  </ul>
+</details>
+
+<div class="keyidea"><p>Compaction merges sorted files in the background, keeps the newest version of each key, and drops a tombstone only when the merge includes the oldest data. Size-tiered compaction writes less and reads more; leveled compaction reads less and writes more. Every storage design trades read, write and space amplification against each other.</p></div>
+
+<div class="check" id="check-compaction">
+  <p class="q">Compaction merges only the two newest SSTables. One holds a tombstone for <code>k</code>, and an older file not in this merge holds <code>k = 7</code>. What must the merge do with the tombstone?</p>
+  <div class="opts">
+    <button>Drop it: the merge output has no value for <code>k</code> anyway</button>
+    <button data-correct>Keep it, because it still has to hide <code>k = 7</code> in the older file</button>
+    <button>Replace it with <code>k = 7</code>, the last real value</button>
+  </div>
+  <div class="fb right"><p>Right. A tombstone's job is to hide older versions, and one still exists below this merge. Only a merge that includes the oldest data for <code>k</code> can drop it safely.</p></div>
+  <div class="fb wrong"><p>Run a read after the merge. If the tombstone is dropped, the newest files say nothing about <code>k</code>, so the read falls through to the older file and returns 7: the delete is undone. Turning the tombstone into 7 does the same thing on purpose. The tombstone must survive until it meets the 7 in some later merge; then both can disappear together.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>B-tree or LSM tree?</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>B+tree</th><th>LSM tree</th></tr></thead>
+  <tbody>
+    <tr><td>Point read</td><td>one path; usually 1 disk read with cached internal pages</td><td>memtable, then files newest first; about 1 block read with Bloom filters</td></tr>
+    <tr><td>Range scan</td><td>one walk down, then the leaf chain</td><td>merge every overlapping file; more work per row</td></tr>
+    <tr><td>Small random writes</td><td>a page read-modify-write each (the page write can be delayed and shared)</td><td>memory plus a log append; sequential flushes</td></tr>
+    <tr><td>Write amplification</td><td>high for scattered small updates (a page per change)</td><td>size-tiered: about once per tier; leveled: up to about 10 times per level, with levels 10× apart; all sequential</td></tr>
+    <tr><td>Space</td><td>pages about 70% full on average under random inserts (splits leave halves)</td><td>compact files, but old versions until compaction</td></tr>
+    <tr><td>Latency</td><td>steady</td><td>spikes when compaction falls behind</td></tr>
+    <tr><td>Used by</td><td>Postgres, MySQL InnoDB, SQLite, MongoDB's WiredTiger, many file systems</td><td>RocksDB, LevelDB, Cassandra, HBase, ScyllaDB, Bigtable</td></tr>
+  </tbody>
+</table></div>
+
+<p>The rule of thumb: <b>read-heavy, range-heavy, latency-sensitive</b> (a bank ledger, an orders table with lots of <code>WHERE ... ORDER BY</code>) leans to a B+tree. <b>Write-heavy, append-mostly, huge</b> (metrics, event logs, message histories, time series) leans to an LSM tree. But that's a convention, not a law. A B+tree with a big cache absorbs a lot of writes, because the pages being written are already in memory; an LSM tree with Bloom filters and a block cache serves point reads in about one I/O. Measure your workload before choosing on reputation.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: other designs an interviewer may bring up</summary>
+  <ul>
+    <li><b>A hash index on disk.</b> Bitcask (from Riak) appends every write to a log file and keeps a hash map in RAM from every key to its position in the log. A point read is one disk read and a write is one append, but there are no range scans, and every key must fit in memory.</li>
+    <li><b>Write-optimized B-trees.</b> A B<sup>ε</sup>-tree gives each internal node a buffer: writes collect in the buffer near the root and are pushed down in batches when it fills, so one page write carries many changes. Tokutek's fractal tree indexes were built on this idea. It sits between a B-tree and an LSM tree on the read/write trade-off.</li>
+    <li><b>Copy-on-write B-trees</b> (LMDB, Btrfs) never overwrite a page: a change writes new copies of the pages on its path and switches the root pointer at the end. Readers keep using the old root undisturbed, and a crash leaves the old tree intact, with no log needed.</li>
+  </ul>
+</details>
+
+<div class="check" id="check-choose">
+  <p class="q">A chat service stores every message ever sent: 2 million new messages a second worldwide, keyed by (conversation, time), almost never edited. Reads fetch the latest 50 messages of a conversation. Which engine fits better, and why?</p>
+  <div class="opts">
+    <button>A B+tree, because reading the latest 50 messages is a range scan</button>
+    <button data-correct>An LSM tree: the write rate is the hard part, and recent messages are still in the memtable or the newest files</button>
+    <button>Either; the choice only affects disk space</button>
+  </div>
+  <div class="fb right"><p>Right. Two million small appends a second is the workload LSM trees exist for, and the reads favor them too: the latest messages are the newest data. (Discord, for one, has written about storing its messages in Cassandra and later ScyllaDB, both LSM-based.)</p></div>
+  <div class="fb wrong"><p>Find the hardest number in the story: 2 million writes a second, forever. In a B+tree each of those lands in some leaf; with conversations scattered over the key space and far more data than RAM, that's a random page read-modify-write per message. An LSM tree turns them into memory inserts and big sequential flushes. And the reads are range scans of <em>recent</em> data, which for an active conversation sit in the memtable and the newest few files, so the LSM read penalty is small. The engine choice changes throughput and latency by orders of magnitude, not just disk space.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>What to say in the interview</h2>
+
+<p>For "design the storage for a service that ingests 500,000 events a second and lets users query an event by id and recent events by time", a strong answer:</p>
+
+<div class="story">
+  <p>"First the constraint that doesn't move: the disk. A random read is about 0.1 ms on an SSD, and the disk reads and writes whole pages, so I'll count I/Os. 500,000 small writes a second, with data far bigger than RAM, rules out updating a B-tree page per event: that's a random read-modify-write each. So I'd use an LSM engine like RocksDB or Cassandra. A write goes to the write-ahead log and the memtable, and returns once the log is fsynced, with group commit so one fsync covers many writes. Full memtables flush as sorted, immutable SSTables. A read checks the memtable, then SSTables newest first, and Bloom filters keep a point read near one block. Deletes are tombstones. I'd pick leveled compaction if reads matter, size-tiered or time-window compaction if it's mostly write-once time series, and I'd leave disk bandwidth for compaction, because when it falls behind, writes stall. If the workload were read-heavy with lots of range queries and updates in place, I'd pick a B+tree engine like Postgres or InnoDB instead: four levels for a billion rows, internal pages cached, one disk read per lookup."</p>
+</div>
+
+<p>Habits that make you sound senior:</p>
+<ul>
+  <li>Start from the physical numbers: random read latency, page size, sequential versus random. Say "I/Os", not "comparisons".</li>
+  <li>Do the fanout arithmetic out loud: page size ÷ entry size, then log<sub>fanout</sub>(rows), then how much of the tree fits in RAM.</li>
+  <li>Say where durability comes from: the WAL and fsync, and what group commit buys.</li>
+  <li>Name the amplification you're trading: read, write or space, and which one this workload can afford.</li>
+  <li>Know the failure modes: torn pages, torn log tails, resurrected deletes, compaction stalls, random-key inserts thrashing a B+tree.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Disks read and write whole pages, and a random read costs about 0.1 ms on an SSD and 10 ms on a hard disk. Count I/Os; prefer sequential.</li>
+  <li>A B-tree node is a page full of sorted keys, so the fanout is hundreds and a billion keys fit in about 4 levels.</li>
+  <li>Inserts split full pages and push the middle key up; only a root split adds a level, so all leaves stay at the same depth.</li>
+  <li>A B+tree keeps values only in chained leaves: higher fanout, internal pages cached in about 100 MB, one disk read per lookup, cheap range scans.</li>
+  <li>Write-ahead rule: the log record is durable before the change counts and before the page is overwritten. Recovery replays from the last checkpoint; LSNs make it idempotent; group commit shares fsyncs.</li>
+  <li>LSM tree: WAL plus memtable, flushed as immutable sorted SSTables. Reads go newest first and stop at the first value or tombstone. Bloom filters cut wasted reads.</li>
+  <li>Compaction merges files, keeps the newest version, and drops tombstones only with the oldest data in the merge. Leveled reads less, size-tiered writes less.</li>
+  <li>B+tree for read-heavy and range-heavy work with steady latency; LSM for write-heavy, append-mostly data. Measure before you trust the rule.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+
+<p>Do them in order. Warm-ups are pen and paper: commit to an answer before you open it. Core exercises are code in <code>exercises/</code>, and their tests <b>measure how much work your code does</b>: pages read and written, blocks read, bytes appended, fsyncs. A correct answer that touches too many pages fails.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Build a B+tree by hand</h4>
+  <p>Pages hold at most 3 keys. Insert 10, 20, 5, 6, 12, 30, 7, 17, 3, 25, 27 into an empty B+tree, splitting a full page in half (with 4 keys: 2 left, 2 right for a leaf; 2 left, 1 up, 1 right for an internal page). Draw the tree after every split. Which inserts copy a key up, and which one moves a key up?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>Up to 5, one leaf: [5, 10, 20]. Insert 6: [5, 6, 10, 20] splits into [5, 6] and [10, 20], and 10 is <b>copied</b> up into a new root [10]. 12 fits: [10, 12, 20]. Insert 30: [10, 12, 20, 30] splits into [10, 12] and [20, 30]; 20 is copied up: root [10, 20]. 7 and 17 fit: leaves [5, 6, 7] [10, 12, 17] [20, 30]. Insert 3: [3, 5, 6, 7] splits into [3, 5] and [6, 7]; 6 is copied up: root [6, 10, 20]. 25 fits: [20, 25, 30]. Insert 27: [20, 25, 27, 30] splits into [20, 25] and [27, 30]; 27 is copied up, making the root [6, 10, 20, 27], one too many. The root splits: [6, 10] stays left, 20 <b>moves</b> up into a new root, [27] goes right.</p>
+    <p>Final tree: root [20]; its children [6, 10] and [27]; leaves [3, 5] → [6, 7] → [10, 12, 17] → [20, 25] → [27, 30]. Height 3. Every leaf split copied its right half's first key up; the one internal split, the root's, moved 20 up, so 20 appears in the root and in a leaf but not in the level between.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Count the I/Os</h4>
+  <p>(a) A table of 2 billion rows of 200 bytes lives in a B+tree with 8 KB pages; internal entries are 16 bytes (an 8-byte key and an 8-byte page id). How many levels? How much RAM holds every internal page? How many disk reads for one lookup if they're cached? (b) An LSM tree has 30 SSTables whose key ranges all overlap, each with a Bloom filter at about 1% false positives. How many block reads does a lookup for a missing key cost on average, with and without the filters?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) A leaf holds 8,192 / 200 ≈ 40 rows, so 2 × 10⁹ / 40 = 50 million leaves. An internal page holds 8,192 / 16 = 512 entries. Levels above: 50,000,000 / 512 ≈ 97,657 pages, then 191, then 1 root. That's 4 levels. The internal pages are 97,657 + 191 + 1 ≈ 97,849 pages × 8 KB ≈ 800 MB of RAM; with them cached, a lookup is 1 disk read (the leaf). (b) Without filters, every file is probed: 30 block reads. With filters, each file wastes a read only on a false positive: 30 × 0.01 = 0.3 block reads on average.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Crash at every moment</h4>
+  <p>A store with a write-ahead log runs: append record R1 (put x = 1), fsync, reply "ok"; append R2 (put x = 2), append R3 (delete y), fsync, reply "ok" to both; append R4 (put z = 9) and the power fails before its fsync. Before all this, y = 5. After the restart, which states are possible? Which are impossible, and why? What must recovery do with a half-written R4?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>R1, R2 and R3 were fsynced and acknowledged, so they must survive: x = 2 and y deleted. R4 was never acknowledged, so either outcome is allowed: z = 9 if the whole record happened to reach the disk, or no z at all. Possible: {x: 2} or {x: 2, z: 9}. Impossible: x = 1, or y = 5, because those would lose acknowledged writes. If R4 is torn (cut short, or ending in garbage), its length or checksum won't match: recovery stops there, ignores it, and truncates the log at the end of R3 so the next record isn't written after the garbage.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. A write-ahead log that survives crashes</h4>
+  <p>In <code>exercises/wal_log.py</code>: <code>WalStore</code> over a simulated <code>LogFile</code>, with <code>put</code>, <code>delete</code>, <code>put_many</code> (group commit) and <code>get</code>, and recovery on open. You design the binary record (length, checksum, payload). The tests lose power in the middle of fsyncs at hundreds of random points, some leaving garbage after the torn record, and check that no acknowledged change is ever lost. They also count bytes appended (one record per change, not a rewrite of the store) and fsyncs (one per change, one per batch).</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. A B+tree on a page store</h4>
+  <p>In <code>exercises/bplus_tree.py</code>: <code>put</code>, <code>get</code>, <code>range</code> and <code>height</code> for a B+tree whose nodes live in a simulated <code>Disk</code> that hands out copies and refuses pages with too many keys. The tests count page reads and writes: <code>get</code> reads one page per level, <code>put</code> writes only the pages it changes, <code>range</code> walks down once and then along the leaf chain, lazily. They also walk your pages to check every leaf is at the same depth, every node but the root is at least half full, and the leaf chain is in order.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. An LSM store</h4>
+  <p>In <code>exercises/lsm_store.py</code>: an <code>SSTable</code> with a sparse index and fence keys over a simulated <code>BlockFile</code>, and an <code>LSMStore</code> with a memtable, flush, newest-first <code>get</code>, tombstones, a merged lazy <code>items(lo, hi)</code> and <code>compact</code>. The tests count blocks read and pairs written: each put is written once, a key in the newest table costs one read even when 50 older tables hold it too, time-ordered keys cost one read thanks to fence keys, and compaction reads each block once and writes each live key once.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure</div>
+  <h4>7. Bloom filters and leveled compaction</h4>
+  <p>Copy your <code>lsm_store.py</code> to a scratch folder. (a) Give each SSTable a Bloom filter (10 bits per key) and measure block reads per lookup of a missing random key with 1, 10 and 50 tables, with and without it. Compare with 1% × tables. (b) Replace the single <code>compact()</code> with leveled compaction (level i holds at most 10<sup>i</sup> flushes' worth of keys, one sorted run per level) and measure write amplification (<code>BlockFile.written</code> ÷ puts) for 100,000 random puts. How does it change with the size ratio?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>8. Say it out loud</h4>
+  <p>Set a 3-minute timer and answer: "Why does Postgres use a B-tree but Cassandra uses an LSM tree?" Did you mention pages and I/O counts, fanout and height, in-place updates versus immutable files, the WAL in both, read, write and space amplification, compaction, and which workloads each was built for?</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k "wal_log or bplus_tree or lsm_store"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="probabilistic-structures.html"><small>← Previous</small>Almost right, in almost no memory</a>
+  <a class="next" href="concurrent-structures.html"><small>Next →</small>Many threads, one structure</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var fmtBytes = function (b) {
+    var u = ["bytes", "KB", "MB", "GB", "TB", "PB", "EB"], i = 0;
+    while (b >= 1000 && i < u.length - 1) { b /= 1000; i++; }
+    return (b >= 100 || i === 0 ? Math.round(b) : Number(b.toFixed(1))) + " " + u[i];
+  };
+  var row = function (label, el) {
+    return V.el("div", { style: "display:flex;align-items:center;gap:10px;margin:6px 0;flex-wrap:wrap" },
+      V.el("span", { class: "small muted", style: "min-width:150px" }, label), el);
+  };
+
+  // ---- B-tree insert stepper (section 3) ----
+  (function () {
+    var MAXK = 3, nid = 0, frames = [];
+    var mk = function (k, c) { return { id: nid++, k: k || [], c: c || [] }; };
+    var clone = function (n) { return { id: n.id, k: n.k.slice(), c: n.c.map(clone) }; };
+    var fmt = function (a) { return "[" + a.join(", ") + "]"; };
+    var root = mk();
+    var snap = function (msg, marks) { frames.push({ t: clone(root), marks: marks || {}, msg: msg }); };
+    snap("An empty B-tree: one empty page, which is both the root and a leaf. A page holds at most 3 keys.");
+    [10, 20, 5, 6, 12, 30, 7, 17, 3, 25, 27, 40].forEach(function (x) {
+      var n = root, path = [];
+      while (n.c.length) {
+        var i = 0;
+        while (i < n.k.length && n.k[i] <= x) i++;
+        var why = i === 0 ? x + " &lt; " + n.k[0] + ", so take the first pointer"
+          : i === n.k.length ? x + " &gt; " + n.k[i - 1] + ", so take the last pointer"
+          : x + " is between " + n.k[i - 1] + " and " + n.k[i] + ", so take pointer " + (i + 1);
+        var m = {}; m[n.id] = "hl";
+        snap("insert <b>" + x + "</b>: read page " + fmt(n.k) + ". " + why + ".", m);
+        path.push([n, i]); n = n.c[i];
+      }
+      var j = 0;
+      while (j < n.k.length && n.k[j] < x) j++;
+      n.k.splice(j, 0, x);
+      var m2 = {}; m2[n.id] = n.k.length > MAXK ? "warn" : "done";
+      snap(n.k.length > MAXK
+        ? "<b>" + x + "</b> goes into leaf " + fmt(n.k) + ": 4 keys, but a page holds 3. It must split."
+        : "<b>" + x + "</b> goes into leaf " + fmt(n.k) + ". It fits: one page written.", m2);
+      var cur = n;
+      while (cur.k.length > MAXK) {
+        var mid = Math.floor(cur.k.length / 2), up = cur.k[mid];
+        var right = mk(cur.k.slice(mid + 1), cur.c.slice(mid + 1));
+        cur.k = cur.k.slice(0, mid); cur.c = cur.c.slice(0, mid + 1);
+        var m3 = {}; m3[cur.id] = "done"; m3[right.id] = "done";
+        if (path.length) {
+          var pe = path.pop(), p = pe[0];
+          p.k.splice(pe[1], 0, up); p.c.splice(pe[1] + 1, 0, right);
+          m3[p.id] = p.k.length > MAXK ? "warn" : "hl";
+          snap("Split into " + fmt(cur.k) + " and " + fmt(right.k) + ". The middle key <b>" + up + "</b> moves up into the parent" +
+            (p.k.length > MAXK ? ", which now has 4 keys and must split too." : ", which has room."), m3);
+          cur = p;
+        } else {
+          root = mk([up], [cur, right]);
+          m3[root.id] = "hl";
+          snap("Split into " + fmt(cur.k) + " and " + fmt(right.k) + ". This was the root, so <b>" + up + "</b> becomes a new root above both halves. The tree is one level taller, and every leaf got one level deeper at the same moment.", m3);
+        }
+      }
+    });
+    frames[frames.length - 1].msg += " All five leaves are at the same depth.";
+
+    var drawB = function (svg, t, marks) {
+      var CW = 28, H = 28, G = 14, DY = 70, items = [], depth = 0;
+      var own = function (n) { return Math.max(1, n.k.length) * CW; };
+      var kidsW = function (n) { var s = 0; n.c.forEach(function (c, i) { s += sw(c) + (i ? G : 0); }); return s; };
+      var sw = function (n) { return n.c.length ? Math.max(own(n), kidsW(n)) : own(n); };
+      var place = function (n, x0, d) {
+        var w = sw(n), it = { n: n, x: x0 + w / 2 - own(n) / 2, y: 10 + d * DY, kids: [] };
+        depth = Math.max(depth, d); items.push(it);
+        var x = x0 + (w - kidsW(n)) / 2;
+        n.c.forEach(function (c) { it.kids.push(place(c, x, d + 1)); x += sw(c) + G; });
+        return it;
+      };
+      var W = sw(t) + 20;
+      place(t, 10, 0);
+      items.forEach(function (it) {
+        it.kids.forEach(function (k, i) {
+          svg.append(V.s("line", { class: "edge", x1: it.x + i * CW, y1: it.y + H, x2: k.x + own(k.n) / 2, y2: k.y }));
+        });
+      });
+      items.forEach(function (it) {
+        var g = V.s("g", { class: "bt " + (marks[it.n.id] || "") });
+        g.append(V.s("rect", { x: it.x, y: it.y, width: own(it.n), height: H, rx: 4 }));
+        it.n.k.forEach(function (k, i) {
+          if (i) g.append(V.s("line", { x1: it.x + i * CW, y1: it.y, x2: it.x + i * CW, y2: it.y + H }));
+          g.append(V.s("text", { x: it.x + i * CW + CW / 2, y: it.y + H / 2, text: k }));
+        });
+        svg.append(g);
+      });
+      var w = Math.max(W, 200);
+      svg.setAttribute("viewBox", "0 0 " + w + " " + (20 + depth * DY + H));
+      svg.style.maxWidth = w * 1.25 + "px";
+    };
+    V.player($("btree-player"), {
+      frames: frames, speed: 1100,
+      draw: function (f, stage) { var svg = V.s("svg", { class: "viz" }); drawB(svg, f.t, f.marks); stage.append(svg); },
+    });
+  })();
+
+  // ---- B+tree height calculator (section 4) ----
+  (function () {
+    var Ns = [1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15];
+    var ROWS = [16, 50, 100, 200, 500, 1000, 4000], PAGES = [4096, 8192, 16384, 32768];
+    var show = function () {
+      var n = Ns[Number($("bp-n").value)], rsz = ROWS[Number($("bp-row").value)], pg = PAGES[Number($("bp-page").value)];
+      $("bp-nval").textContent = n.toLocaleString();
+      $("bp-rowval").textContent = rsz + " bytes";
+      $("bp-pageval").textContent = pg / 1024 + " KB";
+      var leafCap = Math.max(1, Math.floor(pg / rsz)), fan = Math.floor(pg / 16);
+      var levels = [], cnt = Math.ceil(n / leafCap);
+      levels.push(cnt);
+      while (cnt > 1) { cnt = Math.ceil(cnt / fan); levels.push(cnt); }
+      var h = levels.length, internal = 0;
+      for (var i = 1; i < h; i++) internal += levels[i];
+      var names = levels.map(function (_, i) { return i === 0 ? (h === 1 ? "root (a single leaf)" : "leaves") : i === h - 1 ? "root" : "level " + (i + 1); });
+      var trs = [];
+      for (var k = h - 1; k >= 0; k--) trs.push(V.el("tr", {}, V.el("td", {}, names[k]), V.el("td", {}, levels[k].toLocaleString()), V.el("td", {}, fmtBytes(levels[k] * pg))));
+      $("bp-out").replaceChildren(V.el("table", {}, V.el("tr", {}, V.el("th", {}, "level"), V.el("th", {}, "pages"), V.el("th", {}, "size")), trs));
+      var bin = Math.ceil(Math.log2(n + 1));
+      $("bp-msg").innerHTML = "A leaf holds <b>" + leafCap.toLocaleString() + "</b> rows, an internal page <b>" + fan.toLocaleString() + "</b> signposts. Height <b>" + h + "</b>. " +
+        (h > 1 ? "The internal pages take <b>" + fmtBytes(internal * pg) + "</b>; with them cached, a lookup is <b>1</b> disk read. " : "The whole tree is one page. ") +
+        "A balanced binary tree would be about <b>" + bin + "</b> levels: " + bin + " separate reads.";
+    };
+    ["bp-n", "bp-row", "bp-page"].forEach(function (id) { $(id).oninput = show; });
+    show();
+  })();
+
+  // ---- LSM write and read path (sections 6 to 8) ----
+  (function () {
+    var TOMB = "✝", LIMIT = 3, S = { wal: [], mem: {}, tables: [] }, frames = [];
+    var cp = function (t) { return t.map(function (e) { return e.slice(); }); };
+    var snap = function (msg, mark) { frames.push({ wal: S.wal.slice(), mem: Object.assign({}, S.mem), tables: S.tables.map(cp), mark: mark || {}, msg: msg }); };
+    var memSorted = function () { return Object.keys(S.mem).sort().map(function (k) { return [k, S.mem[k]]; }); };
+    var put = function (k, v, why) {
+      S.wal.push(k + "=" + v); S.mem[k] = v;
+      var mm = {}; mm[k] = "hl";
+      snap(why, { wal: S.wal.length - 1, mem: mm });
+      if (Object.keys(S.mem).length >= LIMIT) {
+        S.tables.unshift(memSorted()); S.mem = {}; S.wal = [];
+        var tt = {}; tt[0] = "done";
+        snap("The memtable holds " + LIMIT + " keys: it's full. <b>Flush</b>: write it, already sorted, as SSTable " + S.tables.length + " in one sequential write. The log records it covered can now be dropped.", { tbl: tt });
+      }
+    };
+    snap("An empty LSM tree. The memtable holds at most " + LIMIT + " keys before it's flushed.");
+    put("a", 1, "put a=1: append it to the write-ahead log and insert it into the memtable. No data file is touched.");
+    put("c", 3, "put c=3: the memtable keeps keys sorted, so c goes after a.");
+    put("b", 2, "put b=2: it goes between a and c.");
+    put("a", 9, "put a=9: a newer version of a. SSTable 1 still says a=1; nobody edits it.");
+    put("c", TOMB, "delete c: write a <b>tombstone</b> (" + TOMB + ") for c. A delete is just another write.");
+    put("d", 4, "put d=4: the memtable is full again.");
+    snap("get a: the memtable is empty. Check SSTables newest first: SSTable 2 covers keys a to d, so read its block.", { tbl: { 0: "cmp" } });
+    snap("SSTable 2 has <b>a=9</b>: found, stop. SSTable 1's a=1 is never read. Blocks read: 1.", { cell: { "0:a": "done", "1:a": "dim" } });
+    snap("get c: SSTable 2 has <b>c=" + TOMB + "</b>, a tombstone: the answer is \"not found\", and the search stops. The c=3 underneath is hidden. Blocks read: 1.", { cell: { "0:c": "bad", "1:c": "dim" } });
+    snap("get b: SSTable 2 covers a to d, so b might be there. Read its block: no b. Keep going.", { tbl: { 0: "cmp" } });
+    snap("SSTable 1 has <b>b=2</b>: found. Blocks read: 2, one per table asked. That's the read cost of an LSM tree.", { cell: { "1:b": "done" }, tbl: { 0: "dim" } });
+    snap("get z: SSTable 2 covers a to d, SSTable 1 covers a to c. z is outside both, so neither is read: \"not found\" with 0 blocks read. For keys inside a table's range, a Bloom filter plays the same role.", { tbl: { 0: "dim", 1: "dim" } });
+    snap("<b>Compaction</b>: merge both tables like two sorted lists. For a, the newer a=9 wins and a=1 is dropped. c's tombstone meets c=3; this merge includes the oldest data, so both go.", { cell: { "1:a": "bad", "0:c": "bad", "1:c": "bad", "0:a": "done", "1:b": "done", "0:d": "done" } });
+    S.tables = [[["a", 9], ["b", 2], ["d", 4]]];
+    snap("After compaction: one table, a=9, b=2, d=4. Reads check one file again, and the space held by a=1, c=3 and the tombstone is free.", { tbl: { 0: "done" } });
+
+    V.player($("lsm-player"), {
+      frames: frames, speed: 1300,
+      draw: function (f, stage) {
+        var mem = Object.keys(f.mem).sort();
+        stage.append(
+          row("write-ahead log (disk)", V.cells(f.wal.length ? f.wal : [null], { idx: false, cls: function (i) { return i === f.mark.wal ? "hl" : ""; } })),
+          row("memtable (RAM, sorted)", V.cells(mem.length ? mem.map(function (k) { return k + "=" + f.mem[k]; }) : [null], { idx: false, cls: function (i) { return (f.mark.mem || {})[mem[i]] || ""; } })));
+        f.tables.forEach(function (t, ti) {
+          var label = "SSTable " + (f.tables.length - ti) + (ti === 0 && f.tables.length > 1 ? " (newest)" : "") + ", keys " + t[0][0] + " to " + t[t.length - 1][0];
+          stage.append(row(label, V.cells(t.map(function (e) { return e[0] + "=" + e[1]; }), {
+            idx: false,
+            cls: function (i) { var c = (f.mark.cell || {})[ti + ":" + t[i][0]]; return c || (f.mark.tbl || {})[ti] || ""; },
+          })));
+        });
+        if (!f.tables.length) stage.append(row("SSTables (disk)", V.el("span", { class: "small muted" }, "none yet")));
+      },
+    });
+  })();
+
+  // ---- Compaction trade-off model (section 8) ----
+  (function () {
+    var SIZES = [1e9, 1e10, 1e11, 1e12, 1e13, 1e14], M = 64e6;
+    var show = function () {
+      var N = SIZES[Number($("am-n").value)], T = Number($("am-t").value);
+      $("am-nval").textContent = fmtBytes(N); $("am-tval").textContent = T;
+      var L = Math.max(1, Math.ceil(Math.log(N / M) / Math.log(T) - 1e-9));
+      var lvW = [Math.round(L * T / 2), L * T], tiW = L, lvR = L, tiR = L * (T - 1);
+      var tr = function (a, b, c) { return V.el("tr", {}, V.el("td", {}, a), V.el("td", {}, b), V.el("td", {}, c)); };
+      $("am-out").replaceChildren(V.el("table", {},
+        V.el("tr", {}, V.el("th", {}, ""), V.el("th", {}, "leveled"), V.el("th", {}, "size-tiered")),
+        tr("levels", String(L), String(L)),
+        tr("times each byte is rewritten", lvW[0] + " to " + lvW[1], "about " + tiW),
+        tr("sorted runs a lookup may check", "about " + lvR + " (plus level 0)", "up to " + tiR),
+        tr("wasted block reads per missing key, 1% Bloom filters", (lvR * 0.01).toFixed(2), (tiR * 0.01).toFixed(2))));
+      $("am-msg").innerHTML = "With " + fmtBytes(N) + " and T = " + T + ": <b>" + L + "</b> levels. Leveled rewrites each byte about <b>" + lvW[0] + " to " + lvW[1] + "</b> times so that a read checks about <b>" + lvR + "</b> runs. Size-tiered rewrites each byte about <b>" + tiW + "</b> times, but a read may check up to <b>" + tiR + "</b> runs. (Both also write each byte once to the log and once at flush.)";
+    };
+    $("am-n").oninput = show; $("am-t").oninput = show; show();
+  })();
+})();
+</script>
+</body>
+</html>
