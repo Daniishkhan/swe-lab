@@ -406,7 +406,7 @@ def union(a, b):
   <div class="cap">Kruskal on 7 towns. The cables are sorted by cost (the cells at the top). Yellow towns: the two ends of the cable being considered. Blue lines: cables taken. Green cells: taken; red: skipped because the ends were already connected. It stops after 6 = n − 1 cables.</div>
 </div>
 
-<p>Cost: sorting E edges is O(E log E), and the unions are O(E · α(n)), so the sort dominates. You can stop as soon as n − 1 edges are taken. Why is greedy safe here? If the cheapest remaining cable joins two groups, some cable must join those groups in any spanning tree, and none is cheaper; a skipped cable would close a loop in which every other cable is no more expensive. The full proof (the "cut" and "cycle" properties) is in topic 02.09, along with Prim's algorithm, which grows one tree outward from a start town instead of sorting every cable.</p>
+<p>Cost: sorting E edges is O(E log E), and the unions are O(E · α(n)), so the sort dominates. You can stop as soon as n − 1 edges are taken. Why is greedy safe here? If the cheapest remaining cable joins two groups, some cable must join those groups in any spanning tree, and none is cheaper; a skipped cable would close a loop in which every other cable is no more expensive. The full proof (the "cut" and "cycle" properties) is in <a href="../../02-algorithms/concepts/minimum-spanning-tree.html">topic 02.09</a>, along with Prim's algorithm, which grows one tree outward from a start town instead of sorting every cable.</p>
 
 <details class="aside deeper">
   <summary>Go deeper: Kruskal in disguise</summary>

@@ -289,7 +289,7 @@ for a in (False, True):
 
 <details class="aside deeper">
   <summary>Go deeper: a bitmask as the used set</summary>
-  <p>The whole <code>used</code> list can be one integer: bit i is 1 when item i is used. Test with <code>mask &amp; (1 &lt;&lt; i)</code>, pass <code>explore(mask | (1 &lt;&lt; i))</code>, and there's nothing to un-choose, because each call gets its own integer. The bigger payoff: the mask is a small hashable summary of "which items are placed", so it can be a cache key. Visiting 15 cities in the best order has 15! = 1,307,674,368,000 orders, but only 2<sup>15</sup> × 15 = 491,520 pairs of (cities visited, current city). Caching by those pairs is dynamic programming, the next chapter.</p>
+  <p>The whole <code>used</code> list can be one integer (the <a href="bit-manipulation.html#s5">bit manipulation chapter</a> builds this up): bit i is 1 when item i is used. Test with <code>mask &amp; (1 &lt;&lt; i)</code>, pass <code>explore(mask | (1 &lt;&lt; i))</code>, and there's nothing to un-choose, because each call gets its own integer. The bigger payoff: the mask is a small hashable summary of "which items are placed", so it can be a cache key. Visiting 15 cities in the best order has 15! = 1,307,674,368,000 orders, but only 2<sup>15</sup> × 15 = 491,520 pairs of (cities visited, current city). Caching by those pairs is dynamic programming, the next chapter.</p>
 </details>
 
 <!-- ============================================================ -->

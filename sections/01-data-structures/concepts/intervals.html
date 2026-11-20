@@ -226,7 +226,7 @@ def shared(a, b):
  both busy: [1,2)  [8,10)</code></pre>
 
 <h3>A different question needs a different key</h3>
-<p>"One room, many meeting requests: accept as many as possible without overlaps." Here you sort by <b>end</b>, and take each meeting that starts at or after the end of the last one you took. Finishing earliest leaves the most room for everything else. Its twin, "remove the fewest meetings so the rest don't overlap", is the same algorithm: n minus the number you keep. The proof that this greedy choice is optimal belongs to greedy algorithms (topic 02.10). Notice the split: merging asks "what is connected?", so it needs starts in order; selection asks "what leaves the most room?", so it needs ends in order.</p>
+<p>"One room, many meeting requests: accept as many as possible without overlaps." Here you sort by <b>end</b>, and take each meeting that starts at or after the end of the last one you took. Finishing earliest leaves the most room for everything else. Its twin, "remove the fewest meetings so the rest don't overlap", is the same algorithm: n minus the number you keep. The proof that this greedy choice is optimal belongs to greedy algorithms (<a href="../../02-algorithms/concepts/greedy.html">topic 02.10</a>). Notice the split: merging asks "what is connected?", so it needs starts in order; selection asks "what leaves the most room?", so it needs ends in order.</p>
 
 <div class="keyidea"><p>After sorting: free time is the gaps between merged blocks; inserting into merged blocks is a binary search plus a short walk; intersecting two block lists is two pointers, always advancing the block that ends first. To keep the most non-overlapping intervals, sort by end instead.</p></div>
 
@@ -469,7 +469,7 @@ def fix(node):                              # after node's children changed
 <p>Interviewers then push on scale. Three follow-ups, with answers that come straight from the mechanisms:</p>
 <ul>
   <li><b>"The intervals arrive as a stream."</b> If they arrive sorted by start (logs usually do), merging keeps only the current block: O(1) memory. The sweep needs to know when running intervals end, so it keeps a min-heap of their end times, as big as the current overlap. If the stream isn't sorted, you have to buffer before you can answer, because a late arrival can start earlier than anything you've seen.</li>
-  <li><b>"It doesn't fit in memory."</b> Sort the events on disk with an external merge sort (topic 02.13), then sweep them in one sequential read. The sweep itself needs only the counter.</li>
+  <li><b>"It doesn't fit in memory."</b> Sort the events on disk with an external merge sort (<a href="../../02-algorithms/concepts/streaming-external.html#s6">topic 02.13</a>), then sweep them in one sequential read. The sweep itself needs only the counter.</li>
   <li><b>"It's spread over 100 machines."</b> Split <em>time</em> into shards, say one per hour, and send each interval to every shard it touches, clipped to that shard. The global peak is the largest of the shards' peaks, because every moment belongs to exactly one shard. For merging, merge per shard, then glue blocks that meet at a shard boundary. Split by booking id instead and each machine's peak means nothing on its own; you'd have to bring all the events back together in time order (a k-way merge, from <a href="heaps.html">heaps</a>).</li>
 </ul>
 

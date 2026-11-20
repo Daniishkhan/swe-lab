@@ -353,7 +353,7 @@ index     0    1    2    3    4    5    6    7
 <!-- ============================================================ -->
 <h2 id="s8"><span class="sec-num">8</span>Walking the bits: <code>i &amp; -i</code></h2>
 
-<p>Everything in a Fenwick tree turns on one number, lowbit(j), and computers get it in one step with <code>j &amp; -j</code>. Here's why that works, using 5-bit numbers. A negative number is stored as "flip every bit, then add 1" (that's <b>two's complement</b>, how almost every CPU stores negatives, and how Python's <code>&amp;</code> treats negative ints too):</p>
+<p>Everything in a Fenwick tree turns on one number, lowbit(j), and computers get it in one step with <code>j &amp; -j</code> (<a href="../../02-algorithms/concepts/bit-manipulation.html#s6">why, in the bits chapter</a>). Here's why that works, using 5-bit numbers. A negative number is stored as "flip every bit, then add 1" (that's <b>two's complement</b>, how almost every CPU stores negatives, and how Python's <code>&amp;</code> treats negative ints too):</p>
 
 <pre class="diagram"><code>  12        =  0 1 1 0 0
   flip      =  1 0 0 1 1

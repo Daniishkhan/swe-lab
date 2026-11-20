@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="02.09">
+  <title>Connect everything, cheaply (Minimum spanning trees)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+  <style>
+    /* Page-local: MST figures. Theme tokens only. */
+    svg.viz .edge.cross { stroke: var(--warn); stroke-width: 2.4; stroke-dasharray: 6 4; }
+    svg.viz .edge.best { stroke: var(--ok); stroke-width: 4; }
+    svg.viz .edge.bad { stroke: var(--bad); stroke-width: 3; }
+    svg.viz .edge.ghost { stroke: var(--accent-2); stroke-width: 3; stroke-dasharray: 2 5; stroke-linecap: round; }
+    svg.viz .edge.dim { opacity: 0.35; }
+    .cut-fig svg.viz g.node { cursor: pointer; }
+    .mst-bars { display: grid; gap: 8px; margin-top: 12px; font-family: var(--ui); font-size: 0.88rem; }
+    .mst-bars .row { display: grid; grid-template-columns: minmax(96px, 9rem) 1fr; gap: 10px; align-items: center; }
+    .mst-bars .track { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; height: 22px; overflow: hidden; }
+    .mst-bars .fill { height: 100%; background: var(--accent); min-width: 2px; }
+    .mst-bars .fill.win { background: var(--ok); }
+    .mst-bars .num { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); grid-column: 2; }
+  </style>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 9</div>
+  <h1>Connect everything, cheaply</h1>
+  <div class="meta"><span><span class="badge P1">P1</span> Minimum spanning tree (Kruskal, Prim)</span><span>about 55 minutes</span><span>10 quick checks · 10 exercises</span></div>
+</header>
+
+<p>You have some places and a price list for joining pairs of them. You want every place joined to every other, directly or through others, for the least money. That's the <b>minimum spanning tree</b> problem. It looks like it needs a search over a huge number of options, but two short greedy algorithms solve it exactly: Kruskal's and Prim's. This chapter shows <em>why</em> greedy is safe here, which is the part interviewers probe. It also shows when each algorithm wins, and how to spot an MST hiding inside clustering, bandwidth and route-planning questions.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain why the cheapest network has no loops and exactly n − 1 links.</li>
+    <li>State and prove the cut property and the cycle property, with a picture.</li>
+    <li>Run Kruskal (sort + union-find) and Prim (grow one tree with a heap) by hand, and give their costs.</li>
+    <li>Pick between Kruskal, heap Prim and array Prim from the graph's shape (sparse or dense).</li>
+    <li>Explain why an MST is not a shortest-path tree, and when the MST is unique.</li>
+    <li>Use the MST for clustering, widest paths and a 2× approximation for the traveling salesman.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom, like a book. You need <a href="../../01-data-structures/concepts/union-find.html">union-find</a> (chapter 1, part 7) and <a href="../../01-data-structures/concepts/heaps.html">heaps</a> (chapter 1, part 4). The <a href="shortest-paths.html">shortest-paths chapter</a> helps for section 8 but isn't required. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: fiber for seven towns</h2>
+
+<div class="story">
+  <p>An internet provider wants to bring fiber to seven towns, A to G. Engineers have priced the 12 trenches that are possible (rivers and hills rule out the rest). Each price is in units of $100,000: the A–B trench costs 9, so $900,000.</p>
+  <p>Digging all 12 costs 90 units: $9 million. But the provider only needs every town to reach every other town, possibly through a third town. Which trenches should it dig?</p>
+</div>
+
+<p>The obvious approach is to try every combination. Here's how fast that grows:</p>
+<ul>
+  <li>For our 7 towns, the answer will turn out to use 6 trenches. There are 924 ways to choose 6 of the 12. Checking all 924 is fine.</li>
+  <li>For 30 towns where any pair can be joined, there are 30<sup>28</sup> ≈ 2.3 × 10<sup>41</sup> possible networks without loops (that count is called Cayley's formula). At a billion checks per second, that takes about 7 × 10<sup>24</sup> years.</li>
+</ul>
+<p>Real problems have thousands of towns, or millions of points. So we need an idea, not a faster computer. The idea will be greedy: always grab the cheapest trench that's safe. The whole chapter is about what "safe" means and why it works.</p>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>What the answer looks like</h2>
+
+<p>Before looking for the cheapest network, let's work out what shape it must have.</p>
+
+<p><b>It has no loops.</b> Suppose the network has a loop: A–B, B–E, E–D, D–A, say. Cut out the most expensive trench on that loop. Is everyone still connected? Yes. Any trip that used the removed trench can go the long way round the rest of the loop. So a loop always contains a trench you paid for and didn't need. The cheapest network has no loops. (One exception: if some prices are negative, someone pays you to dig, and extra trenches can save money. The Go deeper box in section 9 covers it. Here, all prices are positive.)</p>
+
+<p><b>It has exactly n − 1 trenches.</b> Picture the towns as islands. At the start there are 7 separate islands. Each trench that doesn't close a loop joins two separate islands into one, so the count of islands drops by exactly 1. To get from 7 islands down to 1 takes exactly 6 trenches. For n towns, n − 1.</p>
+
+<p>A set of links that connects all n points and has no loops is called a <b>spanning tree</b>: "spanning" because it reaches every point, "tree" because it has no loops. Give every link a cost, called its <b>weight</b>. A spanning tree whose weights add up to the smallest possible total is a <b>minimum spanning tree</b>, or <b>MST</b>. In graph words: the towns are <b>vertices</b> (V of them) and the possible trenches are <b>edges</b> (E of them).</p>
+
+<div class="keyidea">The cheapest way to connect n points is always a tree: no loops (a loop has a link you can drop), exactly n − 1 links (each link merges two groups, and you start with n groups).</div>
+
+<div class="check" id="check-edges">
+  <p class="q">A company connects its 50 offices with leased lines, as cheaply as possible. How many lines does it lease?</p>
+  <div class="opts">
+    <button>50, one per office</button>
+    <button data-correct>49</button>
+    <button>It depends on how many possible lines there are</button>
+  </div>
+  <div class="fb right"><p>Right. Start with 50 separate offices. Each useful line merges two groups, so the number of groups drops by one per line. From 50 groups to 1 takes 49 lines. A 50th line would join two offices that are already connected, closing a loop.</p></div>
+  <div class="fb wrong"><p>Count groups instead of lines. At the start each office is alone: 50 groups. A line between two different groups merges them: 49 groups. Every line that isn't wasted lowers the count by exactly 1, so reaching 1 group takes 49 lines, however many lines were on offer. A 50th line would connect two offices that already reach each other: a loop, and money spent on nothing.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>The cut property: which link is safe to take</h2>
+
+<p>Greedy algorithms are risky. Grabbing the cheapest thing now can force you into an expensive choice later. So before we go greedy, we need a rule that says "this link is definitely part of a cheapest network". Here is that rule. It starts with a picture.</p>
+
+<p>Draw a line across the map that splits the towns into two camps. Say West = {A, D, F} and East = {B, C, E, G}. In graph words, a split of the vertices into two non-empty groups is a <b>cut</b>, and an edge with one end in each group <b>crosses</b> the cut. Some trench has to cross the line, or West could never talk to East. Now look at the trenches that cross: A–B 9, B–D 10, D–E 11, E–F 12, F–G 13. The cheapest is A–B, at 9.</p>
+
+<p><b>The cut property:</b> for any cut, the cheapest edge crossing it belongs to a minimum spanning tree. Try it below before reading the proof.</p>
+
+<div class="figure cut-fig">
+  <div class="viz-stage">
+    <div id="cut-svg"></div>
+    <div class="viz-caption" id="cut-msg" aria-live="polite"></div>
+    <div class="viz-controls">
+      <button class="btn" id="cut-rand">Random cut</button>
+      <button class="btn" id="cut-mst">Show the MST</button>
+    </div>
+  </div>
+  <div class="cap">Click a town (or tab to it and press Enter) to move it to the other camp: highlighted (blue) towns versus plain ones. Dashed yellow lines cross the cut; the thick green line is the cheapest one crossing. Press Show the MST to draw the MST's other edges dotted purple. Whatever cut you make, the green edge is always an MST edge.</div>
+</div>
+
+<h3>Why it's true: the swap argument</h3>
+<p>Call the cheapest crossing edge <b>e</b>. Suppose someone hands you a cheapest network T that doesn't use e. We'll show we can swap e in without paying more.</p>
+<ol>
+  <li><b>Add e to T.</b> T already connects e's two ends, so adding e closes a loop.</li>
+  <li><b>The loop crosses the line twice.</b> Walk around the loop: e takes you from West to East. To get back to where you started, the loop must cross back to West somewhere. That's a second crossing edge, <b>f</b>, which is part of T.</li>
+  <li><b>f costs at least as much as e,</b> because e is the cheapest crossing edge.</li>
+  <li><b>Remove f.</b> You removed an edge from a loop, so everything is still connected, and you're back to n − 1 edges: a spanning tree again. Its cost is cost(T) + cost(e) − cost(f), which is no more than cost(T).</li>
+</ol>
+<p>So there's a cheapest network that uses e. If e is <em>strictly</em> cheaper than every other crossing edge, the swap makes T strictly cheaper, which is impossible because T was already the cheapest. So in that case every MST uses e. This trick, "swap one piece of the optimal answer for the greedy choice and show it doesn't get worse", is called an <b>exchange argument</b>. The <a href="greedy.html">greedy chapter</a> uses it again and again.</p>
+
+<details class="aside another">
+  <summary>Explain it another way: two villages and a river</summary>
+  <p>Two villages sit on opposite banks of a river. They must be joined by at least one bridge, and there are five places a bridge could go, with five prices. Whatever else you build on each bank, you need at least one bridge. Why would you ever build anything but the cheapest bridge? If your plan uses a pricier bridge, swap it for the cheapest one: the two banks are still joined, and you saved money. The cut is the river. The "swap" in the proof is exactly this, done carefully so you don't accidentally disconnect someone on the same bank.</p>
+</details>
+
+<div class="keyidea">Cut property: draw any line splitting the points into two camps. The cheapest link across the line is safe to take. Proof: if a cheapest network skips it, adding it makes a loop that crosses the line a second time; drop that other crossing link and the cost doesn't go up.</div>
+
+<div class="check" id="check-cut">
+  <p class="q">In the seven-town map, the cheapest trench touching town F is D–F (cost 3). Is D–F certainly in the MST?</p>
+  <div class="opts">
+    <button>No, you'd need to check every combination</button>
+    <button data-correct>Yes: use the cut {F} versus everything else</button>
+    <button>Only if 3 is the cheapest trench on the whole map</button>
+  </div>
+  <div class="fb right"><p>Right. Put F alone in one camp. The edges crossing that cut are exactly F's own edges: D–F 3, E–F 12, F–G 13. D–F is the cheapest, so the cut property says it's in an MST (in every MST, since nothing else costs 3). The same works for every town: each town's cheapest link is in the MST.</p></div>
+  <div class="fb wrong"><p>The cut property works for <em>any</em> cut you like, so choose a convenient one: draw a small circle around F alone. Every trench crossing that circle touches F: D–F 3, E–F 12, F–G 13. The cheapest crossing is D–F, so it's in the MST. Nothing needs to be the cheapest on the whole map; it only has to be the cheapest across the line you drew. (On this map the cheapest overall is E–G at 2, and D–F still makes it in.)</p></div>
+</div>
+
+<div class="check" id="check-swap">
+  <p class="q">In the swap proof, why does removing f leave everything connected?</p>
+  <div class="opts">
+    <button>Because f was the most expensive edge in T</button>
+    <button data-correct>Because f is on the loop that adding e created, so the rest of the loop is a detour around it</button>
+    <button>Because f crosses the cut, and edges that cross cuts are never needed</button>
+  </div>
+  <div class="fb right"><p>Right. Any trip that used f can go around the rest of the loop instead (which now includes e). That's why the proof picks f <em>from the loop</em>, and not just any crossing edge of T: removing a crossing edge that's not on the loop could cut T in two.</p></div>
+  <div class="fb wrong"><p>Think about the loop as a ring road. Closing one stretch of a ring road doesn't strand anyone: you drive the other way around. f was chosen to be on the loop formed by adding e, so removing it is closing one stretch of the ring. f doesn't have to be T's most expensive edge, and crossing edges are often needed: e itself is one. If you removed some crossing edge of T that's <em>not</em> on the loop, you could cut the tree in two.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>The cycle property: which link is safe to throw away</h2>
+
+<p>The cut property tells you what to take. Its mirror image tells you what to throw away.</p>
+
+<p>Look at the triangle C, E, G on the map. Its three edges cost C–E 4, E–G 2 and C–G 7. If a network uses all three, it has a loop, and the most expensive one, C–G, is the one to drop: C still reaches G through E. In fact, C–G is never needed at all:</p>
+
+<pre class="diagram"><code>      C
+     / \      loop C–E–G:
+  4 /   \ 7   C–G (7) is the
+   /     \    most expensive,
+  E ----- G   so no MST uses it
+      2</code></pre>
+
+<p><b>The cycle property:</b> if an edge is strictly the most expensive edge on some loop (a <b>cycle</b>), no MST contains it.</p>
+
+<p><b>Why:</b> suppose a spanning tree T uses C–G. Remove it. T falls into two pieces, one containing C and one containing G. Those two pieces are a cut. The rest of the loop (C–E–G) still runs from C's piece to G's piece, so some edge on it crosses the cut. Every other edge on the loop is cheaper than C–G, so add that crossing edge back: you have a spanning tree again, and it's cheaper. So T wasn't a minimum.</p>
+
+<p>The two properties are two views of the same swap. The cut property says: <em>the cheapest edge across any cut is in</em>. The cycle property says: <em>the most expensive edge on any cycle is out</em>. Every MST algorithm is a way of applying these two rules in some order until n − 1 edges are in.</p>
+
+<div class="keyidea">Cycle property: the strictly most expensive edge on any loop is in no MST, because removing it from a tree and adding a cheaper edge of the same loop gives a cheaper tree. Cut property says what to take; cycle property says what to skip.</div>
+
+<div class="check" id="check-cycle">
+  <p class="q">The most expensive trench on the whole map, F–G at 13, is on the loop D–F–G–E–D. Someone says "the most expensive edge in the graph is never in the MST". Are they right?</p>
+  <div class="opts">
+    <button>Yes, always</button>
+    <button data-correct>No. It's out here because it's the most expensive on a loop. An edge on no loop (a bridge) is always in, however expensive</button>
+    <button>No, the most expensive edge is always in the MST</button>
+  </div>
+  <div class="fb right"><p>Right. F–G is the most expensive on the loop D–F–G–E–D, so it's out. But picture an island town joined to the mainland by exactly one possible trench costing 1,000. That trench is on no loop, and without it the island is cut off, so every spanning tree, cheapest included, must use it. The cycle property needs a loop.</p></div>
+  <div class="fb wrong"><p>The cycle property is about loops, not about the whole graph. F–G is out because the loop D–F–G–E–D offers a cheaper way around it. Now imagine an island reachable by just one possible trench, at cost 1,000. There's no loop through it and no other way to reach the island, so every spanning tree must include it. Expensive is fine; "most expensive on a loop" is what rules an edge out.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: the exact statements, with ties</summary>
+  <ul>
+    <li><b>Cut property.</b> If e is <em>a</em> cheapest edge across some cut (ties allowed), then some MST contains e. If e is strictly cheaper than every other crossing edge, then every MST contains e.</li>
+    <li><b>Cycle property.</b> If e is strictly the most expensive edge on some cycle, then no MST contains e. If it only ties for most expensive, then some MST avoids it, but another MST might use it.</li>
+    <li><b>Generic MST algorithm.</b> Keep a set of edges known to be in some MST (start empty). Find a cut that none of them cross, and add a cheapest edge across it. Repeat n − 1 times. Kruskal, Prim and Borůvka are three ways of choosing the cut.</li>
+    <li><b>Borůvka (1926)</b>, the oldest of the three, was designed for an electricity network in Moravia. Every group, at the same time, takes its own cheapest outgoing edge (cut: that group versus everything else). Each round at least halves the number of groups, so there are log V rounds and O(E log V) total. Since all groups work at once, it's the natural choice for parallel and distributed MST. With ties you must break them the same way everywhere (for example by edge id), or two groups can pick two different equal-cost edges between them and make a loop.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Kruskal: cheapest first, skip the loops</h2>
+
+<p>We have two safety rules. The simplest way to use both: look at the edges from cheapest to most expensive, and decide each one on the spot. The <a href="../../01-data-structures/concepts/union-find.html">union-find chapter</a> sketched this. Here's why it's correct.</p>
+
+<p>When edge (u, v) comes up, everything cheaper has already been decided. Two cases:</p>
+<ul>
+  <li><b>u and v are already connected</b> by edges we took. Those edges are all cheaper or the same price (we go cheapest first), so this edge would be the most expensive one on the loop it closes (or tied for most expensive, and then it adds nothing the loop doesn't already give). <b>Cycle property: skip it.</b></li>
+  <li><b>u and v are in different groups.</b> Use the cut "u's group | everything else". Could a cheaper edge cross it? Every cheaper edge has been decided already. The ones we took are inside groups. The ones we skipped joined two towns of one group. So no cheaper edge crosses this cut, which makes (u, v) a cheapest one that does (an equal-cost edge still waiting in the list may tie with it; the cut property allows ties). <b>Cut property: take it.</b></li>
+</ul>
+
+<p>One gap an interviewer may poke at: the cut property promises (u, v) is in <em>some</em> MST, but is it the same MST that holds the edges we already took? Yes, and the cut is why. None of the taken edges cross "u's group | everything else" (they're all inside groups). So in the swap proof, the edge f that gets swapped out crosses the cut and can't be one of ours. Start from an MST that holds all our earlier edges, swap (u, v) in, and you get an MST that holds all of them plus (u, v). Repeat for every edge taken. Prim's cut "tree | rest" has the same feature: no tree edge crosses it.</p>
+
+<p>That's Kruskal's algorithm (Joseph Kruskal, 1956):</p>
+<ol>
+  <li>Sort the edges by weight. Sort a copy, or a list of indexes, so you don't scramble the caller's list.</li>
+  <li>Put every vertex in its own group.</li>
+  <li>For each edge (u, v), cheapest first: if u and v are in different groups, take the edge and merge their groups; otherwise skip it.</li>
+  <li>Stop once n − 1 edges are taken. If the edges run out first, the graph wasn't connected.</li>
+</ol>
+
+<p>Step 3 asks "same group?" while groups keep merging. That's exactly what union-find does: <code>find(u) == find(v)</code> answers it, and <code>union(u, v)</code> merges. With union by size and path compression, each call costs about O(1) in practice.</p>
+
+<div class="figure">
+  <div id="kr-player"></div>
+  <div class="cap">Kruskal on the seven towns. Top: edges sorted by cost (yellow = being decided, green = taken, red = skipped). When an edge is taken, the blue towns are the group on one end of it: the cut that proves it safe. The dashed yellow lines also cross that cut, and they all come later in the sorted list. When an edge is skipped, the yellow towns show the loop it would close.</div>
+</div>
+
+<p><b>Cost.</b> Sorting E edges costs O(E log E). The loop does at most 2E finds and V − 1 unions, almost O(1) each, so O(E · α(V)), where α is the "practically at most 4" function from the union-find chapter. The sort dominates, so Kruskal is <b>O(E log E)</b>. That's the same as O(E log V): a graph without parallel edges has fewer than V² edges, so log E &lt; 2 log V. (Parallel edges? Keep only the cheapest one per pair first.) Memory: the edge list, O(E).</p>
+
+<div class="keyidea">Kruskal: sort edges, take each one whose ends are in different groups (cut property, using "u's group" as the cut), skip the rest (cycle property). Union-find answers "same group?". O(E log E), dominated by the sort.</div>
+
+<div class="check" id="check-kruskal">
+  <p class="q">You run Kruskal with a "same group?" check that does a BFS over the edges taken so far, instead of union-find. The graph has 100,000 towns and 300,000 edges. What happens?</p>
+  <div class="opts">
+    <button>Same answer, same speed: the sort is the slow part anyway</button>
+    <button data-correct>Same answer, but each check can walk up to 100,000 towns, so up to about 3 × 10<sup>10</sup> steps in total</button>
+    <button>Wrong answer: BFS can't detect loops</button>
+  </div>
+  <div class="fb right"><p>Right. The answer is still correct, since BFS finds out whether u reaches v. But once the groups get big, each BFS walks a big group: up to 100,000 steps for each of 300,000 edges. Union-find answers the same question in a few steps. Sorting is only about 300,000 × 18 ≈ 5.5 million steps, so with BFS the checks, not the sort, dominate. Exercise 4's test has exactly this size.</p></div>
+  <div class="fb wrong"><p>BFS does answer "is v reachable from u?", so the answer is right. The problem is cost. Late in the run, most edges join two towns that are already in one big group, and a BFS has to walk through that group to find out: up to 100,000 steps, for each of 300,000 edges. Compare the sort: 300,000 × log₂ 300,000 ≈ 5.5 million steps. Union-find's find is a few steps per edge. That's why Kruskal and union-find always come as a pair.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Prim: grow one tree outward</h2>
+
+<p>Kruskal builds many small trees all over the map and lets them merge. Prim's algorithm (Vojtěch Jarník in 1930, Robert Prim in 1957) picks one cut and keeps using it: <b>"the tree so far | everything else"</b>.</p>
+
+<p>Picture a town that only ever builds roads out of its own built-up area. Start at A. Look at every road leaving the built-up area, build the cheapest one, and the town on the other end joins. Look again at every road leaving the (now bigger) area, build the cheapest one, and so on, until every town has joined. By the cut property, every road built is safe, because it's the cheapest one crossing "inside | outside".</p>
+
+<h3>Finding the cheapest road out, fast</h3>
+<p>The plain way is to look at every edge at every step: V steps × E edges. For 10,000 towns and 50,000 edges, that's 500 million edge checks.</p>
+<p>The fix: keep the edges leaving the tree in a <b>min-heap</b>, keyed by weight. When town v joins the tree, push each of v's edges whose far end is still outside. To grow, pop the cheapest edge. One catch: an edge that was pushed earlier may no longer leave the tree, because its far end joined in the meantime by a cheaper route. That's a <b>stale</b> entry. When you pop one, throw it away and pop again. This is called <b>lazy deletion</b>: you never search the heap to remove old entries, you just skip them when they surface.</p>
+
+<div class="figure">
+  <div id="pr-player"></div>
+  <div class="cap">Prim from A. Green towns are in the tree. Dashed yellow lines cross the cut "tree | rest". The heap row lists every entry still waiting, cheapest first (each one reads "from→to cost"). Once all seven towns are in, the remaining pops are red: stale entries whose far end has already joined.</div>
+</div>
+
+<p><b>Cost.</b> Each edge is pushed at most once: when the first of its two ends joins, and only if the other end is still outside. So the heap sees at most E pushes and E pops, each O(log E). That's <b>O(E log E) = O(E log V)</b>, with up to O(E) entries in the heap. Every vertex's adjacency list is read exactly once: when that vertex joins.</p>
+
+<h3>Prim and Dijkstra are one line apart</h3>
+<p>If you've read the <a href="shortest-paths.html">shortest-paths chapter</a>, this loop looks familiar. Same heap, same "pop the smallest, skip if already done, push the neighbors". The only difference is what goes into the heap:</p>
+
+<div class="cols">
+<div>
+<pre><code># Dijkstra: distance from start
+heappush(heap, (dist[u] + w, v))</code></pre>
+</div>
+<div>
+<pre><code># Prim: just this one edge
+heappush(heap, (w, v))</code></pre>
+</div>
+</div>
+
+<p>Dijkstra asks "which town is closest to the <em>start</em>?". Prim asks "which town is closest to the <em>tree</em>, by a single edge?". Section 8 shows how differently the two answers can turn out.</p>
+
+<div class="keyidea">Prim: grow one tree; the cut is always "tree | rest". A min-heap holds the edges leaving the tree; skip stale entries when popped. O(E log V). It's Dijkstra's loop with the key changed from dist[u] + w to w.</div>
+
+<div class="check" id="check-prim">
+  <p class="q">Prim pops the heap entry F→E, cost 12. It was pushed when F joined the tree, but E has joined since then (by B–E, cost 6). What should Prim do?</p>
+  <div class="opts">
+    <button>Take it: it was the cheapest entry in the heap</button>
+    <button data-correct>Throw it away and pop again: E is inside, so F–E no longer crosses the cut</button>
+    <button>Change E's parent to F, since this is the newer entry</button>
+  </div>
+  <div class="fb right"><p>Right. The entry was pushed while E was outside. E has since joined by a cheaper edge, so F–E now joins two towns that are both in the tree; taking it would close a loop. Lazy deletion just skips it. Each skip costs one pop, O(log E), and there are fewer than E of them in total. Step the figure to the end to watch this exact pop.</p></div>
+  <div class="fb wrong"><p>A heap entry is a note written in the past: "F–E crosses the cut". When E joined (by B–E, cost 6), that note went out of date, but nobody went into the heap to erase it, because finding it would be slow. So when it surfaces, check: is the far end still outside? E isn't, so F–E connects two towns that are both in the tree, and taking it closes a loop. Changing E's parent would swap a 6 for a 12. Pop again.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: eager Prim, decrease-key and Fibonacci heaps</summary>
+  <p>The lazy heap can hold O(E) entries. The <b>eager</b> version keeps one entry per outside vertex: <code>best[v]</code> = the cheapest known edge from the tree to v. When a new tree vertex u offers v a cheaper edge, it <em>lowers</em> v's key in the heap (a <b>decrease-key</b>), which needs an indexed heap that knows where each vertex sits. The heap then holds at most V entries; time is still O(E log V). Python's <code>heapq</code> has no decrease-key, which is why the lazy version is the usual one in Python interviews.</p>
+  <p>With a Fibonacci heap (Fredman and Tarjan, 1987), decrease-key is O(1) amortized and Prim becomes O(E + V log V). That's better on paper for dense graphs, but the constant factors are large, so real code rarely uses it. For dense graphs there's a simpler win, in the next section.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Dense graphs: drop the heap</h2>
+
+<p>Now a different problem. A drone company has 5,000 charging pads scattered over a city. Any two pads can be linked by a direct radio relay, and the cost is the distance between them. Find the cheapest way to link all the pads.</p>
+
+<p>Every pair is a possible edge: 5,000 × 4,999 / 2 ≈ 12.5 million edges. A graph where E is close to V² is called <b>dense</b>; one where E is a small multiple of V (road maps, social networks) is <b>sparse</b>. Look at what the two algorithms so far would do here:</p>
+<ul>
+  <li><b>Kruskal</b> must build and sort all 12.5 million edges. In Python each edge is a tuple of about 100 bytes, so that's over a gigabyte just to hold them, then about 12.5M × 24 ≈ 300 million steps to sort.</li>
+  <li><b>Heap Prim</b> pushes up to 12.5 million entries: E log V ≈ 12.5M × 12 ≈ 150 million heap steps, and a heap just as big as Kruskal's list.</li>
+</ul>
+
+<p>The fix is to notice what the heap is for. It finds the cheapest of many candidates. But in eager Prim there are only V candidates at any time, one <code>best[v]</code> per outside vertex. With only 5,000 of them, you can just scan a plain array:</p>
+<ol>
+  <li>Keep <code>best[v]</code> (cheapest known edge from the tree to v) and <code>parent[v]</code> for every vertex. Start with best[start] = 0 and the rest at infinity.</li>
+  <li>V times: scan the outside vertices for the smallest best[v]. That's V steps. Add that vertex u to the tree.</li>
+  <li>For every outside vertex v, compute dist(u, v) and lower best[v] if it's smaller. That's another V steps.</li>
+</ol>
+<p>That's V rounds of about 2V steps: <b>O(V²) time and O(V) memory</b>, with no heap and no edge list. Distances are computed when needed, never stored. For 5,000 pads, that's about 25 million simple steps, and a few arrays of 5,000 numbers.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <label class="small" for="dn-v">vertices V</label>
+      <input type="range" id="dn-v" min="0" max="9" step="1" value="6">
+      <select id="dn-shape">
+        <option value="sparse">Sparse: E = 3V (a road map)</option>
+        <option value="mid">In between: E = V·√V</option>
+        <option value="dense" selected>Dense: every pair, E = V(V−1)/2</option>
+      </select>
+    </div>
+    <div class="mst-bars" id="dn-bars"></div>
+    <div class="viz-caption" id="dn-msg" aria-live="polite"></div>
+  </div>
+  <div class="cap">Rough step counts: Kruskal ≈ E·log₂E (the sort), heap Prim ≈ E·log₂V, array Prim ≈ V². The green bar wins. Drag V and switch the shape: on dense graphs array Prim wins at every size; on sparse ones it loses badly once V passes a few dozen.</div>
+</div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Graph shape</th><th>Pick</th><th>Time</th><th>Extra memory</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Sparse, edges given as a list</td><td>Kruskal</td><td>O(E log E)</td><td>O(E) for the sorted copy</td><td>Short to write; edges often arrive as a list anyway</td></tr>
+    <tr><td>Sparse, adjacency lists</td><td>Heap Prim</td><td>O(E log V)</td><td>O(E) lazy, O(V) eager</td><td>Reads each adjacency list once; no global sort</td></tr>
+    <tr><td>Dense, or "every pair" (points with distances)</td><td>Array Prim</td><td>O(V²)</td><td>O(V)</td><td>No E-sized list or heap at all</td></tr>
+    <tr><td>Edges already sorted, or arriving in order</td><td>Kruskal</td><td>O(E · α(V))</td><td>O(V)</td><td>The sort was the expensive part</td></tr>
+  </tbody>
+</table></div>
+
+<div class="keyidea">Sparse graph: Kruskal or heap Prim, O(E log V). Dense graph or "all pairs of points": array Prim, O(V²) time and O(V) memory, computing each distance when needed. The heap only pays off when there are far more candidates than vertices to scan.</div>
+
+<div class="check" id="check-dense">
+  <p class="q">10,000 points on a plane, and any two can be linked at a cost equal to their distance. Which approach do you pick?</p>
+  <div class="opts">
+    <button>Kruskal: build all pairs, sort, union-find</button>
+    <button>Heap Prim, because a heap is always faster than scanning an array</button>
+    <button data-correct>Array Prim: 10,000 rounds of scanning 10,000 entries, about 10<sup>8</sup> steps, and O(V) memory</button>
+  </div>
+  <div class="fb right"><p>Right. There are about 50 million pairs. Kruskal would store and sort all of them (several GB in Python). Heap Prim would push up to 50 million entries, about 50M × 13 ≈ 650 million heap steps. Array Prim does V² = 10<sup>8</sup> simple steps and keeps three arrays of 10,000. (Section 11's Go deeper box has an even faster trick for points on a plane.)</p></div>
+  <div class="fb wrong"><p>Count before choosing. Every pair is an edge, so E ≈ 50 million. A heap is fast when it saves you scanning many candidates, but array Prim only ever has V = 10,000 candidates (one best[v] per outside point), so a scan is cheap. V scans of V = 10<sup>8</sup> steps. Heap Prim: E log V ≈ 50M × 13 ≈ 6.5 × 10<sup>8</sup>, plus a 50-million-entry heap. Kruskal: 50 million stored edges, then a sort. On dense graphs, the plain array wins.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>An MST is not a shortest-path tree</h2>
+
+<p>This is the most common mix-up, in interviews and at work. Both produce a tree. They answer different questions:</p>
+<ul>
+  <li><b>MST:</b> "What's the cheapest set of links that connects everyone?" It minimizes the <em>total</em> cost of the network. It has no starting point.</li>
+  <li><b>Shortest-path tree</b> (what Dijkstra builds from a start s): "What's the fastest route from s to each place?" It minimizes <em>each</em> place's distance from s. Change s and you get a different tree.</li>
+</ul>
+
+<p>The hub-and-ring graph below makes the difference big. A warehouse H sits in the middle of six shops. Direct roads from H cost 10 to 15; the roads between neighboring shops on the ring cost 3 to 8. The MST uses the cheap ring roads plus a single spoke, for a total of 35. But the drive from H to shop R6 along the MST goes all the way round the ring: 35, against 15 on the direct road.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <select id="sp-graph"><option value="ring" selected>Hub and ring (start H)</option><option value="towns">Seven towns (start A)</option></select>
+      <select id="sp-show"><option value="mst" selected>Show the MST</option><option value="spt">Show the shortest-path tree</option></select>
+    </div>
+    <div id="sp-svg" style="margin-top:10px"></div>
+    <div class="viz-caption" id="sp-msg" aria-live="polite"></div>
+    <div class="table-wrap" id="sp-table"></div>
+  </div>
+  <div class="cap">Blue lines: the MST. Dotted purple lines: the shortest-path tree from the start. The table compares each town's distance from the start inside each tree. Switch between them and compare the totals.</div>
+</div>
+
+<p>One more test that separates them: add 100 to every edge's cost. The MST doesn't change. Every spanning tree has exactly n − 1 edges, so every tree's total goes up by the same 100 × (n − 1), and the cheapest stays the cheapest. Shortest paths can change: a path with 5 edges gets 500 more expensive while a path with 1 edge gets only 100 more, so routes with fewer hops start winning.</p>
+
+<div class="keyidea">MST: cheapest total network, no start point. Shortest-path tree: cheapest route from one start to each place. The path between two towns inside the MST can be far longer than the shortest path. Adding a constant to every edge leaves the MST alone but changes shortest paths.</div>
+
+<div class="check" id="check-spt">
+  <p class="q">You've built the MST of a road network. Your manager asks you to use it to answer "fastest route from depot X to customer Y". What do you say?</p>
+  <div class="opts">
+    <button>Sure: the MST contains the cheapest roads, so it contains the cheapest routes</button>
+    <button data-correct>The MST minimizes total road length, not trip length; the route through it can be much longer. Run Dijkstra from X instead</button>
+    <button>Only if we build the MST starting from X with Prim</button>
+  </div>
+  <div class="fb right"><p>Right. In the hub-and-ring example, H to R6 is 15 directly but 35 through the MST, because the MST dropped the direct road to save on total length. Prim's start vertex doesn't help: every start gives the same MST (when weights are distinct). For routes, you want a shortest-path tree from X.</p></div>
+  <div class="fb wrong"><p>Look at the hub-and-ring numbers: the MST keeps only one of H's six roads, because the ring roads are cheaper in total. So the MST route from H to R6 goes all the way round: 35, against 15 direct. "Cheapest network" and "cheapest trip" are different goals. Starting Prim at X doesn't fix it either: Prim grows the same MST from any start (with distinct weights); it just builds it in a different order. Dijkstra from X is the right tool.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Only the order of the weights matters</h2>
+
+<p>Look back at Kruskal. The weights are used for exactly one thing: sorting. The algorithm never adds them up or subtracts them. So any change to the weights that keeps their order keeps the same MST: add 100 to all of them, double them, square them or take their logarithm (both only if they're all positive). Three consequences interviewers like:</p>
+
+<h3>Negative weights are fine</h3>
+<p>Dijkstra breaks on negative edges, because it assumes a path can only get longer as it grows. Kruskal and Prim make no such assumption. An edge of cost −5 just sorts first. Kruskal and Prim work on any real weights.</p>
+
+<h3>Distinct weights mean exactly one MST</h3>
+<p>If no two edges cost the same, the MST is <b>unique</b>. Why: suppose there were two different MSTs, T1 and T2. Take the cheapest edge e that's in one of them but not the other; say it's in T1. Add e to T2: that makes a loop, and the loop has some edge f that isn't in T1 (otherwise T1 would contain the whole loop). f is in T2 but not T1, so it's one of the edges that differ, and e was the cheapest of those, so f costs more than e (no ties). Swap f for e in T2 and you get a cheaper tree, which is impossible. So T1 = T2.</p>
+<p>With ties there can be several MSTs, all with the same total. A square with four sides of cost 1 has four MSTs: drop any one side. They also all have the same <em>list</em> of weights, sorted.</p>
+
+<h3>Flip the order: maximum spanning trees and widest paths</h3>
+<p>Sort from most expensive to cheapest (or negate every weight) and Kruskal builds a <b>maximum spanning tree</b>. That sounds pointless until you meet <b>bandwidth</b>. A path's bandwidth is set by its narrowest link, like a water pipe that's only as wide as its thinnest section. The widest path from s to t is the one whose narrowest link is as wide as possible. The path between s and t inside the maximum spanning tree is always a widest path. That's the cycle property with "narrowest" in place of "most expensive".</p>
+<p>You can see why by running Kruskal from the widest link down and watching s and t. Say they first land in the same group when a link of width c is added. Every link taken so far is at least c wide, so the path between them in the tree has bandwidth at least c. Could some other path do better, with every link wider than c? All those links came earlier in the list, so they would already have joined s and t before c came up. They didn't, so no path beats c. With numbers: if s and t join at width 40, every link of width 41 or more together still left them apart, so no path made only of such links exists.</p>
+<p>The same holds the other way round for an MST: the path between two towns inside the MST makes its <em>most expensive</em> edge as cheap as possible (a <b>minimax path</b>). Say each road's weight is its steepest hill, and a heavy truck wants the route whose steepest hill is as gentle as possible. The route through the MST is one. Exercise 8 has you find the widest path by running Kruskal from the widest edge down and stopping the moment s and t join.</p>
+
+<div class="keyidea">MST algorithms only compare weights: any order-keeping change leaves the MST the same, and negative weights are fine. Distinct weights give exactly one MST. Reverse the order to get the maximum spanning tree; the paths in it are widest (bottleneck) paths.</div>
+
+<div class="check" id="check-order">
+  <p class="q">A network's link costs are latencies in milliseconds. A teammate converts them all to seconds (divides by 1,000) and then adds a fixed 2 ms of switch delay to each. Does the MST change?</p>
+  <div class="opts">
+    <button>Yes: adding a constant changes which links are cheapest</button>
+    <button>Yes: dividing by 1,000 makes small differences round away</button>
+    <button data-correct>No: both changes keep the links in the same order, and the MST depends only on the order</button>
+  </div>
+  <div class="fb right"><p>Right. Divide by a positive number, add the same constant: if link X was cheaper than link Y before, it still is. Kruskal would sort them identically and make the same choices. (If the costs were stored as rounded integers, rounding could create ties; with floats it doesn't matter.) Shortest paths, on the other hand, would change from the added constant.</p></div>
+  <div class="fb wrong"><p>Ask what Kruskal does with weights: it sorts them, and that's all. Dividing by 1,000 keeps every comparison the same: 3 &lt; 7 and 0.003 &lt; 0.007. Adding 2 to every link also keeps them: 3 + 2 &lt; 7 + 2. Same sorted order, same decisions, same MST. Another way to see it: every spanning tree has n − 1 links, so adding 2 to each link adds 2(n − 1) to every tree, and the cheapest tree stays the cheapest.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: negative weights, forests and the second-best tree</summary>
+  <ul>
+    <li><b>"Cheapest connected set of links" isn't always a tree.</b> If some links have negative cost (someone pays you to dig them), the cheapest connected set takes the MST and then also every remaining negative link. The MST is the cheapest <em>tree</em>, which is what "spanning tree" asks for.</li>
+    <li><b>Disconnected graphs.</b> Kruskal run to the end gives a <b>minimum spanning forest</b>: one MST per connected piece. Prim only covers the piece containing its start, so you'd restart it from each unvisited vertex.</li>
+    <li><b>Adding one edge to an existing MST.</b> The new edge (u, v, w) closes one loop with the tree path from u to v. If w is less than the most expensive edge on that path, swap them; otherwise ignore it. O(V) per new edge, no full rebuild.</li>
+    <li><b>Second-best MST.</b> Among the cheapest spanning trees that differ from the MST, there is always one that is just one swap away: add some non-tree edge, drop the most expensive edge on its loop. Try all non-tree edges, using the "most expensive edge on the tree path" for each.</li>
+    <li><b>Directed graphs</b> are a different problem: the cheapest set of arrows from a root reaching every vertex is a <b>minimum arborescence</b>. Kruskal and Prim give wrong answers there; the Chu–Liu/Edmonds algorithm solves it in O(EV).</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>Where MSTs show up</h2>
+
+<h3>Network design, and its limits</h3>
+<p>Cables, pipes, power lines, the seven-town fiber problem. Two warnings that show senior judgment. First, an MST has no backup: cut any one link and the network splits in two. Real networks add extra links so that every point survives one failure; that's a harder problem, and the MST is the usual starting point. Second, if you're allowed to add new junction points (a splice box in a field), the cheapest network can be cheaper than the MST. That's the <b>Steiner tree</b> problem, which is NP-hard (no known fast exact algorithm); the MST is within 2× of it.</p>
+
+<h3>Clustering: cut the k − 1 most expensive links</h3>
+<p>You have 10,000 customers and the distance between similar ones, and you want 5 groups. Run Kruskal, but stop when 5 groups remain instead of 1. Equivalently: build the MST and delete its 4 most expensive edges. The result has the largest possible <b>spacing</b>: the closest two customers in different groups are as far apart as any 5-grouping allows. Why: call the next edge Kruskal would have taken e; it's the closest pair in different groups, so the spacing is cost(e). Any other 5-grouping has to split one of Kruskal's groups. Kruskal built that group from edges no more expensive than e, and at least one of those edges now joins two different groups. So the other grouping has a cross-group pair no farther apart than e: its spacing is no better. This is <b>single-linkage clustering</b>. Exercise 7 builds it.</p>
+
+<h3>The traveling salesman, within 2×</h3>
+<p>The traveling salesman problem (visit every city once and return, as cheaply as possible) is NP-hard. But when distances obey the <b>triangle inequality</b> (going straight is never longer than a detour through a third city, true for real distances) the MST gives a tour at most twice the best:</p>
+<ol>
+  <li><b>MST ≤ best tour.</b> Delete one road from the best tour and you have a path through every city: a spanning tree. The MST is no more expensive than that, so MST ≤ best tour.</li>
+  <li><b>Walk around the MST.</b> Go around the tree like tracing its outline, using every edge twice: that walk costs 2 × MST and visits every city.</li>
+  <li><b>Take shortcuts.</b> When the walk is about to revisit a city, skip straight to the next new one. By the triangle inequality, skipping never makes the trip longer.</li>
+</ol>
+<p>So the tour costs ≤ 2 × MST ≤ 2 × best tour. With numbers: if the best tour is 100 km, the MST is at most 100 km, and the shortcut tour is at most 200 km. Christofides' algorithm (1976) improves this to 1.5× by adding a matching on the odd-degree vertices.</p>
+
+<h3>Smaller ones</h3>
+<ul>
+  <li><b>Image segmentation:</b> pixels are vertices, color difference is the weight; Kruskal-style merging with a stopping rule groups pixels into regions (the Felzenszwalb–Huttenlocher method).</li>
+  <li><b>Maze generation:</b> randomized Kruskal on a grid of cells gives a maze with exactly one path between any two cells.</li>
+  <li><b>Libraries:</b> NetworkX's <code>minimum_spanning_tree</code> (Kruskal by default; Prim and Borůvka on request) and SciPy's <code>minimum_spanning_tree</code> in <code>scipy.sparse.csgraph</code>.</li>
+</ul>
+
+<div class="keyidea">MSTs show up in network design (but they have no redundancy), in clustering (cut the k − 1 heaviest MST edges for the best spacing), and as a 2× approximation for the metric traveling salesman (MST ≤ best tour, walk the tree twice, shortcut).</div>
+
+<div class="check" id="check-cluster">
+  <p class="q">You've built an MST over 1,000 photos, with edge weights = how different two photos look. You want 3 groups of similar photos. What do you do?</p>
+  <div class="opts">
+    <button>Delete the 3 cheapest MST edges</button>
+    <button data-correct>Delete the 2 most expensive MST edges</button>
+    <button>Delete the 3 most expensive edges in the whole graph</button>
+  </div>
+  <div class="fb right"><p>Right. A tree splits into k pieces when you delete k − 1 of its edges, so 3 groups means 2 deletions. Deleting the most expensive ones cuts where photos are least alike, which is the same as stopping Kruskal when 3 groups remain. Deleting edges of the whole graph wouldn't split anything: there are other paths around them.</p></div>
+  <div class="fb wrong"><p>Two facts. One: deleting one edge from a tree splits it into two pieces; deleting k − 1 edges gives k pieces. So 3 groups means deleting 2 edges, not 3. Two: you want to cut between photos that look most different, so delete the most expensive MST edges, the "weakest links". Deleting the cheapest would split near-identical photos apart. And deleting edges of the full graph usually splits nothing, since other paths go around them; only tree edges are bridges.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>What to say in the interview</h2>
+
+<p>When a problem says "connect all", "minimum cost to link", "cheapest network", or "group into k clusters", a strong answer sounds like this:</p>
+<ol>
+  <li><b>Name it:</b> "This is a minimum spanning tree: n points, weighted links, connect everything at the lowest total. The answer is a tree with n − 1 edges."</li>
+  <li><b>Say why greedy is safe:</b> "By the cut property, the cheapest edge across any cut is in some MST. Kruskal uses the cut around one endpoint's group; Prim uses the cut around the tree it's growing."</li>
+  <li><b>Pick by shape:</b> "The edges come as a list and the graph is sparse, so Kruskal: sort, then union-find, O(E log E)." Or: "Every pair of points is an edge, so array Prim: O(V²) time, O(V) memory, no edge list."</li>
+  <li><b>Cover the edges:</b> "If the graph is disconnected, I get fewer than n − 1 edges and report it. Ties are fine; the total is the same. Negative weights are fine too."</li>
+  <li><b>Check it's not shortest paths:</b> if they say "from s" or "route", it's Dijkstra, not an MST.</li>
+</ol>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"Prove Kruskal is correct."</b> Give the swap argument from section 3 with the cut "u's group | rest" from section 5. Two minutes, and it's the question that separates people who've memorized Kruskal from people who understand it.</li>
+    <li><b>"Can you beat O(E log E)?"</b> If weights are small integers, sort them with counting or radix sort and Kruskal becomes O(E · α(V)). In theory, a randomized algorithm (Karger, Klein and Tarjan, 1995) runs in expected O(E), and Chazelle's (2000) in O(E · α(E, V)) deterministically.</li>
+    <li><b>"Points on a plane, millions of them."</b> Even O(V²) is too slow. The Euclidean MST only uses edges of the Delaunay triangulation, which has at most 3V edges and can be built in O(V log V). Run Kruskal on those: O(V log V) total.</li>
+    <li><b>"The graph doesn't fit on one machine."</b> Borůvka's rounds parallelize: every group picks its cheapest outgoing edge independently, groups merge, repeat; about log V rounds. Many distributed graph systems implement MST this way.</li>
+    <li><b>"Edge weights change over time."</b> Lowering a non-tree edge or raising a tree edge can change the tree; the loop and cut properties tell you which single swap to check. Fully dynamic MST structures exist but are rarely asked about.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>The cheapest way to connect n points is a tree: no loops, exactly n − 1 edges. That's the minimum spanning tree.</li>
+  <li>Cut property: the cheapest edge across any cut is in an MST (in every MST if it's strictly cheapest). Proof by swapping it in for the other crossing edge on the loop it makes.</li>
+  <li>Cycle property: the strictly most expensive edge on any loop is in no MST.</li>
+  <li>Kruskal: sort edges, take each one joining two different groups (union-find), skip the rest. O(E log E).</li>
+  <li>Prim: grow one tree from a start; a min-heap of edges leaving the tree; skip stale entries. O(E log V). Same loop as Dijkstra with key w instead of dist[u] + w.</li>
+  <li>Dense or all-pairs graphs: array Prim, O(V²) time and O(V) memory, no heap.</li>
+  <li>An MST minimizes the total, not the route from any one point. Don't use it for shortest paths.</li>
+  <li>Only the order of weights matters; negative weights are fine; distinct weights mean one MST. Reverse the order for a maximum spanning tree, which holds the widest paths.</li>
+  <li>Uses: network design (no redundancy!), k-clustering by cutting the k − 1 heaviest MST edges, and a 2× tour for the metric traveling salesman.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first. The coding exercises are in <code>exercises/kruskal_mst.py</code>, <code>exercises/prim_mst.py</code> and <code>exercises/mst_clustering.py</code>. Their tests measure your work: the Prim test counts every adjacency entry you read, the dense test counts distance calls and peak memory, and the big tests have up to 300,000 edges under a time cap, so a correct but slow solution fails. Run them with <code>python3 -m pytest -k kruskal_mst</code> (or <code>prim_mst</code>, <code>mst_clustering</code>).</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Trace both by hand</h4>
+  <p>Use the hub-and-ring graph from section 8: hub H; ring R1…R6; spokes H–R1 10, H–R2 11, H–R3 12, H–R4 13, H–R5 14, H–R6 15; ring edges R1–R2 3, R2–R3 4, R3–R4 5, R4–R5 6, R5–R6 7, R6–R1 8. (a) Run Kruskal: list each edge in sorted order and write "take" or "skip (loop through …)". Where do you stop? (b) Run lazy Prim from R4: write the heap after every step, and mark each stale pop. (c) Do both give the same tree? Why must they?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Take R1–R2 3, R2–R3 4, R3–R4 5, R4–R5 6, R5–R6 7. Skip R6–R1 8 (loop R6–R1–R2–…–R6, it's the most expensive on it). Take H–R1 10. Six edges taken, so stop: the other five spokes are never looked at. Total 35. (b) From R4 the tree grows R4 → R3 (5) → R2 (4) → R1 (3) → R5 (6) → R6 (7), and then H by H–R1 (10). The entry R1→R6 8 is popped after R6 has joined: stale. All seven are in once H joins; if you keep popping, the five spokes left in the heap (11 to 15) are all stale too. (c) Same tree, total 35. All weights are distinct, so the MST is unique, and both algorithms build an MST.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. True or false, with a reason</h4>
+  <p>(a) The cheapest edge in the whole graph is always in some MST. (b) If every town takes its own cheapest edge, the result is a spanning tree. (c) Squaring every (positive) weight can change the MST. (d) If you multiply every weight by −1, Kruskal finds the maximum spanning tree. (e) Prim's result depends on the start vertex.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) True: use the cut around one of its endpoints; it's the cheapest edge crossing that cut (it's the cheapest edge of all). (b) False. Each of those edges is in the MST (cut around that town), but they can leave gaps: in a square A–B 1, C–D 2, B–C 5, D–A 6, A and B pick each other and C and D pick each other, giving two separate pieces. Borůvka repeats this step on the pieces until one is left. (c) False: squaring positive numbers keeps their order. (d) True: the most expensive edge becomes the cheapest. (e) The edges can't depend on it when weights are distinct (the MST is unique); with ties, different starts can return different MSTs with the same total. The order edges are added always depends on the start.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Break the shortcuts</h4>
+  <p>Draw 4 towns and 5 edges where "take the 3 cheapest edges" fails. Then draw a graph where "run Dijkstra from A and take its tree" gives a tree more than twice as expensive as the MST. (Hint: section 8.) Finally, say in two sentences why Kruskal's skip rule fixes the first failure.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>kruskal_mst(n, edges)</code></h4>
+  <p>Sort, then union-find (write a small one inside the file, with union by size and path compression). Return the chosen edge tuples; raise <code>ValueError</code> if the graph is disconnected. The tests include parallel edges, self-loops, negative weights, ties and a 100,000-town graph with about 300,000 edges, built so that its MST is known in advance. They also check that you didn't sort the caller's list in place, and they include a star-shaped graph that makes a union-find without either trick walk a chain of 50,000.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>prim_mst(n, adj)</code> with a heap</h4>
+  <p>Lazy Prim from town 0; return the total and a parent list. The adjacency list you get counts every entry you read, with a budget of about two reads per entry. Rescanning the tree's edges at every step blows it at once, and copying the lists first and then rescanning the copy runs into the time cap on a 60,000-town graph. So does array Prim from section 7: on a sparse graph its V² = 3.6 billion scan steps take minutes, against about a second for the heap.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>prim_dense(n, dist)</code> with an array</h4>
+  <p>A complete graph given only as a distance function. Keep <code>best[]</code> and <code>parent[]</code>, scan for the minimum each round. The test allows n² calls to <code>dist</code> (you need about n²/2) and measures peak memory with <code>tracemalloc</code>: an edge list, a heap of all pairs or a distance matrix for 600 points is dozens of times over the limit.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>k_clusters(n, edges, k)</code></h4>
+  <p>Stop Kruskal at k groups; return the spacing (the next edge Kruskal would have taken) and a label per point. Checked against a brute force over every grouping on small inputs, and on 100,000 points in 40 planted clusters under a time cap.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>8. <code>widest_path(n, edges, s, t)</code></h4>
+  <p>The largest bandwidth from s to t, where a path's bandwidth is its narrowest link. Run Kruskal from the widest link down and stop when s and t join (a max-min version of Dijkstra also works; say why). The big test is built so that "try each bandwidth from the top with a BFS" does about 180,000 BFS runs.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>9. Fiber with a backup</h4>
+  <p>The provider from section 1 now has 200 towns and wants every town to stay connected if any one trench is cut. Why is the MST not enough? Sketch a plan: start from the MST, then add the cheapest extra trenches that put every tree edge on a loop. How would you find, for each tree edge, the cheapest non-tree edge whose loop covers it? What does your plan cost in time, and is it optimal? (It isn't, in general: say why.)</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>10. Say it out loud</h4>
+  <p>Set a 3-minute timer. To an imaginary interviewer: state the cut property, prove it with the swap argument, and use it to explain why Kruskal's "take" and Prim's "take" are both safe. Then say, with numbers, when you'd use array Prim instead. Did you mention the second crossing edge on the loop, and why removing it keeps the tree connected?</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="shortest-paths.html"><small>← Previous</small>Shortest paths</a>
+  <a class="next" href="greedy.html"><small>Next →</small>Greedy algorithms</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- Shared data: the seven towns ----------
+  const N7 = ["A", "B", "C", "D", "E", "F", "G"];
+  const P7 = [[40, 55], [175, 30], [318, 75], [70, 178], [205, 145], [150, 262], [318, 238]];
+  // [u, v, cost], A=0 B=1 C=2 D=3 E=4 F=5 G=6
+  const E7 = [[0, 1, 9], [0, 3, 5], [1, 2, 8], [1, 4, 6], [1, 3, 10], [2, 4, 4], [2, 6, 7], [3, 4, 11], [3, 5, 3], [4, 5, 12], [4, 6, 2], [5, 6, 13]];
+  const nodes7 = N7.map((nm, i) => ({ id: i, label: nm, x: P7[i][0], y: P7[i][1] }));
+  const ename = (e, names) => names[e[0]] + "–" + names[e[1]];
+
+  function kruskalSet(n, edges) {
+    const p = [...Array(n).keys()];
+    const find = (x) => { while (p[x] !== x) { p[x] = p[p[x]]; x = p[x]; } return x; };
+    const order = edges.map((_, i) => i).sort((a, b) => edges[a][2] - edges[b][2]);
+    const taken = new Set();
+    for (const i of order) { const a = find(edges[i][0]), b = find(edges[i][1]); if (a !== b) { p[a] = b; taken.add(i); } }
+    return taken;
+  }
+  const edgeIndex = (edges) => (a, b) => edges.findIndex((e) => (e[0] === a && e[1] === b) || (e[0] === b && e[1] === a));
+  const idx7 = edgeIndex(E7);
+  const MST7 = kruskalSet(7, E7);
+
+  // ---------- Cut playground (section 3) ----------
+  (function () {
+    const side = [0, 1, 1, 0, 1, 0, 1]; // West = {A, D, F}
+    let showMst = false;
+    function draw() {
+      const box = $("cut-svg"); box.replaceChildren();
+      const svg = V.s("svg", { class: "viz" });
+      const a = side.filter((x) => x === 0).length, ok = a > 0 && a < 7;
+      const crossing = E7.map((e, i) => (side[e[0]] !== side[e[1]] ? i : -1)).filter((i) => i >= 0);
+      let best = -1;
+      for (const i of crossing) if (best < 0 || E7[i][2] < E7[best][2]) best = i;
+      V.graph(svg, nodes7, E7, {
+        width: 360, height: 290,
+        nodeCls: (i) => (side[i] ? "hl" : ""),
+        edgeCls: (u, v) => { const i = idx7(u, v); return i === best && ok ? "best" : showMst && MST7.has(i) ? "ghost" : side[u] !== side[v] ? "cross" : "dim"; },
+      });
+      box.append(svg);
+      svg.querySelectorAll("g.node").forEach((g, i) => {
+        g.setAttribute("tabindex", "0"); g.setAttribute("role", "button"); g.setAttribute("aria-label", "move town " + N7[i]);
+        const flip = () => { side[i] = 1 - side[i]; draw(); };
+        g.addEventListener("click", flip);
+        g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); flip(); } });
+      });
+      const camp = (s) => "{" + N7.filter((_, i) => side[i] === s).join(", ") + "}";
+      if (!ok) { $("cut-msg").innerHTML = "Every town is in one camp, so this isn't a cut. Move at least one town across."; return; }
+      $("cut-msg").innerHTML = `Cut ${camp(0)} | ${camp(1)}. Crossing: ${crossing.map((i) => ename(E7[i], N7) + " " + E7[i][2]).join(", ")}. Cheapest: <b>${ename(E7[best], N7)} (${E7[best][2]})</b>, and it ${MST7.has(best) ? "is" : "is NOT"} in the MST.`;
+    }
+    $("cut-rand").onclick = () => { do { for (let i = 0; i < 7; i++) side[i] = Math.random() < 0.5 ? 0 : 1; } while (side.every((x) => x === side[0])); draw(); };
+    $("cut-mst").onclick = () => { showMst = !showMst; $("cut-mst").textContent = showMst ? "Hide the MST" : "Show the MST"; draw(); };
+    draw();
+  })();
+
+  // ---------- Kruskal stepper (section 5) ----------
+  (function () {
+    const order = E7.map((_, i) => i).sort((a, b) => E7[a][2] - E7[b][2]);
+    const sorted = order.map((i) => E7[i]);
+    const p = [...Array(7).keys()], size = Array(7).fill(1);
+    const find = (x) => { while (p[x] !== x) x = p[x]; return x; };
+    const state = sorted.map(() => ""), taken = new Set(), frames = [];
+    let cost = 0;
+    const groupOf = (x) => { const r = find(x); return N7.map((_, i) => i).filter((i) => find(i) === r); };
+    function treePath(s, t) { // BFS over taken edges, for the message only
+      const prev = { [s]: -1 }, q = [s];
+      while (q.length) { const x = q.shift(); if (x === t) break; for (const i of taken) { const [a, b] = E7[i]; const y = a === x ? b : b === x ? a : -1; if (y >= 0 && !(y in prev)) { prev[y] = x; q.push(y); } } }
+      const path = []; for (let x = t; x !== -1; x = prev[x]) path.unshift(x); return path;
+    }
+    const snap = (msg, extra) => frames.push({ state: [...state], taken: new Set(taken), msg, ...extra });
+    snap("The 12 possible trenches, sorted by cost. Every town starts as its own group.", { cur: -1 });
+    for (let k = 0; k < sorted.length; k++) {
+      if (taken.size === 6) { state[k] = "dim"; continue; }
+      const [u, v, w] = sorted[k], label = `${N7[u]}–${N7[v]}, cost ${w}`;
+      if (find(u) !== find(v)) {
+        const grp = groupOf(u);
+        const cross = E7.map((e, i) => (grp.includes(e[0]) !== grp.includes(e[1]) ? i : -1)).filter((i) => i >= 0 && i !== order[k]);
+        let ru = find(u), rv = find(v); if (size[ru] < size[rv]) [ru, rv] = [rv, ru];
+        p[rv] = ru; size[ru] += size[rv];
+        taken.add(order[k]); state[k] = "done"; cost += w;
+        snap(`<b>${label}</b>: different groups. Cut: {${grp.map((i) => N7[i]).join(", ")}} | rest. Every other edge across it (${cross.map((i) => E7[i][2]).sort((a, b) => a - b).join(", ")}) is later in the list, so this is the cheapest crossing: take it. ${taken.size} of 6 taken, cost so far ${cost}.`, { cur: k, grp, cross, take: true });
+      } else {
+        state[k] = "bad";
+        const path = treePath(u, v);
+        snap(`<b>${label}</b>: ${N7[u]} and ${N7[v]} are already joined by ${path.map((i) => N7[i]).join("–")}, all cheaper. This edge would be the most expensive on that loop: skip it.`, { cur: k, path });
+      }
+    }
+    snap(`6 = n − 1 edges taken: everyone is connected, stop. The last ${sorted.length - state.filter((s) => s === "done" || s === "bad").length} edges are never examined. Total cost <b>${cost}</b> ($${(cost / 10).toFixed(1)} million, instead of $9.0 million for all 12).`, { cur: -1 });
+    V.player($("kr-player"), {
+      frames, speed: 1500,
+      draw(f, stage) {
+        const row = (a, b) => V.cells(sorted.slice(a, b), { idx: false, label: (e) => N7[e[0]] + N7[e[1]] + " " + e[2], cls: (i) => (i + a === f.cur ? "cmp" : f.state[i + a]) });
+        stage.append(V.el("div", { class: "small muted" }, "edges, cheapest first"), row(0, 6), row(6, 12));
+        const svg = V.s("svg", { class: "viz" });
+        const cur = f.cur >= 0 ? order[f.cur] : -1;
+        V.graph(svg, nodes7, E7, {
+          width: 360, height: 290,
+          nodeCls: (i) => (f.grp && f.grp.includes(i) ? "hl" : f.path && f.path.includes(i) ? "warn" : ""),
+          edgeCls: (a, b) => { const i = idx7(a, b); return i === cur ? (f.take ? "best" : "bad") : f.taken.has(i) ? "hl" : f.cross && f.cross.includes(i) ? "cross" : ""; },
+        });
+        stage.append(svg);
+      },
+    });
+  })();
+
+  // ---------- Prim stepper (section 6) ----------
+  (function () {
+    const adj = N7.map(() => []);
+    E7.forEach(([u, v, w], i) => { adj[u].push([v, w, i]); adj[v].push([u, w, i]); });
+    const inTree = Array(7).fill(false), taken = new Set(), frames = [];
+    let heap = [], cost = 0; // entries: [w, to, from, edgeIdx], kept sorted for display
+    const show = () => [...heap].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const snap = (msg, extra) => frames.push({ inTree: [...inTree], taken: new Set(taken), heap: show(), msg, ...extra });
+    const join = (v) => {
+      inTree[v] = true;
+      const pushed = adj[v].filter(([u]) => !inTree[u]);
+      pushed.forEach(([u, w, i]) => heap.push([w, u, v, i]));
+      return pushed;
+    };
+    const pushed0 = join(0);
+    snap(`Start: A joins the tree. Push A's edges: ${pushed0.map(([u, w]) => "A→" + N7[u] + " " + w).join(", ")}.`, { cur: -1 });
+    while (heap.length) {
+      heap.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const [w, to, from, i] = heap.shift();
+      if (inTree[to]) { snap(`Pop <b>${N7[from]}→${N7[to]} ${w}</b>: ${N7[to]} is already in the tree, so this entry is stale. Throw it away.`, { cur: i, stale: true }); continue; }
+      taken.add(i); cost += w;
+      const pushed = join(to);
+      snap(`Pop <b>${N7[from]}→${N7[to]} ${w}</b>: the cheapest edge leaving the tree. ${N7[to]} joins (cost so far ${cost}).` + (pushed.length ? ` Push ${pushed.map(([u, ww]) => N7[to] + "→" + N7[u] + " " + ww).join(", ")}.` : " All its neighbors are inside, so nothing to push."), { cur: i });
+      if (taken.size === 6) snap(`All 7 towns are in: total <b>${cost}</b>, the same tree Kruskal found. Real code can stop right here. This loop keeps popping, to show that everything left in the heap is stale.`, { cur: -1 });
+    }
+    frames[frames.length - 1].msg += " The heap is empty.";
+    V.player($("pr-player"), {
+      frames, speed: 1500,
+      draw(f, stage) {
+        const svg = V.s("svg", { class: "viz" });
+        V.graph(svg, nodes7, E7, {
+          width: 360, height: 290,
+          nodeCls: (v) => (f.inTree[v] ? "done" : ""),
+          edgeCls: (a, b) => { const i = idx7(a, b); return i === f.cur ? (f.stale ? "bad" : "best") : f.taken.has(i) ? "hl" : f.inTree[a] !== f.inTree[b] ? "cross" : ""; },
+        });
+        stage.append(svg, V.el("div", { class: "small muted", style: "margin-top:6px" }, "heap, cheapest first"),
+          f.heap.length ? V.cells(f.heap.map((h) => N7[h[2]] + "→" + N7[h[1]] + " " + h[0]), { idx: false, cls: (k) => (f.inTree[f.heap[k][1]] ? "dim" : "") }) : V.el("div", { class: "small muted" }, "(empty)"));
+      },
+    });
+  })();
+
+  // ---------- Sparse vs dense (section 7) ----------
+  (function () {
+    const fmt = (x) => (x >= 1e12 ? (x / 1e12).toFixed(1) + " trillion" : x >= 1e9 ? (x / 1e9).toFixed(1) + " billion" : x >= 1e6 ? (x / 1e6).toFixed(1) + " million" : Math.round(x).toLocaleString());
+    function show() {
+      const Vn = [10, 30, 100, 300, 1000, 2000, 5000, 10000, 100000, 1000000][Number($("dn-v").value)], shape = $("dn-shape").value;
+      const E = shape === "sparse" ? 3 * Vn : shape === "mid" ? Math.round(Vn * Math.sqrt(Vn)) : (Vn * (Vn - 1)) / 2;
+      const rows = [
+        ["Kruskal", E * Math.log2(E), "stores " + fmt(E) + " edges"],
+        ["Heap Prim", E * Math.log2(Vn), "heap up to " + fmt(E) + " entries"],
+        ["Array Prim", Vn * Vn, "3 arrays of " + fmt(Vn)],
+      ];
+      const max = Math.max(...rows.map((r) => r[1])), win = rows.reduce((a, b) => (b[1] < a[1] ? b : a));
+      $("dn-bars").replaceChildren(...rows.map((r) => V.el("div", { class: "row" },
+        V.el("span", {}, r[0]),
+        V.el("div", { class: "track" }, V.el("div", { class: "fill" + (r === win ? " win" : ""), style: `width:${Math.max(0.4, (r[1] / max) * 100)}%` })),
+        V.el("span", { class: "num" }, "≈ " + fmt(r[1]) + " steps · " + r[2]))));
+      $("dn-msg").innerHTML = `V = <b>${Vn.toLocaleString()}</b>, E = <b>${fmt(E)}</b>. Fastest here: <b>${win[0]}</b>.` +
+        (shape === "dense" ? " With every pair an edge, E·log V is always bigger than V², and the edge list alone is huge." : shape === "sparse" ? " With few edges per vertex, V² is far more than E·log V: array Prim scans thousands of entries to find each of very few candidates." : " In between, compare E·log V with V²: here E = V·√V.");
+    }
+    $("dn-v").oninput = show; $("dn-shape").onchange = show; show();
+  })();
+
+  // ---------- MST vs shortest-path tree (section 8) ----------
+  (function () {
+    const ringNames = ["H", "R1", "R2", "R3", "R4", "R5", "R6"];
+    const ringPos = [[180, 140]].concat([0, 1, 2, 3, 4, 5].map((k) => [180 + 110 * Math.cos(-Math.PI / 2 + (k * Math.PI) / 3), 140 + 110 * Math.sin(-Math.PI / 2 + (k * Math.PI) / 3)]));
+    const ringE = [1, 2, 3, 4, 5, 6].map((k) => [0, k, 9 + k]).concat([[1, 2, 3], [2, 3, 4], [3, 4, 5], [4, 5, 6], [5, 6, 7], [6, 1, 8]]);
+    const graphs = {
+      ring: { names: ringNames, nodes: ringNames.map((nm, i) => ({ id: i, label: nm, x: Math.round(ringPos[i][0]), y: Math.round(ringPos[i][1]) })), edges: ringE, w: 360, h: 280 },
+      towns: { names: N7, nodes: nodes7, edges: E7, w: 360, h: 290 },
+    };
+    function dijkstraTree(n, edges, s) {
+      const dist = Array(n).fill(Infinity), via = Array(n).fill(-1), done = Array(n).fill(false);
+      dist[s] = 0;
+      for (let r = 0; r < n; r++) {
+        let u = -1; for (let v = 0; v < n; v++) if (!done[v] && (u < 0 || dist[v] < dist[u])) u = v;
+        done[u] = true;
+        edges.forEach(([a, b, w], i) => { const v = a === u ? b : b === u ? a : -1; if (v >= 0 && !done[v] && dist[u] + w < dist[v]) { dist[v] = dist[u] + w; via[v] = i; } });
+      }
+      return { dist, set: new Set(via.filter((i) => i >= 0)) };
+    }
+    function treeDist(n, edges, set, s) {
+      const d = Array(n).fill(Infinity); d[s] = 0; const q = [s];
+      while (q.length) { const x = q.shift(); for (const i of set) { const [a, b, w] = edges[i]; const y = a === x ? b : b === x ? a : -1; if (y >= 0 && d[y] === Infinity) { d[y] = d[x] + w; q.push(y); } } }
+      return d;
+    }
+    function show() {
+      const g = graphs[$("sp-graph").value], mode = $("sp-show").value, n = g.names.length;
+      const mst = kruskalSet(n, g.edges), spt = dijkstraTree(n, g.edges, 0);
+      const ix = edgeIndex(g.edges);
+      const svg = V.s("svg", { class: "viz" });
+      V.graph(svg, g.nodes, g.edges, {
+        width: g.w, height: g.h,
+        nodeCls: (v) => (v === 0 ? "done" : ""),
+        edgeCls: (a, b) => { const i = ix(a, b); return mode === "mst" ? (mst.has(i) ? "hl" : "dim") : spt.set.has(i) ? "ghost" : "dim"; },
+      });
+      $("sp-svg").replaceChildren(svg);
+      const sum = (set) => [...set].reduce((t, i) => t + g.edges[i][2], 0);
+      const dm = treeDist(n, g.edges, mst, 0);
+      $("sp-msg").innerHTML = `MST total: <b>${sum(mst)}</b>. Shortest-path tree total: <b>${sum(spt.set)}</b>. ` +
+        (mode === "mst" ? "The MST buys less cable, but some trips from " + g.names[0] + " get long." : "The shortest-path tree gives every town its fastest route from " + g.names[0] + ", and pays more cable for it.");
+      const tb = V.el("table", {}, V.el("thead", {}, V.el("tr", {}, V.el("th", {}, "town"), V.el("th", {}, "distance from " + g.names[0] + " in the MST"), V.el("th", {}, "shortest distance"))),
+        V.el("tbody", {}, g.names.slice(1).map((nm, k) => V.el("tr", {}, V.el("td", {}, nm), V.el("td", {}, dm[k + 1] > spt.dist[k + 1] ? V.el("b", {}, String(dm[k + 1])) : String(dm[k + 1])), V.el("td", {}, String(spt.dist[k + 1]))))));
+      $("sp-table").replaceChildren(tb);
+    }
+    $("sp-graph").onchange = show; $("sp-show").onchange = show; show();
+  })();
+})();
+</script>
+</body>
+</html>

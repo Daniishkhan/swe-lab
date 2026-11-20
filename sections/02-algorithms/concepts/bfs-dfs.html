@@ -67,7 +67,7 @@
 <ul>
   <li><b>Undirected:</b> an edge goes both ways. Friendship: if Ana is Bo's friend, Bo is Ana's friend.</li>
   <li><b>Directed:</b> an edge has a direction, drawn as an arrow. Following someone on a social app, a web page linking to another, "package A needs package B".</li>
-  <li><b>Weighted:</b> each edge carries a number, like a road's length in minutes. This chapter is about graphs where every edge counts the same. Weights need a different tool (section 9).</li>
+  <li><b>Weighted:</b> each edge carries a number, like a road's length in minutes. This chapter is about graphs where every edge counts the same. Weights need a different tool (<a href="shortest-paths.html">shortest paths, 02.08</a>).</li>
 </ul>
 <p>Graphs often hide. In a maze, cells are nodes and steps between them are edges. In a build, packages are nodes and each "needs" is an arrow. Spotting the hidden graph is half of most interview questions.</p>
 
@@ -257,7 +257,7 @@ reverse it:         A → B → D → F → G      4 hops, a shortest path</code
 
 <details class="aside deeper">
   <summary>Go deeper: what the proof needs, and all shortest paths</summary>
-  <p>The proof uses one fact: every edge adds exactly 1. With a 1-minute road and a 10-minute road, fewest edges isn't fastest; that's Dijkstra's algorithm (section 9). On directed graphs BFS works unchanged, following arrows only forward. To get <em>every</em> shortest path, keep a list of parents per node: any neighbour at distance d − 1 is a valid parent of a node at distance d.</p>
+  <p>The proof uses one fact: every edge adds exactly 1. With a 1-minute road and a 10-minute road, fewest edges isn't fastest; that's Dijkstra's algorithm (<a href="shortest-paths.html">02.08</a>). On directed graphs BFS works unchanged, following arrows only forward. To get <em>every</em> shortest path, keep a list of parents per node: any neighbour at distance d − 1 is a valid parent of a node at distance d.</p>
 </details>
 
 <!-- ============================================================ -->
@@ -574,15 +574,15 @@ def build_order(needed_by):
     <button>DFS, keeping the best total time found</button>
     <button data-correct>Dijkstra's algorithm: the edges have different costs</button>
   </div>
-  <div class="fb right"><p>Right. BFS minimizes the <em>number</em> of aisles, so 2 crowded aisles (10 minutes) beat 4 quiet ones (4 minutes) in its eyes. Dijkstra swaps the queue for a priority queue ordered by total time: the shortest-paths chapter (02.08).</p></div>
-  <div class="fb wrong"><p>Put numbers on it. Route 1: 2 crowded aisles, 2 edges, 10 minutes. Route 2: 4 quiet aisles, 4 edges, 4 minutes. BFS returns route 1, because it guarantees fewest <em>edges</em>, which equals fastest only when every edge costs the same. A DFS tracking the best total must try every route, and there can be exponentially many. Dijkstra is BFS with a priority queue keyed on total time (chapter 02.08).</p></div>
+  <div class="fb right"><p>Right. BFS minimizes the <em>number</em> of aisles, so 2 crowded aisles (10 minutes) beat 4 quiet ones (4 minutes) in its eyes. Dijkstra swaps the queue for a priority queue ordered by total time: the <a href="shortest-paths.html">shortest-paths chapter (02.08)</a>.</p></div>
+  <div class="fb wrong"><p>Put numbers on it. Route 1: 2 crowded aisles, 2 edges, 10 minutes. Route 2: 4 quiet aisles, 4 edges, 4 minutes. BFS returns route 1, because it guarantees fewest <em>edges</em>, which equals fastest only when every edge costs the same. A DFS tracking the best total must try every route, and there can be exponentially many. Dijkstra is BFS with a priority queue keyed on total time (<a href="shortest-paths.html">chapter 02.08</a>).</p></div>
 </div>
 
 <details class="aside deeper">
   <summary>Go deeper: many starts at once, both ends at once, weights</summary>
   <p><b>Multi-source BFS.</b> "How far is every cell from the <em>nearest</em> exit?" One BFS per exit costs O(exits × cells). Instead, put <em>every</em> exit in the queue at the start, all at distance 0, and run one ordinary BFS. Picture fires starting at every exit at once, spreading one cell per second: each cell is first reached from its nearest exit. The queue still comes out in rings, so section 4's proof holds. One search, O(V + E). This is "rotting oranges", and exercise 6.</p>
   <p><b>Bidirectional BFS.</b> For the distance between two given nodes, grow a BFS from each end, one ring at a time, until the frontiers meet. With b neighbours per node and an answer d hops away, one search touches about b^d nodes, two half-searches about 2 × b^(d/2): for b = 100, d = 6, up to 10¹² versus 2 × 10⁶. The classic follow-up to "word ladder".</p>
-  <p><b>Weights.</b> Costs of only 0 or 1: <em>0-1 BFS</em> puts 0-cost neighbours at the front of the deque, 1-cost at the back, still O(V + E). General non-negative weights: Dijkstra with a heap, O((V + E) log V). Negative weights: Bellman-Ford. All in chapter 02.08.</p>
+  <p><b>Weights.</b> Costs of only 0 or 1: <em>0-1 BFS</em> puts 0-cost neighbours at the front of the deque, 1-cost at the back, still O(V + E). General non-negative weights: Dijkstra with a heap, O((V + E) log V). Negative weights: Bellman-Ford. All in <a href="shortest-paths.html">chapter 02.08</a>.</p>
 </details>
 
 <details class="aside deeper">

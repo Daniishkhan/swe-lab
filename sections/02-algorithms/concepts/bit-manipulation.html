@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="02.11">
+  <title>Bit manipulation</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 11</div>
+  <h1>Bit manipulation</h1>
+  <div class="meta"><span><span class="badge P1">P1</span> asked often, and used everywhere in systems</span><span>about 50 minutes</span><span>10 quick checks · 11 exercises</span></div>
+</header>
+
+<p>Every number in a computer is already a row of on/off switches. Bit manipulation means working on those switches directly instead of on the number they spell. That sounds like a low-level party trick, but it's how permissions, feature flags, IP address ranges, Bloom filters, hash tables and database indexes squeeze a whole set into one machine word and answer questions about it in one instruction. Interviewers ask bit questions to see whether you can reason about representation, not just about algorithms.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Read and write binary and hex, and explain two's complement with an odometer.</li>
+    <li>Picture what AND, OR, XOR, NOT and the shifts do to each switch, and test, set, clear or flip one bit from memory.</li>
+    <li>Use an int as a set of up to 64 things: union, intersection, subset test and size, each in a step or two.</li>
+    <li>Explain why <code>x &amp; (x - 1)</code> clears the lowest 1, why <code>x &amp; -x</code> isolates it, and why XOR finds the number without a partner.</li>
+    <li>Enumerate every subset, every submask and every k-subset with masks, and say what each costs.</li>
+    <li>Handle Python's unlimited ints: negatives, 32-bit masks, <code>bit_count()</code>, and what a big-int operation really costs.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom. It builds on <a href="complexity.html">How fast is your code?</a> (2<sup>n</sup> growth) and <a href="backtracking.html">Recursion and backtracking</a> (subsets as a decision tree). Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: a million users, forty switches</h2>
+
+<div class="story">
+  <p>Your company's admin console has 40 permissions: <code>read</code>, <code>write</code>, <code>deploy</code>, <code>billing</code> and so on. Each of its 1,000,000 users holds about 10 of them. The first version stores each user's permissions as a Python set of strings.</p>
+  <p>A set of 10 strings takes 728 bytes in CPython, before counting the strings. A million of them is about 730 MB of RAM, just to remember who may do what. And every page load asks "does she have <code>read</code>, <code>write</code> and <code>deploy</code>?", which is three hash lookups, each one probing a table and comparing strings.</p>
+</div>
+
+<p>Now look at the problem differently. Each permission is a yes/no question. 40 yes/no answers are 40 switches, and a 64-bit number <em>is</em> 64 switches. Give each permission one switch: <code>read</code> is switch 0, <code>write</code> is switch 1, and so on. Then a user's permissions are one number: 8 bytes in a database column or a C array, 8 MB for a million users instead of 730 MB. "Does she have all three?" becomes one AND and one comparison, both single CPU instructions.</p>
+
+<p>That's the whole chapter in one story: <b>a number is a row of switches, so one number can hold a whole set of yes/no facts, and the CPU can flip, test or combine all of them at once.</b> To use it, we need to see the switches clearly, then learn the handful of operators that work on them.</p>
+
+<div class="check" id="check-problem">
+  <p class="q">Why can one 64-bit number replace a set of up to 64 permission names?</p>
+  <div class="opts">
+    <button>Because the number stores a hash of the names, like a set does</button>
+    <button data-correct>Because each permission only needs a yes or a no, and the number has 64 yes/no switches</button>
+    <button>Because the number compresses the strings, like a zip file</button>
+  </div>
+  <div class="fb right"><p>Right. A permission set never needs the names themselves, only "has it / doesn't have it" for each of a fixed list. That's one switch per permission. The names live once, in the code (<code>WRITE = 1 &lt;&lt; 1</code>), not once per user.</p></div>
+  <div class="fb wrong"><p>Nothing is hashed or compressed. Think of a light panel with 64 labelled switches on a wall: the labels are painted on once, and each user just gets a photo of which switches are up. The photo is 64 yes/no answers, which is exactly what one 64-bit number holds. That only works because the list of possible permissions is fixed and small.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Binary: a row of light switches</h2>
+
+<p>Start with something you already trust: decimal. In <b>407</b>, the 4 is worth 4 hundreds, the 0 is worth no tens, the 7 is worth 7 ones. Each place is worth 10 times the place to its right, because there are 10 digits.</p>
+
+<p>Binary is the same idea with only two digits, 0 and 1. So each place is worth <b>2 times</b> the place to its right: 1, 2, 4, 8, 16, 32, 64, 128. Picture a row of light switches, each with a price tag. A switch that's on adds its price; a switch that's off adds nothing. The number is the total.</p>
+
+<pre class="diagram"><code>price:   128  64  32  16   8   4   2   1
+switch:    0   0   0   0   1   1   0   1      →  8 + 4 + 1 = 13
+position:  7   6   5   4   3   2   1   0</code></pre>
+
+<p>Each switch is a <b>bit</b> (binary digit). We number positions from the right, starting at 0, so bit i is worth 2<sup>i</sup>. The rightmost bit is the <b>lowest</b> bit (worth 1) and the leftmost is the <b>highest</b>. In Python you write binary with a <code>0b</code> prefix: <code>0b1101 == 13</code>.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div id="sw-bits"></div>
+    <div class="viz-caption" id="sw-msg"></div>
+    <div class="viz-controls">
+      <button class="btn" id="sw-inc">+ 1</button>
+      <button class="btn" id="sw-shl">× 2 (shift left)</button>
+      <button class="btn" id="sw-shr">÷ 2 (shift right)</button>
+      <button class="btn" id="sw-clr">All off</button>
+    </div>
+  </div>
+  <div class="cap">Eight switches. Click a switch to flip it; its price is above it and its position below. Press All off, then + 1 until it reads 7 (0111). Press + 1 once more and watch the carry ripple left, just like 999 + 1 in decimal. Press × 2 and see every switch slide one place left.</div>
+</div>
+
+<p>Three facts fall straight out of the picture:</p>
+<ul>
+  <li><b>n switches give 2<sup>n</sup> patterns.</b> Each switch doubles the count: 8 bits give 256 values (0 to 255), 32 bits about 4.3 billion, 64 bits about 1.8 × 10<sup>19</sup>.</li>
+  <li><b>All switches on is one less than the next price.</b> 1111 = 15 = 16 − 1, just as 999 = 1000 − 1. So <code>(1 &lt;&lt; n) - 1</code> is "n ones", the mask you'll use constantly. (<code>1 &lt;&lt; n</code> is 1 slid n places left, which is 2<sup>n</sup>; section 4 covers the shift operators.)</li>
+  <li><b>Sliding everything one place left doubles the number,</b> like writing a 0 after a decimal number multiplies it by 10.</li>
+</ul>
+
+<p>Long rows of 0s and 1s are hard to read, so programmers group them in fours. Four bits have 16 patterns, so each group is one <b>hex</b> (base-16) digit: 0–9, then a–f for 10–15. <code>1111 1111</code> is <code>0xff</code> = 255, and 32 ones are <code>0xffffffff</code>. Hex is just binary with a shorter spelling.</p>
+
+<div class="keyidea">A number is a row of switches; bit i is worth 2<sup>i</sup>. n bits hold 2<sup>n</sup> values, n ones in a row is 2<sup>n</sup> − 1, and each hex digit is exactly 4 bits.</div>
+
+<div class="check" id="check-binary">
+  <p class="q">A packet header has a 12-bit field for the packet's length. What's the largest length it can hold?</p>
+  <div class="opts">
+    <button>4,096</button>
+    <button data-correct>4,095</button>
+    <button>2,048</button>
+  </div>
+  <div class="fb right"><p>Right. 12 bits have 2<sup>12</sup> = 4,096 patterns, but one of them is 0, so they cover 0 to 4,095. The largest is all twelve switches on: 4,096 − 1, written <code>0xfff</code>.</p></div>
+  <div class="fb wrong"><p>Count with a smaller case first. 3 switches: 000 up to 111, which is 4 + 2 + 1 = 7. That's 8 patterns (2<sup>3</sup>), from 0 to 7. So n bits have 2<sup>n</sup> patterns and the biggest is 2<sup>n</sup> − 1. For 12 bits: 4,096 patterns, largest 4,095. (2,048 is just the price of the top switch alone, bit 11.)</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Negative numbers: the odometer that rolls back</h2>
+
+<p>Switches can only be on or off. There's no switch for a minus sign. So how does a computer store −3?</p>
+
+<p>Picture a car's odometer with three wheels, reading <code>000</code>. Roll it back one mile and it shows <code>999</code>. Roll it back three miles: <code>997</code>. The odometer has no minus sign either, but <code>999</code> behaves exactly like −1: add 1 to it and you get <code>000</code>, because the carry falls off the left end. And <code>997</code> + 3 is <code>000</code>, so <code>997</code> acts like −3.</p>
+
+<p>Computers do the same with a fixed number of bits. In 8 bits, 0 − 1 rolls back to <code>11111111</code>, so that pattern means −1. This scheme is called <b>two's complement</b>. Here it is on a 4-bit wheel, small enough to see every pattern at once:</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <svg class="viz" id="odo-svg" viewBox="0 0 340 340" style="max-width:360px;margin:0 auto" role="img" aria-label="A wheel of the 16 four-bit patterns"></svg>
+    <div class="viz-caption" id="odo-msg"></div>
+    <div class="viz-controls">
+      <button class="btn" id="odo-dec">− 1</button>
+      <button class="btn" id="odo-inc">+ 1</button>
+      <select id="odo-read" aria-label="Read the patterns as"><option value="s">read as signed (two's complement)</option><option value="u">read as unsigned</option></select>
+    </div>
+  </div>
+  <div class="cap">The 16 patterns of 4 bits on a wheel; the number inside each circle is what the pattern means. Press − 1 from 0000 and you land on 1111 = −1. Keep pressing + 1 past 0111: the wheel goes on to 1000, which means −8. That jump is <b>overflow</b>. Switch to "unsigned" and the same patterns read 0 to 15, with the jump between 15 and 0 instead.</div>
+</div>
+
+<p>Read the wheel and the rules appear:</p>
+<ul>
+  <li><b>The top bit says the sign.</b> Patterns starting with 0 are 0 to 7; patterns starting with 1 are −8 to −1. With n bits the range is −2<sup>n−1</sup> to 2<sup>n−1</sup> − 1. For 32 bits that's −2,147,483,648 to 2,147,483,647.</li>
+  <li><b>To negate: flip every bit, then add 1.</b> 3 is <code>0011</code>; flipped it's <code>1100</code>; plus 1 is <code>1101</code>, which the wheel shows as −3. Why it works: x plus "x flipped" is all ones (each place has exactly one 1), and all ones is −1. So "x flipped" = −1 − x, and adding 1 gives −x.</li>
+  <li><b>Adding needs no special case.</b> In 8 bits, 5 + (−3) is <code>00000101</code> + <code>11111101</code> = <code>1 00000010</code>. The ninth bit falls off the end, like the odometer's carry, leaving <code>00000010</code> = 2. One adder circuit handles positive and negative numbers alike. That's why every modern CPU uses this scheme.</li>
+</ul>
+
+<p>Two follow-ups interviewers like. First, <b>one number has no positive partner.</b> In 4 bits, −(−8) is flip <code>1000</code> → <code>0111</code>, plus 1 → <code>1000</code>: −8 again, because +8 doesn't fit. That's why <code>abs(INT_MIN)</code> is still negative in C and Java. Second, <b>what overflow does is a language rule, not a law.</b> Java and Go wrap around the wheel as shown. In C and C++, overflow of a <em>signed</em> int is undefined behaviour: the compiler may assume it never happens, so code that "relies on wrapping" can be optimized into something else (unsigned types do wrap). Rust panics on overflow in debug builds, and Python never overflows at all (section 9).</p>
+
+<div class="keyidea">Two's complement is an odometer: going below 0 rolls over to all ones. The top bit means negative, −x = (flip every bit of x) + 1, and the same adder works for both signs. Go past the largest value and you wrap to the most negative one: overflow.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: the top switch has a negative price</summary>
+  <p>Keep the price tags from section 2, but make the top one negative. In 8 bits the prices are −128, 64, 32, 16, 8, 4, 2, 1. Then <code>11111111</code> is −128 + 127 = −1, <code>10000000</code> is −128 on its own, and <code>11111101</code> is −128 + 125 = −3. Every pattern still means "add up the prices of the switches that are on". Only the top price changed sign.</p>
+</details>
+
+<div class="check" id="check-twos">
+  <p class="q">An 8-bit signed value holds <code>11111110</code>. What number is it?</p>
+  <div class="opts">
+    <button>254</button>
+    <button>−126</button>
+    <button data-correct>−2</button>
+  </div>
+  <div class="fb right"><p>Right. It's two steps back from <code>00000000</code> on the odometer, so −2. Check with flip-and-add-one: flipped it's <code>00000001</code>, plus 1 is <code>00000010</code> = 2, so the original was −2.</p></div>
+  <div class="fb wrong"><p>254 is what the pattern means <em>unsigned</em>, but the question says signed, and the top bit is on, so it's negative. −126 comes from reading the top bit as a plain minus sign in front of the other seven (<code>1111110</code> = 126). That's not how two's complement works. Use the odometer: one step back from 0 is <code>11111111</code> (−1), two steps back is <code>11111110</code>, so it's −2. Or with prices: −128 + 64 + 32 + 16 + 8 + 4 + 2 = −2.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Five operators, five pictures</h2>
+
+<p>Bitwise operators work on every switch position separately, all at the same time. Bit 0 of the answer depends only on bit 0 of the inputs, bit 1 only on bit 1, and so on. So each operator is fully described by what it does to <em>one</em> pair of switches. Here they are as pictures you can hold in your head:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Operator</th><th>Python</th><th>The picture</th><th>Answer bit is 1 when</th></tr></thead>
+  <tbody>
+    <tr><td>AND</td><td><code>a &amp; b</code></td><td>two switches in a row on one wire: the lamp lights only if both are on</td><td>both are 1</td></tr>
+    <tr><td>OR</td><td><code>a | b</code></td><td>two switches side by side: either one lights the lamp</td><td>at least one is 1</td></tr>
+    <tr><td>XOR</td><td><code>a ^ b</code></td><td>the hallway light with a switch at each end: flipping <em>either</em> switch flips the light</td><td>they differ</td></tr>
+    <tr><td>NOT</td><td><code>~a</code></td><td>flip every switch</td><td>a's bit is 0</td></tr>
+    <tr><td>Shifts</td><td><code>a &lt;&lt; k</code>, <code>a &gt;&gt; k</code></td><td>slide the whole row k places; left fills with 0s and doubles k times, right drops the low k bits and halves</td><td>(moves bits, doesn't combine them)</td></tr>
+  </tbody>
+</table></div>
+
+<p>Try them. Click the bits of <code>a</code> and <code>b</code>, pick an operator, and read the answer column by column:</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <select id="ops-op" aria-label="Operator">
+        <option value="and">a &amp; b  (AND)</option>
+        <option value="or">a | b  (OR)</option>
+        <option value="xor">a ^ b  (XOR)</option>
+        <option value="not">~a  (NOT, kept to 8 bits)</option>
+        <option value="shl">a &lt;&lt; 1  (kept to 8 bits)</option>
+        <option value="shr">a &gt;&gt; 1</option>
+      </select>
+    </div>
+    <div id="ops-rows" style="margin-top:12px"></div>
+    <div class="viz-caption" id="ops-msg"></div>
+  </div>
+  <div class="cap">Click any bit of a or b to flip it. Green cells in the answer are 1s. Look at one column at a time: the answer bit depends only on the bits directly above it. With XOR, notice that a 1 in b flips a's bit and a 0 leaves it alone.</div>
+</div>
+
+<h3>One switch at a time</h3>
+<p>Combine a shift with an operator and you can touch exactly one bit. <code>1 &lt;&lt; i</code> is a row with only switch i on: a <b>mask</b> that points at bit i. Then:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Goal</th><th>Code</th><th>Why it works</th><th>x = 13 = 1101</th></tr></thead>
+  <tbody>
+    <tr><td>Test bit i</td><td><code>(x &gt;&gt; i) &amp; 1</code></td><td>slide bit i to position 0, keep only it</td><td>i = 2 → 1</td></tr>
+    <tr><td>Set bit i (turn on)</td><td><code>x | (1 &lt;&lt; i)</code></td><td>OR with 1 forces on; OR with 0 changes nothing</td><td>i = 1 → 1111 = 15</td></tr>
+    <tr><td>Clear bit i (turn off)</td><td><code>x &amp; ~(1 &lt;&lt; i)</code></td><td>the mask is all ones except bit i; AND with 0 forces off</td><td>i = 2 → 1001 = 9</td></tr>
+    <tr><td>Flip bit i</td><td><code>x ^ (1 &lt;&lt; i)</code></td><td>XOR with 1 flips; XOR with 0 changes nothing</td><td>i = 0 → 1100 = 12</td></tr>
+  </tbody>
+</table></div>
+
+<p>One trap with precedence. In Python, <code>&lt;&lt;</code> and <code>&gt;&gt;</code> bind <em>looser</em> than <code>+</code> and <code>-</code>, so <code>1 &lt;&lt; n - 1</code> means <code>1 &lt;&lt; (n - 1)</code>. And <code>&amp;</code>, <code>|</code>, <code>^</code> bind tighter than <code>==</code>, so <code>x &amp; 1 == 0</code> means <code>(x &amp; 1) == 0</code>. In C, C++ and Java it's the other way round for that last one: <code>x &amp; 1 == 0</code> there means <code>x &amp; (1 == 0)</code>. Write the parentheses in any language and nobody has to remember.</p>
+
+<div class="keyidea">Bitwise operators work column by column. AND keeps where both are on, OR where either is, XOR where they differ (so XOR with 1 flips), NOT flips all, shifts slide. With the mask <code>1 &lt;&lt; i</code> you test, set, clear or flip one bit.</div>
+
+<div class="check" id="check-ops">
+  <p class="q">A bug report says "turning off bit 3 sometimes turns it <em>on</em>". The code is <code>flags = flags ^ (1 &lt;&lt; 3)</code>. What's wrong?</p>
+  <div class="opts">
+    <button>The shift should be <code>1 &lt;&lt; 2</code>, because bits count from 0</button>
+    <button data-correct>XOR flips: if bit 3 was already off, it turns on. Use <code>flags &amp; ~(1 &lt;&lt; 3)</code></button>
+    <button>Python's <code>^</code> is "to the power of", so it computes flags³</button>
+  </div>
+  <div class="fb right"><p>Right. XOR is the hallway switch: it changes the light whatever state it's in. "Turn off" must force the bit to 0 no matter what: AND with a mask that has a 0 at bit 3 and 1s everywhere else, which is <code>~(1 &lt;&lt; 3)</code>. Exercise 8's <code>discard</code> tests exactly this.</p></div>
+  <div class="fb wrong"><p>Bit 3 is the one worth 8, and <code>1 &lt;&lt; 3</code> is 8, so the position is right. And in Python, power is <code>**</code>; <code>^</code> really is XOR. The problem is what XOR means: "flip". Run it twice on a flag that's already off: off → on → off. A "turn off" needs to be <em>idempotent</em> (doing it twice is the same as once), and only AND with 0 is: <code>flags &amp; ~(1 &lt;&lt; 3)</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>A mask is a set</h2>
+
+<p>Back to the permissions from section 1. Number the 40 permissions 0 to 39. A user's permissions are a number whose bit i is on when they hold permission i. That number is a set: a <b>bitmask</b>, or just a <b>mask</b>. Every set operation turns into one operator:</p>
+
+<pre><code>READ, WRITE, DELETE, ADMIN = 1, 2, 4, 8   # one bit each: 1 &lt;&lt; 0, 1 &lt;&lt; 1, ...
+perms = READ | WRITE                       # {read, write}            0011
+perms |= DELETE                            # add delete               0111
+perms &amp;= ~WRITE                            # remove write             0101
+NEED = READ | DELETE
+has_all = (perms &amp; NEED) == NEED           # holds every one in NEED? True
+has_any = (perms &amp; (WRITE | ADMIN)) != 0   # holds at least one?      False</code></pre>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Set idea</th><th>With masks</th><th>Cost for up to 64 items</th></tr></thead>
+  <tbody>
+    <tr><td>union A ∪ B</td><td><code>a | b</code></td><td>1 instruction</td></tr>
+    <tr><td>intersection A ∩ B</td><td><code>a &amp; b</code></td><td>1</td></tr>
+    <tr><td>difference A − B</td><td><code>a &amp; ~b</code></td><td>2</td></tr>
+    <tr><td>in one but not both</td><td><code>a ^ b</code></td><td>1</td></tr>
+    <tr><td>A ⊆ B (A is a subset of B)</td><td><code>(a &amp; ~b) == 0</code>, or <code>(a &amp; b) == a</code></td><td>2</td></tr>
+    <tr><td>empty set, full set of n</td><td><code>0</code>, <code>(1 &lt;&lt; n) - 1</code></td><td></td></tr>
+    <tr><td>complement within n items</td><td><code>~a &amp; ((1 &lt;&lt; n) - 1)</code></td><td>2</td></tr>
+    <tr><td>size |A|</td><td><code>a.bit_count()</code> (section 6 builds it)</td><td>1 on modern CPUs</td></tr>
+  </tbody>
+</table></div>
+
+<p>Compare that with a Python set of strings: a union walks both sets and hashes every element. With masks, the CPU combines 64 memberships in one step because it handles all 64 switches of a word in parallel. That's the real win: not cleverness, but <b>64 questions answered per instruction</b>.</p>
+
+<p>The catch is the fixed universe. A mask only works when the items can be numbered 0, 1, 2, … and there aren't too many. 64 fit in a machine word; a few thousand fit in a short array of words (a <b>bitset</b>, section 10); a million fit in 125 KB. Arbitrary strings or a universe of 2<sup>64</sup> possible ids don't fit; that's what hash sets and Bloom filters are for.</p>
+
+<div class="keyidea">A mask is a set over a small, numbered universe: bit i on means item i is in. Union is |, intersection &amp;, difference &amp; ~, and "A ⊆ B" is <code>(a &amp; ~b) == 0</code>. Each costs about one instruction per 64 items.</div>
+
+<div class="check" id="check-subset">
+  <p class="q">A deploy needs permissions <code>need</code>. A user holds <code>have</code>. Which test says the user may deploy?</p>
+  <div class="opts">
+    <button><code>have &amp; need != 0</code></button>
+    <button data-correct><code>need &amp; ~have == 0</code></button>
+    <button><code>have &gt;= need</code></button>
+  </div>
+  <div class="fb right"><p>Right. <code>need &amp; ~have</code> is "the permissions needed but not held". If that set is empty, every needed bit is held. In Python <code>&amp;</code> binds tighter than <code>==</code>, so this reads as intended; add parentheses anyway for other readers.</p></div>
+  <div class="fb wrong"><p>Try it with numbers. Say need = <code>0110</code> (write and delete) and have = <code>0010</code> (only write). <code>have &amp; need</code> is <code>0010</code>, not 0, so the first test lets her deploy without delete: that test means "has <em>any</em> of them". <code>have &gt;= need</code> compares the numbers' sizes, not their switches: have = <code>1000</code> (8, admin only) is bigger than need = 6 but holds neither. The right question is "is anything needed missing?": needed bits AND not-held bits, <code>need &amp; ~have</code>, must be 0.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>The lowest 1: <code>x &amp; (x - 1)</code> and <code>x &amp; -x</code></h2>
+
+<p>How many permissions does a user hold? That's counting the 1 bits of a number, called the <b>population count</b> or <b>popcount</b>. The obvious way checks every position:</p>
+
+<pre><code>def popcount_slow(x):          # x &gt;= 0
+    count = 0
+    while x:
+        count += x &amp; 1         # is the lowest bit on?
+        x &gt;&gt;= 1                # slide the next bit down
+    return count               # one loop per POSITION, up to the highest 1</code></pre>
+
+<p>For a 64-bit number that's up to 64 loops, even when only 2 bits are on. Can we jump straight from one 1 to the next and skip the zeros?</p>
+
+<h3>What subtracting 1 does</h3>
+<p>Think about the odometer again. In decimal, 4,000 − 1 = 3,999: the lowest nonzero digit goes down by one, and every 0 below it becomes the largest digit, 9. Binary does the same thing with only two digits: <b>the lowest 1 becomes 0, and every 0 below it becomes 1.</b> Everything above the lowest 1 stays the same.</p>
+
+<pre class="diagram"><code>x         = 1011 0100      (180)
+x - 1     = 1011 0011      (179)   lowest 1 → 0, the zeros below it → 1s
+x &amp; (x-1) = 1011 0000      (176)   the changed bits disagree, so AND drops them all</code></pre>
+
+<p>So <code>x &amp; (x - 1)</code> is x with its lowest 1 turned off. Each round deletes exactly one 1, wherever it sits. Replace the slow loop's body with <code>x &amp;= x - 1</code>, count the rounds until x is 0, and you've looped once per 1 bit, not once per position: <code>2**63 + 1</code> takes 2 rounds instead of 64. This is known as Kernighan's popcount (exercise 4 has you write it).</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <select id="pc-x" aria-label="Number"><option value="2880">101101000000 (four 1s)</option><option value="2049">100000000001 (two 1s)</option><option value="2048">100000000000 (a power of two)</option><option value="4095">111111111111 (all 1s)</option></select>
+      <select id="pc-m" aria-label="Method"><option value="k">x &amp;= x − 1</option><option value="s">check every position</option></select>
+    </div>
+    <div id="pc-player" style="margin-top:10px"></div>
+  </div>
+  <div class="cap">Counting the 1s of a 12-bit number two ways. Yellow cells are the bits that subtracting 1 changed; red is the 1 that gets deleted. Step through both methods on "two 1s": 2 steps against 12. Then pick "all 1s", where the two methods tie.</div>
+</div>
+
+<p>Two more tricks use the same picture.</p>
+<ul>
+  <li><b>Is x a power of two?</b> A power of two has exactly one 1 (1, 10, 100, 1000…). Deleting it leaves 0. So <code>x &gt; 0 and x &amp; (x - 1) == 0</code>. The <code>x &gt; 0</code> matters: 0 has no 1 bits, and <code>0 &amp; -1</code> is 0 too.</li>
+  <li><b>Keep only the lowest 1: <code>x &amp; -x</code>.</b> Remember −x = (flip x) + 1. Flipping turns the lowest 1 into 0 and the zeros below it into 1s. Adding 1 ripples through those 1s and stops at exactly the lowest 1's position. Above that, −x is still the flip of x, so AND clears it:</li>
+</ul>
+
+<pre class="diagram"><code>x         = 1011 0100
+~x        = 0100 1011
+-x = ~x+1 = 0100 1100      the +1 ripples up to the lowest 1 of x, and stops
+x &amp; -x    = 0000 0100      only the lowest 1 survives: 4</code></pre>
+
+<p><code>x &amp; -x</code> is called the <b>lowbit</b> of x. It's the engine of the Fenwick tree (<a href="../../01-data-structures/concepts/segment-fenwick-trees.html#s8">chapter 1, section 8 of Segment and Fenwick trees</a>), and with <code>bit_length()</code> it gives the position of the lowest 1. (<code>x.bit_length()</code> is how many bits x needs: 1 for <code>1</code>, 3 for <code>100</code>, 0 for 0. For a power of two 2<sup>i</sup> that is i + 1.) So the lowest 1 sits at <code>(x &amp; -x).bit_length() - 1</code>: for x = 180 that's <code>100</code>.bit_length() − 1 = 2.</p>
+
+<div class="keyidea"><code>x - 1</code> turns the lowest 1 into 0 and the zeros below it into 1s. So <code>x &amp; (x - 1)</code> deletes the lowest 1 (popcount in one loop per 1 bit; power of two when it leaves 0), and <code>x &amp; -x</code> keeps only the lowest 1.</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: popcount in hardware, and in parallel</summary>
+  <p>x86 CPUs have had a single <code>POPCNT</code> instruction since about 2008, and ARM has an equivalent. C compilers turn <code>__builtin_popcount</code> into it when the target CPU has it. CPython's <code>int.bit_count()</code> (3.10+) calls that builtin once per 30-bit digit of the int (section 9); whether it becomes a real <code>POPCNT</code> depends on the flags Python was compiled with, since generic x86-64 builds can't assume the instruction exists.</p>
+  <p>Before that, the fastest software trick counted in parallel ("SWAR", SIMD within a register): add neighbouring bits in pairs, then neighbouring pairs in groups of 4, then 8, using masks like <code>0x5555…</code> (0101…) and <code>0x3333…</code> (0011…). That's log₂ 64 = 6 rounds whatever the input. Interviewers sometimes ask for it after Kernighan's version, to see if you can think of bits as 32 tiny 2-bit counters side by side.</p>
+</details>
+
+<div class="check" id="check-kernighan">
+  <p class="q">How many times does the <code>x &amp;= x - 1</code> loop run for <code>x = 2**40 + 2**3</code>?</p>
+  <div class="opts">
+    <button>41 times, once for each position up to bit 40</button>
+    <button data-correct>2 times</button>
+    <button>1 time, because it's almost a power of two</button>
+  </div>
+  <div class="fb right"><p>Right. x has two 1 bits, at positions 3 and 40. The first round deletes bit 3 (the lowest), the second deletes bit 40, and x is 0. The 36 zeros in between (bits 4 to 39) are never visited.</p></div>
+  <div class="fb wrong"><p>Write it out: x is a 1 at bit 40, then 36 zeros, then a 1 at bit 3, then 000. Subtracting 1 only disturbs the bits from the lowest 1 down: bit 3 becomes 0, bits 0–2 become 1, and AND wipes all four. Bit 40 is untouched. Now x = 2<sup>40</sup>, and the second round deletes that. Two rounds: one per 1 bit, never one per position.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>XOR: pairs that cancel</h2>
+
+<p>An interview classic: a list of 1,000,001 numbers where every number appears exactly twice except one. Find the loner. A set or a counter works, but costs memory for 500,000 entries. Can you do it with one variable?</p>
+
+<p>Go back to the hallway light. Each number is a set of switches to flip. Flip the same switches twice and the light is back where it started. So if you start with all lights off and flip by every number in the list, every pair undoes itself, whatever order they come in, and only the loner's switches are left on. In XOR terms, three facts:</p>
+<ul>
+  <li><code>a ^ a == 0</code>: flipping twice cancels.</li>
+  <li><code>a ^ 0 == a</code>: flipping nothing changes nothing.</li>
+  <li>Order and grouping don't matter: <code>a ^ b == b ^ a</code> and <code>(a ^ b) ^ c == a ^ (b ^ c)</code>, because each column is just "is the number of 1s odd?".</li>
+</ul>
+
+<pre class="diagram"><code>[4, 1, 2, 1, 2]
+0 ^ 4 ^ 1 ^ 2 ^ 1 ^ 2
+  = 4 ^ (1 ^ 1) ^ (2 ^ 2)      regroup: allowed, order doesn't matter
+  = 4 ^ 0 ^ 0
+  = 4</code></pre>
+
+<p>So one pass with one running value is enough: O(n) time, O(1) extra memory. It works on negative numbers too, since XOR is column by column. Exercise 5 measures the memory, so a set fails it.</p>
+
+<p>The same "pairs cancel" idea solves cousins:</p>
+<ul>
+  <li><b>Missing number:</b> a list holds 0 to n with one missing. XOR all the values and all of 0..n. Every present number appears twice and cancels; the missing one appears once.</li>
+  <li><b>Two loners:</b> every number appears twice except a and b. XOR-ing everything gives a ^ b, which isn't 0 because a ≠ b. Its lowest 1 (<code>x &amp; -x</code>!) is a column where a and b differ. Split the list by that bit and XOR each half: each half has exactly one loner.</li>
+  <li><b>RAID 5 storage:</b> store a parity block P = D1 ^ D2 ^ D3 next to three data blocks. If the disk with D2 dies, D2 = P ^ D1 ^ D3. One extra disk protects against any single failure.</li>
+</ul>
+
+<div class="keyidea">XOR is "flip": a ^ a = 0, a ^ 0 = a, and order doesn't matter. So XOR-ing a whole list cancels every pair and leaves what appears an odd number of times, in O(1) memory. That's how RAID parity rebuilds a lost disk.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: one column at a time</summary>
+  <p>Look at only the lowest bit of every number. XOR-ing a column gives 1 exactly when the column has an odd number of 1s. Each pair puts in two equal bits, which adds 0 or 2 ones: no effect on odd-or-even. Only the loner can change it. So each column of the result is the loner's bit, in every column at once.</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: the XOR swap, and why not to use it</summary>
+  <p><code>a ^= b; b ^= a; a ^= b</code> swaps two variables without a temporary. It's a cute puzzle and a bad idea: in Python <code>a, b = b, a</code> is clearer and just as fast, and in C, if a and b are the same memory location (<code>swap(&amp;x[i], &amp;x[j])</code> with i == j), the first line sets it to 0 and the value is lost. Compilers already swap through registers for free. Say this if an interviewer brings it up.</p>
+</details>
+
+<div class="check" id="check-xor">
+  <p class="q">Now every number appears exactly <em>three</em> times except one, which appears once. What does XOR-ing the whole list give?</p>
+  <div class="opts">
+    <button>The loner, because the triples cancel the same way pairs do</button>
+    <button>0, because an odd count of each number cancels out</button>
+    <button data-correct>The XOR of every distinct value: the loner mixed with all the others</button>
+  </div>
+  <div class="fb right"><p>Right. x ^ x ^ x = (x ^ x) ^ x = 0 ^ x = x, so each triple leaves one copy behind. The trick only cancels <em>pairs</em>. For triples you count each column's 1s and take the count mod 3: the columns where the loner has a 1 are the ones whose count isn't a multiple of 3.</p></div>
+  <div class="fb wrong"><p>Flip a switch three times: off → on → off → on. It ends <em>on</em>. Three copies of x leave x, not 0. So in [5, 5, 5, 9] the result is 5 ^ 9 = 12, not 9. XOR only erases things that appear an even number of times. For triples, count the 1s in each column across the whole list; a column whose count isn't a multiple of 3 is a column where the loner has a 1.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Every subset is a number</h2>
+
+<p>Three pizza toppings, ham, cheese and olive. List every combination you could order. In <a href="backtracking.html#s4">the backtracking chapter</a> you drew this as a decision tree: for each topping, take it or leave it, 2 × 2 × 2 = 8 leaves.</p>
+
+<p>Masks give the same 8 without any recursion. Give ham bit 0, cheese bit 1, olive bit 2. Then every order is a 3-bit number, and every 3-bit number is an order. Counting from 0 to 7 is turning a binary odometer, and an odometer visits every reading exactly once:</p>
+
+<pre class="diagram"><code>mask  olive cheese ham    subset
+000     .     .     .     {}
+001     .     .     ham   {ham}
+010     .   cheese  .     {cheese}
+011     .   cheese ham    {ham, cheese}
+100   olive   .     .     {olive}
+...
+111   olive cheese ham    {ham, cheese, olive}</code></pre>
+
+<p>Here's the loop at work on a small search: n tasks with durations, and the busiest set of them that fits in a time budget.</p>
+
+<pre><code>def busiest_fit(durations, budget):     # n &lt;= ~20 tasks
+    n, best = len(durations), 0
+    for mask in range(1 &lt;&lt; n):          # 0 .. 2**n - 1: every subset once
+        total = sum(durations[i] for i in range(n) if (mask &gt;&gt; i) &amp; 1)
+        if total &lt;= budget:             # bit i on means "task i is in"
+            best = max(best, total)
+    return best                         # 2**n masks × n bit tests: O(n · 2**n)</code></pre>
+
+<p>That's the whole technique. It's handy when n is small, about 20 or less (2<sup>20</sup> ≈ 1 million subsets). It's also why <a href="backtracking.html">backtracking</a> code uses a mask for its "used" set: the mask is one small hashable number you can use as a cache key.</p>
+
+<h3>The subsets of a subset</h3>
+<p>Harder question: you already have a set, say mask <code>10110</code> = {B, C, E}, and you want every subset of <em>it</em>. Counting from 0 to 22 and skipping the numbers with a bit outside the mask works, but wastes time: for a mask with 3 bits spread over 50 positions you'd count to 2<sup>50</sup> to find 8 answers.</p>
+
+<p>The fix uses section 6's picture of subtracting 1. Count <em>down</em>, but only on the wheels that exist. <code>s - 1</code> turns s's lowest 1 into 0 and fills everything below with 1s; <code>&amp; mask</code> then throws away the 1s that landed outside the mask. What's left is the next smaller submask, with nothing skipped and nothing visited twice:</p>
+
+<pre class="diagram"><code>mask = 10110            s = (s - 1) &amp; mask
+
+s      s - 1    &amp; mask = next s
+10110  10101    10100
+10100  10011    10010
+10010  10001    10000
+10000  01111    00110     the borrow fills bits 0-3; the mask keeps bits 1 and 2
+00110  00101    00100
+00100  00011    00010
+00010  00001    00000     8 submasks: 10110 10100 10010 10000 00110 00100 00010 00000</code></pre>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <select id="sub-mode" aria-label="What to enumerate"><option value="all">every subset of 3 toppings: count 0 → 7</option><option value="sub">every submask of 10110: s = (s − 1) &amp; mask</option></select>
+    </div>
+    <div id="sub-player" style="margin-top:10px"></div>
+  </div>
+  <div class="cap">Green cells are the items in the current subset; dim cells are bits outside the mask, which (s − 1) &amp; mask never lets in. Step through the submask mode: 8 subsets of a 3-element set, found in 8 steps, while the numbers from 22 down to 0 are 23.</div>
+</div>
+
+<p>A mask with k bits has 2<sup>k</sup> submasks, so this loop costs O(2<sup>k</sup>) however wide the mask is. When you run it for <em>every</em> mask of n items, the total is 3<sup>n</sup>, not the 2<sup>n</sup> × 2<sup>n</sup> = 4<sup>n</sup> you'd pay testing every s against every mask: each item has only three legal states, outside the mask, in the mask but not in s, or in both. For n = 15 that's 14 million steps against a billion. That 3<sup>n</sup> is the cost of any bitmask DP that, for every set, tries every way to split it in two.</p>
+
+<h3>Bitmask DP, briefly</h3>
+<p>Some problems need "which items have I used?" as part of a <a href="dynamic-programming.html">dynamic programming</a> state. Traveling salesman is the famous one: 20 cities have 19! ≈ 1.2 × 10<sup>17</sup> routes. But the best way to finish a route only depends on <em>which</em> cities you've visited and <em>where</em> you are now, not on the order you visited them. As a mask, that's 2<sup>20</sup> × 20 ≈ 21 million states, each trying up to 20 next cities: about 4 × 10<sup>8</sup> steps (the Held–Karp algorithm). Still exponential, so n stays around 20, but feasible where 19! never is. The <a href="dynamic-programming.html#s10">DP chapter's "Go deeper" box</a> has more; exercise 9 has you design one.</p>
+
+<div class="keyidea">Counting 0 to 2<sup>n</sup> − 1 visits every subset of n items once. <code>s = (s - 1) &amp; mask</code> walks the 2<sup>k</sup> submasks of a k-bit mask with no waste. A mask in a DP state turns n! orders into 2<sup>n</sup> sets.</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: Gosper's hack, the next number with the same number of 1s</summary>
+  <p>To visit only the subsets of size k, in increasing order, jump from one mask to the next with the same popcount:</p>
+  <pre><code>c = x &amp; -x                 # lowest 1
+r = x + c                  # carry ripples through the lowest block of 1s
+x = (((r ^ x) &gt;&gt; 2) // c) | r   # put the leftover 1s back at the bottom</code></pre>
+  <p>From <code>0011</code> it goes <code>0101</code>, <code>0110</code>, <code>1001</code>, <code>1010</code>, <code>1100</code>: all C(4, 2) = 6 masks, one step each. A recursion that chooses k positions works just as well and is easier to explain in an interview; exercise 7c accepts either.</p>
+</details>
+
+<div class="check" id="check-submask">
+  <p class="q">You run the submask loop for mask = <code>(1 &lt;&lt; 60) | (1 &lt;&lt; 30) | 1</code>. How many times does the loop body run?</p>
+  <div class="opts">
+    <button data-correct>8</button>
+    <button>61, once per position up to bit 60</button>
+    <button>About 2<sup>60</sup>, once per number below the mask</button>
+  </div>
+  <div class="fb right"><p>Right. The mask has 3 bits, so 2<sup>3</sup> = 8 submasks, and <code>(s - 1) &amp; mask</code> jumps from each straight to the next. The 58 positions outside the mask (of the 61 from bit 0 to bit 60) are never visited, and neither are the numbers in between.</p></div>
+  <div class="fb wrong"><p>Think of three wheels on an odometer that only has those three wheels. It shows 2 × 2 × 2 = 8 readings. <code>s - 1</code> may set lots of bits below the lowest 1, but <code>&amp; mask</code> keeps only the ones on real wheels, so every step lands on a real submask, the next smaller one. 8 steps. Counting every number below 2<sup>60</sup> would be about 10<sup>18</sup> steps, which never finishes.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Bits in Python: no odometer</h2>
+
+<p>Everything so far assumed a fixed number of switches, like a C <code>int32_t</code>. Python's <code>int</code> has <b>no fixed width</b>. It grows as needed: <code>2**100</code> is an exact integer, and nothing ever overflows. That's convenient for arithmetic and surprising for bits.</p>
+
+<h3>Negative numbers have infinitely many 1s</h3>
+<p>Python pretends a negative number is two's complement with an <em>infinite</em> row of 1s to the left. −1 is …1111 forever; −4 is …11100. Every operator follows from that picture:</p>
+
+<pre><code>~5             # -6: flipping 0...0101 gives 1...1010, which is -6 (~x == -x - 1)
+-1 &gt;&gt; 100      # -1: sliding right brings in more 1s from the infinite left
+-5 &gt;&gt; 1        # -3: right shift rounds DOWN (floor), so it's -5 // 2, not -2
+bin(-5)        # '-0b101': bin shows a minus sign and the size, NOT the bit pattern
+-5 &amp; 0xFF      # 251 = 0b11111011: AND with a mask cuts the infinite row to 8 bits</code></pre>
+
+<p>So to see or simulate a fixed width, <b>mask</b>: <code>x &amp; 0xFFFFFFFF</code> keeps 32 bits, and the answer is always a non-negative number with the same low 32 switches. To read such a pattern back as signed, look at bit 31:</p>
+
+<pre><code>MASK = 0xFFFFFFFF                         # 32 ones
+def to_signed32(u):                       # u is a 32-bit pattern, 0 .. 2**32 - 1
+    return u - (1 &lt;&lt; 32) if u &gt;&gt; 31 else u # top bit on: it's negative, roll back 2**32</code></pre>
+
+<p>This is the bug in the classic "add two numbers without +" puzzle (exercise 6). The loop is: XOR adds without carrying, AND then shift left is the carry, repeat until there's no carry. On a 32-bit CPU the carry falls off the end after 32 rounds. In Python there's no end to fall off: for −1 + 1 the carry walks left forever through the infinite 1s. You must mask every round to 32 bits, then convert back with <code>to_signed32</code>.</p>
+
+<h3>Useful built-ins</h3>
+<ul>
+  <li><code>x.bit_count()</code>: popcount (Python 3.10+). <code>x.bit_length()</code>: how many bits x needs; for x &gt; 0 that's the position of the highest 1 plus one.</li>
+  <li><code>int.from_bytes(b, "little")</code> and <code>x.to_bytes(n, "little")</code>: convert between bytes and an int, in C speed.</li>
+  <li>There's no <code>&gt;&gt;&gt;</code> (Java's "shift right, fill with 0s"). Mask first, then shift: <code>(x &amp; MASK) &gt;&gt; k</code>. Python's <code>&gt;&gt;</code> always copies the sign bit in from the left (an <b>arithmetic</b> shift); Java's <code>&gt;&gt;</code> does too, and C++20 guarantees it, while older C left right-shifting a negative number up to the compiler.</li>
+  <li>Shift distances: in Python <code>1 &lt;&lt; 100</code> is just a big number. In Java, an int shift uses only the low 5 bits of the distance, so <code>1 &lt;&lt; 32</code> is 1; in C, shifting by the width or more is undefined. Another reason to mask on purpose.</li>
+  <li><code>enum.Flag</code> and <code>enum.IntFlag</code>: named bit flags that combine with <code>|</code>, for readable permission code.</li>
+</ul>
+
+<h3>What a big int really costs</h3>
+<p>A Python int is stored as an array of 30-bit "digits". On ints that fit in a machine word, <code>&amp;</code> or <code>|</code> is effectively O(1). On a million-bit int, it's O(1,000,000 / 30): it walks the digit array, in C, which takes microseconds. That's still about 30 bits per step instead of 1, which is why one big int makes a fine bitset (exercise 8). But ints are <b>immutable</b>: <code>bits |= 1 &lt;&lt; i</code> builds a brand-new int and copies all of it. On a million-bit set, each single add copies about 125 KB. If you add bits one at a time far more often than you combine whole sets, a list of 64-bit words (or <code>array("Q")</code>, or a <code>bytearray</code>) changes one word in place instead.</p>
+
+<div class="keyidea">Python ints never overflow, and negatives act as if they had infinitely many 1s on the left. To get fixed-width behaviour, AND with a mask like <code>0xFFFFFFFF</code> and convert back by checking the top bit. Big-int operations cost O(bits / 30), and every change copies the int.</div>
+
+<div class="check" id="check-python">
+  <p class="q">You port Java's <code>String.hashCode</code> to Python. It computes <code>h = 31 * h + c</code> for each character code in a Java <code>int</code>, which wraps on overflow. In Python the hashes come out different and enormous. What's the fix?</p>
+  <div class="opts">
+    <button>Use <code>h = (31 * h + c) % 31</code> to keep it small</button>
+    <button data-correct>Mask each step: <code>h = (31 * h + c) &amp; 0xFFFFFFFF</code>, then read bit 31 as the sign, because Java's int is signed</button>
+    <button>Nothing: Python's ints will overflow at 64 bits, which matches</button>
+  </div>
+  <div class="fb right"><p>Right. Java's 32-bit int is an odometer that rolls over at 2<sup>32</sup>; Python's ints never roll over. Keeping the low 32 bits after each step is exactly what the hardware does. Java's int is signed, so the final step is <code>to_signed32</code>: patterns with bit 31 on mean value − 2<sup>32</sup>. (Porting the same loop from C? There it must use an <code>unsigned</code> type, because signed overflow in C is undefined, not a wrap.)</p></div>
+  <div class="fb wrong"><p>Python ints don't overflow at 64 bits or anywhere else: they grow until memory runs out. And <code>% 31</code> keeps a remainder by 31, a completely different number. What Java does on overflow is drop every bit above bit 31, like an odometer losing its carry. In Python you drop them yourself with <code>&amp; 0xFFFFFFFF</code> (which equals <code>% 2**32</code> for this), and, since Java's int is signed, convert the top bit back into a minus sign at the end.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>Where seniors meet bits</h2>
+
+<p>You'll rarely be asked to reverse the bits of an int at work. You'll meet bits as representation choices, constantly. Here are the places worth knowing well enough to talk about:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Where</th><th>The bits</th><th>Why bits</th></tr></thead>
+  <tbody>
+    <tr><td>Unix file permissions</td><td><code>0o755</code> = <code>111 101 101</code>: rwx for owner, r-x for group, r-x for others. "Can others write?" is <code>mode &amp; 0o002</code>.</td><td>9 yes/no answers in one small number, stored in every inode</td></tr>
+    <tr><td>Flags to system calls</td><td><code>os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)</code>, epoll's <code>EPOLLIN | EPOLLOUT</code></td><td>pass any combination of options as one argument</td></tr>
+    <tr><td>Permissions and feature flags in apps</td><td>Discord's API sends a member's permissions as one integer of bit flags; feature-flag systems pack "on for this cohort" into masks</td><td>cheap to store per user, cheap to check on every request</td></tr>
+    <tr><td>Bitsets and bitmap indexes</td><td>one bit per row or document id; a query "country = DK AND plan = pro" ANDs two bitmaps. Postgres combines index results with BitmapAnd / BitmapOr; Roaring bitmaps (Lucene, Druid, Pinot) store each chunk of 65,536 ids as a sorted array when it's sparse and a plain bitmap when it's dense.</td><td>combine millions of memberships at 64 per instruction</td></tr>
+    <tr><td>Bloom filters</td><td>an array of m bits; each key sets k of them (<a href="../../01-data-structures/concepts/probabilistic-structures.html#s3">chapter 1</a>)</td><td>"definitely not here" in a few bits per key</td></tr>
+    <tr><td>IP networks (CIDR)</td><td><code>10.16.0.0/12</code> means "the first 12 bits are the network". An address is in it when <code>ip &amp; mask == net</code>.</td><td>a router checks a prefix with one AND</td></tr>
+    <tr><td>Hash tables</td><td>with a power-of-two capacity, <code>h &amp; (cap - 1)</code> is <code>h % cap</code> in one AND (<a href="../../01-data-structures/concepts/hash-maps.html#s4">chapter 1</a>). Java's HashMap first mixes <code>h ^ (h &gt;&gt;&gt; 16)</code> so the high bits affect the slot too.</td><td>a division costs tens of cycles, an AND one</td></tr>
+    <tr><td>Hash mixing</td><td>MurmurHash3's finalizer: <code>h ^= h &gt;&gt; 33; h *= C1; h ^= h &gt;&gt; 33; h *= C2; h ^= h &gt;&gt; 33</code></td><td>XOR-shift and multiply spread every input bit into every output bit ("avalanche")</td></tr>
+    <tr><td>Packed ids</td><td>Twitter's Snowflake id: 41 bits of milliseconds, 10 bits of machine id, 12 bits of sequence: <code>(ms &lt;&lt; 22) | (machine &lt;&lt; 12) | seq</code></td><td>unique, roughly time-sorted ids with no coordination</td></tr>
+  </tbody>
+</table></div>
+
+<p>The CIDR row is worth doing by hand once. An IPv4 address is 32 bits, written as four bytes. A <code>/p</code> network keeps the top p bits fixed and lets the other 32 − p vary, so it holds 2<sup>32−p</sup> addresses and its mask is p ones followed by zeros: <code>(0xFFFFFFFF &lt;&lt; (32 - p)) &amp; 0xFFFFFFFF</code>. For <code>/12</code> that's <code>255.240.0.0</code>: 8 ones, then <code>11110000</code>, then 16 zeros.</p>
+
+<div class="keyidea">In systems, bits are a representation choice: a fixed list of yes/no facts per thing (permissions, flags), a set over numbered ids (bitmaps, Bloom filters), a prefix (CIDR, power-of-two tables), or several small fields packed in one word (Snowflake ids). Each buys memory and one-instruction checks, and costs readability.</div>
+
+<div class="check" id="check-cidr">
+  <p class="q">A firewall allows <code>10.16.0.0/12</code>. Is <code>10.20.30.40</code> allowed?</p>
+  <div class="opts">
+    <button data-correct>Yes</button>
+    <button>No: its second byte is 20, not 16</button>
+    <button>Only if it's also in 10.0.0.0/8</button>
+  </div>
+  <div class="fb right"><p>Right. The /12 mask is <code>255.240.0.0</code>. Only the second byte needs work: 20 is <code>00010100</code>, and AND with 240 = <code>11110000</code> keeps <code>0001</code>0000 = 16. So the masked address is 10.16.0.0, the network itself. The /12 covers 10.16.0.0 to 10.31.255.255.</p></div>
+  <div class="fb wrong"><p>A /12 doesn't compare whole bytes; it compares the first 12 <em>bits</em>. That's all 8 bits of the first byte and the top 4 of the second. 16 is <code>0001 0000</code> and 20 is <code>0001 0100</code>: their top four bits, <code>0001</code>, match. So yes. Any second byte from 16 (<code>0001 0000</code>) to 31 (<code>0001 1111</code>) is inside. Being inside 10.0.0.0/8 is true too, but the firewall doesn't ask about that.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>What to say in the interview</h2>
+
+<p>When a problem smells of bits (small sets, "every number appears twice", powers of two, flags, "without using +"), a strong answer sounds like this:</p>
+<ol>
+  <li><b>Name the representation:</b> "n is at most 20, so I'll keep the chosen items as a bitmask: bit i means item i is in. That's one int, and it's hashable, so I can memoize on it."</li>
+  <li><b>Say the trick and why it works, with one tiny example:</b> "x &amp; (x − 1) clears the lowest 1, because subtracting 1 turns that 1 into 0 and the zeros below it into 1s: 1100 becomes 1011, and AND gives 1000."</li>
+  <li><b>Give the cost in the right unit:</b> "This loops once per set bit, not once per position. Over all masks, the submask loop is 3<sup>n</sup>, so n = 15 is about 14 million steps."</li>
+  <li><b>Cover the edges:</b> 0 (no set bits, and 0 &amp; −1 is 0 so check x &gt; 0 for powers of two), negative numbers, and fixed width. "In Python I'll mask with 0xFFFFFFFF because ints don't overflow."</li>
+  <li><b>Offer the readable version:</b> "In production I'd wrap this in an IntFlag or a small Bitset class with named methods, so nobody has to decode <code>&amp; ~</code> in a code review."</li>
+</ol>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"Reverse the bits of a 32-bit int."</b> Loop 32 times: shift the answer left, OR in <code>x &amp; 1</code>, shift x right. The O(log w) version swaps halves, then quarters, then pairs, with masks like <code>0x0000FFFF</code>, <code>0x00FF00FF</code>, …, <code>0x55555555</code>.</li>
+    <li><b>"Count the bits of every number from 0 to n."</b> <code>bits[i] = bits[i &gt;&gt; 1] + (i &amp; 1)</code>, or <code>bits[i] = bits[i &amp; (i - 1)] + 1</code>: a tiny DP, O(n) total.</li>
+    <li><b>"Gray code."</b> <code>i ^ (i &gt;&gt; 1)</code> lists all n-bit numbers so neighbours differ in one bit. Rotary encoders use it so a sensor between two positions can't misread wildly.</li>
+    <li><b>"Is it little- or big-endian?"</b> Endianness is the order of <em>bytes</em> in memory, not bits within a byte. Network protocols send big-endian ("network byte order"); x86 and most ARM systems store little-endian. <code>int.from_bytes(b, "big")</code> handles it in Python.</li>
+    <li><b>"Why is a power-of-two table size risky?"</b> <code>h &amp; (cap - 1)</code> keeps only the low bits, so keys that differ only in their high bits all collide. Mix the hash first (the HashMap and Murmur rows above).</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>A number is a row of switches; bit i is worth 2<sup>i</sup>. n bits hold 2<sup>n</sup> values; n ones is 2<sup>n</sup> − 1; a hex digit is 4 bits.</li>
+  <li>Two's complement is an odometer: −1 is all ones, the top bit means negative, −x = ~x + 1, and passing the top wraps around (overflow).</li>
+  <li>AND = both, OR = either, XOR = differ (flip), NOT = flip all, shifts slide (×2 and ÷2 rounding down). Test <code>(x &gt;&gt; i) &amp; 1</code>, set <code>| (1 &lt;&lt; i)</code>, clear <code>&amp; ~(1 &lt;&lt; i)</code>, flip <code>^ (1 &lt;&lt; i)</code>.</li>
+  <li>A mask is a set over numbered items: | union, &amp; intersection, &amp; ~ difference, <code>(a &amp; ~b) == 0</code> subset. 64 memberships per instruction.</li>
+  <li><code>x &amp; (x - 1)</code> deletes the lowest 1 (popcount in one step per 1 bit; power of two if x &gt; 0 and it gives 0). <code>x &amp; -x</code> keeps only the lowest 1.</li>
+  <li>XOR cancels pairs: XOR of a list leaves what appears an odd number of times, in O(1) memory.</li>
+  <li><code>range(1 &lt;&lt; n)</code> is every subset; <code>s = (s - 1) &amp; mask</code> walks a mask's 2<sup>k</sup> submasks; 3<sup>n</sup> over all masks. Masks in DP states turn n! into 2<sup>n</sup>.</li>
+  <li>Python ints never overflow and negatives have infinite 1s on the left: mask with <code>0xFFFFFFFF</code> for fixed width, check bit 31 to read it signed. Big-int ops are O(bits / 30) and copy.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first. The coding exercises are in <code>exercises/bit_tricks.py</code>, <code>exercises/bitmask_subsets.py</code> and <code>exercises/bitset.py</code>. Their tests count your operations, measure memory, or use sizes where a loop over every bit position never finishes, so a correct but slow answer fails. Run them with <code>python3 -m pytest -k "bit_tricks or bitmask_subsets or bitset"</code>.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Work the switches by hand</h4>
+  <p>In 8 bits, write: 13, −13, 13 &amp; −13, 13 &amp; 12, 13 ^ 6, 13 &lt;&lt; 2, and −13 &gt;&gt; 1 (as Python computes it). For each, say which section's picture predicts the answer before you work it out.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>13 = <code>00001101</code>. −13 = flip + 1 = <code>11110010</code> + 1 = <code>11110011</code>. 13 &amp; −13 = <code>00000001</code> = 1 (lowbit). 13 &amp; 12 = <code>00001100</code> = 12 (lowest 1 deleted, since 12 = 13 − 1). 13 ^ 6 = <code>00001011</code> = 11. 13 &lt;&lt; 2 = <code>00110100</code> = 52. −13 &gt;&gt; 1 = −7 (floor of −6.5), pattern <code>11111001</code>.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Break the naive version</h4>
+  <p>(a) Someone writes <code>is_power_of_two = lambda x: x &amp; (x - 1) == 0</code>. Find the input where it's wrong in Python, and one more where the same test is wrong on a 32-bit Java <code>int</code>. (b) Someone uses XOR-all to find the number without a partner, but the list is [2, 2, 2, 7]. What do they get? (c) In Java, <code>if (flags &amp; MASK == 0)</code> doesn't compile or misbehaves. Why, and why does the same line work in Python?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) 0: <code>0 &amp; -1</code> is 0, so it says True. In Python every negative x gives a negative answer (both sides have infinite 1s on the left), so 0 is the only wrong one. On a 32-bit int, −2<sup>31</sup> is <code>1000…0</code> and −2<sup>31</sup> − 1 wraps to <code>0111…1</code>, so their AND is 0 and it says True. The fix is <code>x &gt; 0 and …</code>. (b) 2 ^ 2 ^ 2 ^ 7 = 2 ^ 7 = 5: the triple leaves one 2 behind. (c) Java's <code>==</code> binds tighter than <code>&amp;</code>, so it's <code>flags &amp; (MASK == 0)</code>, an int AND a boolean. Python's <code>&amp;</code> binds tighter than <code>==</code>.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Permissions and networks</h4>
+  <p>(a) A file has mode <code>0o640</code>. Write it as rwx letters. Which single expression tells you whether the group may write? (b) How many addresses does <code>192.168.4.0/22</code> hold, and what are the first and last? Is <code>192.168.7.200</code> inside?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) <code>110 100 000</code> = rw- r-- ---. Group write is <code>mode &amp; 0o020</code>, which is 0 here: no. (b) 2<sup>32−22</sup> = 1,024 addresses. The mask's third byte is <code>11111100</code> = 252; 4 &amp; 252 = 4, so the range is 192.168.4.0 to 192.168.7.255. 7 &amp; 252 = 4, so 192.168.7.200 is inside.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>popcount(x)</code>, <code>bit_positions(x)</code>, <code>next_power_of_two(x)</code></h4>
+  <p>In <code>bit_tricks.py</code>. The test hands you a special int that counts every operation done on it, comparisons included. popcount and bit_positions (the positions of the 1s, smallest first) get a few operations per 1 bit, so a loop over every position fails on <code>2**1000 + 1</code>. next_power_of_two (the smallest power of two ≥ x, how hash tables round up their capacity) gets 6 operations for any x, so doubling a guess fails. Strings and <code>bit_count()</code> are off limits; <code>bit_length()</code> is allowed.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>single_number(nums)</code> in O(1) extra memory</h4>
+  <p>Every value appears twice except one. The test measures peak memory with <code>tracemalloc</code> on 200,001 numbers and allows 4 KB, so a set, a Counter or a sorted copy fails. It also checks you didn't change the list.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>add32(a, b)</code> without + or −</h4>
+  <p>Add two signed 32-bit ints the way a 32-bit CPU does, wrapping on overflow, using only bit operators. The test reads your function's syntax tree and rejects + and − between two numbers (with a constant, like section 9's <code>u - (1 &lt;&lt; 32)</code>, is fine). Without a 32-bit mask on every round, adding a negative number loops forever, and the test stops it after 5 seconds. Section 9 has the fix.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>subsets(items)</code>, <code>submasks(mask)</code>, <code>masks_with_k_bits(n, k)</code></h4>
+  <p>In <code>bitmask_subsets.py</code>. All subsets in mask order; every submask of a mask from largest to 0; every n-bit mask with exactly k ones, smallest first. The tests use masks 60 bits wide, where counting through every number below the mask never finishes, so your work must grow with the number of answers.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>8. <code>Bitset</code>: a set stored in one int</h4>
+  <p>In <code>bitset.py</code>: add, discard, membership, len, ascending iteration, and | &amp; − as new Bitsets. The tests read <code>self.bits</code>, measure the memory of a dense 200,000-position set (it must be packed, about one bit per position), and call len, the set operators and iteration a thousand times on million-position sets, so a loop over every position times out. <code>discard</code> of an absent member must not add it.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>9. Design a bitmask DP</h4>
+  <p>A team needs 12 skills. You have 40 candidates, each with a list of skills. Find the smallest team that covers all 12. Define the state (hint: the set of skills covered so far, as a mask), the transition (add one candidate: <code>covered | skills[c]</code>), the number of states, and the total work. Why is the mask over <em>skills</em> and not over candidates? What would 2<sup>40</sup> cost?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure</div>
+  <h4>10. Measure the permission store</h4>
+  <p>Back to section 1. With <code>tracemalloc</code>, measure 100,000 users' permissions stored three ways: a set of strings each, a Python int each, and one <code>array("Q")</code> of 64-bit words. Scale to a million users. Then time "how many users have both <code>deploy</code> and <code>billing</code>?" for each. Which of the three would you put behind an API, and what would you put in the database column?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>11. Say it out loud</h4>
+  <p>Set a 3-minute timer. Explain to an imaginary interviewer: why <code>x &amp; (x - 1)</code> clears the lowest set bit, how that gives popcount and the power-of-two test, and why Python needs <code>&amp; 0xFFFFFFFF</code> where C doesn't. Did you use an example with real bits, and mention the 0 edge case?</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="greedy.html"><small>← Previous</small>Greedy algorithms and how to argue correctness</a>
+  <a class="next" href="string-algorithms.html"><small>Next →</small>Finding a needle fast</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const bin = (v, w) => (v >>> 0).toString(2).padStart(w, "0").slice(-w);
+
+  // A row of bit cells, highest bit on the left. cls(i, bit) -> class; top(i) -> label above.
+  function bitRow(v, w, o = {}) {
+    const kids = [];
+    for (let i = w - 1; i >= 0; i--) {
+      const b = (v >> i) & 1;
+      const attrs = { class: "cell " + (o.cls ? o.cls(i, b) : b ? "hl" : ""), style: `min-width:${o.minw || 30}px;padding:0 ${(o.minw || 30) < 30 ? 2 : 4}px` };
+      if (o.click) Object.assign(attrs, { role: "button", tabindex: 0, "aria-label": `bit ${i}: ${b}`, style: attrs.style + ";cursor:pointer",
+        onclick: () => o.click(i), onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); o.click(i); } } });
+      kids.push(V.el("div", attrs, o.top ? V.el("span", { class: "ptr" }, o.top(i)) : null, o.char ? o.char(i, b) : String(b),
+        o.idx === false ? null : V.el("span", { class: "idx" }, o.idx ? o.idx(i) : i)));
+    }
+    return V.el("div", { class: "cells" + (o.top ? " with-ptrs" : ""), style: "gap:3px" }, kids);
+  }
+  const labeled = (label, row) => V.el("div", { style: "display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;margin:4px 0" },
+    V.el("span", { class: "small muted", style: "width:78px;flex:none;font-family:var(--mono)" }, label), row);
+
+  // ---------- Light switches (section 2) ----------
+  (function () {
+    const W = 8; let v = 13;
+    function render(msg) {
+      $("sw-bits").replaceChildren(bitRow(v, W, { top: (i) => String(1 << i), click: (i) => { v ^= 1 << i; render(`Flipped the ${1 << i}s switch ${(v >> i) & 1 ? "on" : "off"}.`); } }));
+      const parts = []; for (let i = W - 1; i >= 0; i--) if ((v >> i) & 1) parts.push(1 << i);
+      $("sw-msg").innerHTML = (msg ? msg + " " : "") + `<code>${bin(v, W)}</code> = ${parts.length ? parts.join(" + ") : "nothing on"} = <b>${v}</b> · hex <code>0x${v.toString(16).padStart(2, "0")}</code>`;
+    }
+    $("sw-inc").onclick = () => {
+      let t = 0; while ((v >> t) & 1 && t < W) t++;
+      const old = v; v = (v + 1) & 255;
+      render(old === 255 ? "All eight were on: every one flips off and the carry falls off the left end. 255 + 1 rolled over to 0." :
+        t ? `The lowest ${t} switch${t > 1 ? "es were" : " was"} on: ${t > 1 ? "they all flip" : "it flips"} off and the carry turns on the ${1 << t}s switch.` : "The 1s switch was off: it just turns on.");
+    };
+    $("sw-shl").onclick = () => { const lost = (v >> 7) & 1; v = (v << 1) & 255; render(lost ? "Every switch slid left; the top one fell off the end (8 bits can't hold it)." : "Every switch slid one place left: each is now worth double, so the number doubled."); };
+    $("sw-shr").onclick = () => { const lost = v & 1; v >>= 1; render(lost ? "Every switch slid right and the 1s switch fell off: halved, rounding down." : "Every switch slid one place right: the number halved."); };
+    $("sw-clr").onclick = () => { v = 0; render("All off: 0."); };
+    render("");
+  })();
+
+  // ---------- Odometer wheel (section 3) ----------
+  (function () {
+    const svg = $("odo-svg"), N = 16, C = 170, R = 112; let cur = 0;
+    const signed = (k) => (k >= 8 ? k - 16 : k);
+    function draw(msg) {
+      const s = $("odo-read").value === "s";
+      svg.replaceChildren();
+      const at = (k, r) => { const a = -Math.PI / 2 + (k * 2 * Math.PI) / N; return [C + r * Math.cos(a), C + r * Math.sin(a)]; };
+      svg.append(V.s("circle", { cx: C, cy: C, r: R, fill: "none", stroke: "var(--border-strong)", "stroke-width": 1.4 }));
+      // The overflow seam: between 7 and 8 when signed, between 15 and 0 when unsigned.
+      const seam = s ? 7.5 : 15.5, [x1, y1] = at(seam, R - 26), [x2, y2] = at(seam, R + 30);
+      svg.append(V.s("line", { x1, y1, x2, y2, stroke: "var(--bad)", "stroke-width": 2.4, "stroke-dasharray": "5 4" }));
+      const [lx, ly] = at(seam, R - 44);
+      svg.append(V.s("text", { x: lx, y: ly, class: "label", "text-anchor": "middle", "dominant-baseline": "central", style: "fill:var(--bad)", text: "jump" }));
+      for (let k = 0; k < N; k++) {
+        const [x, y] = at(k, R), [tx, ty] = at(k, R + 38);
+        svg.append(V.s("text", { x: tx, y: ty, class: "label", "text-anchor": "middle", "dominant-baseline": "central", style: k === cur ? "fill:var(--accent);font-weight:700" : "", text: bin(k, 4) }));
+        svg.append(V.s("g", { class: "node " + (k === cur ? "hl" : (s ? k >= 8 : false) ? "warn" : "") }, V.s("circle", { cx: x, cy: y, r: 16 }), V.s("text", { x, y, text: String(s ? signed(k) : k) })));
+      }
+      svg.append(V.s("text", { x: C, y: C - 10, "text-anchor": "middle", style: "fill:var(--text-strong);font-size:22px;font-weight:700", text: bin(cur, 4) }));
+      svg.append(V.s("text", { x: C, y: C + 16, "text-anchor": "middle", class: "label", style: "font-size:13px", text: `= ${s ? signed(cur) : cur}${s ? " signed" : " unsigned"}` }));
+      $("odo-msg").innerHTML = msg || `<code>${bin(cur, 4)}</code> means <b>${signed(cur)}</b> signed, <b>${cur}</b> unsigned. Same switches, two readings.`;
+    }
+    const step = (d) => {
+      const old = cur; cur = (cur + d + N) % N; const s = $("odo-read").value === "s";
+      let m = `<code>${bin(old, 4)}</code> ${d > 0 ? "+" : "−"} 1 = <code>${bin(cur, 4)}</code>: `;
+      if (s && old === 7 && d > 0) m += "<b>overflow</b>. 7 + 1 wrapped to −8: the biggest signed 4-bit value rolls over to the most negative.";
+      else if (s && old === 8 && d < 0) m += "<b>overflow</b> the other way: −8 − 1 wrapped to 7.";
+      else if (old === 15 && d > 0) m += s ? "−1 + 1 = 0. All four switches flip off and the carry falls off the left end, like 999 + 1 on an odometer." : "<b>overflow</b>: 15 + 1 wrapped to 0, the carry fell off the end.";
+      else if (old === 0 && d < 0) m += s ? "0 − 1 rolls back to all ones, which is −1. That's the odometer showing 999." : "<b>overflow</b>: 0 − 1 wrapped to 15.";
+      else m += `${s ? signed(old) : old} ${d > 0 ? "+" : "−"} 1 = <b>${s ? signed(cur) : cur}</b>.`;
+      draw(m);
+    };
+    $("odo-inc").onclick = () => step(1); $("odo-dec").onclick = () => step(-1);
+    $("odo-read").onchange = () => draw();
+    draw();
+  })();
+
+  // ---------- Operator playground (section 4) ----------
+  (function () {
+    const W = 8; let a = 0b11001010, b = 0b10101100;
+    const rule = { and: "AND: 1 only where <b>both</b> are 1.", or: "OR: 1 where <b>either</b> is 1.", xor: "XOR: 1 where they <b>differ</b>. Read b as a row of flip switches: each 1 in b flips a's bit.",
+      not: "NOT: every bit of a flipped. (Shown in 8 bits. Python's ~a is the negative number −a − 1; section 9 explains.)", shl: "Shift left: every bit slides one place left, a 0 comes in on the right. Doubles a (the top bit falls off in 8 bits).", shr: "Shift right: every bit slides one place right, the lowest bit falls off. Halves a, rounding down." };
+    const sym = { and: "&", or: "|", xor: "^" };
+    function draw() {
+      const op = $("ops-op").value, usesB = op in sym;
+      const r = op === "and" ? a & b : op === "or" ? a | b : op === "xor" ? a ^ b : op === "not" ? ~a & 255 : op === "shl" ? (a << 1) & 255 : a >> 1;
+      $("ops-rows").replaceChildren(
+        labeled("a", bitRow(a, W, { idx: false, click: (i) => { a ^= 1 << i; draw(); } })),
+        labeled("b", bitRow(b, W, { idx: false, cls: (i, x) => (!usesB ? "dim" : x ? "hl" : ""), click: (i) => { b ^= 1 << i; draw(); } })),
+        labeled(usesB ? `a ${sym[op]} b` : op === "not" ? "~a" : op === "shl" ? "a << 1" : "a >> 1", bitRow(r, W, { cls: (i, x) => (x ? "done" : "") })));
+      const expr = usesB ? `${bin(a, W)} ${sym[op]} ${bin(b, W)} = ${bin(r, W)}` : `${op === "not" ? "~" : ""}${bin(a, W)}${op === "shl" ? " << 1" : op === "shr" ? " >> 1" : ""} = ${bin(r, W)}`;
+      $("ops-msg").innerHTML = `${rule[op]}<br><code>${expr}</code> (a = ${a}${usesB ? ", b = " + b : ""}, answer = <b>${r}</b>)`;
+    }
+    $("ops-op").onchange = draw; draw();
+  })();
+
+  // ---------- Popcount two ways (section 6) ----------
+  (function () {
+    const W = 12;
+    function frames(x0, method) {
+      const fr = []; let x = x0, count = 0;
+      if (method === "k") {
+        fr.push({ rows: [["x", x, () => ""]], msg: `x = <code>${bin(x, W)}</code>. Each round deletes the lowest 1 with x &amp; (x − 1).` });
+        while (x) {
+          const y = x - 1, low = x & -x, nx = x & y; count++;
+          fr.push({ rows: [["x", x, (i) => ((x ^ y) >> i) & 1 ? "cmp" : ""], ["x − 1", y, (i) => ((x ^ y) >> i) & 1 ? "cmp" : ""]],
+            msg: `x − 1 borrows: the lowest 1 (bit ${Math.log2(low)}) becomes 0 and the ${Math.log2(low)} zero${Math.log2(low) === 1 ? "" : "s"} below it become 1s. The yellow bits are the only ones that changed.` });
+          fr.push({ rows: [["x", x, (i) => (i === Math.log2(low) ? "bad" : "")], ["x & (x−1)", nx, () => ""]],
+            msg: `AND keeps a bit only where x and x − 1 agree, so every yellow bit drops out: bit ${Math.log2(low)} is deleted. Round <b>${count}</b>, count = ${count}.` });
+          x = nx;
+        }
+        fr.push({ rows: [["x", 0, () => "dim"]], msg: `x is 0 after <b>${count}</b> round${count === 1 ? "" : "s"}: ${count} one${count === 1 ? "" : "s"}. Checking every position would take ${W} steps.${count === 1 ? " One round to reach 0 means x had a single 1: a power of two." : ""}` });
+      } else {
+        fr.push({ rows: [["x", x0, () => ""]], msg: `x = <code>${bin(x0, W)}</code>. Check bit 0, then bit 1, and so on.` });
+        for (let i = 0; i < W; i++) {
+          const b = (x0 >> i) & 1; count += b;
+          fr.push({ rows: [["x", x0, (j) => (j === i ? (b ? "done" : "cmp") : j < i ? "dim" : "")]], msg: `Step ${i + 1}: bit ${i} is ${b}. count = ${count}.` });
+        }
+        fr[fr.length - 1].msg = `Done after <b>${W}</b> steps, one per position, to find ${count} one${count === 1 ? "" : "s"}. On a 64-bit number it would be up to 64 steps whatever the count.`;
+      }
+      return fr;
+    }
+    const player = V.player($("pc-player"), { speed: 900, draw(f, stage) { f.rows.forEach(([l, v, c]) => stage.append(labeled(l, bitRow(v, W, { minw: 20, cls: (i, b) => c(i) || (b ? "hl" : "") })))); } });
+    const go = () => player.load(frames(Number($("pc-x").value), $("pc-m").value));
+    $("pc-x").onchange = go; $("pc-m").onchange = go; go();
+  })();
+
+  // ---------- Subsets and submasks (section 8) ----------
+  (function () {
+    function frames(mode) {
+      const fr = [];
+      if (mode === "all") {
+        const names = ["ham", "cheese", "olive"];
+        for (let m = 0; m < 8; m++) {
+          const pick = names.filter((_, i) => (m >> i) & 1);
+          fr.push({ rows: [["mask", m, 3, (i, b) => (b ? "done" : "")]], names, minw: 56, msg: `mask = ${m} = <code>${bin(m, 3)}</code> → {${pick.join(", ")}}. ${m === 7 ? "All 8 subsets, each exactly once, in 8 steps: 2<sup>3</sup>." : "+1 for the next one."}` });
+        }
+      } else {
+        const mask = 0b10110, names = ["A", "B", "C", "D", "E"], inM = (i) => (mask >> i) & 1;
+        let s = mask, n = 0;
+        const set = (v) => "{" + names.filter((_, i) => (v >> i) & 1).join(", ") + "}";
+        fr.push({ rows: [["mask", mask, 5, (i, b) => (!inM(i) ? "dim" : b ? "hl" : "")]], names, msg: `mask = <code>10110</code> = {B, C, E}. Start with s = mask, the biggest submask.` });
+        while (true) {
+          n++;
+          fr.push({ rows: [["s", s, 5, (i, b) => (!inM(i) ? "dim" : b ? "done" : "")]], names, msg: `Submask ${n}: s = <code>${bin(s, 5)}</code> = ${set(s)}.` });
+          if (s === 0) break;
+          const t = s - 1, ns = t & mask;
+          fr.push({ rows: [["s − 1", t, 5, (i, b) => (!inM(i) ? (b ? "bad" : "dim") : b ? "cmp" : "")], ["& mask", ns, 5, (i, b) => (!inM(i) ? "dim" : b ? "done" : "")]], names,
+            msg: `s − 1 = <code>${bin(t, 5)}</code>${(t & ~mask & 31) ? ": red 1s landed outside the mask" : ""}. AND with the mask keeps only real wheels: next s = <code>${bin(ns, 5)}</code>.` });
+          s = ns;
+        }
+        fr[fr.length - 1].msg = `s = 0 = {}: done. <b>${n}</b> submasks = 2<sup>3</sup>, because the mask has 3 bits. Counting 22, 21, …, 0 and filtering would test 23 numbers; with 3 bits spread over 60 positions it would be 2<sup>60</sup>.`;
+      }
+      return fr;
+    }
+    const player = V.player($("sub-player"), { speed: 1000, draw(f, stage) {
+      f.rows.forEach(([l, v, w, c]) => stage.append(labeled(l, bitRow(v, w, { cls: c, idx: (i) => f.names[i], minw: f.minw }))));
+    } });
+    const go = () => player.load(frames($("sub-mode").value));
+    $("sub-mode").onchange = go; go();
+  })();
+})();
+</script>
+</body>
+</html>

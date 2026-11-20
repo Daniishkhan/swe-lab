@@ -402,7 +402,7 @@ def estimate(rows, item):
   <ul>
     <li><b>Conservative update</b> (Estan and Varghese, 2002): on an add, only raise the counters that need it: each of the item's counters becomes max(counter, old estimate + count). The estimate never drops below the truth, and overcounting shrinks a lot on skewed streams. The price: the counters no longer handle decrements.</li>
     <li><b>Count Sketch</b> (Charikar, Chen and Farach-Colton, 2002): each row also hashes the item to +1 or −1 and adds that sign times the count; the estimate is the median over rows of (sign × counter). Pollution then cancels out on average instead of piling up, so estimates can be too low as well as too high.</li>
-    <li><b>Heavy hitters with k counters:</b> Misra-Gries and Space-Saving keep about k (item, count) pairs, with no hashing, and are guaranteed to keep every item that makes up more than N/k of the stream (a second pass can confirm the exact counts). A good answer when the question is only "who are the top k?".</li>
+    <li><b>Heavy hitters with k counters:</b> <a href="../../02-algorithms/concepts/streaming-external.html#s9">Misra-Gries</a> and Space-Saving keep about k (item, count) pairs, with no hashing, and are guaranteed to keep every item that makes up more than N/k of the stream (a second pass can confirm the exact counts). A good answer when the question is only "who are the top k?".</li>
     <li><b>Where it ships:</b> the RedisBloom module has a Count-Min Sketch (<code>CMS.INCRBY</code>, <code>CMS.QUERY</code>), Apache Spark can build one from a column (<code>df.stat.countMinSketch</code>), and network gear uses the same idea to find heavy flows at line rate.</li>
   </ul>
 </details>
