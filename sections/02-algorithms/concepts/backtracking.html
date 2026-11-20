@@ -10,174 +10,894 @@
   <script src="../../../assets/curriculum.js"></script>
   <script src="../../../assets/viz.js"></script>
   <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
 </head>
 <body data-root="../../.." data-section="02" data-page="concept">
-<main class="content">
-  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.06 · Recursion and backtracking (permutations, subsets, constraint search)</p>
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 6</div>
   <h1>Recursion and backtracking</h1>
-  <p class="lede">Backtracking is a depth-first walk through a tree of choices that you never actually build. Choose, explore, un-choose. The skill is seeing the tree, and cutting branches before you walk them.</p>
-  <details class="box accent" open id="idea">
-    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
-    <div class="box-body">
-      <p class="one-liner">Make one choice, recurse on the smaller problem, then undo the choice and try the next one. Pruning (abandoning a partial solution that can't succeed) is what makes exponential search finish in practice.</p>
-    </div>
-  </details>
+  <div class="meta"><span><span class="badge P0">P0</span> asked almost everywhere</span><span>about 55 minutes</span><span>10 quick checks · 9 exercises</span></div>
+</header>
 
-  <details class="box" open id="first-principles">
-    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
-    <div class="box-body">
-      <h3>1. Recursion is delegation with a contract</h3>
-      <p>A recursive function says: "I'll solve this size-n problem by trusting myself to solve a smaller one." You need a <b>base case</b> (small enough to answer directly) and <b>progress</b> (every call gets closer to it). Don't trace the whole call tree in your head. Trust the contract, which is the "leap of faith" that makes recursion manageable.</p>
-      <h3>2. The decision tree</h3>
-      <p>Subsets of [1, 2, 3]: at each level, decide "include this element or not". That's a binary tree of depth 3 with 2³ = 8 leaves, one per subset. Permutations: level k picks which unused element goes in position k, giving n! leaves. Draw the tree first; the code follows from it.</p>
-      <h3>3. The template</h3>
-      <pre><code>def backtrack(path, choices):
-    if is_complete(path):
-        results.append(path.copy())   # copy! path keeps changing
-        return
-    for c in choices:
-        if not valid(path, c):        # prune
+<p>Some questions want <em>every</em> answer: every subset of a list, every ordering, every way to fill a board without breaking a rule. You can't write those with a fixed number of loops, because the number of choices is only known when the code runs. Recursion solves that, and backtracking is the search built on top of it. Interviewers like these problems because the template is short but the bugs are subtle, and the running time grows faster than people guess.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Write a recursive function by naming its base case and its smaller problem, and trace its call stack.</li>
+    <li>Draw the decision tree for subsets, permutations and combinations, and count its leaves: 2<sup>n</sup>, n! and C(n, k).</li>
+    <li>Write choose → explore → un-choose from memory, and explain why you save a <em>copy</em> of the path.</li>
+    <li>Prune branches that break a rule, can't reach the goal, or repeat a branch you've already explored.</li>
+    <li>Estimate the cost as nodes × work per node, and say when to switch to dynamic programming.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom. It builds on <a href="complexity.html">How fast is your code?</a> (2<sup>n</sup> and n! growth) and <a href="bfs-dfs.html">Exploring graphs</a> (depth-first search). Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: loops you can't write</h2>
+
+<div class="story">
+  <p>Your app has 3 feature flags, each on or off. Before every release, QA tests each combination: 2 × 2 × 2 = 8 configurations. You write three nested loops, and it works.</p>
+  <p>Next sprint a fourth flag ships, so you add a fourth loop. Then a fifth. Then product adds a rule: <code>dark_mode</code> and <code>legacy_ui</code> can never both be on. And the release manager wants every <em>order</em> in which to turn on 6 flags, one per day: 720 orders, which as loops means 6 nested loops, each checking that its flag isn't already taken.</p>
+</div>
+
+<pre><code>configs = []
+for a in (False, True):
+    for b in (False, True):
+        for c in (False, True):          # one loop per flag...
+            configs.append((a, b, c))    # ...so 6 flags need 6 loops</code></pre>
+
+<p>The trouble isn't speed. It's shape. <b>The number of loops is fixed when you write the code, but the number of flags is only known when it runs.</b> What we want to say is "decide flag 1, then do the same thing for the rest". A function that calls itself can say exactly that.</p>
+
+<p>The numbers also warn us. 10 flags give 1,024 configurations, 20 give 1,048,576, 30 give over a billion. So we need two things: a way to walk through every choice, and a way to <em>skip</em> choices that can't work, like any configuration with both <code>dark_mode</code> and <code>legacy_ui</code> on.</p>
+
+<div class="check" id="check-problem">
+  <p class="q">The list of flags comes from a config file. What stops you from writing "every on/off combination" with for-loops?</p>
+  <div class="opts">
+    <button>Nested loops are O(n²), which is too slow</button>
+    <button data-correct>You need one loop per flag, and you don't know how many flags there are until the program runs</button>
+    <button>A loop can't skip combinations that break a rule</button>
+  </div>
+  <div class="fb right"><p>Right. Each flag needs its own level of looping, and code has a fixed number of levels. Recursion gives you one more level on demand: each call handles one flag and calls itself for the rest.</p></div>
+  <div class="fb wrong"><p>Count the loops, not the steps. Three flags need three nested loops; seven flags need seven. The loops aren't slow (any method has to produce all 2<sup>n</sup> combinations), and a loop can skip things with <code>continue</code>. The problem is that you'd need a different program for every number of flags. A function that handles one flag and calls itself for the remaining ones works for any count.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Recursion: a smaller copy of the same problem</h2>
+
+<p>You're in a long line at a cinema and want to know your position. You can't see the front, so you ask the person ahead of you. They don't know either, so they ask the person ahead of <em>them</em>, and so on, until the question reaches the first person, who knows without asking: "1". Each person then adds 1 and passes the answer back.</p>
+
+<p>That's <b>recursion</b>: a function that solves a problem by calling itself on a smaller version of the same problem. It has two parts:</p>
+<ul>
+  <li>A <b>base case</b>: an input small enough to answer directly. (The first person in line.)</li>
+  <li>A <b>recursive case</b>: shrink the problem, call yourself on the smaller one, and build your answer from its answer. (Ask the person ahead, add 1.)</li>
+</ul>
+
+<pre><code>def total(nums):
+    if not nums:                      # base case: an empty list adds up to 0
+        return 0
+    return nums[0] + total(nums[1:])  # first number + the total of the rest</code></pre>
+
+<p><b>Trust the recursive call.</b> Don't trace <code>total(nums[1:])</code> all the way down in your head; that's how people get lost. Assume it returns the right total for the shorter list, and check only two things: the base case is right (an empty list sums to 0), and every call moves toward it (<code>nums[1:]</code> is one shorter). If both hold, it works for every length: it works for 0, and whenever it works for one length it works for the next. That argument is <b>induction</b>, and it's why recursion is safe to trust. (One cost note: <code>nums[1:]</code> copies the rest of the list each time, about 500,000 item copies for 1,000 numbers. Passing an index avoids it.)</p>
+
+<div class="keyidea">A recursive function needs a base case it can answer directly, and a step that shrinks the problem and trusts the call to solve the smaller version. Check those two things; don't trace the whole chain in your head.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: handing off to an assistant</summary>
+  <p>You're asked to add up 100 receipts. You keep the top one, hand the other 99 to an assistant ("add these up and tell me"), and add your receipt to whatever they say. You don't care how they do it. They do the same with 98, and so on, until someone is handed an empty stack and says "0" without asking anyone. The trust is only safe because the stack really gets smaller each time, and someone really does get the empty stack.</p>
+</details>
+
+<div class="check" id="check-base">
+  <p class="q">This counts how many times you can halve n before reaching 1. <code>halvings(8)</code> returns 3. What does <code>halvings(0)</code> do?</p>
+<pre><code>def halvings(n):
+    if n == 1:
+        return 0
+    return 1 + halvings(n // 2)</code></pre>
+  <div class="opts">
+    <button>Returns 0</button>
+    <button>Returns 1</button>
+    <button data-correct>Never reaches the base case, and crashes with RecursionError</button>
+  </div>
+  <div class="fb right"><p>Right. 0 // 2 is 0, so <code>halvings(0)</code> calls <code>halvings(0)</code> forever. The input never shrinks, so the base case is never reached, and Python stops it after about 1,000 calls. The fix is a base case every input can reach: <code>if n &lt;= 1</code>.</p></div>
+  <div class="fb wrong"><p>Apply the two checks. Does the input shrink? From 0, the next call is <code>halvings(0 // 2)</code>, which is <code>halvings(0)</code> again. Nothing ever returns, so nothing can come back as 0 or 1. Python gives up with a RecursionError after about 1,000 nested calls. "Every call moves toward the base case" has to hold for every input, not just the ones you tried.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>The call stack: where paused calls wait</h2>
+
+<p>When <code>total([3, 1, 4])</code> calls <code>total([1, 4])</code>, the first call isn't finished. It's paused halfway through <code>3 + total(...)</code>, waiting. Every call gets a <b>frame</b>: a small record of its own local variables (its own <code>nums</code>) and where to continue. Frames pile up on the <b>call stack</b> like plates. Only the top one runs. When it returns, its frame is thrown away and the one below wakes up with the answer.</p>
+
+<div class="figure">
+  <div id="stack-player"></div>
+  <div class="cap">The call stack for <code>total([3, 1, 4])</code>, newest frame on top. Blue is the call that's running; the ones below are paused, each with its own <code>nums</code>. Step with ▶| and watch it grow to 4 frames, then shrink as the answers come back.</div>
+</div>
+
+<ul>
+  <li><b>Memory is set by depth, not by the number of calls.</b> A list of n numbers needs n + 1 frames at the deepest point.</li>
+  <li><b>Depth has a hard limit.</b> Python allows about 1,000 frames (<code>sys.getrecursionlimit()</code> returns 1000); go deeper and you get a <code>RecursionError</code>. Backtracking trees are usually shallow (their depth is the number of choices, like 20 flags), so this rarely bites them. It does bite recursion over long lists, or a recursive DFS down a graph path of 5,000 nodes.</li>
+</ul>
+
+<div class="keyidea">Every call that hasn't returned has a frame on the stack with its own local variables. Memory is set by the deepest chain of waiting calls, and Python caps that chain at about 1,000.</div>
+
+<div class="check" id="check-stack">
+  <p class="q">You call the recursive <code>total</code> on a list of 10,000 numbers. What happens?</p>
+  <div class="opts">
+    <button>It works like a loop, just a bit slower</button>
+    <button data-correct>RecursionError: it needs about 10,000 frames at once, and Python allows about 1,000</button>
+    <button>It runs forever, because the list is too long to reach the base case</button>
+  </div>
+  <div class="fb right"><p>Right. Every number adds a paused call, and none can finish until the empty list is reached, so all 10,001 frames exist at the same moment: ten times the limit. For plain list processing, use a loop. Recursion earns its keep when the depth is small and the branching is the hard part.</p></div>
+  <div class="fb wrong"><p>Picture the plates. <code>total</code> of 10,000 numbers can't finish until <code>total</code> of 9,999 does, which can't finish until… so all 10,001 calls are on the stack at once. The base case <em>would</em> be reached (the list does shrink), but Python stops at about 1,000 plates and raises RecursionError long before that.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: raising the limit, or using your own stack</summary>
+  <p><code>sys.setrecursionlimit</code> raises Python's counter, but frames also use the real thread stack, and set too high the interpreter can crash outright. Python has no tail-call optimization either. The robust fix is a loop with a list you manage as the stack, each entry holding what a frame would hold. Here is the take-or-skip search from the next section that way:</p>
+<pre><code>def subsets_iterative(items):
+    result, stack = [], [(0, [])]           # (next index, path so far)
+    while stack:
+        i, path = stack.pop()
+        if i == len(items):
+            result.append(path)
             continue
-        path.append(c)                # choose
-        backtrack(path, next_choices) # explore
-        path.pop()                    # un-choose</code></pre>
-      <h3>4. Pruning is where the speed comes from</h3>
-      <p>N-queens: placing queens row by row and checking columns and diagonals with sets cuts 8-queens from 16.7 million raw placements to about 2,000 visited nodes. Sudoku, combination sum with a sorted list ("stop once the remaining candidates are too big"), and word search all live or die by pruning.</p>
-      <h3>5. When the tree has repeated subtrees, it's DP</h3>
-      <p>If different paths lead to the <em>same</em> subproblem (same index, same remaining sum), cache the result. That's memoization, and it's the bridge to the next page.</p>
-    </div>
-  </details>
+        stack.append((i + 1, path))               # skip items[i]
+        stack.append((i + 1, path + [items[i]]))  # take items[i] (popped first)
+    return result</code></pre>
+  <p>No list is ever changed after it's made (taking an item builds a new one), so nothing needs undoing, at the price of a copy per take. Section 4 explains that trade-off.</p>
+</details>
 
-  <details class="box analogy" open id="analogy">
-    <summary><span class="kicker">Intuition</span><span class="label">Analogy: a choose-your-own-adventure book</span></summary>
-    <div class="box-body">
-      <p>At each page you pick an option and turn to it. When you hit a bad ending, you flip back to the last choice and take the other option. Your finger holding the earlier page is the call stack. <b>Un-choosing</b> is flipping back. Pruning is noticing "this path leads into the dragon's cave" and not reading it at all.</p>
-    </div>
-  </details>
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>The decision tree, and choose → explore → un-choose</h2>
 
-  <details class="box viz" open id="see-it">
-    <summary><span class="kicker">See it</span><span class="label">Playground: the decision tree for subsets</span></summary>
-    <div class="box-body">
-      <p class="small muted">Each level decides one element: left = skip it, right = take it. The highlighted path is the current call stack; leaves are emitted subsets. Turn on pruning with a target sum to see branches cut early.</p>
-      <div class="viz-controls">
-        <span class="small">elements</span><input id="bt-in" type="text" value="2, 3, 5, 7" style="width:9em">
-        <label class="small"><input type="checkbox" id="bt-prune"> only subsets with sum ≤</label><input id="bt-cap" type="number" value="8" style="width:5em">
-        <button class="btn" id="bt-go">Run</button>
-      </div>
-      <div id="bt-player" style="margin-top:12px"></div>
-    </div>
-  </details>
+<p>This is the most important section of the chapter. Everything after it is the same idea with a different kind of choice.</p>
 
-  <details class="box" open id="costs">
-    <summary><span class="kicker">Costs</span><span class="label">How big are these trees?</span></summary>
-    <div class="box-body">
-      <div class="table-wrap"><table>
-        <thead><tr><th>Problem</th><th>Leaves</th><th>Total time</th><th>Practical n</th></tr></thead>
-        <tbody>
-          <tr><td>Subsets</td><td>2ⁿ</td><td>O(n · 2ⁿ)</td><td>~20</td></tr>
-          <tr><td>Permutations</td><td>n!</td><td>O(n · n!)</td><td>~9–10</td></tr>
-          <tr><td>Combinations C(n, k)</td><td>C(n, k)</td><td>O(k · C(n, k))</td><td>depends on k</td></tr>
-          <tr><td>N-queens</td><td>≤ n!</td><td>heavily pruned</td><td>~12–14 in Python</td></tr>
-        </tbody>
-      </table></div>
-      <p class="small muted">Space: O(depth) for the call stack and path, plus the output itself. The extra factor of n in time comes from copying each complete path.</p>
-    </div>
-  </details>
+<h3>Every answer is a path</h3>
+<p>Call the flags items 1, 2 and 3. Building one configuration is a series of decisions: take item 1 or skip it, then item 2, then item 3. Draw every possible series and you get a tree:</p>
 
-  <details class="box senior" open id="interview">
-    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
-    <div class="box-body">
-      <ul>
-        <li><b>Draw a small tree before coding</b> and point at what each level decides. Interviewers love seeing the structure first.</li>
-        <li><b>Handle duplicates by sorting and skipping</b>: <code>if i &gt; start and nums[i] == nums[i-1]: continue</code>. Explain that it prevents identical sibling branches.</li>
-        <li><b>State the complexity honestly:</b> it's exponential, and that's fine when n is small. Show where pruning helps without claiming it changes the worst case.</li>
-        <li><b>Production relevance:</b> constraint solvers, schedulers, config validators, regex engines (catastrophic backtracking is a real outage cause: ReDoS), and search over plans in AI agents.</li>
-      </ul>
-    </div>
-  </details>
+<pre class="diagram"><code>                                   []
+                         +1/                  \−1
+                 [1]                                 []
+            +2/         \−2                     +2/         \−2
+       [1,2]              [1]               [2]               []
+     +3/    \−3        +3/    \−3        +3/    \−3        +3/    \−3
+ [1,2,3]   [1,2]    [1,3]     [1]     [2,3]     [2]      [3]      []</code></pre>
+<p class="small muted">+2 means "take item 2", −2 means "skip item 2". Each node shows the path so far.</p>
 
-  <details class="box trap" open id="traps">
-    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
-    <div class="box-body">
-      <ul>
-        <li>Appending <code>path</code> instead of <code>path.copy()</code>: every result ends up as the same (empty) list.</li>
-        <li>Forgetting to un-choose (pop, or remove from the used set) after the recursive call.</li>
-        <li>Missing base case or no progress: infinite recursion.</li>
-        <li>Mutable default arguments (<code>def f(path=[])</code>) leaking state across calls.</li>
-      </ul>
-    </div>
-  </details>
+<p>Each <b>level</b> is one decision. Each <b>node</b> is a partial answer. Each <b>leaf</b> (a node with nothing left to decide) is one complete answer, spelled out by the path from the root down to it. Every level doubles the node count, so n decisions give <b>2<sup>n</sup> leaves</b> and 2<sup>n+1</sup> − 1 nodes: 8 subsets from 15 nodes for 3 items, 1,048,576 from 2,097,151 for 20.</p>
+<p><b>Backtracking is a depth-first walk of this tree.</b> It's the DFS from the last chapter with one twist: the tree is never stored. Each node exists only while you stand on it, as the current contents of one list.</p>
 
-  <details class="box" open id="check">
-    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
-    <div class="box-body">
-      <details class="qa"><summary>Subsets: "include/exclude" tree vs "for i in range(start, n)" loop. What's the difference?</summary><p>Same subsets, different tree shapes. Include/exclude makes a binary tree where every leaf is a subset. The loop version emits a subset at <em>every node</em>, where each node picks the next element to add, which naturally avoids duplicates and handles combinations.</p></details>
-      <details class="qa"><summary>How do you generate permutations without a "used" array?</summary><p>Swap-based: for position k, swap each later element into position k, recurse on k + 1, then swap back.</p></details>
-      <details class="qa"><summary>When should you stop backtracking and switch to DP?</summary><p>When the state of a subproblem (index, remaining capacity…) is small and repeats across branches. Then caching the answer turns exponential work into (number of states × work per state).</p></details>
-    </div>
-  </details>
+<h3>Walking the tree with one shared list</h3>
+<p>We keep one list, <code>path</code>, holding the choices from the root to where we stand. Three moves at every node:</p>
+<ol>
+  <li><b>Choose:</b> change <code>path</code> to make one choice.</li>
+  <li><b>Explore:</b> recurse to make the remaining choices.</li>
+  <li><b>Un-choose:</b> undo exactly that change, so <code>path</code> is back to what it was before you chose.</li>
+</ol>
 
-  <details class="box" open id="practice">
-    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
-    <div class="box-body">
-      <p><b>Exercise:</b> <code>exercises/backtracking.py</code>: subsets, permutations, and n-queens count.</p>
-      <p><b>Classic problems:</b> Subsets II · Combination Sum · Letter Combinations of a Phone Number · Palindrome Partitioning · Word Search · Sudoku Solver.</p>
-    </div>
+<pre><code>def subsets(items):
+    result, path = [], []
+    def explore(i):                  # decide items[i]
+        if i == len(items):          # nothing left to decide: a leaf
+            result.append(path[:])   # save a COPY of the path
+            return
+        path.append(items[i])        # choose: take items[i]
+        explore(i + 1)               # explore everything that includes it
+        path.pop()                   # un-choose: path is as it was
+        explore(i + 1)               # explore everything that skips it
+    explore(0)
+    return result</code></pre>
+
+<div class="figure">
+  <div id="tree-player"></div>
+  <div class="cap">The code above on <code>[1, 2, 3]</code>. Blue is the node you're on, blue edges are the current path, green nodes are finished. Watch <code>path</code> grow on the way down and shrink on the way back. Then switch the menu to <b>save path (the bug)</b> and play it again: every saved entry changes at once.</div>
+</div>
+
+<div class="keyidea">Backtracking is a depth-first walk of the decision tree with one shared <code>path</code>. Choose (change the path), explore (recurse), un-choose (undo that exact change). At a leaf, save a copy.</div>
+
+<h3>Why un-choose?</h3>
+<p>Because there's only one <code>path</code> for the whole search. After the leaf [1, 2, 3], the code must visit [1, 2]: the same path <em>without</em> the 3. Delete the <code>pop()</code> and every branch inherits whatever earlier branches added. On <code>[1, 2, 3]</code> you get:</p>
+<pre class="plain"><code>[[1,2,3], [1,2,3], [1,2,3,3], [1,2,3,3], [1,2,3,3,2,3], [1,2,3,3,2,3], [1,2,3,3,2,3,3], [1,2,3,3,2,3,3]]</code></pre>
+<p>Un-choose is what makes "standing on a node" mean something: when you come back to a node, the shared state is exactly what it was when you left.</p>
+
+<h3>The classic bug: saving the path instead of a copy</h3>
+<p>Write <code>result.append(path)</code> instead of <code>result.append(path[:])</code>. A Python variable holds a <em>reference</em> to a list (an arrow pointing at it), not the items. So <code>result</code> ends up with 8 arrows to the same single list. That list keeps changing, and when the search ends every append has been popped, so you get <code>[[], [], [], [], [], [], [], []]</code>. <code>path[:]</code> (or <code>list(path)</code>) makes a snapshot that later changes can't touch. Copying up to n items at each leaf is part of the real cost (section 10).</p>
+
+<details class="aside another">
+  <summary>Explain it another way: a maze and a chalk line</summary>
+  <p>You explore a maze drawing a chalk line behind you. At a fork you pick a corridor (choose) and walk it (explore). At a dead end you walk back to the fork, <em>erasing the chalk as you go</em> (un-choose), and try the next corridor. The chalk always shows the route from the entrance to where you stand. At an exit, a photo of the chalk line records the route; a note saying "the route is the chalk line" doesn't, because the chalk will be erased. <code>path[:]</code> is the photo.</p>
+</details>
+
+<div class="check" id="check-copy">
+  <p class="q">A friend's code collects the subsets of <code>["a", "b"]</code> but prints <code>[[], [], [], []]</code>. Which line is the bug?</p>
+<pre><code>def explore(i):
+    if i == len(items):
+        result.append(path)        # line A
+        return
+    path.append(items[i])          # line B
+    explore(i + 1)
+    path.pop()                     # line C
+    explore(i + 1)</code></pre>
+  <div class="opts">
+    <button>Line C: popping removes the item from the saved subsets</button>
+    <button data-correct>Line A: it saves the one shared list, which is empty by the end; it should save <code>path[:]</code></button>
+    <button>Line B: it should append to <code>result</code>, not <code>path</code></button>
+  </div>
+  <div class="fb right"><p>Right. All four entries are the same list object, and by the end every append has been undone by a pop, so you see one empty list four times. Line C is correct and needed: without it the second branch would still hold the first branch's items.</p></div>
+  <div class="fb wrong"><p>Count the objects, not the lines. How many lists does this program make? One: <code>path</code>. Line A puts a reference to it into <code>result</code> four times. Line C does remove items, but from the shared list, and that's needed so the next branch starts clean; it only damages the results because they <em>are</em> the shared list. Line B is the choose step; it has to change <code>path</code>, or there'd be nothing to save. Save a snapshot at line A, <code>result.append(path[:])</code>, and later pops can't reach it.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: copying instead of undoing</summary>
+  <p>You can skip un-choose by passing a new list down: <code>explore(i + 1, path + [items[i]])</code>. No undo, no aliasing bug, but a copy of up to n items at every node instead of only at the leaves. For subsets that's still O(n · 2<sup>n</sup>), since the tree has about twice as many nodes as leaves, so it's fine in an interview if you name the trade-off. Undoing wins when the state is big: copying a sudoku grid is 81 writes, undoing one placement is 1.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Permutations: when order matters</h2>
+
+<p>Back to the release manager: turn on 6 flags, one per day, in every possible order. Now a choice isn't "take or skip" but "which flag goes <em>next</em>?". Day 1 has 6 options, day 2 the 5 left, and so on: 6! = 720 orders. An ordering of all the items is a <b>permutation</b>, and n items have <b>n!</b> of them.</p>
+
+<pre class="diagram"><code>                          []
+                 a/        |b       \c
+        [a]               [b]               [c]
+      b/   \c           a/   \c           a/   \b
+  [a,b]    [a,c]    [b,a]    [b,c]    [c,a]    [c,b]
+    |c       |b       |c       |a       |b       |a
+ [a,b,c]  [a,c,b]  [b,a,c]  [b,c,a]  [c,a,b]  [c,b,a]</code></pre>
+
+<p>The new question at every node is "which items are still free?". We keep a <code>used</code> list of booleans, one per input position, as part of the shared state:</p>
+
+<pre><code>def permutations(items):
+    result, path = [], []
+    used = [False] * len(items)          # used[i]: is items[i] already in path?
+    def explore():
+        if len(path) == len(items):      # every item placed: a leaf
+            result.append(path[:])
+            return
+        for i in range(len(items)):      # try each free item in the next spot
+            if used[i]:
+                continue
+            used[i] = True               # choose (two changes...)
+            path.append(items[i])
+            explore()                    # explore
+            path.pop()                   # un-choose (...so undo both)
+            used[i] = False
+    explore()
+    return result</code></pre>
+
+<ul>
+  <li><b>Un-choose undoes every change the choose made</b>, here two. Forget <code>used[i] = False</code> and that item is gone for the rest of the search.</li>
+  <li><b>Track positions, not values.</b> <code>if items[i] in path</code> seems to work, but it's O(n) per check, and with two equal values the second one looks "already used". <code>used[i]</code> is O(1) and doesn't care about values.</li>
+</ul>
+
+<p><b>Size:</b> 3 items give 6 leaves and 16 nodes; 4 give 24 and 65; 10 give 3,628,800 leaves and 9,864,101 nodes. The total is always about 2.718 × n! (e × n!). The last two levels have n! nodes each (once n − 1 items are placed, the last one is forced), so they hold about three quarters of the tree, and listing all permutations costs O(n · n!) with the copies.</p>
+
+<div class="keyidea">Permutations: each level picks the next item from the ones not used yet: n, then n − 1, then n − 2 choices, n! leaves. <code>used</code> is part of the state, so un-choose resets it along with <code>path</code>.</div>
+
+<div class="check" id="check-perms">
+  <p class="q">You delete the <code>if used[i]: continue</code> check and run the code on <code>[1, 2, 3]</code>. What comes out?</p>
+  <div class="opts">
+    <button>The same 6 permutations, just more slowly</button>
+    <button data-correct>27 lists, including [1, 1, 1] and [3, 3, 3]</button>
+    <button>It never stops, because nothing marks the end</button>
+  </div>
+  <div class="fb right"><p>Right. Every one of the 3 levels can now pick any of the 3 items: 3 × 3 × 3 = 27 sequences, repeats included. It still stops, because the base case is about the path's <em>length</em>, which still grows by one per level.</p></div>
+  <div class="fb wrong"><p>Ask what's still true. The base case still fires at 3 items and each level still adds one, so the search ends. What's gone is "each item only once": level 1 has 3 choices, level 2 has 3 again, level 3 has 3 again. That's 27 leaves instead of 3 × 2 × 1 = 6, and some are [1, 1, 1]. The branching shrinks by one per level <em>only</em> because of <code>used</code>.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: a bitmask as the used set</summary>
+  <p>The whole <code>used</code> list can be one integer: bit i is 1 when item i is used. Test with <code>mask &amp; (1 &lt;&lt; i)</code>, pass <code>explore(mask | (1 &lt;&lt; i))</code>, and there's nothing to un-choose, because each call gets its own integer. The bigger payoff: the mask is a small hashable summary of "which items are placed", so it can be a cache key. Visiting 15 cities in the best order has 15! = 1,307,674,368,000 orders, but only 2<sup>15</sup> × 15 = 491,520 pairs of (cities visited, current city). Caching by those pairs is dynamic programming, the next chapter.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Combinations: the start index</h2>
+
+<p>New request: pick 3 of your 10 engineers for an on-call rotation. Order doesn't matter now: {Ana, Bo, Cy} is one team however you list it. That's a <b>combination</b>. The permutation code stopped at 3 items gives 10 × 9 × 8 = 720 ordered triples, with every team appearing 3! = 6 times. There are only 720 / 6 = 120 teams.</p>
+
+<p>The fix is one rule: <b>only pick items that come after the last item you picked.</b> Then each team can be built only one way, in increasing order: {1, 4, 7} comes out as 1 → 4 → 7, never 4 → 1 → 7, because after 4 you may only look at 5 and up. In code, each call gets a <code>start</code>: the first item it may use.</p>
+
+<pre class="diagram"><code>                       []
+                1/        \2   \3
+         [1]               [2]       [3]
+      2/  |3  \4         3/   \4      |4
+ [1,2]  [1,3]  [1,4]  [2,3]  [2,4]  [3,4]</code></pre>
+<p class="small muted">Choosing 2 of 1..4. After picking x, the next level starts at x + 1. Nothing starts with 4: no bigger number would be left to pair it with.</p>
+
+<pre><code>def combinations(n, k):                   # all k-sized subsets of 1..n
+    result, path = [], []
+    def explore(start):
+        if len(path) == k:
+            result.append(path[:])
+            return
+        need = k - len(path)               # how many more we must pick
+        for x in range(start, n - need + 2):   # leave room for the rest
+            path.append(x)                 # choose x
+            explore(x + 1)                 # only numbers bigger than x after it
+            path.pop()                     # un-choose
+    explore(1)
+    return result</code></pre>
+
+<p>The loop's upper end is a first taste of pruning. If we still need 2 numbers, starting at n is pointless: nothing would be left after it. For choosing 10 of 20, that bound cuts the tree from 616,666 nodes to 352,716, with the same 184,756 answers.</p>
+
+<p>Every node of this tree is a set in increasing order. Drop k, save <code>path[:]</code> at <em>every</em> node, and let the loop run to n, and you get every subset exactly once. That "loop form" of subsets is what section 8 builds on.</p>
+
+<div class="keyidea">Combinations: give each call a start index and only pick items after the last one picked. Each set comes out exactly once, in increasing order: C(n, k) leaves instead of k! copies of each.</div>
+
+<div class="check" id="check-start">
+  <p class="q">To choose 2 of <code>[a, b, c, d]</code>, someone uses the permutation code (loop from index 0 every time, skip used items) and stops at 2 items. How many lists come out?</p>
+  <div class="opts">
+    <button>6: one per pair</button>
+    <button data-correct>12: every pair comes out twice, as [a, b] and [b, a]</button>
+    <button>16: every item pairs with every item, including itself</button>
+  </div>
+  <div class="fb right"><p>Right. 4 choices, then 3: 4 × 3 = 12 ordered pairs, and each of the C(4, 2) = 6 pairs appears in 2 orders. A start index removes the second order, because after picking b you can't go back to a.</p></div>
+  <div class="fb wrong"><p>Count the branches. Level 1 loops over 4 items; level 2 loops from index 0 again, skipping only the one already used: 3 options, so 4 × 3 = 12 leaves. (16 would need an item paired with itself, which <code>used</code> prevents.) Those 12 include both [a, b] and [b, a]. Picture a roster you may only read downward: you'd tick a before b every time, so each pair could be written only one way. That's what the start index enforces.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Pruning: cut dead branches early</h2>
+
+<p>The trees grow brutally, but in real problems most branches are hopeless long before they reach a leaf. <b>Pruning</b> means asking, before you walk down a branch, "can anything below here be an answer?". If not, you skip the branch and its whole subtree, which might be millions of nodes. Almost every pruning trick is one of three cuts:</p>
+<ol>
+  <li><b>The path already breaks a rule.</b> With <code>dark_mode</code> and <code>legacy_ui</code> both on, no choice for the other flags can fix it.</li>
+  <li><b>The path can't reach the goal anymore.</b> You need a sum of 10 and you're at 12; or you need 2 more items and 1 is left (section 6's bound). When the question asks for the <em>best</em> answer, the same cut is called <b>branch and bound</b>: drop a branch when even its best possible outcome can't beat the best answer found so far.</li>
+  <li><b>The branch repeats one already explored.</b> Two equal values at the same spot (section 8), or the mirror image of a board you've searched.</li>
+</ol>
+
+<h3>The N-Queens puzzle</h3>
+<p>Place n queens on an n × n chessboard so no two attack each other (a queen attacks along its row, its column and both diagonals). Each row gets exactly one queen, so level r of the tree decides the column of the queen in row r. Without pruning that's n<sup>n</sup> complete boards: for 8 × 8, 16,777,216 boards to build and check.</p>
+
+<p>With cut 1, we check each square <em>before</em> placing a queen, and skip it if an earlier queen attacks it. Three sets make the check O(1): <code>cols</code> for used columns, <code>diag</code> for used "\" diagonals (every square on one has the same <code>row − col</code>), and <code>anti</code> for used "/" diagonals (same <code>row + col</code>).</p>
+
+<pre><code>def count_queens(n):
+    cols, diag, anti = set(), set(), set()
+    def place(row):
+        if row == n:
+            return 1                       # a queen in every row: one solution
+        found = 0
+        for c in range(n):
+            if c in cols or row - c in diag or row + c in anti:
+                continue                   # attacked: prune this whole branch
+            cols.add(c); diag.add(row - c); anti.add(row + c)          # choose
+            found += place(row + 1)                                    # explore
+            cols.remove(c); diag.remove(row - c); anti.remove(row + c) # un-choose
+        return found
+    return place(0)</code></pre>
+
+<div class="figure">
+  <div id="queens-player"></div>
+  <div class="cap">The code above on a 4 × 4 board, rows and columns counted from 0. The square with the thick outline is the one being checked; red squares are attacked by queens already placed. Every attacked square the search skips is a subtree it never builds. Step to the end for the counts.</div>
+</div>
+
+<p>On 4 × 4 the pruned search places 16 queens (checking 60 squares) to find both solutions, against 256 complete boards. On 8 × 8 it places 2,056 queens and checks 15,720 squares to find all 92 solutions. Counting the empty board, that's 2,057 nodes instead of the unpruned tree's 19,173,961: over 9,000 times fewer.</p>
+
+<h3>Pruning changes the work, not the worst-case bound</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>n</th><th>solutions</th><th>queens placed (pruned)</th><th>growth from n − 1 to n</th><th>boards without pruning (n<sup>n</sup>)</th></tr></thead>
+  <tbody>
+    <tr><td>4</td><td>2</td><td>16</td><td>× 3.2</td><td>256</td></tr>
+    <tr><td>6</td><td>4</td><td>152</td><td>× 2.9</td><td>46,656</td></tr>
+    <tr><td>8</td><td>92</td><td>2,056</td><td>× 3.7</td><td>16,777,216</td></tr>
+    <tr><td>10</td><td>724</td><td>35,538</td><td>× 4.2</td><td>10,000,000,000</td></tr>
+    <tr><td>12</td><td>14,200</td><td>856,188</td><td>× 5.1</td><td>about 8.9 × 10<sup>12</sup></td></tr>
+    <tr><td>14</td><td>365,596</td><td>27,358,552</td><td>× 5.9</td><td>about 1.1 × 10<sup>16</sup></td></tr>
+  </tbody>
+</table></div>
+
+<p>Look at the growth column: from n = 6 on, each extra row multiplies the work by a factor that itself keeps rising. A polynomial doesn't do that (n<sup>3</sup> grows by about × 1.25 from n = 13 to 14). With one queen per row and per column the tree can't have more than n! leaves, and nobody knows a polynomial-time way to count all the solutions. (Finding just <em>one</em> solution is a different question: for every n ≥ 4 there are known formulas that place the queens directly, no search needed.) So the sentence for the interview is: <b>pruning can cut the work by thousands of times, but a search that grows exponentially usually still does, just more slowly.</b> It's still worth doing: 19 million nodes versus 2 thousand is "too slow" versus "instant".</p>
+
+<p><b>Cut 2 gets stronger with sorted input.</b> Picking numbers to reach a target, with 4 left to go: if the numbers are sorted and the current one is 5, every later one is at least 5 too. So you don't skip one branch, you <code>break</code> out of the loop and skip them all with one comparison.</p>
+
+<div class="keyidea">Prune a branch as soon as it breaks a rule, can't reach the goal, or repeats one you've explored. Make each check O(1) (sets, running sums), and sort when it lets one check rule out everything after it. Pruning can cut the work by thousands of times; the worst-case bound stays exponential.</div>
+
+<div class="check" id="check-prune">
+  <p class="q">Pruning took 8-queens from 19 million nodes to about 2,000. Is the pruned search that counts all solutions now a polynomial-time algorithm?</p>
+  <div class="opts">
+    <button>Yes: about 2,000 for n = 8 is close to n<sup>4</sup> = 4,096, so it's roughly O(n<sup>4</sup>)</button>
+    <button data-correct>No: the work still multiplies by a growing factor per extra row (× 3.7, × 4.2, × 5.1, × 5.9 in the table), which no polynomial does</button>
+    <button>No, because pruning only helps when a board has no solution</button>
+  </div>
+  <div class="fb right"><p>Right. One data point fits any curve; the growth rate shows the shape. For n<sup>4</sup> the factor <em>shrinks</em> toward 1 as n grows: (9/8)<sup>4</sup> ≈ 1.6, (15/14)<sup>4</sup> ≈ 1.3. Here it keeps growing, from about 3 to about 6. Pruning cut the work enormously; the growth is still exponential.</p></div>
+  <div class="fb wrong"><p>Test the guess against the table. If the work were n<sup>4</sup>, going from 13 to 14 rows would multiply it by (14/13)<sup>4</sup> ≈ 1.35. The real factor is about 5.9, and it rises every row: that's exponential growth, whatever the count at n = 8 happens to be. And pruning helps whether or not solutions exist: it removes attacked squares in every branch, including the ones that lead to the 92 solutions.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: mirror images, and failing fast</summary>
+  <p><b>Cut 3 on a board.</b> Flip an N-Queens solution left to right and you get another one. So try the first-row queen only in the left half of the columns and double the count. For odd n, also try the middle column but don't double those: their mirror images also start in the middle column, so the search finds them anyway. The same idea applies when splitting numbers into k groups of equal sum: empty groups are interchangeable, so if a number fails in one empty group, trying it in another explores a mirror copy. Exercise 7 tests exactly that.</p>
+  <p><b>Fail first.</b> When you can choose the order, try what's most likely to fail early. A dead end found at depth 2 removes a big subtree; found at depth 12, almost nothing. That's why exercise 7 places big numbers first, and why the sudoku solver in the next section fills the most constrained cell first.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Duplicates in the input</h2>
+
+<p>So far the items were all different. Take the subsets of <code>[1, 2, 2]</code>: the take-or-skip tree treats the two 2s as different items, so it makes 8 subsets, with [1, 2] and [2] each appearing twice. There are only 6 different ones: [], [1], [1, 2], [1, 2, 2], [2], [2, 2].</p>
+
+<p>Generating everything and throwing repeats into a set still builds every branch, and with many duplicates almost all are wasted: <code>[2] * 20</code> builds 1,048,576 subsets to find 21 different ones. We want cut 3 instead: <b>never build a branch that copies one already explored.</b></p>
+
+<p>Use the loop form from section 6 (each iteration picks "the next item in the subset") and sort first, so equal values sit side by side. If one loop tries a 2 as the next item and then tries the <em>other</em> 2 as the next item, both branches start from the same path plus a 2, with the same items left. Same subtree. So: <b>at each depth, skip a value equal to the one just tried at that same depth.</b></p>
+
+<pre class="diagram"><code>                   []
+              1/     \2   \2
+        [1]          [2]    (skip)
+      2/   \2         |2
+  [1,2]   (skip)    [2,2]
+    |2
+ [1,2,2]</code></pre>
+<p class="small muted">Subsets of [1, 2, 2], loop form. In each loop, the second 2 is skipped because the first 2 was just tried there. The second 2 is still reachable one level down, which is how [2, 2] and [1, 2, 2] get built.</p>
+
+<pre><code>def subsets_unique(nums):
+    nums = sorted(nums)                     # equal values side by side
+    result, path = [], []
+    def explore(start):
+        result.append(path[:])              # every node is a subset
+        for i in range(start, len(nums)):
+            if i &gt; start and nums[i] == nums[i - 1]:
+                continue                    # same value already tried at this depth
+            path.append(nums[i])
+            explore(i + 1)
+            path.pop()
+    explore(0)
+    return result</code></pre>
+
+<p>The condition is <code>i &gt; start</code>, not <code>i &gt; 0</code>, and that's the whole trick. <code>i == start</code> is the first item this loop looks at, so it can't repeat anything <em>this loop</em> tried, even if it equals the item before it: that earlier item was chosen one level up, as part of the path. With the rule, <code>[2] * 20</code> visits exactly 21 nodes, one per answer.</p>
+
+<p>Permutations need their own version of this rule (exercise 4). A permutation's loop starts at index 0 at every depth, so "the one just tried at this depth" has to be worked out differently. Draw the tree for <code>[1, 1, 2]</code> before you code it.</p>
+
+<div class="keyidea">With duplicates: sort, then at each depth try each distinct value once, skipping <code>nums[i]</code> when <code>i &gt; start</code> and it equals <code>nums[i − 1]</code>. Equal choices at the same depth would grow identical subtrees.</div>
+
+<div class="check" id="check-dup">
+  <p class="q">Someone writes the skip as <code>if i &gt; 0 and nums[i] == nums[i - 1]</code>. What does <code>subsets_unique([2, 2])</code> return now?</p>
+  <div class="opts">
+    <button>[[], [2], [2, 2]], the same as before</button>
+    <button data-correct>[[], [2]]: the subset [2, 2] is lost</button>
+    <button>[[], [2], [2], [2, 2]]: the repeat is back</button>
+  </div>
+  <div class="fb right"><p>Right. At the root, index 0 is taken and index 1 is skipped, which is correct. One level down the loop starts at index 1, and <code>i &gt; 0</code> is true there too, so the second 2 is skipped even though it's the <em>first</em> thing that loop tries. [2, 2] can never be built.</p></div>
+  <div class="fb wrong"><p>Walk it by hand. Root: path [], i = 0 takes the first 2 and recurses with start = 1. There, path is [2] and the loop starts at i = 1. Is 1 &gt; 0 and nums[1] == nums[0]? Yes: skipped, so that call adds nothing more. Back at the root, i = 1 is skipped too (correctly). Result: [[], [2]]. The rule must compare with "the value this loop tried just before", and a loop's first value has none, which is what <code>i &gt; start</code> says.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Constraint search: sudoku and grids</h2>
+
+<p>N-Queens belongs to a bigger family, <b>constraint search</b>: some <b>variables</b> to fill (empty sudoku cells), each with a <b>domain</b> of values (digits 1 to 9), and <b>constraints</b> on which combinations are allowed (no digit twice in a row, column or 3 × 3 box). The same template handles all of them:</p>
+
+<pre><code>def solve(state):
+    if state.is_complete():
+        return True
+    var = state.pick_empty()                 # which variable to fill next?
+    for value in state.legal_values(var):    # only values that break no rule
+        state.assign(var, value)             # choose
+        if solve(state):                     # explore
+            return True                      # one answer is enough: stop
+        state.unassign(var, value)           # un-choose
+    return False                             # every value failed: back up</code></pre>
+
+<p>Two differences from the subset searches. We stop at the first answer: <code>return True</code> unwinds every call without undoing, so the solved state stays in place. And <code>legal_values</code> must be cheap: keep a set of used digits per row, column and box (27 sets), so "can 5 go here?" is 3 lookups instead of re-reading 27 cells, the same trick as <code>cols</code> and <code>diag</code> in N-Queens.</p>
+
+<h3>Which cell first?</h3>
+<p>The natural order is reading order. A much better one is the <b>most constrained variable</b>: the cell with the fewest legal digits. A cell with one legal digit costs no guessing. A cell with zero means this branch is dead, and you learn it now instead of 30 levels later. Real numbers from one simple solver with the 27 sets: the sudoku printed on Wikipedia has 51 empty cells, and blind guessing would face 9<sup>51</sup> ≈ 4.6 × 10<sup>48</sup> fillings. Reading order places 4,208 digits; most-constrained-first places 51, with no wrong guess at all. A puzzle built to be hard (Arto Inkala's 2012 puzzle, 21 givens) takes 49,558 placements in reading order and 10,101 most-constrained-first.</p>
+
+<h3>Grids: the board is the state</h3>
+<p>A walk on a grid (a word in a letter grid, a path through a maze) must remember which cells it has used. The cheap way is the grid itself: overwrite the cell with a marker like <code>"#"</code> when you step on it, explore the neighbors, and write the original back when you step off. Writing it back <em>is</em> the un-choose. Forget it and later walks find cells blocked that should be free, and the caller gets back a damaged grid.</p>
+
+<div class="keyidea">Constraint search fills one variable per level with a value that breaks no rule. Keep the rules in sets so each check is O(1), fill the most constrained variable first, and stop at the first answer if one is all you need.</div>
+
+<div class="check" id="check-mrv">
+  <p class="q">Your sudoku solver is picking its next cell. Cell A has exactly 1 legal digit. Cell B has 6. Which should it fill first?</p>
+  <div class="opts">
+    <button>B: with 6 options, one of them is more likely to be right</button>
+    <button data-correct>A: its digit is forced, so it costs no guessing, and it may remove options from B</button>
+    <button>It doesn't matter: backtracking tries everything anyway, so the work is the same</button>
+  </div>
+  <div class="fb right"><p>Right. Filling A is a branch of size 1: no guess, nothing to undo. And once its digit is placed, the cells in its row, column and box lose that option, so B might drop to 5 options or even 1. That's how most-constrained-first placed 51 digits on the Wikipedia puzzle instead of 4,208.</p></div>
+  <div class="fb wrong"><p>Count the tree. Branching on B first makes 6 subtrees, and each still has to fill A somewhere deep inside. Branching on A first makes 1 subtree, which then branches on B. Same answers, but the order decides how many dead ends you walk into before noticing them, so the work is not the same. On the Wikipedia puzzle: 4,208 placements in reading order, 51 with fewest-options-first.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: how real solvers search</summary>
+  <p><b>Constraint propagation:</b> after each placement, remove that digit from the options of every cell in its row, column and box; a cell left with one option is filled at once, a cell with none means back up now. <b>SAT solvers</b> are backtracking plus that forced-move propagation (the DPLL algorithm); modern ones (CDCL) also learn a new rule from every dead end and jump back several levels to the decision that caused it. They solve industrial problems with millions of variables, such as chip verification, and some package managers use them to resolve dependencies. <b>Exact cover</b> (Knuth's Algorithm X with "dancing links") is a backtracking search for a family of puzzles that includes sudoku, tiling and, with a small extension, N-Queens. Nobody expects you to write these in an interview; saying "most constrained first, and propagate forced moves" shows you know where the speed comes from.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>What it costs, and when it's the wrong tool</h2>
+
+<p>The cost of a backtracking search is <b>(number of nodes) × (work per node)</b>. Most nodes sit near the bottom, so the leaves usually decide it, and at each leaf we copy a path of up to n items. Python does roughly 10 million simple steps per second (from the complexity chapter):</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Search</th><th>Leaves</th><th>Total time</th><th>Reaches about 1 second at</th></tr></thead>
+  <tbody>
+    <tr><td>Subsets of n</td><td>2<sup>n</sup></td><td>O(n · 2<sup>n</sup>)</td><td>n ≈ 20 (21 million steps, about 2 s)</td></tr>
+    <tr><td>Permutations of n</td><td>n!</td><td>O(n · n!)</td><td>n ≈ 9 to 10 (n = 10 is 36 million steps)</td></tr>
+    <tr><td>Combinations, k of n</td><td>C(n, k)</td><td>O(k · C(n, k))</td><td>depends on k: C(20, 3) = 1,140, C(30, 15) = 155,117,520</td></tr>
+    <tr><td>N-Queens, pruned</td><td>at most n!</td><td>exponential</td><td>about n = 12 (856,188 placements)</td></tr>
+  </tbody>
+</table></div>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">items n =</span><input type="range" id="cost-n" min="1" max="30" value="10" style="width:220px"><b id="cost-nval"></b></div>
+    <div id="cost-out" style="margin-top:12px"></div>
+  </div>
+  <div class="cap">Steps (leaves × copy) and rough Python time at 10 million steps per second, bars on a log scale. Slide n from 10 to 20: subsets go from about a millisecond to about 2 seconds, while permutations passed "hours" at n = 13. Choosing 3 of n stays small, because C(n, 3) is only about n³/6.</div>
+</div>
+
+<ul>
+  <li><b>Memory is the depth, plus the output.</b> Subsets of 20 items walk 2,097,151 nodes but never have more than 21 <code>explore</code> calls waiting at once. The output is another matter: 1,048,576 lists holding about 10 million numbers.</li>
+  <li><b>You can't beat the size of the output.</b> To list every subset, any algorithm must write 2<sup>n</sup> lists, so O(n · 2<sup>n</sup>) is the best possible. Say so: the search isn't slow, the question is big.</li>
+</ul>
+
+<h3>When backtracking is the wrong tool</h3>
+<p>Backtracking visits answers one at a time. That's right when you must <em>list</em> them. It's wasteful when you only need to <em>count</em> them or find the <em>best</em> one, and the tree keeps asking the same smaller question. How many ways can you climb 30 stairs taking 1 or 2 steps at a time? The tree ("1 step or 2?") has 1,346,269 leaves, one per way, and walking it makes 2,692,537 calls. But each call only asks "how many ways from stair k to the top?", and there are just 31 different k.</p>
+
+<pre><code>def ways(n):                      # walks the whole tree
+    if n &lt;= 1:
+        return 1
+    return ways(n - 1) + ways(n - 2)   # 2,692,537 calls for n = 30
+
+from functools import cache
+
+@cache                            # remember each answer the first time
+def ways_memo(n):
+    if n &lt;= 1:
+        return 1
+    return ways_memo(n - 1) + ways_memo(n - 2)   # computes only 31 answers for n = 30</code></pre>
+
+<p>Remembering answers by their arguments is <b>memoization</b>, the door into <a href="dynamic-programming.html">dynamic programming</a>. It works because the answer from stair k doesn't depend on how you reached stair k. If you had to list every way, no cache could help: the output alone has 1,346,269 entries.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>The question asks for…</th><th>Reach for</th></tr></thead>
+  <tbody>
+    <tr><td>every subset, ordering, combination or valid board</td><td>backtracking (the output is the cost)</td></tr>
+    <tr><td>one valid answer under strong rules (sudoku, N-Queens, a word on a grid)</td><td>backtracking with pruning, stopping at the first answer</td></tr>
+    <tr><td>a count, minimum or maximum, where the same smaller question repeats</td><td>dynamic programming</td></tr>
+  </tbody>
+</table></div>
+
+<div class="keyidea">Cost = nodes × work per node: O(n · 2<sup>n</sup>) for subsets, O(n · n!) for permutations. Memory is the depth plus the output. If you only need a count or a best value and the same subproblem keeps coming back, memoize: that's dynamic programming.</div>
+
+<div class="check" id="check-dp">
+  <p class="q">Which of these is a bad fit for plain backtracking?</p>
+  <div class="opts">
+    <button>List every way to seat 6 guests in a row (720 ways)</button>
+    <button data-correct>Count the ways to climb 60 stairs taking 1 or 2 steps at a time</button>
+    <button>Find any one valid way to fill a sudoku</button>
+  </div>
+  <div class="fb right"><p>Right. There are about 2.5 trillion ways up 60 stairs, so a tree walk with one leaf per way would take days, yet there are only 61 different subproblems. Memoize and it's instant. Listing 720 seatings is optimal (you have to write them), and sudoku wants one answer under strong rules, pruning's best case.</p></div>
+  <div class="fb wrong"><p>Ask two questions: is the output itself big, and does the tree repeat itself? Seatings: you must print 720 rows anyway. Sudoku: one answer, and the rules prune almost every branch. Stairs: the answer is one number, about 2.5 trillion, but the tree has that many leaves, and every call is one of only 61 questions ("ways from stair k"). A few repeating questions behind a huge tree is the signal for dynamic programming.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: generators, and the bridge to dynamic programming</summary>
+  <p><b>Don't store what you don't need.</b> A generator (a function using <code>yield</code>) hands out one answer at a time and pauses in between. Memory drops from "all answers" to "one path", and the caller can stop early: <code>next(subsets_lazy(items))</code> runs only until the first answer.</p>
+<pre><code>def subsets_lazy(items, i=0, path=None):
+    path = [] if path is None else path
+    if i == len(items):
+        yield path[:]                      # hand out one answer, then pause
+        return
+    path.append(items[i])
+    yield from subsets_lazy(items, i + 1, path)
+    path.pop()
+    yield from subsets_lazy(items, i + 1, path)</code></pre>
+  <p><b>From backtracking to DP:</b> (1) make each call <em>return</em> its answer (a count, a best value) instead of appending to a shared list, so it depends only on its arguments; (2) cache by those arguments. Step 1 is the hard part. If the answer depends on state outside the arguments, like a shared <code>used</code> list, caching gives wrong answers. That's why the bitmask from section 5 matters: it moves the used set into the arguments.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>What to say in the interview</h2>
+
+<p>When a problem says "all", "every", "list the ways" or "find any arrangement that…", a strong answer sounds like this:</p>
+<ol>
+  <li><b>Name the tree:</b> "Each level decides one item, take or skip: n levels, 2<sup>n</sup> leaves." (Or "next unused item, n! leaves", or "only items after the last pick, C(n, k) leaves".)</li>
+  <li><b>Give the cost before coding:</b> "O(n · 2<sup>n</sup>) time, since I copy up to n at each leaf, and O(n) extra space for the recursion, not counting the output. That's optimal: the output has 2<sup>n</sup> lists."</li>
+  <li><b>Write the template out loud:</b> choose, explore, un-choose; "I save <code>path[:]</code>, not <code>path</code>, because it's one shared list."</li>
+  <li><b>Prune and dedupe:</b> "I'll sort so I can break once a number is too big", "skip a value equal to the one just tried at this depth", "sets make each rule check O(1)".</li>
+  <li><b>Test small, name the boundary:</b> empty input, one item, duplicates. Then: "if we only needed the count, I'd memoize, because the subproblems repeat."</li>
+</ol>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"What if n is 40?"</b> 2<sup>40</sup> is about 1.1 trillion. For subset-sum questions, split the items into two halves of 20, list each half's 2<sup>20</sup> = 1,048,576 sums, sort one list and binary search it for each sum of the other. That's <em>meet in the middle</em>: about 2 × 2<sup>20</sup> × 20 ≈ 42 million steps.</li>
+    <li><b>"Just one answer"</b>: return True up the chain, like the sudoku template. <b>"An iterator"</b>: a generator. <b>"Deep recursion"</b>: an explicit stack (section 3). <b>"In parallel"</b>: subtrees share nothing, so hand them to workers, each with its own path. Split a few levels down so there are many more tasks than workers, because subtrees can be very uneven.</li>
+    <li><b>"Many words on one board"</b> (after word search): put all the words in a trie and run one search from each cell, following the trie as you walk, so a prefix shared by many words is walked once, not once per word.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Recursion: a base case you answer directly, plus a step that shrinks the problem and trusts the call. Every input must reach the base case.</li>
+  <li>Each waiting call is a frame on the call stack. Memory is the deepest chain of frames; Python stops at about 1,000.</li>
+  <li>"Generate all" problems are decision trees: one level per choice, one leaf per answer. Backtracking walks that tree depth-first without storing it.</li>
+  <li>The template: choose (change the shared path), explore (recurse), un-choose (undo exactly that change). Save <code>path[:]</code>, never <code>path</code>.</li>
+  <li>Subsets: take or skip, 2<sup>n</sup> leaves. Permutations: next unused item, n! leaves. Combinations: only items after the last pick, C(n, k) leaves.</li>
+  <li>Prune when a branch breaks a rule, can't reach the goal, or repeats one already explored. Sort so you can <code>break</code>; use sets for O(1) checks. Pruning cuts the real work; the worst case usually stays exponential.</li>
+  <li>Duplicates: sort, then skip a value equal to the one just tried at the same depth (<code>i &gt; start</code>).</li>
+  <li>Constraint search: one variable per level, most constrained first, stop at the first answer if that's all you need.</li>
+  <li>Cost = nodes × work per node. If you only need a count or a best value and subproblems repeat, memoize: dynamic programming.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first. The coding exercises are in <code>exercises/backtracking.py</code>. Their tests count the work your search does (comparisons, arithmetic or cell reads, through special values), so a search that explores branches it could have cut fails, with a message saying how much it did. Run them with <code>python3 -m pytest -k backtracking</code>.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Trace the template</h4>
+  <p>(a) Run section 4's <code>subsets</code> on <code>["a", "b", "c"]</code> by hand: in what order are the subsets saved? (b) What does it return with the bug <code>result.append(path)</code>? (c) Run section 5's <code>permutations</code> on <code>[1, 2, 3]</code>: what are <code>path</code> and <code>used</code> when the third permutation is saved?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) [a, b, c], [a, b], [a, c], [a], [b, c], [b], [c], []: take-first puts every subset with "a" before every subset without it. (b) <code>[[], [], [], [], [], [], [], []]</code>, eight references to one list that ends empty. (c) The leaves come out as [1, 2, 3], [1, 3, 2], [2, 1, 3], so <code>path = [2, 1, 3]</code> and <code>used = [True, True, True]</code>.</p>
   </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Count the tree</h4>
+  <p>Leaves and total nodes (count the root) for: (a) the take-or-skip tree for 4 items; (b) permutations of 4 items; (c) choosing 2 of 1..5 with section 6's start index and room bound, then without the room bound; (d) the 4 × 4 N-Queens figure: queens placed and squares checked.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) 16 leaves, 31 nodes. (b) 24 leaves; 1 + 4 + 12 + 24 + 24 = 65 nodes. (c) 10 leaves either way; 1 + 4 + 10 = 15 nodes with the bound, 16 without (a first pick of 5 that leads nowhere). (d) 16 queens placed, 60 squares checked, 2 solutions.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Pick the tool</h4>
+  <p>Backtracking, backtracking with pruning, or dynamic programming? One sentence each. (a) List every way to seat 6 guests in a row. (b) Count the ways to climb 50 stairs taking 1, 2 or 3 steps. (c) Find one way to place 10 queens on a 10 × 10 board. (d) List every way to split "aab" into pieces that are all palindromes. (e) The fewest coins that make 14 cents from coins worth 1, 7 and 10 cents.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Backtracking: the 720 seatings are the output. (b) DP: one number, and "ways from stair k" repeats; only 51 different questions. (c) Backtracking with pruning, stopping at the first solution. (d) Backtracking: each level picks the next piece, a palindrome starting where the last one ended; the answers are [a, a, b] and [aa, b]. (e) DP: a minimum, and "fewest coins for amount x" repeats. (Greedy fails here: taking 10 first needs 5 coins, but 7 + 7 needs 2.)</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>unique_permutations(nums)</code>, with repeats in the input</h4>
+  <p>Every distinct ordering: <code>[1, 1, 2]</code> gives 3, not 6. The test uses 12 values with 2,970 distinct orderings and counts every comparison, hash and function call, so building all 479,001,600 orderings and removing repeats fails. Adapt section 8's skip rule to a loop that starts at index 0 at every depth.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>combination_sum(candidates, target)</code></h4>
+  <p>All combinations of distinct positive candidates that add up to the target, each reusable any number of times; [2, 2, 3] and [3, 2, 2] count once. The tests count every +, − and comparison. One fails a search that builds every order (section 6). Another has 104 candidates: rejecting each one at every node costs over 1.5 million operations, while sorting and breaking at the first that's too big (section 7) costs about 200,000. The budget is 500,000.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>word_search(board, word)</code></h4>
+  <p>Spell the word by walking up, down, left and right through a letter grid, each cell at most once. Leave the board unchanged (section 9's mark and restore). The test counts cell reads: stop a walk at the first wrong letter (building whole walks first reads over 12 million cells), and catch a hopeless word, like two Bs on a board with one, with a cheap pass before searching.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>can_partition_k(nums, k)</code></h4>
+  <p>Can the numbers be split into k groups with equal sums? The hard tests have no answer, so every branch must fail; dealing each number into each group is k<sup>n</sup> deals, over 4 billion for 16 numbers in 4 groups. Use section 7's three cuts: skip a group the number would overflow, place big numbers first, and never retry a number in a second empty group. Missing either of the last two costs over 2.8 million operations; the budget is 1 million.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure</div>
+  <h4>8. A sudoku solver, and the most constrained cell</h4>
+  <p>Write a solver with 27 sets and a counter of digits placed. Run it on the Wikipedia puzzle (rows one after another, dots for blanks) once in reading order and once filling the cell with the fewest legal digits first. Do you get near 4,208 and 51? Then add constraint propagation (section 9's box) and measure again.</p>
+<pre class="plain"><code>53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79</code></pre>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>9. Say it out loud</h4>
+  <p>Set a 3-minute timer. Explain how you'd list all the subsets of a list that may contain duplicates. Did you draw the tree, give the cost and why it's optimal, say why you copy the path, explain <code>i &gt; start</code> versus <code>i &gt; 0</code>, and say when you'd switch to dynamic programming?</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="bfs-dfs.html"><small>← Previous</small>Exploring graphs: BFS, DFS, topological sort</a>
+  <a class="next" href="dynamic-programming.html"><small>Next →</small>Dynamic programming</a>
+</nav>
+
 </main>
 <script>
 (function () {
-  const $ = (id) => document.getElementById(id);
-  let els = [], cap = Infinity;
-  function build() {
-    // Build the full decision tree with ids, then generate DFS frames over it.
-    let id = 0;
-    const make = (depth, path, sum) => {
-      const node = { id: id++, depth, path, sum, val: depth === 0 ? "∅" : path.length ? "{" + path.join(",") + "}" : "{}" };
-      node.pruned = sum > cap;
-      if (depth < els.length && !node.pruned) { node.left = make(depth + 1, path, sum); node.right = make(depth + 1, [...path, els[depth]], sum + els[depth]); }
-      return node;
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (a) { return "[" + a.join(", ") + "]"; };
+
+  // ---------- Call stack for total([3, 1, 4]) (section 3) ----------
+  (function () {
+    var nums = [3, 1, 4], fr = [], stack = [];
+    var snap = function (msg) { fr.push({ st: stack.map(function (f) { return { arr: f.arr, note: f.note, run: f.run }; }), msg: msg }); };
+    for (var k = 0; k <= nums.length; k++) {
+      var arr = nums.slice(k);
+      stack.forEach(function (f) { f.run = false; });
+      stack.push({ arr: arr, note: arr.length ? "paused at " + arr[0] + " + total(" + fmt(arr.slice(1)) + ")" : "base case: return 0", run: true });
+      if (k === 0) snap("Call <b>total(" + fmt(arr) + ")</b>. The list isn't empty, so it needs total(" + fmt(arr.slice(1)) + ") first. It pauses halfway through its last line and waits. Depth 1.");
+      else if (arr.length) snap("A new frame for <b>total(" + fmt(arr) + ")</b>, with its own nums = " + fmt(arr) + ". It also pauses, waiting on total(" + fmt(arr.slice(1)) + "). Depth " + stack.length + ".");
+      else snap("<b>total([])</b> hits the base case: an empty list adds up to 0. No more calls. Depth " + stack.length + ", the deepest this gets.");
+    }
+    var ret = 0;
+    while (stack.length) {
+      var gone = stack.pop();
+      if (!stack.length) { snap("<b>total(" + fmt(gone.arr) + ") returns " + ret + "</b>. The stack is empty again. At its deepest it held " + (nums.length + 1) + " frames for " + nums.length + " numbers: n + 1."); break; }
+      var top = stack[stack.length - 1], sum = top.arr[0] + ret;
+      top.run = true; top.note = top.arr[0] + " + " + ret + " = " + sum + ", so return " + sum;
+      snap("total(" + fmt(gone.arr) + ") returns " + ret + " and its frame is thrown away. <b>total(" + fmt(top.arr) + ")</b> wakes up with that answer: " + top.arr[0] + " + " + ret + " = " + sum + ".");
+      ret = sum;
+    }
+    V.player($("stack-player"), {
+      frames: fr, speed: 1300,
+      draw: function (f, stage) {
+        if (!f.st.length) { stage.append(V.el("div", { class: "muted small" }, "(the stack is empty)")); return; }
+        stage.append(V.el("div", { class: "small muted", style: "margin-bottom:6px" }, "top of the stack (running)"),
+          V.el("div", { style: "display:flex;flex-direction:column-reverse;gap:6px;max-width:440px" },
+            f.st.map(function (fm) {
+              return V.el("div", { class: "panel", style: "padding:8px 12px;" + (fm.run ? "border-color:var(--accent);background:var(--accent-soft)" : "") },
+                V.el("div", { style: "font-family:var(--mono);font-weight:600" }, "total(nums=" + fmt(fm.arr) + ")"),
+                V.el("div", { class: "small muted" }, fm.note));
+            })),
+          V.el("div", { class: "small muted", style: "margin-top:6px" }, "bottom of the stack (the first call)"));
+      },
+    });
+  })();
+
+  // ---------- Subsets decision tree (section 4) ----------
+  (function () {
+    var items = [1, 2, 3], D = items.length, W = 640;
+    var leafX = function (j) { return 40 + 80 * j; };
+    var pos = function (key) {
+      var d = key.length, lo = 0;
+      for (var k = 0; k < d; k++) lo = lo * 2 + (key[k] === "S" ? 1 : 0);
+      var span = Math.pow(2, D - d), first = lo * span, last = first + span - 1;
+      return { x: (leafX(first) + leafX(last)) / 2, y: 26 + d * 66 };
     };
-    return make(0, [], 0);
-  }
-  function frames(root) {
-    const fr = [], visited = new Set(), out = [];
-    const stack = [];
-    (function dfs(n) {
-      stack.push(n); visited.add(n);
-      const leaf = n.depth === els.length;
-      let msg;
-      if (n.pruned) msg = `Sum ${n.sum} &gt; ${cap}: <b>prune</b>. Nothing below this node can work, so skip its whole subtree.`;
-      else if (leaf) { out.push(n.val); msg = `Leaf: every element decided. Emit <b>${n.val}</b>.`; }
-      else msg = `Decide element <b>${els[n.depth]}</b>: first skip it (left), then take it (right).`;
-      fr.push({ cur: n, stack: new Set(stack), visited: new Set(visited), out: [...out], msg });
-      if (n.left) dfs(n.left);
-      if (n.right) dfs(n.right);
-      stack.pop();
-    })(root);
-    fr.push({ visited, stack: new Set(), out, msg: `Done: ${out.length} subsets emitted, ${visited.size} nodes visited${cap < Infinity ? `, while the unpruned tree has ${2 ** (els.length + 1) - 1}` : ""}.` });
-    return fr;
-  }
-  let root;
-  const player = V.player($("bt-player"), {
-    speed: 450,
-    draw(f, stage) {
-      const svg = V.s("svg", { class: "viz" });
-      // Show only visited nodes so the tree "grows" as the search runs.
-      const prune = (n) => (n && f.visited.has(n) ? { ...n, left: prune(n.left), right: prune(n.right) } : null);
-      const shown = prune(root);
-      V.binaryTree(svg, shown, { dx: 38, dy: 52, r: 16, label: (n) => (n.depth === 0 ? "start" : n.pruned ? "✂" : n.val.length > 7 ? "…" : n.val),
-        cls: (n) => (f.cur && n.id === f.cur.id ? "hl" : n.pruned ? "bad" : [...f.stack].some((s) => s.id === n.id) ? "warn" : n.depth === els.length ? "done" : "") });
-      stage.append(svg, V.el("div", { class: "small muted", style: "margin-top:6px" }, "emitted: ", f.out.join("  ") || "∅"));
-    },
-  });
-  const run = () => {
-    els = $("bt-in").value.split(/[ ,]+/).filter(Boolean).map(Number).filter((x) => !isNaN(x)).slice(0, 4);
-    cap = $("bt-prune").checked ? Number($("bt-cap").value) : Infinity;
-    root = build(); player.load(frames(root));
-  };
-  $("bt-go").onclick = run; $("bt-prune").onchange = run;
-  run();
+    var keys = [""];
+    for (var d = 0; d < D; d++) keys.filter(function (k) { return k.length === d; }).forEach(function (k) { keys.push(k + "T", k + "S"); });
+    var pathOf = function (key) { var p = []; for (var k = 0; k < key.length; k++) if (key[k] === "T") p.push(items[k]); return p; };
+
+    function build(bug) {
+      var path = [], result = [], fr = [], done = {}, seen = {}, cur = "";
+      var snap = function (msg) {
+        fr.push({ cur: cur, path: path.slice(), result: result.map(function (r) { return r === "ALIAS" ? "ALIAS" : r.slice(); }), done: Object.assign({}, done), seen: Object.assign({}, seen), msg: msg, bug: bug });
+      };
+      var leafMsg = function () {
+        return bug ? " A leaf: <b>result.append(path)</b> stores the shared list itself, which holds " + fmt(path) + " right now."
+                   : " A leaf. Save a copy: result gets <b>" + fmt(path) + "</b>.";
+      };
+      function explore(i, key, how) {
+        cur = key; seen[key] = true;
+        if (i === D) { result.push(bug ? "ALIAS" : path.slice()); done[key] = true; snap(how + leafMsg()); return; }
+        snap(how + (i === 0 ? "" : " ") + "Now deciding item " + items[i] + ".");
+        path.push(items[i]);
+        explore(i + 1, key + "T", "Choose: path.append(" + items[i] + ") → path = " + fmt(path) + ".");
+        cur = key; path.pop();
+        if (key + "T" in seen) done[key + "T"] = true;
+        snap("Back up to item " + items[i] + "'s node. Un-choose: path.pop() → path = " + fmt(path) + ", exactly as it was before the choice.");
+        explore(i + 1, key + "S", "Explore without " + items[i] + ": path stays " + fmt(path) + ".");
+        cur = key; done[key + "S"] = true; done[key] = true;
+      }
+      explore(0, "", "Start at the root with path = [].");
+      cur = null;
+      snap(bug ? "Done. result has 8 entries, but they are 8 references to the one shared list, and every append was undone by a pop, so all of them show <b>[]</b>."
+               : "Done: <b>8 subsets</b> (2³) from 15 nodes, and path is empty again. Each leaf saved a snapshot that later pops couldn't touch.");
+      return fr;
+    }
+
+    function draw(f, stage) {
+      var svg = V.s("svg", { class: "viz", viewBox: "0 0 " + W + " 292", style: "max-width:720px;min-width:520px" });
+      keys.forEach(function (k) {
+        if (!k.length) return;
+        var a = pos(k.slice(0, -1)), b = pos(k), on = f.cur !== null && f.cur.indexOf(k) === 0;
+        var dx = b.x - a.x, dy = b.y - a.y, len = Math.sqrt(dx * dx + dy * dy), r = 16;
+        svg.append(V.s("line", { class: "edge" + (on ? " hl" : ""), x1: a.x + dx / len * r, y1: a.y + dy / len * r, x2: b.x - dx / len * r, y2: b.y - dy / len * r, style: f.seen[k] ? "" : "opacity:.35" }));
+        var it = items[k.length - 1], take = k[k.length - 1] === "T";
+        svg.append(V.s("text", { class: "label", x: (a.x + b.x) / 2 + (take ? -10 : 10), y: (a.y + b.y) / 2 - 2, "text-anchor": take ? "end" : "start", text: (take ? "+" : "−") + it }));
+      });
+      keys.forEach(function (k) {
+        var p = pos(k), cls = k === f.cur ? "hl" : f.done[k] ? "done" : "";
+        svg.append(V.s("g", { class: "node " + cls, style: f.seen[k] ? "" : "opacity:.35" },
+          V.s("circle", { cx: p.x, cy: p.y, r: 15 }),
+          V.s("text", { x: p.x, y: p.y, text: k.length < D ? items[k.length] + "?" : "" })));
+        if (k.length === D) svg.append(V.s("text", { class: "label", x: p.x, y: p.y + 32, "text-anchor": "middle", style: f.seen[k] ? "" : "opacity:.35", text: fmt(pathOf(k)).replace(/ /g, "") }));
+      });
+      var chip = function (t, alias) { return V.el("span", { style: "font:600 0.82rem var(--mono);border:1px solid " + (alias ? "var(--warn)" : "var(--ok)") + ";border-radius:6px;padding:2px 7px" }, t); };
+      var row = function (label, kid) { return V.el("div", { style: "display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap" }, V.el("span", { class: "small muted", style: "width:52px" }, label), kid); };
+      stage.append(svg,
+        row("path", V.cells(f.path.length ? f.path : [null], { idx: false, cls: function (i) { return i === f.path.length - 1 ? "hl" : ""; } })),
+        row("result", f.result.length ? V.el("div", { style: "display:flex;flex-wrap:wrap;gap:6px" }, f.result.map(function (r) { return chip(r === "ALIAS" ? fmt(f.path) : fmt(r), r === "ALIAS"); })) : V.el("span", { class: "small muted" }, "(nothing saved yet)")));
+    }
+
+    var sel = V.el("select", { title: "What the leaf saves" }, V.el("option", { value: "copy" }, "save path[:] (a copy)"), V.el("option", { value: "bug" }, "save path (the bug)"));
+    var pl = V.player($("tree-player"), { frames: build(false), draw: draw, speed: 1300, extraControls: [sel] });
+    sel.onchange = function () { pl.load(build(sel.value === "bug")); };
+  })();
+
+  // ---------- 4-queens with pruning (section 7) ----------
+  (function () {
+    var n = 4, q = [], fr = [], placed = 0, checked = 0, sols = 0;
+    var attackedBy = function (r, c) {
+      for (var i = 0; i < q.length; i++) {
+        if (q[i] === c) return [i, q[i], "column"];
+        if (i - q[i] === r - c) return [i, q[i], "\\ diagonal (same row − col)"];
+        if (i + q[i] === r + c) return [i, q[i], "/ diagonal (same row + col)"];
+      }
+      return null;
+    };
+    var snap = function (msg, tr, bad) { fr.push({ q: q.slice(), tr: tr, bad: bad, placed: placed, checked: checked, sols: sols, msg: msg }); };
+    snap("An empty 4 × 4 board. Row 0 first: try each column, left to right.", null, false);
+    (function place(r) {
+      if (r === n) { sols++; snap("A queen in every row and none attack each other: <b>solution #" + sols + "</b>. Count it and keep searching.", null, false); return; }
+      for (var c = 0; c < n; c++) {
+        checked++;
+        var a = attackedBy(r, c);
+        if (a) { snap("Row " + r + ", col " + c + ": attacked by the queen at (" + a[0] + ", " + a[1] + ") along its " + a[2] + ". Skip it, and the whole subtree under it.", [r, c], true); continue; }
+        q.push(c); placed++;
+        snap("Row " + r + ", col " + c + " is safe. Choose: place a queen" + (r + 1 < n ? " and move on to row " + (r + 1) + "." : "."), [r, c], false);
+        place(r + 1);
+        q.pop();
+        snap("Back at row " + r + ". Un-choose: remove the queen at (" + r + ", " + c + ")" + (c + 1 < n ? " and try column " + (c + 1) + "." : ". No columns left in this row, so back up again."), null, false);
+      }
+    })(0);
+    snap("Done: <b>" + sols + " solutions</b>. The search placed " + placed + " queens and checked " + checked + " squares. Without pruning it would build all 4⁴ = 256 complete boards and check each one.", null, false);
+
+    V.player($("queens-player"), {
+      frames: fr, speed: 700,
+      draw: function (f, stage) {
+        var hit = function (r, c) { for (var i = 0; i < f.q.length; i++) if (f.q[i] === c || i - f.q[i] === r - c || i + f.q[i] === r + c) return true; return false; };
+        var cells = [];
+        for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
+          var isQ = f.q[r] === c, isT = f.tr && f.tr[0] === r && f.tr[1] === c;
+          var style = "width:42px;height:42px;font-size:0.95rem;";
+          if (!isQ && r >= f.q.length && hit(r, c)) style += "background:var(--bad-soft);border-color:var(--bad);color:var(--bad);";
+          if (isT) style += "outline:3px solid var(--warn);outline-offset:-3px;";
+          cells.push(V.el("div", { class: isQ ? "cur" : "", style: style }, isQ ? "Q" : isT && f.bad ? "✗" : ""));
+        }
+        stage.append(V.el("div", { style: "display:flex;gap:20px;align-items:center;flex-wrap:wrap" },
+          V.el("div", { class: "grid-board", style: "grid-template-columns:repeat(" + n + ",42px)" }, cells),
+          V.el("div", { class: "small" },
+            V.el("div", {}, "queens placed: ", V.el("b", {}, String(f.placed))),
+            V.el("div", {}, "squares checked: ", V.el("b", {}, String(f.checked))),
+            V.el("div", {}, "solutions: ", V.el("b", {}, String(f.sols))),
+            V.el("div", { class: "muted", style: "margin-top:6px" }, "unpruned: 256 boards"))));
+      },
+    });
+  })();
+
+  // ---------- Cost slider (section 10) ----------
+  (function () {
+    var fact = function (k) { var v = 1; for (var i = 2; i <= k; i++) v *= i; return v; };
+    var choose3 = function (k) { return k < 3 ? 0 : k * (k - 1) * (k - 2) / 6; };
+    var rows = [
+      { name: "Choose 3 of n: C(n, 3) × 3", f: function (k) { return choose3(k) * 3; }, c: "var(--ok)" },
+      { name: "Subsets: 2ⁿ × n", f: function (k) { return Math.pow(2, k) * k; }, c: "var(--warn)" },
+      { name: "Permutations: n! × n", f: function (k) { return fact(k) * k; }, c: "var(--bad)" },
+    ];
+    var big = function (v) { if (v < 1e7) return Math.round(v).toLocaleString(); var e = Math.floor(Math.log10(v)); return (v / Math.pow(10, e)).toFixed(1) + " × 10^" + e; };
+    var time = function (v) {
+      var s = v / 1e7;
+      if (s < 0.001) return "instant";
+      if (s < 1) return (s * 1000).toFixed(0) + " ms";
+      if (s < 120) return s.toFixed(1) + " s";
+      if (s < 7200) return (s / 60).toFixed(0) + " min";
+      if (s < 172800) return (s / 3600).toFixed(0) + " hours";
+      if (s < 3.15e7) return (s / 86400).toFixed(0) + " days";
+      var y = s / 3.15e7;
+      return y < 1e6 ? Math.round(y).toLocaleString() + " years" : y < 1.4e10 ? big(y) + " years" : "longer than the age of the universe";
+    };
+    var maxLog = Math.log10(rows[2].f(30));
+    function update() {
+      var k = Number($("cost-n").value);
+      $("cost-nval").textContent = String(k);
+      $("cost-out").replaceChildren.apply($("cost-out"), rows.map(function (r) {
+        var v = r.f(k), w = v < 1 ? 0.5 : Math.max(0.5, (Math.log10(v) / maxLog) * 100);
+        return V.el("div", { style: "margin:8px 0" },
+          V.el("div", { class: "small" }, V.el("b", {}, r.name), " · " + big(v) + " steps · " + time(v)),
+          V.el("div", { class: "bar", style: "height:9px" }, V.el("span", { style: "width:" + w + "%;background:" + r.c })));
+      }));
+    }
+    $("cost-n").oninput = update;
+    update();
+  })();
 })();
 </script>
 </body>

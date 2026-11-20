@@ -10,162 +10,867 @@
   <script src="../../../assets/curriculum.js"></script>
   <script src="../../../assets/viz.js"></script>
   <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
 </head>
 <body data-root="../../.." data-section="02" data-page="concept">
-<main class="content">
-  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.03 · Binary search, including &quot;search on the answer&quot; variants</p>
-  <h1>Binary search and "search on the answer"</h1>
-  <p class="lede">Binary search isn't really about sorted arrays. It works on any yes/no question whose answer flips exactly once. Find that flip and you can throw away half the possibilities with every guess.</p>
-  <details class="box accent" open id="idea">
-    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
-    <div class="box-body">
-      <p class="one-liner">If a predicate goes false, false, …, false, true, true, …, true over a range, you can find the first true in O(log n) probes. A sorted array is just one place where such a predicate exists.</p>
-    </div>
-  </details>
+<main class="content book">
 
-  <details class="box" open id="first-principles">
-    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
-    <div class="box-body">
-      <h3>1. The real shape: a monotonic predicate</h3>
-      <p>Take <code>ok(i) = nums[i] >= target</code> on a sorted array. As i grows it's F F F T T T. It never flips back. Every binary search question is "where's the first T?" (or the last F).</p>
-      <h3>2. One template, half-open interval</h3>
-      <pre><code>lo, hi = 0, len(nums)          # answer is in [lo, hi]; hi = "none are true"
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 3</div>
+  <h1>Binary search and "search on the answer"</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> asked almost everywhere</span><span>about 55 minutes</span><span>10 quick checks · 9 exercises</span></div>
+</header>
+
+<p>Binary search looks like the easiest algorithm there is: look in the middle, throw away half, repeat. It is also one of the easiest to get subtly wrong. Loops that never end, answers that are off by one, searches that find "a" copy when you needed the first one. Interviewers love it for exactly that reason.</p>
+<p>This chapter teaches it as one idea instead of a pile of special cases: <b>you are never really searching for a value; you are searching for the place where a yes/no answer flips.</b> Once you see that, the off-by-one bugs have a clear cause, and you can binary search things that aren't arrays at all: the smallest ship that works, the slowest pace that finishes on time, a square root.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Write a binary search that finds the first position where a yes/no question turns to yes, and say its invariant out loud.</li>
+    <li>Explain why binary search loops hang or miss by one, and check any loop against three rules.</li>
+    <li>Use lower bound and upper bound (<code>bisect_left</code> / <code>bisect_right</code>) to find the first and last copy, count copies, and answer range questions.</li>
+    <li>Search a rotated sorted array in O(log n).</li>
+    <li>Spot "search on the answer" problems, write the yes/no check, and give the O(n log range) cost.</li>
+    <li>Say when binary search is the wrong tool, and what to use instead.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom, like a book. It builds on <a href="complexity.html">How fast is your code?</a> (where log₂ n comes from) and <a href="sorting.html">Putting things in order</a> (sorting as a one-time cost that makes later questions cheap). Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: 10 million orders, 1,000 questions a second</h2>
+
+<div class="story">
+  <p>A delivery app keeps every order from today in one list, in the order they arrived, so the list is sorted by time. By evening it holds 10,000,000 orders. A support dashboard keeps asking questions like "show me the orders placed between 18:00:00 and 18:00:59". Across all the support staff, it asks about 1,000 of these a second.</p>
+  <p>The first version scans: walk the list from the start until you reach 18:00:00, then collect orders until 18:01:00. On average that reads about half the list, 5 million orders, per question. 1,000 questions a second is 5 billion reads a second. Python does roughly 10 million simple steps a second, so the dashboard needs about 500 seconds of work every second. It falls behind within minutes.</p>
+</div>
+
+<p>The scan ignores the one thing that makes this list special: <b>it's sorted</b>. Look at the order in the middle of the list. If it was placed at 14:12, then every order before it is earlier than 14:12 too, so none of them can be at 18:00. One look, and half the list is ruled out. Look at the middle of what's left, and half of <em>that</em> goes. That's binary search.</p>
+
+<p>With it, each question needs two searches (where 18:00:00 starts, and where 18:01:00 starts), and each search needs at most 24 looks into a list of 10 million. That's 48 reads per question instead of 5 million, or 48,000 reads a second for the whole dashboard: about 5 milliseconds of work per second instead of 500 seconds.</p>
+
+<p>Notice what the dashboard actually needs. Not "is there an order at exactly 18:00:00.000?", but "<em>where</em> does 18:00 start?". Most of this chapter is about that difference.</p>
+
+<div class="check" id="check-problem">
+  <p class="q">A teammate suggests loading all 10 million timestamps into a hash set instead, because set lookups are O(1). What goes wrong?</p>
+  <div class="opts">
+    <button>Nothing; the set answers each question in O(1), which beats O(log n)</button>
+    <button data-correct>A set can say whether one exact timestamp is there, but not which orders fall between 18:00:00 and 18:00:59</button>
+    <button>Hash sets can't store timestamps</button>
+  </div>
+  <div class="fb right"><p>Right. A hash set throws the order away: items are placed by their hash, not by time. To answer "between" with a set you'd have to try every possible timestamp in that minute (60,000 of them at millisecond precision) or scan everything. The sorted list keeps the order, and order is exactly what binary search uses.</p></div>
+  <div class="fb wrong"><p>Think of a coat check. Hand over your exact ticket and you get your coat back instantly; that's a hash set. Now ask the attendant "which coats came in between 6:00 and 6:01?". They have no idea: the coats are hung by ticket number, not by time. A sorted list is a rail of coats in arrival order: find where 6:00 starts and where 6:01 starts, and everything between is your answer. Timestamps hash fine; the problem is that "between" needs order, and hashing destroys it.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Halving a sorted list</h2>
+
+<p>You've already met halving in <a href="complexity.html">the complexity chapter</a>: guessing a secret number from 1 to 64 takes only 6 yes/no questions, because each answer cuts the possibilities in half. Binary search on a sorted list is the same game. The list plays the secret-keeper.</p>
+
+<p>Keep two indexes, <code>lo</code> and <code>hi</code>, that fence in the part of the list where the target could still be. Look at the item in the middle, <code>mid</code>.</p>
+<ul>
+  <li>If it's the target, you're done.</li>
+  <li>If it's <b>smaller</b> than the target, the target can't be at mid or anywhere left of it (those are even smaller). Move <code>lo</code> to <code>mid + 1</code>.</li>
+  <li>If it's <b>bigger</b>, the target can't be at mid or to its right. Move <code>hi</code> to <code>mid − 1</code>.</li>
+</ul>
+<p>When the fence is empty (<code>lo &gt; hi</code>), the target isn't there.</p>
+
+<pre><code>def find(a, x):
+    lo, hi = 0, len(a) - 1      # if x is anywhere, it's in a[lo..hi]
+    while lo &lt;= hi:             # the fenced part still has items
+        mid = (lo + hi) // 2
+        if a[mid] == x:
+            return mid
+        if a[mid] &lt; x:
+            lo = mid + 1        # x is bigger: it can only be right of mid
+        else:
+            hi = mid - 1        # x is smaller: it can only be left of mid
+    return -1                   # fence is empty: x isn't in the list</code></pre>
+
+<div class="figure">
+  <div id="find-player"></div>
+  <div class="cap">The search above on 15 sorted numbers. Yellow is the probe (mid); faded cells are ruled out. Try a target that's missing, like 40, and notice where <code>lo</code> ends up: right where 40 would go. Section 3 is built on that.</div>
+</div>
+
+<p>Pass indexes, not slices. <code>find(a[mid + 1:], x)</code> looks the same but copies half the list on every step, which costs n/2 + n/4 + … ≈ n in total: O(n), not O(log n). It also returns an index into the copy, not into <code>a</code>. (The complexity chapter's section 5 has this trap.)</p>
+
+<h3>How many probes?</h3>
+<p>Each probe at least halves what's left. So the worst case is the number of times you can halve n before nothing is left, which is ⌊log₂ n⌋ + 1 (⌊ ⌋ means "round down").</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>items n</th><th>scan, worst case</th><th>binary search, worst case</th></tr></thead>
+  <tbody>
+    <tr><td>15</td><td>15</td><td>4</td></tr>
+    <tr><td>1,000</td><td>1,000</td><td>10</td></tr>
+    <tr><td>1,000,000</td><td>1,000,000</td><td>20</td></tr>
+    <tr><td>10,000,000</td><td>10,000,000</td><td>24</td></tr>
+    <tr><td>1,000,000,000</td><td>1,000,000,000</td><td>30</td></tr>
+  </tbody>
+</table></div>
+
+<div class="keyidea">Each probe rules out half of what's left, so n items need at most ⌊log₂ n⌋ + 1 probes: 20 for a million, 30 for a billion. It only works because the list is sorted: one comparison tells you which half can't hold the answer.</div>
+
+<div class="check" id="check-probes">
+  <p class="q">A sorted list of 1,000,000 user ids grows to 2,000,000. In the worst case, how many more probes does binary search need?</p>
+  <div class="opts">
+    <button>Twice as many: 40 instead of 20</button>
+    <button data-correct>One more: 21 instead of 20</button>
+    <button>About a million more</button>
+  </div>
+  <div class="fb right"><p>Right. The very first probe on 2,000,000 items cuts them to 1,000,000, and from there it's the old search. Doubling the data adds one probe. That's what log₂ means, and it's why binary search barely notices growth: a billion items is 30 probes.</p></div>
+  <div class="fb wrong"><p>Work backwards. Halve 2,000,000 once and you have 1,000,000 left, which is exactly the old problem: 20 more probes at most. So 21 in total. Twice the data means one more halving, not twice the halvings. "A million more" would be a scan's cost, which grows with n itself.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: the bug that sat in Java for nine years</summary>
+  <p>In C, C++, Java and Go, an <code>int</code> has a fixed size. A Java int is 32 bits and tops out at 2,147,483,647. If <code>lo</code> and <code>hi</code> are both above about 1.07 billion (2³⁰), then <code>lo + hi</code> goes past that limit, wraps around to a negative number, and <code>mid</code> becomes a negative index. In Java that throws an exception (in C it's undefined behavior), but only on arrays with more than a billion items, so tests never catch it.</p>
+  <p>That bug was in Java's own <code>Arrays.binarySearch</code> for about nine years before Joshua Bloch wrote it up in 2006; the same line is in the classic book <em>Programming Pearls</em>. The fix is <code>mid = lo + (hi - lo) / 2</code>, which never exceeds <code>hi</code>, or in Java <code>(lo + hi) &gt;&gt;&gt; 1</code>, which treats the sum as unsigned. Python's ints never overflow, so <code>(lo + hi) // 2</code> is safe in Python. (NumPy's fixed-size ints are not.) If you write binary search in a fixed-width language in an interview, use the safe form and say why.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>The real idea: find where the answer flips</h2>
+
+<p><code>find</code> answers one question: "is x in the list, and where is <em>a</em> copy?". That's not what most real problems ask. Try it on <code>[2, 4, 4, 4, 4, 7, 9]</code>:</p>
+<ul>
+  <li>Searching for 4, the first probe is index 3, which holds a 4, so it returns 3. But the <em>first</em> 4 is at index 1. Which copy you get depends on where the probes happen to land.</li>
+  <li>Searching for 5, it returns −1. But the dashboard from section 1 needs "where would 5 go?" (index 5), because "orders from 18:00:00 on" starts there even if no order was placed at exactly 18:00:00.</li>
+</ul>
+
+<p>Here's the reframe that fixes both. Instead of comparing with x three ways (smaller, equal, bigger), ask one <b>yes/no question</b> about each position. For "where would 5 go?", the question is "is a[i] ≥ 5?":</p>
+
+<pre class="diagram"><code>index:      0    1    2    3    4    5    6
+a[i]:       2    4    4    4    4    7    9
+a[i] ≥ 5?   no   no   no   no   no   yes  yes
+                                     ↑ the first yes: index 5</code></pre>
+
+<p>Because the list is sorted, the answers can only go no, no, …, no, yes, …, yes. Once a yes appears, every later item is at least as big, so it's a yes too. A yes/no question whose answer changes at most once, and never goes back, is called <b>monotone</b> (all no or all yes counts too). What we want is the <b>boundary</b>: the first yes.</p>
+
+<h3>Searching for a boundary</h3>
+<p>Binary search finds that boundary by keeping two facts true at every step. This pair of facts is the loop's <b>invariant</b> (something the loop never breaks):</p>
+<ul>
+  <li>everything <b>left of lo</b> is a known <b>no</b>;</li>
+  <li>everything <b>from hi on</b> is a known <b>yes</b>.</li>
+</ul>
+<p>Between them, from lo up to (but not including) hi, is the <b>unknown zone</b>, written [lo, hi).</p>
+
+<pre class="diagram"><code>[ known no  |  unknown ...  |  known yes ]
+ 0           lo              hi           n</code></pre>
+
+<ol>
+  <li><b>Start</b> with lo = 0 and hi = n. Nothing is known. hi = n is one past the end: a pretend "yes" that stands for "maybe no item is a yes at all".</li>
+  <li><b>Probe</b> mid = (lo + hi) // 2. Since lo &lt; hi, mid is always inside the unknown zone.</li>
+  <li>If the answer at mid is <b>yes</b>, then mid and everything after it are yes: set hi = mid.</li>
+  <li>If it's <b>no</b>, then mid and everything before it are no: set lo = mid + 1.</li>
+  <li><b>Stop</b> when the zone is empty, lo == hi. Now lo is the first yes, or n if there is none.</li>
+</ol>
+
+<div class="figure">
+  <div id="bound-player"></div>
+  <div class="cap">Top row: the values. Bottom row: what the search knows about each position (red = known no, green = known yes, ? = unknown). The faded cell at the end is the pretend "yes" at index n. Try "a[i] &gt; x" with x = 8: the boundary moves past all the 8s.</div>
+</div>
+
+<p>The same loop works for any monotone question, not only "a[i] ≥ x". Here it is on something that isn't a list of numbers at all. Builds 1 to n of an app; at some point a bad change went in, and every build after it is broken too. Each test run takes 10 minutes. Which build broke it?</p>
+
+<pre><code>def first_broken(n, is_broken):
+    lo, hi = 1, n + 1        # unknown zone is [lo, hi); n + 1 means "none broken"
+    while lo &lt; hi:           # stop when the unknown zone is empty
+        mid = (lo + hi) // 2 # lo &lt;= mid &lt; hi: always an untested build
+        if is_broken(mid):
+            hi = mid         # mid and everything after: known broken
+        else:
+            lo = mid + 1     # mid and everything before: known fine
+    return lo                # the first broken build, or n + 1 if none are</code></pre>
+
+<p>With 1,000 builds, testing them one by one could take 1,000 runs, almost 7 days. This takes at most 10 runs: 100 minutes.</p>
+
+<div class="keyidea">Don't search for a value; search for the boundary where a monotone yes/no question flips. Keep "left of lo is no, from hi on is yes" true at every step, and stop when lo and hi meet: lo is the first yes.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: two flags</summary>
+  <p>Stand a red flag on the last spot you <em>know</em> is a no, and a green flag on the first spot you know is a yes. At the start you know nothing, so the red flag stands just before the list (position −1) and the green flag just after it (position n). Each probe lands strictly between the flags and moves one of them there: a no moves the red flag, a yes moves the green flag. The flags only ever walk toward each other. When they're neighbors there's nothing left between them, and the green flag marks the first yes.</p>
+  <p>Some people write the loop exactly like this: <code>lo, hi = -1, n</code>, <code>while hi - lo &gt; 1</code>, and both branches set <code>lo = mid</code> or <code>hi = mid</code>; return <code>hi</code>. It's the same invariant with different labels (here lo is the red flag itself, not the spot after it). Pick one style and keep to it.</p>
+</details>
+
+<div class="check" id="check-invariant">
+  <p class="q">In <code>first_broken</code>, when <code>is_broken(mid)</code> is true the code sets <code>hi = mid</code>. Why not <code>hi = mid - 1</code>, since we've already tested mid?</p>
+  <div class="opts">
+    <button>mid − 1 would be slightly faster, so it's only a style choice</button>
+    <button data-correct>mid might be the first broken build; hi = mid − 1 would claim build mid − 1 is broken, which we never tested</button>
+    <button>hi = mid − 1 would make the loop run forever</button>
+  </div>
+  <div class="fb right"><p>Right. hi means "from here on, everything is known broken". We know mid is broken, so mid can join that zone. We know nothing about mid − 1; it might be fine. Builds 1 to 4 with build 3 the first broken one: lo = 1, hi = 5, mid = 3 is broken, and hi = mid − 1 = 2 declares build 2 broken. The loop then returns 2, the wrong build.</p></div>
+  <div class="fb wrong"><p>Read hi as a promise: "every build from hi on is broken". Setting hi = mid − 1 makes that promise about build mid − 1 without testing it. It doesn't hang (the zone still shrinks), and it isn't a style choice: it gives wrong answers. Trace builds 1 to 4 where build 3 is the first broken one. lo = 1, hi = 5. mid = 3 is broken, so the buggy line sets hi = 2. mid = 1 is fine, so lo = 2. Now lo == hi == 2, and it reports build 2, which works fine. The correct line, hi = 3, keeps build 3 in play.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: why the loop must be right, and git bisect</summary>
+  <p>The invariant gives you a proof in three steps, the same three that prove any loop. <b>It starts true:</b> with lo = 0 and hi = n there's nothing left of lo and nothing from hi on except the pretend yes. <b>Each step keeps it true:</b> a yes at mid means everything after mid is yes (that's monotone), so hi = mid is safe; a no means everything before mid is no, so lo = mid + 1 is safe. <b>The loop ends:</b> hi − lo is a whole number, at least 1 inside the loop, and both branches make it smaller (mid &lt; hi, and mid + 1 &gt; lo). It reaches 0 after at most ⌈log₂(n + 1)⌉ steps (⌈ ⌉ means "round up"). When it does, lo == hi, there are no unknowns, so lo is the first yes.</p>
+  <p><code>first_broken</code> is exactly what <code>git bisect</code> does. You mark one commit good and one bad; git checks out the commit in the middle; you test it and type <code>git bisect good</code> or <code>bad</code>; repeat. About log₂ of the number of commits rounds: 10 for 1,000 commits. <code>git bisect run ./test.sh</code> does the whole thing unattended. It relies on the same monotone assumption: if a bug was introduced, fixed, and introduced again, bisect finds <em>a</em> place where good turns to bad, not necessarily the first one.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Why binary searches hang (and miss by one)</h2>
+
+<p>When Jon Bentley gave professional programmers a couple of hours to write binary search, only about one in ten got it bug-free. The bugs are almost always one of a few lines: <code>&lt;</code> versus <code>&lt;=</code>, <code>mid</code> versus <code>mid + 1</code>, <code>n</code> versus <code>n − 1</code>. Guessing between them until the tests pass is how people get stuck. The invariant turns the guessing into three rules you can check line by line:</p>
+
+<ol>
+  <li><b>Start with the invariant true.</b> If "no item is a yes" is a possible answer, hi must start at n, one past the end. Starting at n − 1 means the search can never answer "none".</li>
+  <li><b>Every branch must keep it true.</b> Only mid itself was tested. On a yes, hi = mid (not mid − 1: section 3's quick check). On a no, lo = mid + 1 (mid is a known no, so it leaves the zone).</li>
+  <li><b>Every branch must shrink the zone.</b> Otherwise the next pass computes the same mid, gets the same answer, and changes nothing again, forever.</li>
+</ol>
+
+<p>Rule 3 is the one that causes hangs, and the reason is rounding. <code>(lo + hi) // 2</code> rounds <em>down</em>. When the zone is down to one cell, say lo = 4 and hi = 5, mid = 9 // 2 = 4 = lo. If the code then says <code>lo = mid</code>, lo stays 4, hi stays 5, and the loop spins forever. <code>hi = mid</code> is safe because mid is always strictly less than hi; <code>lo = mid + 1</code> is safe because it's always more than lo.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>The line (in a "first a[i] ≥ x" search)</th><th>Breaks which rule</th><th>Smallest input that shows it</th></tr></thead>
+  <tbody>
+    <tr><td><code>hi = len(a) - 1</code></td><td>1: can't answer "none"</td><td>a = [1], x = 2 returns 0, but a[0] = 1 is not ≥ 2 (right answer: 1)</td></tr>
+    <tr><td><code>hi = mid - 1</code></td><td>2: skips a possible answer</td><td>a = [1, 2], x = 2 returns 0 (right answer: 1)</td></tr>
+    <tr><td><code>lo = mid</code></td><td>3: zone stops shrinking</td><td>a = [1], x = 2 hangs: lo = 0, hi = 1, mid = 0 forever</td></tr>
+    <tr><td><code>while lo &lt;= hi</code> (with <code>hi = mid</code>)</td><td>3: runs when the zone is already empty</td><td>a = [1], x = 1 hangs at lo = hi = 0; x = 2 reads a[1] and crashes</td></tr>
+  </tbody>
+</table></div>
+
+<p>Try each bug below. The figure runs a "first a[i] ≥ x" search with the line you choose, and stops as soon as a step changes nothing.</p>
+
+<div class="figure">
+  <div id="bug-player"></div>
+  <div class="cap">A bug lab on [1, 3, 5, 7, 9, 11]. Faded cells are ruled out; the unknown zone runs from lo up to, not including, hi; the dashed cell is index n. Pick a version and a target. "lo = mid" hangs on almost any target; "hi = len(a) − 1" only goes wrong for x = 12, the case where the answer is "none".</div>
+</div>
+
+<div class="keyidea">Three rules: hi starts where the invariant is true (n if "none" is possible); each branch moves only mid into a known zone (hi = mid on yes, lo = mid + 1 on no); and each branch must shrink [lo, hi). Since // rounds down, mid can equal lo but never hi, which is why lo = mid hangs and hi = mid doesn't.</div>
+
+<div class="check" id="check-hang">
+  <p class="q">This loop has a bug: the no branch says <code>lo = mid</code>. On <code>a = [1, 3, 5, 7]</code>, which target finishes instead of looping forever?</p>
+  <pre><code>lo, hi = 0, len(a)
 while lo &lt; hi:
     mid = (lo + hi) // 2
-    if ok(mid):  hi = mid        # mid might be the answer; keep it
-    else:        lo = mid + 1    # mid is definitely not; drop it
-return lo                         # first index where ok is true</code></pre>
-      <p>The invariant, which you should say out loud: <b>everything left of lo is false, everything from hi on is true</b>. Each step shrinks [lo, hi) and keeps the invariant, so when lo == hi you've found the boundary. No <code>+1/-1</code> guessing, no infinite loops.</p>
-      <h3>3. Search on the answer</h3>
-      <p>Often you're not searching an array at all. You're searching the space of possible <em>answers</em>: "what's the minimum ship capacity to deliver in D days?" Capacity c either works or doesn't, and if c works, c+1 works too. That's monotonic, so you can binary search c over [max(weight), sum(weights)] with a greedy O(n) check at each probe. Total: O(n log(sum)).</p>
-      <p>Smell test for this pattern: <b>"minimum X such that…" or "maximum X such that…"</b>, plus a check that's easy once X is fixed. Examples: Koko eating bananas, split array largest sum, minimum days to make bouquets, the smallest divisor under a threshold.</p>
-    </div>
-  </details>
+    if a[mid] &gt;= x:
+        hi = mid
+    else:
+        lo = mid          # bug: should be mid + 1</code></pre>
+  <div class="opts">
+    <button>x = 4</button>
+    <button data-correct>x = 1</button>
+    <button>x = 8</button>
+  </div>
+  <div class="fb right"><p>Right. With x = 1 every probe is a yes (everything is ≥ 1), so only hi moves and the buggy line never runs: hi goes 4, 2, 1, 0 and the loop returns 0. For x = 4 the zone shrinks to lo = 1, hi = 2; mid = 1, a[1] = 3 is a no, and lo = mid = 1 changes nothing. For x = 8 it gets stuck at lo = 3, hi = 4 the same way.</p></div>
+  <div class="fb wrong"><p>Look for the moment the zone is down to one cell: hi = lo + 1. Then mid = (lo + lo + 1) // 2 = lo, because // rounds down. If that cell is a no, <code>lo = mid</code> leaves lo where it was, and the next pass does the exact same thing. So the loop hangs whenever it takes the no branch with a one-cell zone, and for x = 4 and x = 8 it does (stuck at lo = 1, hi = 2 and at lo = 3, hi = 4). For x = 1, a[mid] ≥ 1 is true at every probe, so the no branch never runs and the bug never fires.</p></div>
+</div>
 
-  <details class="box analogy" open id="analogy">
-    <summary><span class="kicker">Intuition</span><span class="label">Analogy: finding the bad commit</span></summary>
-    <div class="box-body">
-      <p><code>git bisect</code> is binary search on a predicate: "is the bug present at this commit?" Old commits are good, new ones bad, and somewhere it flips. You never need the commits to be "sorted" by anything except time, and you only need the predicate to flip once.</p>
-      <p class="muted small">Physical picture: a dimmer switch with an unmarked dial. You want the lowest setting where the room is bright enough. Try the middle, then the middle of the half that's left. Ten tries cover a thousand positions.</p>
-    </div>
-  </details>
+<details class="aside deeper">
+  <summary>Go deeper: searching for the last yes, and the other loop style</summary>
+  <p><b>The last yes.</b> Some questions flip the other way: yes, yes, yes, no, no. If you want the last yes, the easiest correct move is to search for the first <em>no</em> with the same loop and subtract 1 (section 8 does this). The alternative keeps lo as a known yes and uses <code>lo = mid</code>, which only works if you round mid <em>up</em>: <code>mid = (lo + hi + 1) // 2</code>. Then mid is never equal to lo, and the zone always shrinks. It's correct but easy to forget, which is why "first no, minus 1" is the safer habit.</p>
+  <p><b>The closed style.</b> <code>find</code> in section 2 uses <code>hi = len(a) - 1</code>, <code>while lo &lt;= hi</code> and <code>hi = mid - 1</code>, all things the table calls bugs. It isn't buggy, because it has a different invariant: "if x is anywhere, it's in a[lo..hi], both ends included". For that invariant, an empty zone is lo &gt; hi, and mid itself has already been ruled out when a[mid] ≠ x, so mid − 1 is right. Every bug in the table comes from taking a line from one style and dropping it into the other. Know which invariant your loop keeps, and every line follows from it.</p>
+</details>
 
-  <details class="box viz" open id="see-it">
-    <summary><span class="kicker">See it</span><span class="label">Playground: lower_bound, step by step</span></summary>
-    <div class="box-body">
-      <div class="viz-controls"><span class="small">target</span><input id="bs-t" type="number" value="23" style="width:6em"><button class="btn" id="bs-go">Search</button><button class="btn" id="bs-new">New array</button></div>
-      <div id="bs-player" style="margin-top:12px"></div>
-      <div class="legend"><span><i style="background:var(--bad)"></i>known false (&lt; target)</span><span><i style="background:var(--ok)"></i>known true (≥ target)</span><span><i style="background:var(--accent)"></i>mid</span></div>
-    </div>
-  </details>
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>First, last, and how many: lower and upper bound</h2>
 
-  <details class="box viz" open id="see-it-2">
-    <summary><span class="kicker">See it</span><span class="label">Playground: search on the answer (ship capacity)</span></summary>
-    <div class="box-body">
-      <p class="small muted">Weights <code>[1..10]</code>, ship within <b>D</b> days. Each probe picks a capacity, packs greedily, and counts days. The strip shows the predicate "capacity works" over all candidate capacities.</p>
-      <div class="viz-controls"><span class="small">days D</span><input id="sc-d" type="range" min="1" max="10" value="5"><b id="sc-dv"></b></div>
-      <div id="sc-player" style="margin-top:12px"></div>
-    </div>
-  </details>
+<p>Two boundary questions cover almost every "sorted list" problem. They're common enough to have names:</p>
+<ul>
+  <li><b>lower bound</b> of x: the first index with a[i] ≥ x. Python calls it <code>bisect_left(a, x)</code>.</li>
+  <li><b>upper bound</b> of x: the first index with a[i] &gt; x. Python calls it <code>bisect_right(a, x)</code>.</li>
+</ul>
+<p>Both are the boundary loop from section 3; only the question changes. Between them sit exactly the copies of x:</p>
 
-  <details class="box senior" open id="interview">
-    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
-    <div class="box-body">
-      <ul>
-        <li><b>Name the predicate and prove it's monotonic</b> before writing code. That one sentence is the whole correctness argument.</li>
-        <li><b>Use one template everywhere</b> and state the invariant. Interviewers watch for <code>lo &lt;= hi</code> vs <code>lo &lt; hi</code> confusion. Having a single template you can defend reads as senior.</li>
-        <li><b>Overflow:</b> in Java or C++, <code>(lo + hi) / 2</code> can overflow; write <code>lo + (hi - lo) / 2</code>. Python ints don't overflow, but mention it anyway.</li>
-        <li><b>Beyond arrays:</b> bisecting a deploy range, searching a timestamp-sorted log file by seeking to byte offsets, finding a capacity limit with load tests. All the same idea.</li>
-        <li><b>Know the library:</b> <code>bisect.bisect_left</code> / <code>bisect_right</code>, and since Python 3.10 they take a <code>key=</code>.</li>
-      </ul>
-    </div>
-  </details>
+<pre class="diagram"><code>index:     0    1    2    3    4    5
+a[i]:      2    4    4    4    7    9
+a[i] ≥ 4?  no   yes  yes  yes  yes  yes   → bisect_left(a, 4)  = 1
+a[i] &gt; 4?  no   no   no   no   yes  yes   → bisect_right(a, 4) = 4
+the 4s live in [1, 4): indexes 1, 2, 3, and there are 4 − 1 = 3 of them</code></pre>
 
-  <details class="box trap" open id="traps">
-    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
-    <div class="box-body">
-      <ul>
-        <li>Infinite loop: <code>lo = mid</code> with <code>mid = (lo + hi) // 2</code> can stall when hi = lo + 1.</li>
-        <li>Wrong search bounds for search-on-answer: the low bound must be feasible-or-below (max weight), the high bound definitely feasible (sum).</li>
-        <li>Using it on a predicate that isn't monotonic, like a "peak" in an unsorted array without the extra argument for why it works.</li>
-        <li>Returning <code>lo</code> without checking it's in range and actually matches (for an exact-match search).</li>
-      </ul>
-    </div>
-  </details>
+<div class="table-wrap"><table>
+  <thead><tr><th>x</th><th>bisect_left(a, x)</th><th>bisect_right(a, x)</th><th>what it tells you</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>0</td><td>0</td><td>smaller than everything: it would go at the front</td></tr>
+    <tr><td>4</td><td>1</td><td>4</td><td>three copies, at indexes 1 to 3</td></tr>
+    <tr><td>5</td><td>4</td><td>4</td><td>both equal: no copies; 5 would go at index 4</td></tr>
+    <tr><td>9</td><td>5</td><td>6</td><td>one copy, the last item</td></tr>
+    <tr><td>10</td><td>6</td><td>6</td><td>bigger than everything: index n, past the end</td></tr>
+  </tbody>
+</table></div>
 
-  <details class="box" open id="check">
-    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
-    <div class="box-body">
-      <details class="qa"><summary>How do you get the last index where nums[i] ≤ target from the template?</summary><p>Search the first index where nums[i] &gt; target (bisect_right) and subtract 1.</p></details>
-      <details class="qa"><summary>How does search in a rotated sorted array still work?</summary><p>At any mid, one half is sorted (compare nums[lo] with nums[mid]). Check whether the target lies inside that sorted half's range; if so go there, otherwise go to the other half.</p></details>
-      <details class="qa"><summary>How many probes for a range of 10⁹?</summary><p>About 30, since log₂(10⁹) ≈ 30. That's why "n up to 10⁹" in a problem statement is a hint.</p></details>
-    </div>
-  </details>
+<p>Everything else is a line of arithmetic on those two numbers. Call them L and R:</p>
+<ul>
+  <li><b>How many copies of x:</b> R − L.</li>
+  <li><b>Is x there at all:</b> L &lt; n and a[L] == x. (Equivalently, R − L &gt; 0.)</li>
+  <li><b>First copy:</b> L, if x is there. <b>Last copy:</b> R − 1, if x is there.</li>
+  <li><b>Where to insert x</b> and keep the list sorted: L (before equal items) or R (after them).</li>
+  <li><b>How many items in [lo, hi]:</b> bisect_right(a, hi) − bisect_left(a, lo). Two searches, any size of range.</li>
+</ul>
 
-  <details class="box" open id="practice">
-    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
-    <div class="box-body">
-      <p><b>Exercise:</b> <code>exercises/binary_search.py</code>: lower_bound and minimum ship capacity. Tests compare against <code>bisect</code> on random inputs.</p>
-      <p><b>Classic problems:</b> Search Insert Position · First Bad Version · Search in Rotated Sorted Array · Koko Eating Bananas · Split Array Largest Sum · Median of Two Sorted Arrays (hard).</p>
-    </div>
+<p>That last line is the whole dashboard from section 1:</p>
+
+<pre><code>from bisect import bisect_left, bisect_right
+
+def orders_between(times, start, end):
+    """times is sorted. How many orders have start &lt;= t &lt;= end?"""
+    i = bisect_left(times, start)   # first order at or after start
+    j = bisect_right(times, end)    # first order strictly after end
+    return j - i                    # times[i:j] is exactly the range</code></pre>
+
+<div class="keyidea">bisect_left is the first a[i] ≥ x; bisect_right is the first a[i] &gt; x. The copies of x are exactly a[left:right]. Counting, first copy, last copy, insert position and range queries all come from these two boundaries, each found in O(log n).</div>
+
+<div class="check" id="check-bounds">
+  <p class="q"><code>a = [2, 4, 4, 4, 7, 9]</code>. What does <code>bisect_left(a, 5)</code> return?</p>
+  <div class="opts">
+    <button>−1, because 5 isn't in the list</button>
+    <button data-correct>4</button>
+    <button>3</button>
+  </div>
+  <div class="fb right"><p>Right. bisect_left answers "where is the first a[i] ≥ 5?". a[3] = 4 is a no; a[4] = 7 is the first yes. That's also where you'd insert 5 to keep the list sorted. A boundary search always returns a position from 0 to n; "not found" shows up as a[L] != x, never as −1.</p></div>
+  <div class="fb wrong"><p>Write the yes/no row for "a[i] ≥ 5": 2 no, 4 no, 4 no, 4 no, 7 yes, 9 yes. The first yes is at index 4. Index 3 is the <em>last 4</em>, which you'd get from bisect_right(a, 4) − 1, a different question. And a boundary search never says −1: it always lands on a position, even past the end (index 6 here, for any x above 9).</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: the same tool in other languages, and in databases</summary>
+  <ul>
+    <li><b>C++:</b> <code>std::lower_bound</code> and <code>std::upper_bound</code> are exactly these two; <code>std::equal_range</code> returns both at once.</li>
+    <li><b>Java:</b> <code>Arrays.binarySearch</code> returns the index if found, otherwise <code>−(insertion point) − 1</code>, so a "not found" result is always negative and still tells you where x would go. With duplicates, it doesn't promise <em>which</em> copy you get; if you need the first, write the boundary loop.</li>
+    <li><b>Python:</b> <code>bisect.insort(a, x)</code> inserts into a sorted list, but the insert shifts every later item, so it's O(n) per insert even though the search is O(log n). Since 3.10, the bisect functions also take a <code>key=</code>.</li>
+    <li><b>Databases:</b> <code>WHERE t BETWEEN a AND b</code> on an indexed column does the same thing: a tree search finds where a starts, then the database walks forward until it passes b. That walk is called a range scan.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>A sorted list that's been rotated</h2>
+
+<p>A server keeps the ids of its last 7 requests in a ring buffer: 7 slots, and when they're full, the newest id overwrites the oldest. Ids only go up. Read the slots from 0 to 6 and you see:</p>
+
+<pre class="diagram"><code>slot:   0    1    2    3    4    5    6
+id:     25   28   31   12   15   18   21
+        └── newer ─┘   └───── older ────┘</code></pre>
+
+<p>It's a sorted list that was cut in two and the pieces swapped. That's called a <b>rotated sorted array</b>. Try section 2's <code>find</code> on it. For 15 it gets lucky: the middle is 12, 12 &lt; 15, it goes right and finds 15. For 28 it fails: the middle is still 12, 12 &lt; 28, so it goes right again, and 28 is on the left. One comparison with the middle no longer tells you which side is safe to throw away.</p>
+
+<h3>Way 1: find the cut, then search one piece</h3>
+<p>The cut is where the smallest id sits. Find it with a boundary question. Compare every item with the <b>last</b> item, 21: "is a[i] ≤ 21?". The newer piece (25, 28, 31) is all bigger than 21; the older piece (12 to 21) is all ≤ 21. So the answers are no, no, no, yes, yes, yes, yes: monotone. The first yes, at index 3, is the smallest id. Then decide which piece the target lives in (≤ 21 means the right piece) and run an ordinary search there. Two binary searches, O(log n).</p>
+
+<pre class="diagram"><code>  31 |       *
+  28 |    *
+  25 | *
+  21 |                   *
+  18 |                *
+  15 |             *
+  12 |          *
+     +------------------------
+       0  1  2  3  4  5  6   index
+≤ 21?  n  n  n  y  y  y  y   (n = no, y = yes)</code></pre>
+
+<h3>Way 2: one pass</h3>
+<p>Cut a rotated array anywhere and at least one of the two halves is in plain sorted order. You can tell which by comparing its ends: if a[lo] ≤ a[mid], the left half a[lo..mid] has no cut in it. A sorted half lets you check "is the target between its ends?". If yes, search there; if no, the target can only be in the other half. Either way, half is gone.</p>
+<p>Both ways are O(log n). Way 1 is easier to get right under pressure, because it reuses the boundary loop you already trust.</p>
+
+<div class="keyidea">A rotated sorted array is two sorted runs. "Is a[i] ≤ the last item?" is monotone on it (no for the first run, yes for the second), so a boundary search finds the smallest item, and an ordinary search finishes the job. Total O(log n).</div>
+
+<div class="check" id="check-rotated">
+  <p class="q">You want the index of the smallest item in a rotated sorted array (all values distinct), and the array might not be rotated at all. Which question can you binary search for its first yes?</p>
+  <div class="opts">
+    <button>"Is a[i] &lt; a[0]?"</button>
+    <button data-correct>"Is a[i] ≤ a[n − 1]?" (compare with the last item)</button>
+    <button>"Is a[i] &lt; a[i − 1]?" (is it smaller than its left neighbor?)</button>
+  </div>
+  <div class="fb right"><p>Right. On [25, 28, 31, 12, 15, 18, 21] the answers to "≤ 21?" are no, no, no, yes, yes, yes, yes: first yes at index 3. On an unrotated [12, 15, 18, 21], every answer is yes, so the first yes is index 0, still the smallest. "&lt; a[0]" works on a rotated array but is all no on an unrotated one, giving n: wrong without a special case. "&lt; a[i − 1]" is yes at only one spot, so there's no boundary to find.</p></div>
+  <div class="fb wrong"><p>Test each question on two arrays: rotated [25, 28, 31, 12, 15, 18, 21] and unrotated [12, 15, 18, 21]. "a[i] &lt; a[0]": rotated gives no, no, no, yes, yes, yes, yes (good), but unrotated gives no, no, no, no, and the search returns 4, past the end. "a[i] &lt; a[i − 1]": rotated gives no, no, no, yes, no, no, no. A single yes in the middle isn't a boundary; a probe that lands on a no can't tell which side the yes is on. "a[i] ≤ a[n − 1]" gives the right first yes on both: index 3, then index 0.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: duplicates make it O(n)</summary>
+  <p>Allow repeated values and rotation gets truly harder. Compare [1, 1, 1, 1, 1, 0, 1] with [1, 0, 1, 1, 1, 1, 1]. In both, a[lo], a[mid] and a[hi] are all 1, so no probe can tell you which side the 0 is on. The best you can do is drop one end (hi −= 1) and try again, and an array of all 1s with a single 0 forces that n times. So with duplicates, the worst case is O(n), and an interviewer who asks the follow-up wants to hear exactly that, plus why.</p>
+  <p>A bonus from Way 1: the index of the smallest item is how far the array was rotated. In the ring buffer, it's the slot of the oldest request.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Search on the answer</h2>
+
+<p>So far the yes/no question has been about positions in a list. Now for the move that turns binary search from a lookup trick into a problem-solving tool: asking the question about <em>possible answers</em> instead.</p>
+
+<div class="story">
+  <p>A teacher has 5 stacks of exams to grade: 30, 11, 23, 4 and 20 exams. Each hour she picks one stack and grades up to p exams from it; if fewer than p are left in that stack, she finishes it and takes the rest of the hour off (she never mixes stacks within an hour). She has 8 hours. What's the <b>slowest pace</b> p that still gets everything graded in time?</p>
+</div>
+
+<p>At pace p, a stack of s exams takes s / p hours, rounded up. Write that ⌈s / p⌉. The total is the sum over all stacks. The first idea: try p = 1, 2, 3, … and stop at the first pace that fits.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>pace p</th><th>1</th><th>5</th><th>10</th><th>14</th><th>15</th><th>20</th><th>30</th></tr></thead>
+  <tbody>
+    <tr><td>hours needed</td><td>88</td><td>19</td><td>11</td><td>9</td><td>8</td><td>7</td><td>5</td></tr>
+    <tr><td>within 8?</td><td>no</td><td>no</td><td>no</td><td>no</td><td>yes</td><td>yes</td><td>yes</td></tr>
+  </tbody>
+</table></div>
+
+<p>That works here: 15 tries. But scale it up and it falls apart. Make it a batch job with 100,000 queues of up to 1,000,000,000 items each, where the answer could be in the hundreds of millions. Trying paces one at a time is up to a billion tries, each adding up 100,000 queues: 10¹⁴ steps.</p>
+
+<h3>The answers form a sorted list</h3>
+<p>Look at the bottom row of the table: no, no, no, no, yes, yes, yes. A faster pace never needs <em>more</em> hours (each ⌈s / p⌉ can only stay the same or drop as p grows). So "can she finish at pace p?" is a monotone question over p, and the answer we want is its first yes. That's section 3's boundary search, except the "list" is the range of paces 1 to 30, and "reading an item" means running a check.</p>
+<p>The range needs care. <b>lo</b> must be no bigger than the answer: pace 1 is the slowest that makes sense. <b>hi</b> must be a sure yes: at pace 30 (the biggest stack) every stack takes exactly one hour, 5 hours in all, the fastest possible. (If she had fewer hours than stacks, no pace would work; check that first.)</p>
+
+<div class="figure">
+  <div id="answer-player"></div>
+  <div class="cap">Binary search over paces 1 to 30. The bars show the true hours at every pace, but the search only computes the ones it probes (numbers on top). Red = known too slow, green = known fast enough, yellow = the check being run. Change the deadline and watch the answer move. Bars taller than 40 are cut off (↑).</div>
+</div>
+
+<pre><code>def slowest_pace(stacks, hours):
+    def can_finish(pace):                  # the yes/no question
+        return sum((s + pace - 1) // pace for s in stacks) &lt;= hours
+    lo, hi = 1, max(stacks)                # at max(stacks), every stack takes 1 hour
+    while lo &lt; hi:
+        mid = (lo + hi) // 2
+        if can_finish(mid):
+            hi = mid                       # fast enough: the answer is mid or slower
+        else:
+            lo = mid + 1                   # too slow: the answer is faster than mid
+    return lo                              # assumes hours &gt;= len(stacks)</code></pre>
+
+<p><code>(s + pace - 1) // pace</code> is ⌈s / pace⌉ in whole numbers, with no floats. Notice hi starts at <code>max(stacks)</code>, not one past it: here a yes is guaranteed, so hi can be a real known yes instead of a pretend one. The invariant is the same.</p>
+
+<h3>The recipe</h3>
+<p>Every "search on the answer" problem has the same five steps. Say them out loud in an interview:</p>
+<ol>
+  <li><b>What is the answer a number of?</b> A pace, a capacity, a number of days, a distance.</li>
+  <li><b>Write the check:</b> "if the answer were x, would it work?". It's usually a greedy pass over the input, O(n). The trick is that checking a given x is much easier than finding the best x.</li>
+  <li><b>Argue it's monotone:</b> "if x works, does x + 1 work too?". Give the reason in one sentence. No reason, no binary search.</li>
+  <li><b>Pick bounds:</b> lo at or below the answer, hi a sure yes. A hi that's too small gives a wrong answer silently; a hi that's too big costs only a few extra checks (doubling hi adds one), so err big.</li>
+  <li><b>Binary search for the first yes</b> (or the last yes; next section). Cost: one check per probe, so O(cost of check × log(hi − lo)).</li>
+</ol>
+<p>How to spot one: the problem says "minimum X such that…" or "maximum X such that…", the possible answers span a huge range, and if someone told you an X, you could check it quickly.</p>
+
+<div class="keyidea">When "does x work?" is monotone in x, the possible answers form a sorted list of no's then yes's. Binary search over the answer range, running the O(n) check at each probe: O(n log range) in total. For a billion possible answers that's 30 checks.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: the shower knob</summary>
+  <p>Turn a shower knob to the right and the water gets hotter, never colder. You want the coldest setting that's at least 38°C. You don't try every notch from the left. You turn it halfway, feel the water, and go halfway again toward warmer or colder. Your hand is the check; the knob's range is the list of possible answers. Nobody wrote the temperatures down anywhere; you only ever need the answer at the spots you test. That's search on the answer: the "sorted list" is imaginary, and you compute an item only when you probe it.</p>
+</details>
+
+<div class="check" id="check-monotone">
+  <p class="q">Which of these can you solve with binary search on the answer?</p>
+  <div class="opts">
+    <button>The pace at which the teacher finishes in exactly 8 hours: not 7, not 9</button>
+    <button data-correct>The fewest identical servers so that every request is answered within 200 ms, given that adding a server never makes anything slower</button>
+    <button>The day this year when a stock's price was closest to $100</button>
+  </div>
+  <div class="fb right"><p>Right. "Do s servers meet the 200 ms target?" is monotone: if s servers do, s + 1 do too. So the answers go no, …, no, yes, …, yes, and you want the first yes. "Exactly 8 hours" isn't monotone: paces 1 to 14 are no, 15 to 19 are yes, and from pace 20 on (7 hours or fewer) it's no again. Two flips. And a stock price wanders up and down, so "closest to $100" has no single flip point.</p></div>
+  <div class="fb wrong"><p>For each one, write the yes/no answers in order and see if they flip only once. Servers: more servers never hurt, so it's no, no, no, yes, yes, yes: one flip. "Exactly 8 hours": paces 1 to 14 are no (too slow), 15 to 19 are yes, and 20 to 30 are no again (too fast, only 7 or fewer hours). Two flips: a probe at pace 25 says "no", and you can't tell whether to go faster or slower. The stock price goes up and down all year, so "closest to $100" isn't even a yes/no that flips once. Binary search needs exactly one flip.</p></div>
+</div>
+
+<div class="check" id="check-cost">
+  <p class="q">The batch-job version: 100,000 queues, the biggest holding 1,000,000,000 items. Roughly how much work is binary search on the pace?</p>
+  <div class="opts">
+    <button>About 30 steps: log₂ of a billion</button>
+    <button data-correct>About 3 million steps: 30 checks, each adding up 100,000 queues</button>
+    <button>About 100 trillion steps</button>
+  </div>
+  <div class="fb right"><p>Right. log₂(1,000,000,000) ≈ 30, so about 30 probes, and each probe runs the check, which reads all 100,000 queues: 30 × 100,000 = 3,000,000. O(n log range). 100 trillion (10¹⁴) is what trying every pace from 1 up could cost.</p></div>
+  <div class="fb wrong"><p>Count two things and multiply. How many probes? The range is 1 to a billion, and each probe halves it: about 30. What does one probe cost? Running <code>can_finish</code>, which adds up every queue: 100,000 steps. So 30 × 100,000 ≈ 3 million. "30 steps" forgets that a probe isn't free; here, unlike a sorted list, reading one "item" costs n. 100 trillion is a billion paces × 100,000 queues: the one-by-one approach.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: when the check is the expensive part</summary>
+  <ul>
+    <li><b>Expensive checks.</b> The check can be anything monotone: a 10-minute test run (git bisect), a one-minute load test for "how many requests per second can 4 servers take?", a simulation. Binary search keeps the number of checks at log₂ of the range, which is what makes these practical: 30 one-minute load tests instead of a billion.</li>
+    <li><b>No known upper bound.</b> Start hi at 1 and double it until <code>can(hi)</code> is a yes: 1, 2, 4, 8, … That finds a sure yes in about log₂(answer) checks, and then the normal search runs below it. This is exponential search (section 10) applied to answers.</li>
+    <li><b>You need the plan, not just the number.</b> Binary search gives you the best x. If the problem wants the actual schedule (which items on which day), run the check once more at the answer and record what it does.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>The other direction: the biggest value that still works</h2>
+
+<p>Some problems ask for a <b>maximum</b>. A hardware shop has cables of 7, 12 and 5 meters. A customer needs at least 4 pieces, all the same whole number of meters long (leftovers are thrown away). What's the longest piece length that still gives 4 pieces?</p>
+
+<p>The check: at length x, cable c gives c // x pieces. Add them up and compare with 4. Now the monotone direction is flipped. Shorter pieces are always easier to get, so the answers go yes, yes, …, yes, no, no:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>length x</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th></tr></thead>
+  <tbody>
+    <tr><td>pieces (7//x + 12//x + 5//x)</td><td>24</td><td>11</td><td>7</td><td>5</td><td>4</td><td>3</td><td>2</td></tr>
+    <tr><td>at least 4?</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>no</td><td>no</td></tr>
+  </tbody>
+</table></div>
+
+<p>We want the <b>last yes</b>, 5. Rather than invent a second loop (and its own off-by-one traps, section 4's deeper box), use the loop you already trust to find the <b>first no</b>, then step back one:</p>
+
+<pre><code>def longest_piece(cables, k):
+    # can(x) = "at least k pieces of length x?": yes ... yes, no ... no
+    lo, hi = 1, max(cables) + 1      # length max+1 can't give any piece: a sure no
+    while lo &lt; hi:                   # search for the FIRST no
+        mid = (lo + hi) // 2
+        if sum(c // mid for c in cables) &gt;= k:
+            lo = mid + 1             # mid works: the first no is further right
+        else:
+            hi = mid                 # mid fails: it might be the first no
+    return lo - 1                    # the last yes is just before the first no</code></pre>
+
+<p>Compare it with <code>slowest_pace</code>: the branches have swapped roles, because now "works" is on the left. If even length 1 fails (fewer than k meters of cable in total), the first no is 1 and the function returns 0, meaning "impossible". Decide up front what your function should return in that case.</p>
+
+<div class="keyidea">Minimum that works: first yes. Maximum that works: the answers flip from yes to no, so find the first no with the same loop and subtract 1. One loop to trust, in both directions.</div>
+
+<div class="check" id="check-lastyes">
+  <p class="q">For the cables 7, 12 and 5 with k = 4, the loop above ends with lo = 6. A teammate's version returns <code>lo</code> instead of <code>lo - 1</code>. What goes wrong?</p>
+  <div class="opts">
+    <button>Nothing: 6 is the answer</button>
+    <button data-correct>It returns 6, which only gives 3 pieces: 7//6 + 12//6 + 5//6 = 1 + 2 + 0</button>
+    <button>It's only wrong when no length works at all: it returns 1 instead of 0</button>
+  </div>
+  <div class="fb right"><p>Right. The loop finds the first length that <em>fails</em>, and 6 fails: 1 + 2 + 0 = 3 pieces. The answer is the one before it, 5: 1 + 2 + 1 = 4 pieces. Returning lo is the classic "search for a maximum" off-by-one.</p></div>
+  <div class="fb wrong"><p>Remember what this loop's lo means at the end: the first <em>no</em>. Check 6 directly: 7 // 6 = 1, 12 // 6 = 2, 5 // 6 = 0, so 3 pieces, not enough. Length 5 gives 1 + 2 + 1 = 4 pieces, enough. So the last yes is 5, which is lo − 1. It's true that returning lo also breaks the impossible case (1 instead of 0), but that's a symptom: lo is the first no every single time, so returning it is wrong every single time.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Searching real numbers</h2>
+
+<p>The answer doesn't have to be a whole number. Square root is the classic: √x is the boundary where "is m · m ≥ x?" flips from no to yes, and that question is monotone for m ≥ 0. With real numbers there's no "next" number, so the loop changes in two ways:</p>
+
+<pre><code>def sqrt(x):                      # x &gt;= 0
+    lo, hi = 0.0, max(1.0, x)     # the root is always in here
+    for _ in range(100):          # a fixed count, not "while hi - lo &gt; eps"
+        mid = (lo + hi) / 2
+        if mid * mid &lt; x:
+            lo = mid              # fine here: / doesn't round down onto lo
+        else:
+            hi = mid
+    return hi</code></pre>
+
+<ul>
+  <li><b>hi = max(1, x), not x.</b> For x below 1 the root is bigger than x (√0.25 = 0.5), so [0, x] would miss it.</li>
+  <li><b>lo = mid is fine here.</b> The hang in section 4 came from <code>//</code> rounding mid down onto lo. With real division mid lands strictly between lo and hi, until lo and hi are neighboring floats. Then mid rounds to one of them, a step changes nothing, and only the fixed count ends the loop.</li>
+  <li><b>Count iterations; don't wait for a gap.</b> Each step halves the gap: starting from [0, 2], 21 steps get it under 0.000001 (2 / 2²¹ ≈ 0.00000095). You need about log₂(starting gap ÷ precision) steps, so 100 gives a float-exact root for any x up to about 10²⁸; for √(10¹⁰⁰) it isn't enough (that start gap needs about 220). But <code>while hi - lo &gt; 1e-9</code> can hang: computing √(10²⁰), lo and hi end up at two neighboring floats near 10¹⁰, and neighboring floats there are 0.0000019 apart. The gap can never drop below 10⁻⁹, so the loop never ends.</li>
+</ul>
+<p>On sqrt(2) this returns 1.4142135623730951, the same as <code>math.sqrt(2)</code>. For an exact <em>integer</em> square root of a huge number, use the integer boundary loop instead: the last m with m · m ≤ n (Python ships it as <code>math.isqrt</code>).</p>
+
+<div class="keyidea">Binary search works on real numbers too: same invariant, real division, and a fixed number of iterations. Each one halves the gap, so pick about log₂(starting gap ÷ precision) of them; a fixed count can't hang.</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>When binary search is the wrong tool</h2>
+
+<p>Binary search needs two things: a monotone question, and the ability to jump straight to any position (to "read item mid" in one step). Take either away, or make the setup cost more than the searching saves, and something else wins.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Situation</th><th>Why binary search loses</th><th>Use instead</th></tr></thead>
+  <tbody>
+    <tr><td>Unsorted data, one lookup</td><td>Sorting first costs n log n; one scan costs n</td><td>Scan</td></tr>
+    <tr><td>Many exact lookups, never ranges</td><td>log n per lookup, versus about 1</td><td>Hash set or dict</td></tr>
+    <tr><td>Many inserts and deletes between lookups</td><td>Inserting into a sorted array shifts up to n items</td><td>Balanced tree, skip list, or a database index</td></tr>
+    <tr><td>A linked list</td><td>Reaching the middle means walking there</td><td>Scan, or a skip list / tree</td></tr>
+    <tr><td>The question isn't monotone</td><td>There's no single flip to find</td><td>Rethink the question, or scan</td></tr>
+    <tr><td>A dozen items</td><td>Saves a handful of steps</td><td>Scan; it's simpler and just as fast</td></tr>
+  </tbody>
+</table></div>
+
+<p>The first two rows are a trade-off you should be able to price out loud. With n = 1,000,000 unsorted numbers and k lookups: k scans cost k × 1,000,000; sorting once and then binary searching costs about 20,000,000 + 20k. Sorting pays off after about 20 lookups. A hash set costs about 1,000,000 to build and about 1 per lookup, so it wins for exact lookups at any k above a few, and loses the moment you need "between", "first after", or "how many below".</p>
+
+<div class="check" id="check-wrongtool">
+  <p class="q">You have a sorted <b>linked list</b> of 1,000,000 nodes and binary search it for one value, walking as little as possible (you keep a pointer to the first node of the part that's left). About how many node-to-node steps does it take?</p>
+  <div class="opts">
+    <button>About 20, the same as for an array</button>
+    <button data-correct>About 1,000,000, because reaching each middle node means walking to it</button>
+    <button>About 20,000,000 (n log n)</button>
+  </div>
+  <div class="fb right"><p>Right. To read the middle node you walk from the head: 500,000 steps. The next middle is 250,000 steps from there, then 125,000, and so on: about 1,000,000 in total. O(n), no better than a plain scan, and the scan is simpler. (Restart every walk from the head and it's worse: up to about 20 million.) That's why systems that need sorted order plus fast search use trees or skip lists, not sorted linked lists.</p></div>
+  <div class="fb wrong"><p>Binary search's 20 probes assume you can jump to any index in one step, like an array. A linked list can only go node by node. Reaching the first middle costs 500,000 steps; the next middle is 250,000 further; then 125,000. That adds up to about 1,000,000, so it's O(n). 20 million is what you'd pay restarting every walk from the head; walking on from the start of the part that's left, each walk is half as long as the last, so the total is about one trip down the list.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: B-trees, disks, and searching without an end</summary>
+  <p><b>On disk, every probe is a trip.</b> A billion sorted 100-byte records is 100 GB on disk. Binary search needs 30 probes, each a random read: on a spinning disk (about 10 ms per random read) that's 0.3 seconds per lookup; on an SSD (about 0.1 ms) about 3 ms. Databases do better with a <b>B-tree</b>: each node is one disk page (8 KB in PostgreSQL, 16 KB in MySQL's InnoDB) holding a few hundred sorted keys. You binary search inside the page, in memory, and follow one pointer down. With 500 keys per page, 4 levels hold 62.5 billion keys (500⁴), and the top levels stay cached in RAM, so a lookup costs one or two disk reads instead of 30. A B-tree is binary search reshaped so that every slow probe brings back a whole page of answers.</p>
+  <p><b>Exponential (galloping) search.</b> If you don't know where the list ends (a stream, a paged API, a file with no index), probe positions 1, 2, 4, 8, … until you pass the target, then binary search inside the last gap. If the answer is at position p, that's about 2 log₂ p probes: about 40 for p = 1,000,000, without ever knowing n. It's also cheaper than plain binary search when the answer is near the front. Python's own sort (Timsort) gallops like this when merging, once one side keeps winning.</p>
+  <p><b>Interpolation search</b> guesses the position by proportion instead of taking the middle, the way you open a phone book near the back for "W": about log log n probes on evenly spread values, but O(n) on skewed ones.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>What to say in the interview</h2>
+
+<p>When binary search fits, a strong answer sounds like this:</p>
+<ol>
+  <li><b>Name the boundary.</b> "I'll binary search for the first index where a[i] ≥ target." Or: "for the smallest capacity that ships everything in time."</li>
+  <li><b>Say the invariant and the bounds.</b> "Everything left of lo is a no, everything from hi on is a yes. hi starts at n, because the answer can be 'none'."</li>
+  <li><b>For search on the answer, argue monotone.</b> "If capacity c works, c + 1 works too: every day's load still fits. So the answers flip once."</li>
+  <li><b>Give the cost.</b> "O(log n) probes." Or: "about 30 checks over a range of a billion, each O(n), so O(n log range)."</li>
+  <li><b>Test the edges out loud.</b> Empty input, one item, all items equal, target below everything, target above everything, answer exactly at lo or at hi.</li>
+</ol>
+<p>Write the loop from the invariant, not from memory. If you catch yourself changing <code>&lt;</code> to <code>&lt;=</code> to make a test pass, stop and re-state what lo and hi mean.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"Would this work in Java?"</b> <code>(lo + hi) / 2</code> overflows past about a billion; use <code>lo + (hi - lo) / 2</code> (section 2).</li>
+    <li><b>"What if the rotated array has duplicates?"</b> Worst case O(n), because a[lo] = a[mid] = a[hi] gives no information (section 6).</li>
+    <li><b>"What if you don't know the length?"</b> Exponential search: 1, 2, 4, 8, … then binary search the last gap (section 10).</li>
+    <li><b>"Find a peak" in an unsorted array.</b> Binary search still works: if a[mid] &lt; a[mid + 1], some peak must lie to the right, so the left half can go. The real requirement is never "sorted"; it's "one probe tells me which half is safe to throw away".</li>
+    <li><b>"The sorted data is split across 100 machines."</b> If each machine holds one key range, keep a small sorted list of each machine's first key: one binary search over it picks the machine, which then searches its own part. Range queries touch only the machines whose ranges overlap.</li>
+    <li><b>"k-th smallest in a sorted matrix" or "median of two sorted arrays".</b> Both are boundary searches: the first on the value (count how many entries are ≤ x, monotone in x), the second on where to cut the shorter array, O(log(min(m, n))).</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Binary search rules out half of what's left with every probe: at most ⌊log₂ n⌋ + 1 probes, 20 for a million. It needs sorted order and jumps to any position in one step.</li>
+  <li>The real idea is a boundary: a monotone yes/no question goes no, …, no, yes, …, yes, and you want the first yes.</li>
+  <li>Invariant: left of lo is no, from hi on is yes, [lo, hi) is unknown. Start lo = 0, hi = n; yes → hi = mid; no → lo = mid + 1; stop when lo == hi.</li>
+  <li>Hangs come from a branch that doesn't shrink the zone (<code>lo = mid</code>, since // rounds down); misses come from moving a bound past an untested spot or starting hi at n − 1.</li>
+  <li>bisect_left = first a[i] ≥ x, bisect_right = first a[i] &gt; x. Count = right − left; last copy = right − 1; range count = two searches.</li>
+  <li>A rotated sorted array is two runs: "a[i] ≤ last item?" is monotone, so find the smallest item, then search one run. Duplicates make it O(n) in the worst case.</li>
+  <li>Search on the answer: if "does x work?" is monotone, binary search the range of answers, running the O(n) check at each probe: O(n log range). For a maximum, find the first no and subtract 1.</li>
+  <li>Real numbers: real division and a fixed number of iterations. Wrong tool: unsorted single lookups, exact-only lookups (hash), heavy inserts, linked lists, questions that aren't monotone.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first. The coding exercises are in <code>exercises/binary_search.py</code>. Their tests count every item you read and every comparison and addition on the numbers they hand you, so a correct but slow solution fails. Run them with <code>python3 -m pytest -k binary_search</code>.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Trace it by hand</h4>
+  <p>Take <code>a = [3, 8, 8, 8, 12, 17, 21]</code>. (a) Run <code>find</code> from section 2 for 12 and for 9; write lo, hi and mid at each step. (b) Run the boundary loop from section 3 for "a[i] ≥ 8" and for "a[i] &gt; 8"; write lo, hi, mid and the yes/no answer at each step. How many copies of 8 are there, according to (b)?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) For 12: (lo 0, hi 6, mid 3: a = 8 &lt; 12) → (4, 6, mid 5: 17 &gt; 12) → (4, 4, mid 4: 12, found at index 4). For 9: the same first two probes, then (4, 4, mid 4: 12 &gt; 9) → hi = 3, lo = 4 &gt; hi: not found, returns −1, and lo = 4 is where 9 would go.</p>
+    <p>(b) "≥ 8": (0, 7, mid 3: yes) → (0, 3, mid 1: yes) → (0, 1, mid 0: 3, no) → lo = hi = 1. "&gt; 8": (0, 7, mid 3: no) → (4, 7, mid 5: yes) → (4, 5, mid 4: 12, yes) → lo = hi = 4. Copies of 8: 4 − 1 = 3.</p>
   </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Break the loop</h4>
+  <p>Each version of "first index with a[i] ≥ x" below has one line changed from section 3's loop. For each, find the smallest input that breaks it, and say whether it gives a wrong answer, hangs, or crashes. (a) <code>hi = len(a) - 1</code> at the start. (b) <code>while lo &lt;= hi</code>. (c) <code>lo = mid</code> in the no branch. Then say which of section 4's three rules each one breaks.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) a = [1], x = 2: the loop never runs and it returns 0, but the answer is 1 ("none"). Wrong answer; rule 1. (b) a = [], any x: lo = hi = 0, the loop runs, and a[0] crashes. With a = [1], x = 1 it hangs at lo = hi = 0 (yes, hi = mid = 0, no change). Rule 3. (c) a = [1], x = 2: lo = 0, hi = 1, mid = 0 is a no, lo = mid = 0, forever. Hangs; rule 3.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Binary search, or not?</h4>
+  <p>For each one, say whether binary search applies. If it does, name the yes/no question and the range, and estimate the number of probes. (a) The first day a server's disk was over 90% full, from a year of daily usage numbers, if files are never deleted. (b) The same, but files do get deleted sometimes. (c) The integer square root of a 30-digit number. (d) Whether 42 appears in an unsorted list of 1,000 numbers, checked once. (e) The lowest floor of a 100-floor building from which a dropped phone breaks, if you have as many phones as you like.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Yes: "is usage on day d over 90%?" is monotone because usage only grows. Range 365 days, 9 probes. (b) No: usage can go up and down, so there can be several crossings; binary search lands on <em>a</em> crossing, not necessarily the first. Scan. (c) Yes: the last m with m · m ≤ n, over 0 to n; log₂(10³⁰) ≈ 100 probes, exact in Python's big ints. (d) No: one scan is 1,000 steps; sorting first costs more than that. (e) Yes: "does it break from floor f?" is monotone. 7 drops, since 2⁷ = 128 ≥ 100. (With only two phones it becomes a different puzzle, a dynamic programming one.)</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>search_range(nums, target)</code>: first and last copy</h4>
+  <p>Return (first, last), or (−1, −1). The list comes as a read-only sequence that counts every item you read. The test allows 6 · ⌈log₂(n + 1)⌉ + 6 reads (108 for n = 100,000) and includes a list where <em>every</em> item equals the target, so finding one copy and walking outward (O(n)) fails. Write the boundary loop yourself; no <code>bisect</code>.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>search_rotated(nums, target)</code></h4>
+  <p>Distinct values, sorted, then rotated (or not rotated at all). Return the index or −1. The test checks every rotation of every small list against brute force, then counts reads on 100,000 items, allowing 8 · ⌈log₂(n + 1)⌉ + 8. Finding the cut by scanning for the drop is O(n) and fails. Way 1 in section 6 is the safer route.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>min_ship_capacity(weights, days)</code></h4>
+  <p>Packages ship in order; each day the ship loads the next packages that fit under its capacity. Find the smallest capacity that ships everything within <code>days</code> days. Use the recipe from section 7: what's the check, why is it monotone, and what are lo and hi? (Hint: the ship must carry the heaviest package on its own.) The weights count every comparison and addition made with them; trying capacities one at a time blows the budget of 4 · n · (⌈log₂(sum)⌉ + 2).</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>max_min_gap(positions, k)</code></h4>
+  <p>Put k sensors at k of the given positions on a road so that the closest two are as far apart as possible; return that distance. This is a <em>maximum</em>: section 8's direction. Sort once, then write a greedy check for "can k sensors be placed with every gap at least d?". The test counts comparisons, additions and subtractions: one sort plus about n per probe fits; sorting inside every check, or trying d = 1, 2, 3, …, doesn't.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>8. Bisect a flaky benchmark</h4>
+  <p>A performance regression slipped into one of the last 2,000 commits. Each benchmark run takes 15 minutes, and about 1 run in 20 gives the wrong answer. How many runs would plain binary search need if the benchmark were perfect? What does one wrong answer do to it, and can it recover? Design something robust (repeat each probe? verify the final pair? run probes in parallel?) and estimate the total time.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>9. Say it out loud</h4>
+  <p>Set a 3-minute timer. Explain <code>min_ship_capacity</code> to an imaginary interviewer without code: the yes/no question, why it's monotone, what lo and hi are and why, the total cost, and two edge cases you'd test. Did you say "first yes" and "O(n log(sum))"?</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="sorting.html"><small>← Previous</small>Putting things in order</a>
+  <a class="next" href="two-pointers-sliding-window.html"><small>Next →</small>Two pointers, sliding window, prefix sums</a>
+</nav>
+
 </main>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  let arr = [];
-  const newArr = () => { const s = new Set(); while (s.size < 14) s.add(1 + Math.floor(Math.random() * 60)); arr = [...s].sort((a, b) => a - b); };
-  function frames(t) {
-    const fr = []; let lo = 0, hi = arr.length, probes = 0;
-    fr.push({ lo, hi, msg: `Find the first index with value ≥ <b>${t}</b>. Window is [lo, hi) = [${lo}, ${hi}).` });
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1; probes++;
-      const ok = arr[mid] >= t;
-      fr.push({ lo, hi, mid, msg: `mid = ${mid}, value ${arr[mid]} ${ok ? "≥" : "&lt;"} ${t}: ok(mid) is <b>${ok}</b>. ${ok ? "mid might be the answer, so hi = mid." : "Everything up to mid is false, so lo = mid + 1."}` });
-      if (ok) hi = mid; else lo = mid + 1;
-    }
-    fr.push({ lo, hi, ans: lo, msg: `lo == hi == <b>${lo}</b> after ${probes} probes (log₂ ${arr.length} ≈ ${Math.log2(arr.length).toFixed(1)}). ${lo < arr.length ? `First value ≥ ${t} is ${arr[lo]}.` : "No value is ≥ target; the insertion point is the end."}` });
-    return fr;
-  }
-  const bs = V.player($("bs-player"), {
-    draw(f, stage) {
-      const ptrs = {}; ptrs[f.lo] = "lo"; if (f.hi < arr.length) ptrs[f.hi] = (ptrs[f.hi] ? ptrs[f.hi] + "," : "") + "hi"; if (f.mid != null) ptrs[f.mid] = (ptrs[f.mid] ? ptrs[f.mid] + "," : "") + "mid";
-      stage.append(V.cells(arr, { ptrs, cls: (i) => (i === f.mid ? "hl" : f.ans === i ? "done" : i < f.lo ? "bad" : i >= f.hi ? "win" : "") }));
-      if (f.hi === arr.length) stage.append(V.el("div", { class: "small muted" }, "hi = len(nums) = ", arr.length, " (one past the end)"));
-    },
-  });
-  const run = () => bs.load(frames(Number($("bs-t").value)));
-  $("bs-go").onclick = run; $("bs-t").addEventListener("keydown", (e) => e.key === "Enter" && run());
-  $("bs-new").onclick = () => { newArr(); run(); };
-  newArr(); run();
+  const select = (pairs, value) => V.el("select", {}, pairs.map(([v, label]) => V.el("option", { value: v, selected: String(v) === String(value) ? "selected" : null }, label)));
+  const ptrs = (pairs) => { const out = {}; for (const [name, i] of pairs) if (i != null) out[i] = out[i] ? out[i] + "," + name : name; return out; };
+  const label = (text) => V.el("div", { class: "small muted", style: "margin:2px 0 4px" }, text);
 
-  const W = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-  const days = (c) => { let d = 1, cur = 0; for (const w of W) { if (cur + w > c) { d++; cur = 0; } cur += w; } return d; };
-  function scFrames(D) {
-    const fr = []; let lo = Math.max(...W), hi = W.reduce((a, b) => a + b, 0);
-    const L0 = lo, H0 = hi;
-    fr.push({ lo, hi, L0, H0, D, msg: `Answer lies in [max weight, total] = [${lo}, ${hi}]. Any capacity ≥ the answer also works: monotonic.` });
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1, d = days(mid), ok = d <= D;
-      fr.push({ lo, hi, mid, L0, H0, D, msg: `Try capacity <b>${mid}</b>: greedy packing needs ${d} day${d > 1 ? "s" : ""} → ${ok ? "works, try smaller (hi = mid)" : "too slow, need bigger (lo = mid + 1)"}.` });
-      if (ok) hi = mid; else lo = mid + 1;
+  // ---------- Section 2: classic search on 15 numbers ----------
+  (function () {
+    const a = [2, 5, 8, 12, 16, 23, 31, 38, 42, 47, 51, 56, 64, 72, 89];
+    function build(x) {
+      const fr = []; let lo = 0, hi = a.length - 1, k = 0;
+      fr.push({ lo, hi, msg: `Looking for <b>${x}</b> in ${a.length} sorted numbers. lo = 0, hi = ${hi}: all ${a.length} are still possible.` });
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1; k++;
+        const head = `Probe ${k}: mid = (${lo} + ${hi}) // 2 = ${mid}, and a[${mid}] = ${a[mid]}. `;
+        if (a[mid] === x) {
+          fr.push({ lo, hi, mid, found: mid, msg: head + `Found it after ${k} probe${k > 1 ? "s" : ""}. A scan from the left would have read ${mid + 1} items.` });
+          return fr;
+        }
+        if (a[mid] < x) { fr.push({ lo, hi, mid, msg: head + `${a[mid]} &lt; ${x}, so ${x} can only be to the right: lo = ${mid + 1}.` }); lo = mid + 1; }
+        else { fr.push({ lo, hi, mid, msg: head + `${a[mid]} &gt; ${x}, so ${x} can only be to the left: hi = ${mid - 1}.` }); hi = mid - 1; }
+      }
+      fr.push({ lo, hi, msg: `lo = ${lo} &gt; hi = ${hi}: nothing is left, so ${x} isn't in the list (${k} probes). Look where lo stopped: index ${lo}${lo < a.length ? `, the first number bigger than ${x} (${a[lo]})` : ", past the end"}. That's where ${x} would go.` });
+      return fr;
     }
-    fr.push({ lo, hi, ans: lo, L0, H0, D, msg: `Minimum capacity: <b>${lo}</b>. We checked ${fr.length - 1} capacities out of ${H0 - L0 + 1}.` });
-    return fr;
-  }
-  const sc = V.player($("sc-player"), {
-    draw(f, stage) {
-      const caps = []; for (let c = f.L0; c <= f.H0; c++) caps.push(c);
-      stage.append(V.el("div", { style: "overflow-x:auto" }, V.cells(caps, {
-        idx: false, label: (c) => c,
-        ptrs: f.mid != null ? { [f.mid - f.L0]: "probe" } : {},
-        cls: (i, c) => (c === f.mid ? "hl" : c === f.ans ? "done" : c < f.lo ? "bad" : c >= f.hi ? "win" : "dim"),
-      })));
-      stage.append(V.el("div", { class: "small muted" }, "capacity candidates. Red: proven too small. Green: proven to work. Faded: unknown."));
-    },
-  });
-  const scRun = () => { $("sc-dv").textContent = $("sc-d").value; sc.load(scFrames(Number($("sc-d").value))); };
-  $("sc-d").oninput = scRun; scRun();
+    const pick = select([[23, "find 23"], [40, "find 40 (missing)"], [89, "find 89"], [2, "find 2"]], 23);
+    const player = V.player($("find-player"), {
+      frames: build(23), speed: 1100, extraControls: [pick],
+      draw(f, stage) {
+        const p = ptrs([["lo", f.lo], ["mid", f.mid], ["hi", f.hi]]);
+        stage.append(V.el("div", { style: `display:grid;grid-template-columns:repeat(${a.length},minmax(0,1fr));gap:3px;padding:22px 0;max-width:640px` },
+          a.map((v, i) => V.el("div", {
+            class: "cell " + (f.found === i ? "done" : i === f.mid ? "cmp" : i < f.lo || i > f.hi ? "dim" : ""),
+            style: "min-width:0;padding:0;height:34px;font-size:.75rem",
+          }, p[i] ? V.el("span", { class: "ptr" }, p[i]) : null, v, V.el("span", { class: "idx" }, i)))));
+      },
+    });
+    pick.onchange = () => player.load(build(Number(pick.value)));
+  })();
+
+  // ---------- Section 3: boundary search with known-no / known-yes zones ----------
+  (function () {
+    const a = [3, 5, 5, 8, 8, 8, 12, 15], n = a.length;
+    function build(x, strict) {
+      const op = strict ? "&gt;" : "≥", name = strict ? "bisect_right" : "bisect_left";
+      const fr = []; let lo = 0, hi = n, k = 0;
+      fr.push({ lo, hi, msg: `Question: is a[i] ${op} ${x}? Nothing is known yet: lo = 0, hi = ${n}. Index ${n} is one past the end, a pretend "yes" that means "no item is a yes".` });
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1; k++;
+        const yes = strict ? a[mid] > x : a[mid] >= x;
+        fr.push({ lo, hi, mid, msg: `Probe ${k}: the unknown zone is [${lo}, ${hi}), so mid = (${lo} + ${hi}) // 2 = ${mid}. Is a[${mid}] = ${a[mid]} ${op} ${x}? <b>${yes ? "Yes" : "No"}</b>. ` +
+          (yes ? `Everything from ${mid} on is a yes too (sorted!): hi = ${mid}.` : `Everything up to ${mid} is a no too: lo = ${mid + 1}.`) });
+        if (yes) hi = mid; else lo = mid + 1;
+      }
+      fr.push({ lo, hi, end: true, msg: `lo = hi = ${lo}: the unknown zone is empty. The first yes is at index <b>${lo}</b>${lo === n ? " (past the end: no item is a yes)" : ` (a[${lo}] = ${a[lo]})`}. That's ${name}(a, ${x}) = ${lo}, found with ${k} probes.` });
+      return fr;
+    }
+    const tgt = select([[8, "x = 8"], [5, "x = 5"], [10, "x = 10"], [1, "x = 1"], [20, "x = 20"]], 8);
+    const rule = select([["ge", "a[i] ≥ x  (bisect_left)"], ["gt", "a[i] > x  (bisect_right)"]], "ge");
+    const player = V.player($("bound-player"), {
+      frames: build(8, false), speed: 1300, extraControls: [tgt, rule],
+      draw(f, stage) {
+        const vals = [...a, null];
+        stage.append(label("a[i]"), V.cells(vals, {
+          cls: (i) => (f.end && i === f.lo ? "hl" : i === f.mid ? "cmp" : ""),
+          ptrs: ptrs([["lo", f.lo], ["mid", f.mid], ["hi", f.hi]]),
+        }));
+        const ans = vals.map((_, i) => (i < f.lo ? "no" : i >= f.hi ? "yes" : "?"));
+        stage.append(label("what the search knows"), V.cells(ans, {
+          idx: false,
+          cls: (i) => (i < f.lo ? "bad" : i >= f.hi ? "done" + (i === n ? " dim" : "") : i === f.mid ? "cmp" : ""),
+        }));
+      },
+    });
+    const reload = () => player.load(build(Number(tgt.value), rule.value === "gt"));
+    tgt.onchange = reload; rule.onchange = reload;
+  })();
+
+  // ---------- Section 4: bug lab ----------
+  (function () {
+    const a = [1, 3, 5, 7, 9, 11], n = a.length;
+    const versions = {
+      ok:    { hi0: n,     le: false, yes: (m) => m,     no: (m) => m + 1, line: "correct loop" },
+      lomid: { hi0: n,     le: false, yes: (m) => m,     no: (m) => m,     line: "lo = mid" },
+      lele:  { hi0: n,     le: true,  yes: (m) => m,     no: (m) => m + 1, line: "while lo &lt;= hi" },
+      hin1:  { hi0: n - 1, le: false, yes: (m) => m,     no: (m) => m + 1, line: "hi = len(a) - 1" },
+      him1:  { hi0: n,     le: false, yes: (m) => m - 1, no: (m) => m + 1, line: "hi = mid - 1" },
+    };
+    const right = (x) => { let i = 0; while (i < n && a[i] < x) i++; return i; };
+    function build(key, x) {
+      const v = versions[key], fr = [];
+      let lo = 0, hi = v.hi0, k = 0;
+      fr.push({ lo, hi, msg: `Version: <b>${v.line}</b>. Searching for the first a[i] ≥ ${x}. Start: lo = 0, hi = ${hi}.` });
+      while (v.le ? lo <= hi : lo < hi) {
+        k++;
+        const mid = (lo + hi) >> 1;
+        if (mid >= n) { fr.push({ lo, hi, mid, bad: true, msg: `Step ${k}: lo = ${lo}, hi = ${hi}, mid = ${mid}. But a only has indexes 0 to ${n - 1}: reading a[${mid}] raises <b>IndexError</b>. The loop ran with an empty zone.` }); return fr; }
+        const yes = a[mid] >= x, nlo = yes ? lo : v.no(mid), nhi = yes ? v.yes(mid) : hi;
+        const what = yes ? `yes, so hi = ${nhi}` : `no, so lo = ${nlo}`;
+        if (nlo === lo && nhi === hi) {
+          fr.push({ lo, hi, mid, bad: true, msg: `Step ${k}: lo = ${lo}, hi = ${hi}, mid = ${mid}. a[${mid}] = ${a[mid]} ≥ ${x}? ${what}. <b>Nothing changed.</b> The next pass computes the same mid and does the same thing: this loop never ends.` });
+          return fr;
+        }
+        fr.push({ lo, hi, mid, msg: `Step ${k}: lo = ${lo}, hi = ${hi}, mid = (${lo} + ${hi}) // 2 = ${mid}. a[${mid}] = ${a[mid]} ≥ ${x}? ${what}.` });
+        lo = nlo; hi = nhi;
+      }
+      const want = right(x), ok = lo === want;
+      fr.push({ lo, hi, end: true, good: ok, msg: `The loop ends and returns lo = ${lo}. The right answer is ${want}${want === n ? " (no item is ≥ " + x + ")" : ""}: <b>${ok ? "correct" : "wrong"}</b>.` +
+        (ok ? "" : key === "hin1" ? " hi started at " + (n - 1) + ", so the answer " + n + ' ("none") was never possible.' : " The search moved hi past a spot it never tested.") });
+      return fr;
+    }
+    const ver = select([["ok", "correct"], ["lomid", "bug: lo = mid"], ["lele", "bug: while lo <= hi"], ["hin1", "bug: hi = len(a) - 1"], ["him1", "bug: hi = mid - 1"]], "lomid");
+    const tgt = select([[0, "x = 0"], [4, "x = 4"], [7, "x = 7"], [11, "x = 11"], [12, "x = 12"]], 7);
+    const player = V.player($("bug-player"), {
+      frames: build("lomid", 7), speed: 1300, extraControls: [ver, tgt],
+      draw(f, stage) {
+        stage.append(V.cells([...a, null], {
+          cls: (i) => (f.end && i === f.lo ? (f.good ? "done" : "bad") : i === f.mid ? (f.bad ? "bad" : "cmp") : i >= f.lo && i <= f.hi ? "" : "dim"),
+          ptrs: ptrs([["lo", f.lo], ["mid", f.mid], ["hi", f.hi]]),
+        }));
+      },
+    });
+    const reload = () => player.load(build(ver.value, Number(tgt.value)));
+    ver.onchange = reload; tgt.onchange = reload;
+  })();
+
+  // ---------- Section 7: search on the answer ----------
+  (function () {
+    const stacks = [30, 11, 23, 4, 20], P = Math.max(...stacks);
+    const hours = (p) => stacks.reduce((t, s) => t + Math.ceil(s / p), 0);
+    function build(H) {
+      const fr = [], seen = {}; let lo = 1, hi = P, k = 0;
+      fr.push({ lo, hi, seen: { ...seen }, H, msg: `Deadline: ${H} hours. Possible paces: 1 to ${P} (the biggest stack). At pace ${P} every stack takes one hour, ${stacks.length} hours in all, so ${P} is a sure yes: lo = 1, hi = ${P}.` });
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1; k++;
+        const h = hours(mid), yes = h <= H; seen[mid] = h;
+        const sum = (k === 1 ? stacks.map((s) => `⌈${s}/${mid}⌉`).join(" + ") + " = " : "") + stacks.map((s) => Math.ceil(s / mid)).join(" + ");
+        fr.push({ lo, hi, mid, seen: { ...seen }, H, msg: `Check ${k}: mid = (${lo} + ${hi}) // 2 = ${mid}. Hours at pace ${mid}: ${sum} = <b>${h}</b>. ` +
+          (yes ? `${h} ≤ ${H}: fast enough, so the answer is ${mid} or slower: hi = ${mid}.` : `${h} &gt; ${H}: too slow, so the answer is faster than ${mid}: lo = ${mid + 1}.`) });
+        if (yes) hi = mid; else lo = mid + 1;
+      }
+      fr.push({ lo, hi, seen: { ...seen }, H, end: true, msg: `lo = hi = <b>${lo}</b>: the slowest pace that finishes in ${H} hours. ${k} checks × ${stacks.length} stacks = ${k * stacks.length} steps. Trying paces 1, 2, 3, … would have taken ${lo} checks (${lo * stacks.length} steps). Every colored bar without a number is known from the order alone, never computed.` });
+      return fr;
+    }
+    const Ht = 262, L = 40, B = 40, T = 28, cap = 40;
+    const y = (v) => Ht - B - (Math.min(v, cap) / cap) * (Ht - B - T);
+    const style = { no: "fill:var(--bad-soft);stroke:var(--bad)", yes: "fill:var(--ok-soft);stroke:var(--ok)", mid: "fill:var(--warn-soft);stroke:var(--warn)", unk: "fill:var(--surface-3);stroke:var(--border-strong)" };
+    const deadline = select([[5, "deadline 5 h"], [6, "deadline 6 h"], [8, "deadline 8 h"], [10, "deadline 10 h"], [12, "deadline 12 h"]], 8);
+    const player = V.player($("answer-player"), {
+      frames: build(8), speed: 1500, extraControls: [deadline],
+      draw(f, stage) {
+        const W = stage.clientWidth && stage.clientWidth < 520 ? 400 : 640, bw = (W - L - 10) / P, fs = W < 640 ? "font-size:13px" : "";
+        const svg = V.s("svg", { class: "viz", viewBox: `0 0 ${W} ${Ht}`, style: fs });
+        for (let v = 0; v <= cap; v += 10) svg.append(V.s("line", { class: "grid-line", x1: L, x2: W - 10, y1: y(v), y2: y(v) }), V.s("text", { class: "label", x: L - 6, y: y(v) + 4, "text-anchor": "end", text: v, style: fs }));
+        for (let p = 1; p <= P; p++) {
+          const h = hours(p), x = L + (p - 1) * bw;
+          const st = p === f.mid ? "mid" : p < f.lo ? "no" : p >= f.hi ? "yes" : "unk";
+          svg.append(V.s("rect", { x: x + 2, y: y(h), width: bw - 4, height: Ht - B - y(h), rx: 2, style: style[st] + ";stroke-width:1" }));
+          if (f.seen[p] != null) svg.append(V.s("text", { class: "label", x: x + bw / 2, y: y(h) - 4, "text-anchor": "middle", text: h, style: "fill:var(--text);" + fs }));
+          else if (h > cap) svg.append(V.s("text", { class: "label", x: x + bw / 2, y: y(h) - 3, "text-anchor": "middle", text: "↑" }));
+          if (p === 1 || p % 5 === 0) svg.append(V.s("text", { class: "label", x: x + bw / 2, y: Ht - B + 14, "text-anchor": "middle", text: p, style: fs }));
+          const tag = [p === f.lo ? "lo" : "", p === f.hi ? "hi" : ""].filter(Boolean).join(",");
+          if (tag) svg.append(V.s("text", { x: x + bw / 2, y: Ht - B + 28, "text-anchor": "middle", text: tag, style: "fill:var(--accent);font-weight:700;" + (fs || "font-size:11px") }));
+        }
+        svg.append(V.s("line", { x1: L, x2: W - 10, y1: y(f.H), y2: y(f.H), style: "stroke:var(--text);stroke-dasharray:6 4;opacity:.7" }),
+          V.s("text", { x: W - 12, y: y(f.H) - 5, "text-anchor": "end", text: `deadline ${f.H} h`, style: "fill:var(--text);" + (fs || "font-size:11px") }),
+          V.s("line", { class: "axis", x1: L, x2: W - 10, y1: Ht - B, y2: Ht - B }),
+          V.s("text", { class: "label", x: L + 2, y: 12, text: "hours needed", style: fs }),
+          V.s("text", { class: "label", x: W - 12, y: Ht - 2, "text-anchor": "end", text: W < 640 ? "pace p →" : "pace p (exams per hour) →", style: fs }));
+        stage.append(svg);
+      },
+    });
+    deadline.onchange = () => player.load(build(Number(deadline.value)));
+  })();
 })();
 </script>
 </body>

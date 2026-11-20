@@ -4,172 +4,836 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="topic" content="02.04">
-  <title>Two pointers, sliding windows and prefix sums</title>
+  <title>Two pointers, sliding window, prefix sums</title>
   <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
   <link rel="stylesheet" href="../../../assets/style.css">
   <script src="../../../assets/curriculum.js"></script>
   <script src="../../../assets/viz.js"></script>
   <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
 </head>
 <body data-root="../../.." data-section="02" data-page="concept">
-<main class="content">
-  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.04 · Two pointers, sliding window, prefix sums</p>
-  <h1>Two pointers, sliding windows and prefix sums</h1>
-  <p class="lede">Three techniques that turn "check every subarray" (O(n²)) into one pass (O(n)). They all work the same way: reuse what you computed for the last position instead of starting over.</p>
-  <details class="box accent" open id="idea">
-    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
-    <div class="box-body">
-      <p class="one-liner">Don't recompute overlapping work. A window slides by adding one element on the right and removing one on the left; a prefix sum answers any range sum as one subtraction.</p>
-    </div>
-  </details>
+<main class="content book">
 
-  <details class="box" open id="first-principles">
-    <summary><span class="kicker">Build it</span><span class="label">From first principles</span></summary>
-    <div class="box-body">
-      <h3>1. The brute force and its waste</h3>
-      <p>"Longest substring without repeating characters": check every (start, end) pair, which is O(n²) pairs and O(n) to check each, so O(n³). But the substring [2..7] and [2..8] share almost everything. The waste is recomputing the shared part.</p>
-      <h3>2. Sliding window: grow right, shrink left</h3>
-      <pre><code>left = 0
-for right, x in enumerate(items):
-    add x to the window state
-    while window is invalid:
-        remove items[left] from the window state
-        left += 1
-    record the answer for window [left, right]</code></pre>
-      <p>Both pointers only move forward, so the total work is O(n) even with the inner <code>while</code>. The window state is usually a counter, a set, or a running sum.</p>
-      <p><b>When it works:</b> validity must be <em>monotonic</em> as the window grows. If [l, r] is invalid, then [l, r+1] is also invalid (for "at most" constraints), so moving left is safe. Negative numbers in a sum break this, which is when you switch to prefix sums.</p>
-      <h3>3. Two pointers from both ends</h3>
-      <p>On sorted input, one pointer at each end: if the sum is too big, move the right pointer left; if too small, move the left pointer right. Each move rules out a whole row of pairs. That covers two-sum on sorted input, container with most water, 3-sum (fix one, two-pointer the rest), and palindromes.</p>
-      <h3>4. Prefix sums: precompute once, answer any range in O(1)</h3>
-      <pre><code>P[0] = 0, P[i+1] = P[i] + nums[i]
-sum(nums[i..j]) = P[j+1] - P[i]</code></pre>
-      <p>Combined with a hash map of "how many times have I seen prefix value p?", you can count subarrays summing to k in one pass, negatives included: at each point, ask how many earlier prefixes equal <code>current − k</code>.</p>
-    </div>
-  </details>
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 4</div>
+  <h1>Two pointers, sliding window, prefix sums</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> one of the most common interview patterns</span><span>about 55 minutes</span><span>10 quick checks · 11 exercises</span></div>
+</header>
 
-  <details class="box analogy" open id="analogy">
-    <summary><span class="kicker">Intuition</span><span class="label">Analogies</span></summary>
-    <div class="box-body">
-      <div class="cols">
-        <div class="panel"><h4>Sliding window: a caterpillar</h4><p class="small">The head eats forward. When it's eaten something bad (a repeated letter), the tail inches forward until the bad bit is gone. It never walks backwards.</p></div>
-        <div class="panel"><h4>Two pointers: squeezing a tube of toothpaste</h4><p class="small">Fingers start at both ends and move inward. Each squeeze permanently rules out the part behind your fingers.</p></div>
-        <div class="panel"><h4>Prefix sums: a car's odometer</h4><p class="small">To get the distance between two towns, subtract the odometer readings. You never re-drive the road.</p></div>
-      </div>
-    </div>
-  </details>
+<p>A huge share of interview questions about arrays and strings have the same shape. "Find the busiest stretch." "Find two numbers that add up to 100." "How many stretches add up to exactly k?" The obvious answer looks at every pair or every stretch, and that's n². This chapter is about three tools that get the same answers in about n steps. They all rest on one idea: <b>neighbouring candidates share most of their work, so don't redo it.</b> The code for each tool is short. The part interviewers probe is the reasoning: why is it safe to skip all those candidates?</p>
 
-  <details class="box viz" open id="see-it">
-    <summary><span class="kicker">See it</span><span class="label">Playground: longest substring without repeats</span></summary>
-    <div class="box-body">
-      <div class="viz-controls"><input id="sw-s" type="text" value="abcabcbbxyz" maxlength="20" style="width:14em"><button class="btn" id="sw-go">Run</button></div>
-      <div id="sw-player" style="margin-top:12px"></div>
-    </div>
-  </details>
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Look at a brute force and say exactly which work it repeats.</li>
+    <li>Explain why, on sorted input, moving one pointer safely throws away a whole row of pairs.</li>
+    <li>Write fixed and variable sliding windows, and prove they're O(n) even though they have a loop inside a loop.</li>
+    <li>Say why a sliding window breaks when numbers can be negative, and what to use instead.</li>
+    <li>Use prefix sums for O(1) range sums, and prefix sums plus a hash map for "how many stretches sum to k".</li>
+  </ol>
+</div>
 
-  <details class="box viz" open id="see-it-2">
-    <summary><span class="kicker">See it</span><span class="label">Playground: prefix sums + hash map (subarray sum = k)</span></summary>
-    <div class="box-body">
-      <div class="viz-controls"><span class="small">nums</span><input id="ps-n" type="text" value="3, 4, -7, 1, 3, 3, 1, -4" style="width:15em"><span class="small">k</span><input id="ps-k" type="number" value="7" style="width:5em"><button class="btn" id="ps-go">Run</button></div>
-      <div id="ps-player" style="margin-top:12px"></div>
-    </div>
-  </details>
+<p class="muted small">How to read this: top to bottom. It builds on <a href="complexity.html">How fast is your code?</a> (especially "a loop inside a loop is not always n²"), <a href="sorting.html">Putting things in order</a> and <a href="binary-search.html">Binary search</a>. Answer each quick check before reading on. "Go deeper" boxes are optional on a first read.</p>
 
-  <details class="box senior" open id="interview">
-    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
-    <div class="box-body">
-      <ul>
-        <li><b>Justify the O(n):</b> "each index enters the window once and leaves once."</li>
-        <li><b>Know when the window breaks</b> (negatives, non-monotonic validity) and switch to prefix sums with a hash map. Saying why is the senior part.</li>
-        <li><b>"Exactly k" = "at most k" − "at most (k−1)"</b>: a standard trick for counting windows with exactly k distinct values.</li>
-        <li><b>The same idea in systems:</b> sliding-window rate limiters, moving averages over metrics, TCP's sliding window for flow control, and 2D prefix sums (summed-area tables) in image processing and analytics.</li>
-      </ul>
-    </div>
-  </details>
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: a year of traffic</h2>
 
-  <details class="box trap" open id="traps">
-    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
-    <div class="box-body">
-      <ul>
-        <li>Forgetting to seed the prefix-count map with <code>{0: 1}</code>, which misses subarrays starting at index 0.</li>
-        <li>Recording the answer before the window is valid again.</li>
-        <li>Jumping left to <code>last_seen[c] + 1</code> without <code>max(left, …)</code>: left must never move backwards ("abba").</li>
-        <li>Using a sliding window when the array has negative numbers.</li>
-      </ul>
-    </div>
-  </details>
+<div class="story">
+  <p>You run a website. For every minute of last year you have one number: how many requests arrived in that minute. A year has 525,600 minutes, so that's 525,600 numbers in a list.</p>
+  <p>Your boss has three questions. Which 60-minute stretch was the busiest? What's the shortest stretch of minutes that, added together, got at least 1,000,000 requests (how fast can a flood build up)? And a new dashboard will ask, 100,000 times a day, "how many requests came in between minute a and minute b?"</p>
+</div>
 
-  <details class="box" open id="check">
-    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
-    <div class="box-body">
-      <details class="qa"><summary>Fixed-size window of k: what's the template?</summary><p>Add nums[i], and once i ≥ k, remove nums[i − k]; record the answer when i ≥ k − 1. No inner while loop needed.</p></details>
-      <details class="qa"><summary>Why does sorted two-sum with two pointers never miss the answer?</summary><p>If sum &gt; target, the right element can't pair with anything at or right of the left pointer (all those are ≥ left), so discarding it loses nothing. The symmetric argument covers the left pointer.</p></details>
-      <details class="qa"><summary>How do you count subarrays with sum divisible by k?</summary><p>Prefix sums mod k: two prefixes with the same remainder bound a subarray whose sum is divisible by k. Count remainders in a map.</p></details>
-    </div>
-  </details>
+<p>Each question is about a <b>range</b>: a run of neighbouring items, from index i to index j, with nothing skipped. (A range of a list is also called a <b>subarray</b>; a range of a string is a <b>substring</b>.) The direct way to answer each one adds up ranges from scratch. Here's what that costs, at the 10 million simple steps per second that Python manages:</p>
 
-  <details class="box" open id="practice">
-    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
-    <div class="box-body">
-      <p><b>Exercise:</b> <code>exercises/sliding_window.py</code>: longest unique substring, minimum-length subarray, subarray sum equals k.</p>
-      <p><b>Classic problems:</b> Two Sum II · 3Sum · Container With Most Water · Minimum Window Substring · Longest Repeating Character Replacement · Product of Array Except Self.</p>
-    </div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Question</th><th>Direct way</th><th>Steps</th><th>Time</th></tr></thead>
+  <tbody>
+    <tr><td>Busiest hour</td><td>Add up each of the 525,541 windows of 60 minutes</td><td>about 31 million additions</td><td>3 s</td></tr>
+    <tr><td>Shortest stretch with 1,000,000 requests</td><td>Try every start and every end, with a running sum</td><td>about 138 billion</td><td><b>about 3.8 hours</b></td></tr>
+    <tr><td>Dashboard, 100,000 questions</td><td>Add up the range for each question</td><td>up to 52.6 billion</td><td><b>about 1.5 hours</b></td></tr>
+  </tbody>
+</table></div>
+
+<p>By the end of this chapter, each of these takes about a million steps or fewer: a tenth of a second. Not by buying a faster computer, but by noticing that almost all of that work is the same work, done again and again.</p>
+
+<div class="check" id="check-ranges">
+  <p class="q">How many different ranges (start ≤ end) does a list of 1,000 items have?</p>
+  <div class="opts">
+    <button>1,000: one per starting point</button>
+    <button data-correct>About 500,000</button>
+    <button>1,000,000: every start times every end</button>
+  </div>
+  <div class="fb right"><p>Right: 1,000 + 999 + … + 1 = 1,000 × 1,001 / 2 = 500,500. Start 0 has 1,000 possible ends, start 1 has 999, and so on. That's the n²/2 "triangle" every brute force in this chapter walks through.</p></div>
+  <div class="fb wrong"><p>Count by starting point. A range that starts at index 0 can end at any of the 1,000 indexes. One that starts at index 1 can end at 999 of them (the end can't come before the start). Start 999 has only one: itself. Add them up: 1,000 + 999 + … + 1 = 500,500, which is about n²/2. Not n (each start has many ends), and not n² (half the start/end combinations have the end before the start).</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Where the work goes</h2>
+
+<p>Look at two neighbouring windows from the first question: minutes 100 to 159, and minutes 101 to 160. They share 59 of their 60 numbers. The direct way throws away the first total and adds those 59 numbers again. Every window repeats almost all the work of the one before it.</p>
+
+<pre class="diagram"><code>minute:     100  101  102  …  159  160
+window A:  [ 60 numbers ............. ]
+window B:       [ the same 59 ....... + 1 new ]
+
+total(B) = total(A) − minute 100 + minute 160      2 steps, not 59</code></pre>
+
+<p>The other questions have the same problem in a different form. Every brute force in this chapter walks through a triangle of about n²/2 candidates: all pairs (i, j), or all ranges from i to j. Each tool skips almost all of the triangle, for a reason you can say out loud:</p>
+<ul>
+  <li><b>Two pointers:</b> one comparison proves that a whole row of candidates can't win, so you never look at them.</li>
+  <li><b>Sliding window:</b> the next candidate is the last one plus one small change, so you update instead of starting over.</li>
+  <li><b>Prefix sums:</b> compute running totals once, and every range becomes one subtraction.</li>
+</ul>
+
+<div class="keyidea">Neighbouring candidates overlap. Reuse the overlap, or prove that a whole group of candidates can't win, and n² work becomes about n.</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Opposite ends: pairs in a sorted list</h2>
+
+<p>Start with the simplest triangle: pairs. You have a sorted list and a target, and you want two numbers that add up to the target. You wrote a version of this in the complexity chapter (exercise 6, <code>count_pairs_with_sum</code>). This time, the focus is <em>why</em> it works, because that's what an interviewer asks next.</p>
+
+<p>The brute force checks every pair: for 7 numbers that's 7 × 6 / 2 = 21 pairs. The two-pointer way puts one pointer, <code>lo</code>, on the smallest number and another, <code>hi</code>, on the largest. Then it looks at <code>a[lo] + a[hi]</code>:</p>
+<ul>
+  <li>Equal to the target: found it.</li>
+  <li>Too small: move <code>lo</code> one step right (to a bigger number).</li>
+  <li>Too big: move <code>hi</code> one step left (to a smaller number).</li>
+</ul>
+
+<h3>Why is it safe to throw a number away?</h3>
+<p>Take the list [1, 3, 4, 6, 8, 11, 13] and target 10. The first check is 1 + 13 = 14. Too big. Now think about 13. Its smallest possible partner is 1, the smallest number in the list. If 13 plus its <em>smallest</em> partner is already too big, then 13 plus any other partner is bigger still. So 13 can't be in any answer. One comparison ruled out every pair that uses 13, and we drop it by moving <code>hi</code> left.</p>
+<p>It works the same way in reverse. If <code>a[lo] + a[hi]</code> is too small, then <code>a[hi]</code> is the biggest partner <code>a[lo]</code> has left. Even that isn't enough, so nothing can rescue <code>a[lo]</code>. Drop it.</p>
+
+<p>The picture that makes this click: draw every pair as a grid. Each row is the smaller number of the pair, each column the larger one, and each cell holds their sum. Because the list is sorted, sums grow as you go right along a row and as you go down a column. The two pointers always sit at the top-right corner of the part of the grid that's still possible. Each check crosses out a whole row or a whole column.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">target</span><select id="tp-target"><option value="10" selected>10 (found after 6 checks)</option><option value="15">15</option><option value="30">30 (no pair)</option></select></div>
+    <div id="tp-player" style="margin-top:10px"></div>
+  </div>
+  <div class="cap">Opposite-ends two pointers on a sorted list. Yellow cells are the two numbers being added; in the grid, the current pair is solid blue and the row or column about to be crossed out is yellow. Step through and count: each check removes a whole row or column, never just one cell. Then try target 30, where no pair exists.</div>
+</div>
+
+<p>Each check moves <code>lo</code> up by one or <code>hi</code> down by one. They start n − 1 apart and stop when they meet, so there are at most n − 1 checks. That's O(n) instead of n²/2. On a million sorted numbers: under a million checks instead of 500 billion.</p>
+
+<div class="keyidea">On sorted input, compare the two ends. If one end is hopeless even with its best possible partner, it can't be in any answer, so drop it. Each check throws away a whole row or column of pairs, so there are at most n − 1 checks.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: two gifts, one gift card</summary>
+  <p>You have a gift card for exactly $10 and a shelf of items sorted by price. Hold the cheapest item in your left hand and the most expensive in your right. Total over $10? The right-hand item is too expensive even with the cheapest companion on the shelf, so it goes back, and you never pick it up again. Under $10? The left-hand item is too cheap even with the most expensive companion, so it goes back. Every item you put back is gone for good, and each check puts one item back. That's why you finish in one pass along the shelf.</p>
+</details>
+
+<div class="check" id="check-discard">
+  <p class="q">Sorted list [2, 5, 9, 14, 20], target 16. The first check is 2 + 20 = 22. What do you know now?</p>
+  <div class="opts">
+    <button data-correct>20 can't be in any pair that hits 16, so move hi left</button>
+    <button>2 is too small, so move lo right</button>
+    <button>Nothing yet; you still have to try 5 + 20, 9 + 20 and 14 + 20</button>
+  </div>
+  <div class="fb right"><p>Right. 2 is the smallest partner 20 could have, and 2 + 20 is already 6 over. Every other pair with 20 is bigger. So the whole "20" column of the grid is crossed out with one check: 4 pairs gone. Next check: 2 + 14 = 16, found.</p></div>
+  <div class="fb wrong"><p>Plug in the numbers. Every pair that uses 20 is 20 + (something from 2, 5, 9, 14). The smallest of those is 2 + 20 = 22, already over 16. So 5 + 20, 9 + 20 and 14 + 20 are all over too, without checking them: drop 20. Moving <code>lo</code> would be the wrong direction: it makes the sum <em>bigger</em>, and we're already too big. The rule: too big, shrink the big end; too small, grow the small end.</p></div>
+</div>
+
+<h3>The same move in other problems</h3>
+<ul>
+  <li><b>Three numbers that sum to zero:</b> sort, fix the first number, then run opposite-ends pointers on the rest. O(n²) instead of O(n³).</li>
+  <li><b>Merging two sorted lists</b> (the merge step from the sorting chapter) is two pointers, one per list, each only moving forward.</li>
+  <li><b>Container with the most water:</b> two walls, one at each end; always move the shorter wall inward. The shorter wall limits every narrower container that uses it, so it's hopeless for the rest of the search.</li>
+  <li><b>Counting pairs at or under a limit</b> (exercise 4): when a pair is small enough, ask how many <em>other</em> pairs you just learned are small enough too.</li>
+</ul>
+
+<details class="aside deeper">
+  <summary>Go deeper: the proof, and when to use a hash set instead</summary>
+  <p><b>The invariant.</b> An <em>invariant</em> is a statement that's true before the loop starts and stays true after every step. Here it is: "if a pair that hits the target exists, both of its numbers lie between lo and hi". At the start, lo and hi are the two ends, so it's true. Each step drops an end that we just proved can't be in any answer, so it stays true. When lo meets hi with nothing found, no pair lies between them, so no pair exists. This is the sentence that turns "it seems to work" into "it's correct".</p>
+  <p><b>Unsorted input.</b> If the list isn't sorted, you have two options. Sort it first and use two pointers: O(n log n) time, and O(1) extra memory with an in-place sort like heapsort (Python's Timsort can use up to n/2 extra slots). Or walk the list once with a hash set of the numbers seen so far, asking "is target − x in the set?": O(n) expected time but O(n) memory. For "is there a pair with exactly this sum", the hash set wins on time. But a hash set only answers <em>exact</em> questions. "The pair closest to the target", "how many pairs are under a limit" or "all triples summing to zero" need the order, and that's when sorting earns its cost.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Same direction: a reader and a writer</h2>
+
+<p>The two pointers don't have to start at opposite ends. In the second shape, both move left to right, one fast and one slow. The classic job is cleaning a list <b>in place</b>, which means without building a second list: O(1) extra memory.</p>
+
+<p>Say you want to remove every 0 from a list, keep the order of the rest, and not use a second list. The tempting way is to delete each 0 when you see it. But deleting from the middle of a Python list shifts everything after it one slot left, so each delete is O(n). On a million items where half are zeros, that's about 250 billion shifts.</p>
+
+<p>Instead, use two pointers. <code>read</code> visits every item once. <code>write</code> marks where the cleaned part ends. When <code>read</code> finds an item to keep, copy it down to <code>write</code> and move <code>write</code> forward.</p>
+
+<pre><code>def remove_all(nums, bad):
+    write = 0                          # nums[:write] is the cleaned part
+    for read in range(len(nums)):      # read looks at every item exactly once
+        if nums[read] != bad:
+            nums[write] = nums[read]   # keep it: copy it down to the write spot
+            write += 1
+    return write                       # new length; nums[write:] is leftover junk</code></pre>
+
+<pre class="diagram"><code>[ kept, final  |  already read, now junk  |  not read yet ]
+ 0              write                       read          n</code></pre>
+
+<p><code>write</code> never gets ahead of <code>read</code>, so you never overwrite an item you haven't read yet. That's n reads, at most n writes, and no extra list. Notice that the function returns a <em>length</em>. The slots after it still hold old values. C arrays can't shrink, so "remove in place" in C, and in many interview prompts, works exactly this way.</p>
+
+<div class="keyidea">Same-direction pointers: a fast reader looks at every item once, and a slow writer marks the end of the finished part. O(n) time, O(1) extra memory, and the writer can never overtake the reader.</div>
+
+<div class="check" id="check-compact">
+  <p class="q">You run <code>remove_all</code> on <code>[0, 3, 0, 0, 5, 7]</code> with <code>bad = 0</code>. It returns 3. What does the list look like afterwards?</p>
+  <div class="opts">
+    <button>[3, 5, 7]</button>
+    <button data-correct>[3, 5, 7, 0, 5, 7]</button>
+    <button>[3, 5, 7, 0, 0, 0]</button>
+  </div>
+  <div class="fb right"><p>Right. The function only ever overwrites slots 0, 1 and 2 (with 3, 5 and 7). Slots 3, 4 and 5 keep whatever was there: the original 0, 5, 7. The list never changes length; the returned 3 tells you how much of it is meaningful.</p></div>
+  <div class="fb wrong"><p>Trace the writes. <code>write</code> starts at 0. The 3 at index 1 is copied to slot 0. The 5 at index 4 goes to slot 1. The 7 at index 5 goes to slot 2. That's every write the function does. It never deletes anything, and it never writes zeros, so slots 3 to 5 keep their old values: 0, 5, 7. In-place functions like this return the new length and leave junk after it.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: fast and slow pointers on a linked list (Floyd's cycle detection)</summary>
+  <p>Same direction, different speeds. On a linked list (each node points to the next), move <code>slow</code> one node per step and <code>fast</code> two.</p>
+  <ul>
+    <li><b>Middle of the list:</b> when fast reaches the end, slow is halfway. One pass, no counting.</li>
+    <li><b>Does the list loop back on itself?</b> If there's no loop, fast reaches the end. If there is one, fast enters the loop first and keeps lapping. Once both are inside a loop of length c, fast gains exactly one node on slow per step, so the gap closes within c steps and they land on the same node. O(n) time and O(1) memory. A set of visited nodes also works, but costs O(n) memory.</li>
+    <li><b>Where does the loop start?</b> Let a be the number of steps from the head to the loop's first node, and b the steps from there to the meeting point. Slow walked a + b; fast walked twice that. The extra a + b steps fast took were whole laps, so a + b is a multiple of c. Now put one pointer back at the head and move both one step at a time. After a steps, the one from the head is at the loop's start, and the other has gone a + b in total from the loop's start, a whole number of laps, so it's there too. They meet exactly at the loop's start.</li>
+    <li>The same trick finds the duplicate in a list of n + 1 numbers from 1 to n without changing the list or using extra memory: treat each value as a "next" pointer, and the duplicate is where the loop starts.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Fixed window: every stretch of exactly k</h2>
+
+<p>Back to the busiest hour. A <b>window</b> is the range you're currently looking at. A <b>fixed-size window</b> always holds exactly k items. When it slides one step right, exactly one number joins on the right and exactly one leaves on the left. So keep a running total and update it with two steps, instead of adding k numbers again.</p>
+
+<div class="figure">
+  <div id="fw-player"></div>
+  <div class="cap">A window of k = 5 sliding over 10 minutes of traffic. Green is the window; blue just joined; red just left. Watch the work counter: sliding costs 2 per step whatever k is, while re-adding each window costs k − 1 = 4.</div>
+</div>
+
+<pre><code>def max_sum_of_k(nums, k):             # assumes 1 &lt;= k &lt;= len(nums)
+    window = sum(nums[:k])             # the first window: k numbers, added once
+    best = window
+    for right in range(k, len(nums)):
+        window += nums[right]          # the new number joins on the right
+        window -= nums[right - k]      # the oldest number leaves on the left
+        best = max(best, window)
+    return best</code></pre>
+
+<p>For the year of traffic, that's about 1.05 million steps instead of 31 million. For the busiest <em>day</em> (k = 1,440) it's still about 1.05 million, while re-adding each window costs 754 million. The sliding cost doesn't depend on k at all.</p>
+
+<div class="keyidea">A fixed window of size k: when it slides, one item joins and one leaves. Update the running answer with those two, and the whole scan is O(n), whatever k is.</div>
+
+<div class="check" id="check-fixed">
+  <p class="q">n = 1,000,000 numbers, k = 1,000. About how many additions does re-adding every window take, compared with sliding?</p>
+  <div class="opts">
+    <button>About 1 million vs about 1 million: both are one pass</button>
+    <button data-correct>About 1 billion vs about 2 million</button>
+    <button>About 1 trillion vs about 1 million</button>
+  </div>
+  <div class="fb right"><p>Right. There are 999,001 windows, and re-adding each takes 999 additions: about 998 million. Sliding takes 999 for the first window, then 2 per step: about 2 million. A 500× difference, and it grows with k.</p></div>
+  <div class="fb wrong"><p>Count windows and the cost per window. A window can start at index 0 up to index n − k, so there are n − k + 1 = 999,001 windows. Re-adding one costs k − 1 = 999 additions, so the total is about 999,001 × 999 ≈ 1 billion: not one pass. And never a trillion: even the worst k, about n/2, gives n²/4 = 250 billion. Sliding pays 2 per step, one in and one out: about 2 million.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: the maximum of every window (monotonic deque)</summary>
+  <p>A sum is easy to update: subtract what leaves. A <em>maximum</em> isn't. When the biggest number leaves the window, which one is the new biggest? Rescanning the window costs O(k) per step, O(n·k) total.</p>
+  <p>The fix is a <b>deque</b> (a list you can add to and remove from at both ends in O(1)) of indexes whose values decrease from front to back. When a new number arrives, pop from the back every item that's ≤ it. Those can never be the maximum again: the new number is at least as big and will stay in the window longer. Then push the new index. If the front index has slid out of the window, pop it from the front. The front is always the current maximum.</p>
+  <p>Each index is pushed once and popped at most once, so the total work is O(n), the same "count the total moves" argument as everywhere in this chapter. For [1, 3, −1, −3, 5, 3, 6, 7] with k = 3, the maximums are 3, 3, 5, 5, 6, 7. The data structures chapter calls this a monotonic queue.</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: windows over a stream, and rate limiters</summary>
+  <p>A fixed window only needs the last k items, never the whole history. That's why it fits <b>streams</b>, data that never ends: "requests in the last 5 minutes" on a monitoring dashboard is a sliding window kept in a ring buffer (a fixed-size array whose end wraps around to the start) or a deque, with old items dropped from the front as time moves on.</p>
+  <p><b>Rate limiters</b> ("at most 100 requests per user per rolling minute") use the same idea in two versions. A <em>sliding window log</em> keeps the timestamp of every request in the last 60 seconds and drops the old ones from the front: exact, but it stores up to 100 timestamps per user. A <em>sliding window counter</em> keeps only two counts, this minute's and last minute's, and estimates. 15 seconds into this minute, with 30 requests so far and 80 last minute, it assumes the last 45 seconds of last minute held 80 × 45/60 = 60 of them: estimate 30 + 60 = 90. Constant memory, slightly approximate. The rate-limiting chapter (02.14) goes further.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Variable window: the caterpillar</h2>
+
+<p>The second question, "the shortest stretch with at least 1,000,000 requests", has no fixed size. The window has to grow and shrink. To keep things small enough to trace by hand, take a cousin of that question: <em>the longest run of days whose total spending stays within a budget of 8</em>, with daily spends [2, 1, 3, 4, 1, 1, 2, 5, 1]. Every number is positive, and that matters a lot (section 7).</p>
+
+<p>The brute force tries every start and every end: 9 × 10 / 2 = 45 ranges. A <b>variable-size window</b> moves like a caterpillar instead. Each step, the right end eats the next number. If the window now breaks the rule (the sum is over 8), the left end lets go of numbers, one at a time, until the window is valid again. Then record its length.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">input</span><select id="vw-data" style="width:auto"><option value="pos" selected>All positive: [2, 1, 3, 4, 1, 1, 2, 5, 1]</option><option value="neg">One negative: [3, 1, 1, 3, 6, −8, 6]</option></select><span class="small muted">budget 8</span></div>
+    <div id="vw-player" style="margin-top:10px"></div>
+  </div>
+  <div class="cap">The caterpillar: L and R are the two ends; green is the window. Blue just got eaten on the right, red was just let go on the left. Watch the move counters: R moves once per number; L moves several times at some steps and not at all at others, but never more than n times in total. Leave the "One negative" input for section 7.</div>
+</div>
+
+<pre><code>def longest_within_budget(spend, budget):   # spends and budget are &gt;= 0
+    left = total = best = 0
+    for right in range(len(spend)):
+        total += spend[right]                # the right end eats one number
+        while total &gt; budget:                # over budget: let go from the left
+            total -= spend[left]
+            left += 1
+        best = max(best, right - left + 1)   # spend[left..right] is valid now
+    return best</code></pre>
+
+<p>Check it on the edges. An empty list: the loop never runs, and the answer is 0. A single number bigger than the budget: the <code>while</code> lets go of it, <code>left</code> ends up at <code>right + 1</code>, and the length is 0. All numbers equal: the window just settles at the right size and slides.</p>
+
+<h3>Why it's O(n), even with a loop inside a loop</h3>
+<p>The inner <code>while</code> can run several times in one step. In the figure, when the 5 arrives at index 7, the left end lets go of two numbers in a row (4, then 1). So one step can cost a lot. But <code>left</code> only ever moves forward, and it never passes <code>right + 1</code>. Across the whole run, it moves at most n times <em>in total</em>. <code>right</code> moves exactly n times. That's at most 2n pointer moves, each O(1): <b>O(n)</b>. In the figure, R moves 9 times and L moves 6 times: 15 moves, under 2n = 18.</p>
+<p>This is rule 6 from the complexity chapter: don't multiply the worst inner loop by the number of outer steps; count the total work across the whole run. The cost is called <b>amortized</b> O(1) per step, because the occasional expensive step is paid for by many cheap ones.</p>
+
+<div class="check" id="check-amortized">
+  <p class="q">What's the time complexity of this loop over n numbers?</p>
+<pre><code>left = total = 0
+for right in range(n):
+    total += nums[right]
+    while total &gt; budget:
+        total -= nums[left]
+        left += 1</code></pre>
+  <div class="opts">
+    <button>O(n²): the while loop can run up to n times for each right</button>
+    <button data-correct>O(n)</button>
+    <button>O(n log n)</button>
+  </div>
+  <div class="fb right"><p>Right. Count the line <code>left += 1</code> over the whole run: left starts at 0, only goes up, and never passes n. So that line runs at most n times in total, however the runs are spread across the steps. n steps of the for loop plus at most n steps of the while loop: 2n.</p></div>
+  <div class="fb wrong"><p>"Up to n times for each right" is true for one step but not for all of them at once. Think of a bucket of n tokens. Every time <code>left += 1</code> runs, it spends a token, because left moves forward and can never come back. There are only n tokens for the whole run. So if one step spends 5 tokens, other steps must spend none. Total: n for the outer loop + at most n for the inner one = O(n). Nothing here halves anything, so there's no log n either.</p></div>
+</div>
+
+<h3>Why it's safe to let go (the part interviewers probe)</h3>
+<p>Being fast is no use if it's wrong. When the window [left .. right] goes over budget, we let go of <code>left</code> and never look at it as a start again. How do we know the best answer doesn't start at <code>left</code>?</p>
+<p>Every range that starts at <code>left</code> and that we haven't checked yet is longer: [left .. right′] with right′ &gt; right. It holds everything in [left .. right] plus more numbers, and all the numbers are positive, so its sum is even bigger. Over budget now means over budget for every later end. That start is hopeless forever. This is the pair grid from section 3 again: one check crosses out a whole row, here the row of every range that starts at <code>left</code>.</p>
+<p>And after the <code>while</code> stops, the window is the longest valid range that ends at <code>right</code>, because any longer one would start before <code>left</code>, and those starts were all proven hopeless. Checking the longest valid range for every end means checking the answer.</p>
+
+<div class="keyidea">A variable window works when the rule has one direction: once a window breaks the rule, growing it can't fix it. Then each time the left end lets go, it retires a start for good. Each pointer moves at most n times, so the whole scan is O(n).</div>
+
+<details class="aside another">
+  <summary>Explain it another way: a caterpillar on a ruler</summary>
+  <p>A caterpillar crawls along a ruler. It stretches its head forward one mark at a time, and if its body gets too long (the rule breaks), it pulls its tail forward until it's comfortable again. Its tail never goes backwards, and neither does its head. By the time it reaches the end of the ruler, its head has visited every mark once and its tail at most once. However wiggly the trip, that's at most two visits per mark.</p>
+  <p>Where the picture breaks: a real caterpillar pulls its tail forward because it wants to. Ours only lets go when it's <em>proven</em> that the tail position can't start the best answer. That proof is the part you must say in an interview.</p>
+</details>
+
+<h3>Two shapes: longest and shortest</h3>
+<p>Variable-window problems come in two shapes, and the difference is which direction is "good":</p>
+<ul>
+  <li><b>Longest valid stretch</b> (within a budget, no repeated letter, at most k different letters): growing can break the rule. Eat on the right every step, let go on the left <em>while the window is invalid</em>, then record. That's the code above.</li>
+  <li><b>Shortest valid stretch</b> (sum at least a target, contains every letter of a word): growing can only help. Eat on the right until the window becomes valid; then, <em>while it's still valid</em>, record it and let go on the left to see if a shorter one works.</li>
+</ul>
+<p>Exercises 7 and 8 are one of each. For longest-without-repeats, the rule is "no letter twice": keep a set of the letters inside the window, and when the new letter is already in the set, let go from the left until it isn't.</p>
+
+<div class="check" id="check-shrink">
+  <p class="q">Longest substring without a repeated letter, on "abcbd". The window is "abc" (left = 0) and the right end eats the second "b" at index 3. Where does left end up?</p>
+  <div class="opts">
+    <button>Index 1: let go of one letter, "a"</button>
+    <button data-correct>Index 2: let go of "a" and the first "b"; the window is "cb"</button>
+    <button>Index 3: start over from the new letter</button>
+  </div>
+  <div class="fb right"><p>Right. The rule broke because of the first "b", so the left end has to let go until that "b" is gone: first "a", then "b". The window "cb" is valid again. Starting over at index 3 would throw away "c", which is still part of a valid window.</p></div>
+  <div class="fb wrong"><p>Ask what broke the rule: two b's in the window. Letting go of "a" alone leaves "bcb", still two b's, so the <code>while</code> keeps going and lets go of the first "b" too. Now "cb" is valid, left = 2, and we stop: letting go of anything more would only make the window shorter for no reason. Restarting at index 3 throws away the "c", which never caused a problem.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>When the window breaks: negative numbers</h2>
+
+<p>Everything in section 6 rested on one sentence: "all the numbers are positive, so its sum is even bigger". Allow a negative number and that sentence is false, so the whole argument falls apart.</p>
+
+<p>Go back to the figure in section 6 and pick <b>One negative</b>: [3, 1, 1, 3, 6, −8, 6], budget 8. When the 6 arrives at index 4, the window [3, 1, 1, 3, 6] sums to 14, so the left end lets go of 3, 1, 1 and 3. But [3, 1, 1, 3, 6, −8] sums to 6, within budget, and has length 6. The window answers 4. It retired start 0, betting that every longer range from there would be bigger. The −8 made it smaller, and the bet was lost.</p>
+
+<p>The property the window needs is called <b>monotonicity</b>: as a window grows, "valid" can turn into "invalid" (or the other way round, for the shortest shape) but never flip back and forth. Some rules have it and some don't:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Rule</th><th>One direction?</th><th>Sliding window?</th></tr></thead>
+  <tbody>
+    <tr><td>sum ≤ budget, every number ≥ 0</td><td>yes: growing only adds</td><td>yes</td></tr>
+    <tr><td>sum ≥ target, every number ≥ 0</td><td>yes</td><td>yes</td></tr>
+    <tr><td>no letter repeated; at most k different letters</td><td>yes: growing never removes a letter</td><td>yes</td></tr>
+    <tr><td>sum ≤ budget, negatives allowed</td><td>no: a later negative can bring it back</td><td><b>no</b>, use prefix sums plus a binary search over their running maximum, O(n log n)</td></tr>
+    <tr><td>sum exactly k, negatives allowed</td><td>no</td><td><b>no</b>, use prefix sums + a hash map (section 9)</td></tr>
+    <tr><td>exactly k different letters</td><td>no: too few, then right, then too many</td><td>to count them: (at most k) − (at most k − 1); see section 11</td></tr>
+  </tbody>
+</table></div>
+
+<div class="keyidea">A sliding window is only correct when growing the window pushes the rule in one direction. Negative numbers break that for sums. Before you write the loop, say out loud why letting go of the left end is safe.</div>
+
+<div class="check" id="check-negatives">
+  <p class="q">Which of these can a sliding window solve correctly?</p>
+  <div class="opts">
+    <button>Longest stretch with sum ≤ 10, where numbers can be negative</button>
+    <button data-correct>Shortest stretch with sum ≥ 10, where every number is positive</button>
+    <button>Number of stretches with sum exactly 10, where numbers can be negative</button>
+  </div>
+  <div class="fb right"><p>Right. With only positive numbers, a window that reaches 10 stays at 10 or more as it grows, and a window that's below 10 stays below as it shrinks. So letting go from the left while the sum is still ≥ 10 never throws away an answer. The two others allow negatives, so a longer window can have a <em>smaller</em> sum, and no start can be safely retired.</p></div>
+  <div class="fb wrong"><p>Test each one with a single negative number. Longest with sum ≤ 10 on [6, 6, −5]: the window lets go of the first 6 when [6, 6] hits 12, yet [6, 6, −5] = 7 was fine and longer. Exactly 10 with negatives: in [10, −3, 3], both [10] and the whole list sum to 10. Once the window holds [10], it can't know whether eating more numbers will bring the sum back to 10, so it can't decide what to let go. Only the all-positive option has the one-direction property: once the sum reaches 10, more numbers keep it there.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Prefix sums: every range in one subtraction</h2>
+
+<p>Now the dashboard: 100,000 questions of the form "total from minute a to minute b". A window doesn't help, because the questions jump around. Instead, do one pass of work up front and make every question cheap.</p>
+
+<p>A <b>prefix sum</b> is a running total. Define P[0] = 0, and P[i] = the sum of the first i numbers. Then the sum of nums[i:j] (from index i up to, but not including, j) is</p>
+<pre class="diagram"><code>sum(nums[i:j]) = P[j] − P[i]       everything before j, minus everything before i</code></pre>
+
+<p>With nums = [3, 4, −2, 5, −6, 1, 4, 2, −3, 3], the prefix sums are P = [0, 3, 7, 5, 10, 4, 5, 9, 11, 8, 11]. The sum of nums[2:6] is −2 + 5 − 6 + 1 = −2, and P[6] − P[2] = 5 − 7 = −2. Same answer, one subtraction.</p>
+
+<pre><code>def build_prefix(nums):
+    P = [0] * (len(nums) + 1)          # one more slot than nums: P[0] = 0
+    for i, x in enumerate(nums):
+        P[i + 1] = P[i] + x            # P[i + 1] = sum of the first i + 1 numbers
+    return P
+
+def range_sum(P, i, j):                # sum of nums[i:j], i.e. nums[i] .. nums[j - 1]
+    return P[j] - P[i]</code></pre>
+
+<p>The extra slot P[0] = 0 is what makes ranges that start at index 0 work without a special case: sum(nums[0:j]) = P[j] − P[0] = P[j]. For the dashboard, that's 525,600 additions once, then one subtraction per question: about 625,600 steps, 0.06 seconds instead of up to 1.5 hours.</p>
+
+<p>It helps to see the prefix sums as a line, like the height of a hiking trail. Each number is a step up or down. The sum of a range is how much higher the trail is at the end of the range than at its start.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0"><span class="small">i</span><input type="range" id="ps-i" min="0" max="9" value="2" style="width:140px"><span class="small">j</span><input type="range" id="ps-j" min="1" max="10" value="6" style="width:140px"><select id="ps-data" style="width:auto"><option value="neg" selected>with negatives</option><option value="pos">all positive</option></select></div>
+    <svg class="viz" id="ps-svg" viewBox="0 0 520 270" style="margin-top:10px"></svg>
+    <div class="viz-caption" id="ps-msg"></div>
+  </div>
+  <div class="cap">Prefix sums as a trail. Each dot is P[k]; green steps go up, red steps go down; the numbers along the bottom are nums. Move i and j: the sum of nums[i:j] is always the height difference P[j] − P[i]. Then switch to "all positive": the trail only climbs, so a longer range always has a bigger sum. That's the one-direction property the sliding window needs, and the red dips are why negatives break it.</div>
+</div>
+
+<div class="keyidea">Prefix sums: P[0] = 0 and P[i + 1] = P[i] + nums[i]. Then sum(nums[i:j]) = P[j] − P[i]. O(n) once, then O(1) per range, and negative numbers don't matter.</div>
+
+<div class="check" id="check-prefix">
+  <p class="q">With P[0] = 0 and P[i] = the sum of the first i numbers, which expression is the sum of nums[2] through nums[5], both included?</p>
+  <div class="opts">
+    <button>P[5] − P[2]</button>
+    <button data-correct>P[6] − P[2]</button>
+    <button>P[6] − P[1]</button>
+  </div>
+  <div class="fb right"><p>Right. nums[2] through nums[5] is nums[2:6] in Python terms: start at 2, stop <em>before</em> 6. P[6] holds nums[0..5]; P[2] holds nums[0..1]; the difference is exactly nums[2..5].</p></div>
+  <div class="fb wrong"><p>Plug in numbers: nums = [5, 1, 2, 7, 3, 4], so P = [0, 5, 6, 8, 15, 18, 22]. The answer should be 2 + 7 + 3 + 4 = 16. P[6] − P[2] = 22 − 6 = 16. P[5] − P[2] = 18 − 6 = 12: it misses the 4, because P[5] stops before nums[5]. P[6] − P[1] = 22 − 5 = 17: it includes nums[1] = 1. Read P[i] as "the total of everything <em>before</em> index i".</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: 2D prefix sums, difference arrays, changing data, floats</summary>
+  <p><b>2D prefix sums.</b> For a grid, let P[r][c] be the sum of every cell in rows 0 to r − 1 and columns 0 to c − 1. The sum of a rectangle covering rows r1 to r2 − 1 and columns c1 to c2 − 1 is P[r2][c2] − P[r1][c2] − P[r2][c1] + P[r1][c1]: take the big rectangle, subtract the strip above and the strip to the left, then add back the corner you subtracted twice. Graphics calls this a <em>summed-area table</em> (fast box blurs), and the classic Viola–Jones face detector calls it an <em>integral image</em>.</p>
+  <p><b>Difference arrays: prefix sums backwards.</b> You get q updates of the form "add v to every item from index a up to, but not including, b", then need the final list once. Doing each update item by item is O(n·q). Instead, keep D (n + 1 slots, all 0) with D[a] += v and D[b] −= v for each update, then take the prefix sums of D at the end: O(n + q). Example: hotel bookings, each one adds 1 room for nights a to b − 1; the prefix sums of D give the rooms occupied every night.</p>
+  <p><b>When the data changes.</b> Changing one number changes every prefix sum after it: O(n) per update. If updates and range sums are mixed, use a Fenwick tree (binary indexed tree) or a segment tree: O(log n) for both. They're in the data structures section (topic 01.10).</p>
+  <p><b>Floats.</b> Running totals of floating-point numbers pile up rounding error, and subtracting two huge totals that are almost equal loses digits. Store money as integer cents where you can. In Java or C++, a running total of ints can overflow; use a 64-bit type. Python's ints don't overflow.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Prefix sums plus a hash map: an exact total</h2>
+
+<p>Section 7 left a hole: "how many stretches sum to exactly k", with negatives allowed. The window can't do it, and the brute force checks n²/2 ranges. Prefix sums turn it into a lookup.</p>
+
+<p>A range nums[i:j] sums to k exactly when P[j] − P[i] = k, that is, when <b>P[i] = P[j] − k</b>. So, standing at position j, the good starts are the earlier positions whose prefix sum is exactly P[j] − k. "Have I seen this value before, and what do I know about it?" is a hash map question: O(1) on average. One pass does it all. At each j, look up first, then record P[j]. O(n) time and O(n) memory. Negative numbers don't matter, because nothing assumed the trail only climbs.</p>
+
+<p>Here's the idea on a different question: the longest stretch of games where wins and losses <b>break even</b>. Write +1 for a win and −1 for a loss. A break-even stretch sums to 0, so it runs between two positions with the same prefix sum. For the longest one, remember the <em>first</em> time each prefix value appeared.</p>
+
+<pre><code>def longest_break_even(results):       # +1 for a win, -1 for a loss
+    first_seen = {0: -1}               # prefix sum 0 "happens" just before index 0
+    run = best = 0
+    for i, r in enumerate(results):
+        run += r                       # run = sum of results[0..i]
+        if run in first_seen:          # same height as before: the stretch between sums to 0
+            best = max(best, i - first_seen[run])
+        else:
+            first_seen[run] = i        # keep only the first time: it gives the longest stretch
+    return best</code></pre>
+
+<p>Traced on results = [−1, +1, +1, −1, +1, +1, +1, −1]:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>i</th><th>result</th><th>run</th><th>run seen before at</th><th>break-even stretch</th><th>best</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>−1</td><td>−1</td><td>no; record −1 at 0</td><td>—</td><td>0</td></tr>
+    <tr><td>1</td><td>+1</td><td>0</td><td>−1 (before the start)</td><td>results[0..1], length 2</td><td>2</td></tr>
+    <tr><td>2</td><td>+1</td><td>1</td><td>no; record 1 at 2</td><td>—</td><td>2</td></tr>
+    <tr><td>3</td><td>−1</td><td>0</td><td>−1 (before the start)</td><td>results[0..3], length 4</td><td>4</td></tr>
+    <tr><td>4</td><td>+1</td><td>1</td><td>2</td><td>results[3..4], length 2</td><td>4</td></tr>
+    <tr><td>5</td><td>+1</td><td>2</td><td>no; record 2 at 5</td><td>—</td><td>4</td></tr>
+    <tr><td>6</td><td>+1</td><td>3</td><td>no; record 3 at 6</td><td>—</td><td>4</td></tr>
+    <tr><td>7</td><td>−1</td><td>2</td><td>5</td><td>results[6..7], length 2</td><td>4</td></tr>
+  </tbody>
+</table></div>
+
+<p>Exercise 9 asks a different question about the same picture: not "how long", but "how many". Think about what the map has to remember for that, and what the starting entry should be.</p>
+
+<div class="keyidea">The sum of a range is the difference of two prefix sums. So "a range ending here with sum k" means "an earlier prefix sum equal to P[j] − k", which is a hash map lookup. n² ranges become n lookups, and negatives are fine.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: a hiking altimeter</summary>
+  <p>You're hiking a trail that goes up and down, writing your altitude in a notebook at every marker. You want stretches where you climbed exactly 100 m in total. At each marker you don't re-walk the trail. You look in your notebook: "was I ever exactly 100 m lower than I am right now?" Each earlier marker at that altitude is the start of one such stretch. Going downhill (negative steps) doesn't confuse the notebook at all. That's exactly what confuses a sliding window.</p>
+</details>
+
+<div class="check" id="check-seed">
+  <p class="q">Why does <code>longest_break_even</code> start with <code>first_seen = {0: -1}</code> instead of an empty dict?</p>
+  <div class="opts">
+    <button>To avoid a KeyError the first time <code>run</code> is looked up</button>
+    <button data-correct>So that a stretch starting at index 0 is counted</button>
+    <button>Because an empty stretch breaks even, and it should count as an answer</button>
+  </div>
+  <div class="fb right"><p>Right. A stretch from index 0 to i sums to P[i + 1] − P[0], and P[0] = 0 sits "before index 0". Without the entry, [+1, −1] would return 0 instead of 2: the code would never see height 0 before index 1. Storing −1 makes the length come out as i − (−1) = i + 1.</p></div>
+  <div class="fb wrong"><p>Try [+1, −1] without the entry. At i = 0, run = 1: not seen, store {1: 0}. At i = 1, run = 0: not seen, so store {0: 1}, and best stays 0. But the whole list breaks even! The missing piece is the height <em>before</em> any game: 0, at position −1. There's no KeyError risk either way (the code checks <code>in</code> first), and empty stretches never count: the length i − (−1) is always at least 1.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>Which tool when</h2>
+
+<p>In an interview, the hard part is often recognising which of these tools the problem wants. Read the problem for these signals:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>The problem says…</th><th>Tool</th><th>Time · extra memory</th><th>Why it's safe</th></tr></thead>
+  <tbody>
+    <tr><td>sorted list, a pair or triple with a sum (or closest to it, or under a limit)</td><td>opposite-ends pointers</td><td>O(n) per pass · O(1)</td><td>one end is hopeless with its best partner</td></tr>
+    <tr><td>unsorted list, a pair with an exact sum</td><td>hash set of seen values</td><td>O(n) · O(n)</td><td>exact lookups don't need order</td></tr>
+    <tr><td>clean, dedupe or partition a list in place</td><td>reader and writer, same direction</td><td>O(n) · O(1)</td><td>the writer never passes the reader</td></tr>
+    <tr><td>linked list: middle, loop, loop start</td><td>fast and slow pointers</td><td>O(n) · O(1)</td><td>fast gains one node per step</td></tr>
+    <tr><td>every stretch of exactly k</td><td>fixed window</td><td>O(n) · O(1)</td><td>one in, one out</td></tr>
+    <tr><td>longest or shortest stretch, rule has one direction (positive numbers, distinct letters)</td><td>variable window</td><td>O(n) · O(1), or O(alphabet) for letters</td><td>each let-go retires a start for good</td></tr>
+    <tr><td>many range sums on data that doesn't change</td><td>prefix sums</td><td>O(n) once, O(1) each · O(n)</td><td>a range is a difference of two totals</td></tr>
+    <tr><td>stretches with an exact sum, negatives allowed</td><td>prefix sums + hash map</td><td>O(n) · O(n)</td><td>look up P[j] − k</td></tr>
+    <tr><td>maximum or minimum of every window</td><td>monotonic deque</td><td>O(n) · O(k)</td><td>each index in and out once</td></tr>
+    <tr><td>many "add v to a range" updates, read once</td><td>difference array</td><td>O(n + q) · O(n)</td><td>prefix sums of the changes</td></tr>
+  </tbody>
+</table></div>
+
+<div class="check" id="check-tool">
+  <p class="q">A list of daily account balance changes, some up, some down. You need the number of stretches of days whose changes add up to exactly 0. Which tool?</p>
+  <div class="opts">
+    <button>A variable sliding window</button>
+    <button data-correct>Prefix sums plus a hash map</button>
+    <button>Sort the changes, then opposite-ends pointers</button>
+  </div>
+  <div class="fb right"><p>Right. A stretch sums to 0 exactly when two prefix sums are equal, so for each day you look up how many earlier days had the same running balance. Negatives are fine. O(n).</p></div>
+  <div class="fb wrong"><p>Two signals decide it. "Some down" means negative numbers, so a sliding window can't safely let go of a start: a later drop can bring a too-big sum back to 0. And "stretches of days" means the order matters, so sorting destroys the very thing you're asked about: after sorting, neighbours are no longer consecutive days. A stretch sums to 0 when the running balance is the same at its two ends: that's an equal-prefix-sum lookup in a hash map.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>What to say in the interview</h2>
+
+<p>When one of these problems comes up, a strong answer sounds like this:</p>
+<ol>
+  <li><b>Name the brute force and its cost:</b> "Checking every start and end is n²/2 ranges, so O(n²)."</li>
+  <li><b>Name the waste, and why skipping it is safe:</b> "All numbers are positive, so once a window is over budget, every longer window from that start is too. I can retire the start."</li>
+  <li><b>State the invariant</b> (the fact that stays true after every step): "After the inner loop, nums[left..right] is the longest valid window ending at right."</li>
+  <li><b>Give the complexity with the reason:</b> "There's a loop inside a loop, but left only moves forward, at most n times in total. So it's O(n) time and O(1) extra memory."</li>
+  <li><b>Test the edges out loud:</b> empty input, one item, no valid window (return 0), all items equal, k bigger than n, and the question that catches most people: "can the numbers be negative?"</li>
+</ol>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"What if the numbers can be negative?"</b> Exact sums: prefix sums + hash map. Shortest stretch with sum ≥ target: prefix sums plus a monotonic deque of increasing prefix values, still O(n). Or prefix sums plus binary search when the prefix sums happen to be sorted (all positive), O(n log n).</li>
+    <li><b>"How many stretches have exactly k different letters?"</b> That rule has no single direction, but "at most k" does, and a window can count: after the inner loop, every start from left to right gives a valid range ending at right, so add right − left + 1. Then exactly k = (at most k) − (at most k − 1). For the <em>longest</em> one, the at-most-k window already finds it, as long as the string has at least k different letters.</li>
+    <li><b>"Sum divisible by k?"</b> Same map, keyed by P[j] mod k: two prefix sums with the same remainder bound a range whose sum is a multiple of k.</li>
+    <li><b>"Can three-sum beat n²?"</b> Not by much. No known algorithm does three-sum in O(n^(2−ε)) for any fixed ε &gt; 0, and that belief (the "3SUM conjecture") is used to argue other problems are hard too.</li>
+    <li><b>"The data is a stream."</b> A fixed window needs O(k) memory, a variable window needs the items between its two ends, and prefix-sum-plus-map needs one entry per distinct prefix value. Say which one you're paying for.</li>
+    <li><b>"The data doesn't fit on one machine."</b> Prefix sums split well: each machine sums its chunk, a short pass adds up the chunk totals, then each machine adds its offset. That's a <em>parallel prefix sum</em> (a "scan"), a basic building block on GPUs.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Every brute force here walks a triangle of n²/2 pairs or ranges. Neighbouring candidates overlap; reuse the overlap or prove a whole row can't win.</li>
+  <li>Opposite ends on sorted input: if one end is hopeless with its best partner, drop it. At most n − 1 checks. Unsorted, exact sum: a hash set is O(n).</li>
+  <li>Same direction: a reader visits each item once, a writer marks the finished part. In place, O(1) memory. Fast and slow pointers find loops in linked lists.</li>
+  <li>Fixed window: one in, one out, 2 steps per slide whatever k is.</li>
+  <li>Variable window: grow on the right, let go on the left. O(n) because each pointer moves at most n times in total.</li>
+  <li>It's only correct when the rule has one direction as the window grows. Negative numbers break it for sums. Say why letting go is safe.</li>
+  <li>Prefix sums: P[0] = 0, sum(nums[i:j]) = P[j] − P[i]. O(n) once, O(1) per range, negatives fine.</li>
+  <li>Exact sums with negatives: for each j, look up earlier prefix sums equal to P[j] − k in a hash map. O(n).</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first. The coding exercises are in <code>exercises/sliding_window.py</code>. Their tests count the work you do (characters read; numbers added, subtracted or compared, including running totals you build from them; list slots written), so a correct but quadratic answer fails. Run them with <code>python3 -m pytest -k sliding_window</code>.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Cross out the grid</h4>
+  <p>Draw the pair grid for the sorted list [1, 2, 4, 7, 11, 15]. Run opposite-ends pointers for target 15, then for target 20. For each check, write the sum, which pointer moves, and how many pairs that check crossed out. How many checks did each target take, out of 15 pairs?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>Target 15: 1 + 15 = 16 &gt; 15: hi moves, column 15 crossed out (5 pairs); 1 + 11 = 12 &lt; 15: lo moves, row 1 crossed out (4 pairs); 2 + 11 = 13 &lt; 15: lo moves, row 2 crossed out (3 pairs); 4 + 11 = 15: found. 4 checks. Target 20: 1 + 15 = 16 &lt; 20: lo moves, row 1 crossed out (5 pairs); 2 + 15 = 17 &lt; 20: lo moves, row 2 crossed out (4 pairs); 4 + 15 = 19 &lt; 20: lo moves, row 4 crossed out (3 pairs); 7 + 15 = 22 &gt; 20: hi moves, column 15 crossed out (2 pairs); 7 + 11 = 18 &lt; 20: lo moves, row 7 crossed out (1 pair). Now lo = hi, so there's no pair: 5 checks, and the crossed-out counts 5 + 4 + 3 + 2 + 1 add up to all 15 pairs.</p>
   </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Pick the tool</h4>
+  <p>Which tool, and why? (a) The average temperature of every 7-day stretch. (b) The longest run of days with total rainfall at most 50 mm. (c) One million questions "total sales from day a to day b" on last year's data. (d) The number of stretches of a bank account's daily changes that add up to exactly −100. (e) Two numbers in a sorted list whose sum is closest to 1,000. (f) Whether a linked list loops back on itself, using O(1) memory. (g) Any two numbers in an <em>unsorted</em> list that add up to 50.</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Fixed window, k = 7. (b) Variable window: rainfall is never negative, so the rule has one direction. (c) Prefix sums: O(n) once, then O(1) per question. (d) Prefix sums + hash map: changes can be negative, so no window. (e) Opposite-ends pointers, keeping the closest sum seen; a hash set can't answer "closest". (f) Fast and slow pointers (Floyd). (g) A hash set of the numbers seen so far, O(n); or sort and use two pointers, O(n log n) but less memory.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Break the window</h4>
+  <p>The "shortest stretch with sum ≥ target" window (section 6, second shape) is correct when every number is positive. Find a list of three numbers, one of them negative, and a target, where it gives the wrong answer. Then say which step threw the right answer away.</p>
+  <details class="aside another">
+    <summary>One answer</summary>
+    <p>[3, −2, 4] with target 4. The window grows to [3, −2, 4] (sum 5, valid, length 3), then lets go of 3: the sum drops to 2, no longer valid, so it stops letting go and finishes with 3. But [4] alone has sum 4: length 1. Letting go of the −2 would have <em>raised</em> the sum. With only positive numbers, a shorter window always has a smaller sum, so stopping is safe; with a negative inside, it isn't.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>count_pairs_at_most(nums, limit)</code> in O(n log n)</h4>
+  <p>Count pairs i &lt; j with nums[i] + nums[j] ≤ limit, in an unsorted list with duplicates and negatives. Sort a copy, then use opposite-ends pointers. The twist: when a pair passes, a whole row of pairs passes with it; count them all at once. The test's numbers count every addition and subtraction, and allow 3n of them. Checking every pair is about 2,000,000 for n = 2,000.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>dedupe_sorted(nums, keep)</code>, in place</h4>
+  <p>In a sorted list, keep each value at most <code>keep</code> times, in order, in the front of the list, and return the new length. A reader and a writer, as in section 4, but the keep-or-skip question is different: which already-written slot tells you whether one more copy is allowed? The test hands you a fixed-size array that counts reads and writes and measures your extra memory, so deleting and shifting (O(n²) writes) or building a second list both fail.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>anagram_starts(text, pattern)</code>, a fixed window of letter counts</h4>
+  <p>Find every index where a rearrangement of <code>pattern</code> starts in <code>text</code>. The window is the size of the pattern; what slides in and out are letter counts. The test's text counts every character you read and allows about 5 reads per character. Re-counting each window from scratch reads n × m: 2,000,000 for n = 20,000 and m = 100.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>longest_k_distinct(s, k)</code>, a variable window (longest shape)</h4>
+  <p>The longest substring with at most k different letters. A set isn't enough any more: when the left end lets go of a letter, you need to know whether another copy of it is still inside. The test allows about 6 reads per character; trying every start reads about 18 million for n = 6,000.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>8. <code>shortest_reaching(nums, target)</code>, a variable window (shortest shape)</h4>
+  <p>The second question from section 1, on positive numbers: the length of the shortest stretch with sum ≥ target, or 0 if there's none. The test's numbers count additions and subtractions and allow 3n; restarting the sum at every start costs millions for n = 5,000. It also tests a target bigger than the whole list's sum.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>9. <code>count_sum_k(nums, k)</code>, prefix sums plus a hash map</h4>
+  <p>How many stretches sum to exactly k, with negatives and zeros allowed. A sliding window gives wrong answers here (the tests include cases where it does). The numbers count additions and subtractions, and allow 3n. Zeros are the trap: [0, 0, 0] with k = 0 has 6 answers.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>10. A rate limiter for 10 million users</h4>
+  <p>"At most 100 requests per user in any rolling 60 seconds." Design it twice: once as a sliding window log (a deque of timestamps per user) and once as a sliding window counter (two counts per user). For each, how many bytes per active user, and how much memory for 10 million active users? What does the counter get wrong, and when would that matter? What happens when one user sends 1,000 requests in one second?</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>11. Say it out loud</h4>
+  <p>Set a 3-minute timer. Explain to an imaginary interviewer: why the variable window is O(n) even with a loop inside a loop, why letting go of the left end never throws away the answer, and why that argument fails with negative numbers. Did you mention that each pointer only moves forward, that a retired start is hopeless for every later end, and what to use instead (prefix sums + hash map)?</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="binary-search.html"><small>← Previous</small>Binary search and "search on the answer"</a>
+  <a class="next" href="bfs-dfs.html"><small>Next →</small>Exploring graphs: BFS, DFS, topological sort</a>
+</nav>
+
 </main>
 <script>
-(function () {
-  const $ = (id) => document.getElementById(id);
-  function swFrames(s) {
-    const fr = [], last = {}; let left = 0, best = 0, bestL = 0;
-    for (let r = 0; r < s.length; r++) {
-      const c = s[r];
-      if (c in last && last[c] >= left) {
-        fr.push({ l: left, r, dup: last[c], best, bestL, msg: `'${c}' is already in the window at index ${last[c]}. Move left past it.` });
-        left = last[c] + 1;
+(function() {
+    const $ = (id) => (document.getElementById(id));
+    const m = (v) => (v < 0 ? "−" + -v : String(v));
+    const faded = "opacity:.22;text-decoration:line-through";
+    (function() {
+      const a = [1, 3, 4, 6, 8, 11, 13], n = a.length, total = n * (n - 1) / 2;
+      function build(t) {
+        const fr = [], rows = new Set, cols = new Set;
+        let lo = 0, hi = n - 1, checks = 0;
+        const snap = (msg, x = {}) => (fr.push({ lo, hi, rows: new Set(rows), cols: new Set(cols), checks, msg, ...x }));
+        snap(`Target <b>${t}</b>. ${n} numbers make ${total} pairs (the grid). lo starts at the smallest number, ${a[0]}; hi at the largest, ${a[n - 1]}.`);
+        while (lo < hi) {
+          const s = a[lo] + a[hi], k = hi - lo;
+          checks++;
+          if (s === t) {
+            snap(`${a[lo]} + ${a[hi]} = <b>${s}</b>. Found it after ${checks} checks, out of ${total} pairs.`, { cur: true, found: true });
+            return fr;
+          }
+          if (s > t) {
+            snap(`${a[lo]} + ${a[hi]} = <b>${s}</b> &gt; ${t}: too big. ${a[lo]} is the smallest partner ${a[hi]} has left, so every pair with ${a[hi]} is too big. Its whole column goes: ${k} pair${k > 1 ? "s" : ""}.`, { cur: true, pend: ["col", hi] });
+            cols.add(hi);
+            hi--;
+          } else {
+            snap(`${a[lo]} + ${a[hi]} = <b>${s}</b> &lt; ${t}: too small. ${a[hi]} is the biggest partner ${a[lo]} has left, so every pair with ${a[lo]} is too small. Its whole row goes: ${k} pair${k > 1 ? "s" : ""}.`, { cur: true, pend: ["row", lo] });
+            rows.add(lo);
+            lo++;
+          }
+        }
+        snap(`lo and hi have met: every pair is crossed out, so no pair sums to ${t}. That took ${checks} checks instead of ${total}.`, { over: true });
+        return fr;
       }
-      last[c] = r;
-      if (r - left + 1 > best) { best = r - left + 1; bestL = left; }
-      fr.push({ l: left, r, best, bestL, msg: `Window [${left}, ${r}] = "${s.slice(left, r + 1)}", length ${r - left + 1}. Best so far: <b>${best}</b>.` });
-    }
-    fr.push({ l: bestL, r: bestL + best - 1, best, bestL, final: true, msg: `Done in one pass. Longest is "<b>${s.slice(bestL, bestL + best)}</b>" (length ${best}). Each pointer moved at most n times.` });
-    return fr;
-  }
-  let cur = "";
-  const sw = V.player($("sw-player"), {
-    draw(f, stage) {
-      const ptrs = { [f.l]: "left" }; ptrs[f.r] = f.r === f.l ? "left,right" : "right";
-      stage.append(V.cells([...cur], { ptrs, cls: (i) => (i === f.dup ? "bad" : i >= f.l && i <= f.r ? (f.final ? "done" : "win") : i > f.r ? "dim" : "") }));
-      const win = new Set(cur.slice(f.l, f.r + 1));
-      stage.append(V.el("div", { class: "small muted" }, "window state (a set of characters): {", [...win].join(", "), "}"));
-    },
-  });
-  const swRun = () => { cur = $("sw-s").value || "a"; sw.load(swFrames(cur)); };
-  $("sw-go").onclick = swRun; swRun();
-
-  let nums = [];
-  function psFrames(k) {
-    const fr = [], seen = new Map([[0, 1]]); let p = 0, count = 0; const P = [0], found = [];
-    fr.push({ i: -1, P: [...P], seen: new Map(seen), count, found: [], msg: `Seed the map with prefix 0 seen once (the empty prefix). Looking for sum = <b>${k}</b>.` });
-    nums.forEach((x, i) => {
-      p += x; P.push(p);
-      const need = p - k, hits = seen.get(need) || 0;
-      if (hits) { count += hits; P.forEach((v, j) => { if (j < P.length - 1 && v === need) found.push([j, i]); }); }
-      fr.push({ i, P: [...P], seen: new Map(seen), count, need, found: [...found], msg: `prefix = ${p}. Need an earlier prefix of ${p} − ${k} = <b>${need}</b>: seen ${hits} time${hits === 1 ? "" : "s"}. Count = <b>${count}</b>.` });
-      seen.set(p, (seen.get(p) || 0) + 1);
-    });
-    fr.push({ i: nums.length, P: [...P], seen: new Map(seen), count, found, msg: `Total subarrays summing to ${k}: <b>${count}</b>: ${found.map(([a, b]) => `[${a}..${b}]`).join(", ") || "none"}. One pass, negatives and all.` });
-    return fr;
-  }
-  const ps = V.player($("ps-player"), {
-    draw(f, stage) {
-      const last = f.found[f.found.length - 1];
-      stage.append(V.el("div", { class: "small muted" }, "nums"), V.cells(nums, { ptrs: f.i >= 0 && f.i < nums.length ? { [f.i]: "i" } : {}, cls: (j) => (j === f.i ? "hl" : last && j >= last[0] && j <= last[1] && f.i === last[1] ? "win" : "") }));
-      stage.append(V.el("div", { class: "small muted" }, "prefix sums P (P[j] = sum of nums before j)"), V.cells(f.P, { cls: (j, v) => (v === f.need && j < f.P.length - 1 ? "done" : "") }));
-      stage.append(V.el("div", { class: "small muted" }, "map {prefix: times seen}: ", [...f.seen].map(([a, b]) => `${a}:${b}`).join("  ")));
-    },
-  });
-  const psRun = () => { nums = $("ps-n").value.split(/[ ,]+/).filter(Boolean).map(Number).filter((x) => !isNaN(x)).slice(0, 14); ps.load(psFrames(Number($("ps-k").value))); };
-  $("ps-go").onclick = psRun; psRun();
-})();
+      const player = V.player($("tp-player"), {
+        speed: 1300,
+        draw(f, stage) {
+          const ptrs = f.over ? {} : f.lo === f.hi ? { [f.lo]: "lo hi" } : { [f.lo]: "lo", [f.hi]: "hi" };
+          const left = V.el("div", {}, V.el("div", { class: "small muted", style: "margin-bottom:22px" }, "sorted list"), V.cells(a, { ptrs, cls: (i) => (f.over || i < f.lo || i > f.hi ? "dim" : f.cur && (i === f.lo || i === f.hi) ? f.found ? "done" : "cmp" : "") }));
+          const head = V.el("tr", {}, V.el("th", {}, ""), a.slice(1).map((v) => (V.el("th", {}, v))));
+          const body = a.slice(0, n - 1).map((v, i) => (V.el("tr", {}, V.el("th", {}, v), a.slice(1).map((w, jj) => {
+            const j = jj + 1;
+            if (j <= i)
+              return V.el("td", { style: "background:none;border-color:transparent" }, "");
+            const gone = f.rows.has(i) || f.cols.has(j);
+            const pend = f.pend && (f.pend[0] === "row" && f.pend[1] === i || f.pend[0] === "col" && f.pend[1] === j) && i >= f.lo && j <= f.hi;
+            const isCur = f.cur && i === f.lo && j === f.hi;
+            return V.el("td", { class: isCur ? f.found ? "path" : "cur" : pend ? "dep" : "", style: gone ? faded : "" }, a[i] + a[j]);
+          }))));
+          const grid = V.el("div", {}, V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "every pair: row + column = cell"), V.el("table", { class: "dp-table" }, head, body));
+          stage.append(V.el("div", { style: "display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start" }, left, grid), V.el("div", { class: "small muted", style: "margin-top:6px" }, `checks so far: ${f.checks} · pairs still possible: ${f.over ? 0 : (f.hi - f.lo + 1) * (f.hi - f.lo) / 2}`));
+        }
+      });
+      const load = () => (player.load(build(Number($("tp-target").value))));
+      $("tp-target").onchange = load;
+      load();
+    })();
+    (function() {
+      const a = [4, 2, 7, 1, 8, 3, 6, 5, 2, 9], k = 5, fr = [];
+      let s = 0;
+      for (let i = 0;i < k; i++)
+        {s += a[i];}
+      let best = s, bestAt = 0, work = k - 1, naive = k - 1;
+      fr.push({ l: 0, r: k - 1, s, best, work, naive, msg: `k = ${k}. The first window: ${a.slice(0, k).join(" + ")} = <b>${s}</b>. That costs ${k - 1} additions, once.` });
+      for (let r = k;r < a.length; r++) {
+        const prev = s;
+        s += a[r] - a[r - k];
+        work += 2;
+        naive += k - 1;
+        let note;
+        if (s > best) {
+          best = s;
+          bestAt = r - k + 1;
+          note = " New best.";
+        } else
+          note = s === best ? ` Ties the best, ${best}; keep the first one.` : ` Best is still ${best}.`;
+        fr.push({ l: r - k + 1, r, s, best, work, naive, inn: r, out: r - k, msg: `${a[r]} joins, ${a[r - k]} leaves: ${prev} + ${a[r]} − ${a[r - k]} = <b>${s}</b>.${note}` });
+      }
+      const last = fr[fr.length - 1];
+      fr.push({
+        ...last,
+        inn: undefined,
+        out: undefined,
+        l: bestAt,
+        r: bestAt + k - 1,
+        done: true,
+        msg: `Done. The busiest window is [${a.slice(bestAt, bestAt + k).join(", ")}] = <b>${best}</b>. Sliding cost ${last.work} additions and subtractions; re-adding all ${a.length - k + 1} windows would cost ${last.naive}. With k = 60 it would be 2 per step against 59.`
+      });
+      V.player($("fw-player"), {
+        frames: fr,
+        speed: 1100,
+        draw(f, stage) {
+          stage.append(V.cells(a, {
+            ptrs: f.done ? {} : { ...f.out !== undefined ? { [f.out]: "out" } : {}, ...f.inn !== undefined ? { [f.inn]: "in" } : {} },
+            cls: (i) => (i === f.inn ? "hl" : i === f.out ? "bad" : i >= f.l && i <= f.r ? f.done ? "done" : "win" : "")
+          }), V.el("div", { class: "small muted" }, `window sum: ${f.s} · best: ${f.best} · work so far: sliding ${f.work}, re-adding ${f.naive}`));
+        }
+      });
+    })();
+    (function() {
+      const data = { pos: [2, 1, 3, 4, 1, 1, 2, 5, 1], neg: [3, 1, 1, 3, 6, -8, 6] }, B = 8;
+      function build(a) {
+        const fr = [], n = a.length;
+        let l = 0, s = 0, best = 0, bl = 0, br = -1, rm = 0, lm = 0, retired = null;
+        const snap = (o) => (fr.push({ l, s, best, rm, lm, ...o }));
+        snap({ r: -1, msg: `Budget ${B}. The window starts empty. Each step the right end eats one number; while the sum is over ${B}, the left end lets go.` });
+        for (let r = 0;r < n; r++) {
+          s += a[r];
+          rm++;
+          snap({ r, add: r, msg: `R eats ${m(a[r])}: sum = <b>${s}</b>` + (s > B ? ` &gt; ${B}, over budget.` : ` ≤ ${B}.`) });
+          while (s > B) {
+            const d = l;
+            s -= a[l];
+            l++;
+            lm++;
+            if (retired === null)
+              retired = { at: d, r, sum: s + a[d] };
+            snap({ r, drop: d, msg: `L lets go of ${m(a[d])}: sum = <b>${s}</b>` + (s > B ? `, still over.` : ` ≤ ${B}, valid again.`) });
+          }
+          const len = r - l + 1, f = fr[fr.length - 1];
+          if (len > best) {
+            best = len;
+            bl = l;
+            br = r;
+            f.best = best;
+            f.msg += ` Window [${a.slice(l, r + 1).map(m).join(", ")}], length ${len}: new best.`;
+          } else
+            f.msg += ` Window [${a.slice(l, r + 1).map(m).join(", ")}], length ${len} (best is ${best}).`;
+        }
+        let msg = `Done. Longest within budget: [${a.slice(bl, br + 1).map(m).join(", ")}], length <b>${best}</b>. R moved ${rm} times and L ${lm} times: ${rm + lm} moves, never more than 2n = ${2 * n}.`;
+        let ti = 0, tj = -1;
+        for (let i = 0;i < n; i++) {
+          let t = 0;
+          for (let j = i;j < n; j++) {
+            t += a[j];
+            if (t <= B && j - i > tj - ti) {
+              ti = i;
+              tj = j;
+            }
+          }
+        }
+        if (tj - ti + 1 > best) {
+          const ts = a.slice(ti, tj + 1).reduce((x, y) => (x + y), 0);
+          msg = `The window says <b>${best}</b>. But [${a.slice(ti, tj + 1).map(m).join(", ")}] sums to ${ts} ≤ ${B} and has length <b>${tj - ti + 1}</b>. ` + `L let go of index ${retired.at} when [${a.slice(retired.at, retired.r + 1).map(m).join(", ")}] summed to ${retired.sum}, betting that every longer window from there would be even bigger. The ${m(Math.min(...a))} broke that bet.`;
+          fr.push({ l: ti, r: tj, s: ts, best, rm, lm, truth: true, msg });
+        } else
+          fr.push({ l: bl, r: br, s: a.slice(bl, br + 1).reduce((x, y) => (x + y), 0), best, rm, lm, final: true, msg });
+        return fr.map((f) => (({ ...f, a })));
+      }
+      const player = V.player($("vw-player"), {
+        speed: 1200,
+        draw(f, stage) {
+          const ptrs = {}, n = f.a.length;
+        if (!f.final && !f.truth) {
+          if (f.r < 0) ptrs[0] = "L R";
+          else if (f.l > f.r) { ptrs[f.r] = "R"; if (f.l < n) ptrs[f.l] = "L"; }
+          else { ptrs[f.l] = "L"; ptrs[f.r] = f.l === f.r ? "L R" : "R"; }
+        }
+        stage.append(V.cells(f.a, {
+            label: m,
+            ptrs,
+            cls: (i) => (f.truth ? i >= f.l && i <= f.r ? "warn" : "dim" : f.final ? i >= f.l && i <= f.r ? "done" : "" : i === f.drop ? "bad" : i < f.l ? "dim" : i === f.add ? "hl" : i <= f.r ? "win" : "")
+          }), V.el("div", { class: "small muted" }, `sum: ${f.s} · budget: ${B} · best: ${f.best} · moves: R ${f.rm}, L ${f.lm}`));
+        }
+      });
+      const load = () => (player.load(build(data[$("vw-data").value])));
+      $("vw-data").onchange = load;
+      load();
+    })();
+    (function() {
+      const data = { neg: [3, 4, -2, 5, -6, 1, 4, 2, -3, 3], pos: [3, 4, 2, 5, 6, 1, 4, 2, 3, 3] };
+      const W = 520, H = 270, L = 26, R = 62, T = 24, Bm = 50;
+      function draw() {
+        const nums = data[$("ps-data").value], n = nums.length, P = [0];
+        for (const x of nums)
+          {P.push(P[P.length - 1] + x);}
+        let i = Number($("ps-i").value), j = Number($("ps-j").value);
+        if (i >= j) {
+          if (document.activeElement === $("ps-i"))
+            j = i + 1;
+          else
+            i = j - 1;
+          $("ps-i").value = i;
+          $("ps-j").value = j;
+        }
+        const lo = Math.min(...P), hi = Math.max(...P);
+        const x = (k) => (L + k * (W - L - R) / n), y = (v) => (T + (hi - v) * (H - T - Bm) / (hi - lo || 1));
+        const svg = $("ps-svg");
+        svg.replaceChildren();
+        if (lo < 0)
+          svg.append(V.s("line", { class: "grid-line", x1: L, x2: W - R, y1: y(0), y2: y(0) }), V.s("text", { class: "label", style: "font-size:13px", x: L - 6, y: y(0) + 4, "text-anchor": "end", text: "0" }));
+        svg.append(V.s("line", { class: "axis", x1: L, x2: W - R, y1: H - Bm + 8, y2: H - Bm + 8 }));
+        for (let k = 0;k < n; k++) {
+          const inside = k >= i && k < j;
+          svg.append(V.s("line", { x1: x(k), y1: y(P[k]), x2: x(k + 1), y2: y(P[k + 1]), stroke: nums[k] >= 0 ? "var(--ok)" : "var(--bad)", "stroke-width": inside ? 3.5 : 2, opacity: inside ? 1 : 0.35 }));
+          svg.append(V.s("text", { class: "label", x: (x(k) + x(k + 1)) / 2, y: H - Bm + 24, "text-anchor": "middle", text: m(nums[k]), style: "font-size:13px;" + (inside ? "fill:var(--text)" : "") }));
+        }
+        for (let k = 0;k <= n; k++) {
+          const end = k === i || k === j;
+          svg.append(V.s("circle", { cx: x(k), cy: y(P[k]), r: end ? 5.5 : 3.5, fill: end ? "var(--accent)" : "var(--surface-3)", stroke: "var(--border-strong)" }));
+          svg.append(V.s("text", { class: "label", x: x(k), y: y(P[k]) - 9, "text-anchor": "middle", text: m(P[k]), style: "font-size:13px;" + (end ? "fill:var(--accent)" : "") }));
+          svg.append(V.s("text", { class: "label", x: x(k), y: H - 6, "text-anchor": "middle", text: "P" + k, style: "font-size:13px;" + (end ? "fill:var(--accent)" : "") }));
+        }
+        const bx = W - R + 12;
+        svg.append(V.s("line", { x1: x(i), x2: bx, y1: y(P[i]), y2: y(P[i]), stroke: "var(--accent)", "stroke-dasharray": "4 4", opacity: 0.7 }), V.s("line", { x1: x(j), x2: bx, y1: y(P[j]), y2: y(P[j]), stroke: "var(--accent)", "stroke-dasharray": "4 4", opacity: 0.7 }), V.s("line", { x1: bx, x2: bx, y1: y(P[i]), y2: y(P[j]), stroke: "var(--accent-2)", "stroke-width": 2.5 }), V.s("text", { x: bx + 8, y: (y(P[i]) + y(P[j])) / 2 + 4, fill: "var(--accent-2)", "font-size": 15, text: (P[j] - P[i] >= 0 ? "+" : "") + m(P[j] - P[i]) }));
+        const terms = nums.slice(i, j).map((v, k) => (k === 0 ? m(v) : v < 0 ? "− " + -v : "+ " + v)).join(" ");
+        $("ps-msg").innerHTML = `sum(nums[${i}:${j}]) = ${terms} = <b>${m(P[j] - P[i])}</b>, and P[${j}] − P[${i}] = ${m(P[j])} − ${P[i] < 0 ? "(" + m(P[i]) + ")" : P[i]} = <b>${m(P[j] - P[i])}</b>. One subtraction, whatever the length.`;
+      }
+      $("ps-i").oninput = draw;
+      $("ps-j").oninput = draw;
+      $("ps-data").onchange = draw;
+      draw();
+    })();
+  })();
 </script>
 </body>
 </html>

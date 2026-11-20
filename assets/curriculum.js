@@ -408,7 +408,7 @@ window.CURRICULUM = {
     {
      "file": "bfs-dfs.html",
      "topic": "02.05",
-     "title": "BFS, DFS, topological sort and components"
+     "title": "Exploring graphs: BFS, DFS, topological sort"
     },
     {
      "file": "binary-search.html",
@@ -433,14 +433,14 @@ window.CURRICULUM = {
     {
      "file": "two-pointers-sliding-window.html",
      "topic": "02.04",
-     "title": "Two pointers, sliding windows and prefix sums"
+     "title": "Two pointers, sliding window, prefix sums"
     }
    ],
    "exercises": [
     {
      "file": "backtracking.py",
      "module": "backtracking",
-     "title": "Recursion and backtracking",
+     "title": "Backtracking: generate, prune, and search",
      "topics": [
       "02.06"
      ],
@@ -449,7 +449,7 @@ window.CURRICULUM = {
     {
      "file": "binary_search.py",
      "module": "binary_search",
-     "title": "Binary search and \"search on the answer\"",
+     "title": "Binary search: boundaries, rotated arrays, and search on the answer",
      "topics": [
       "02.03"
      ],
@@ -485,7 +485,7 @@ window.CURRICULUM = {
     {
      "file": "dp.py",
      "module": "dp",
-     "title": "Dynamic programming classics",
+     "title": "Dynamic programming: define the state, fill the table, read the answer",
      "topics": [
       "02.07"
      ],
@@ -494,7 +494,7 @@ window.CURRICULUM = {
     {
      "file": "graphs.py",
      "module": "graphs",
-     "title": "Graph traversal: topological sort and connected components",
+     "title": "Exploring graphs: shortest paths, islands, exits, cycles, build order",
      "topics": [
       "02.05"
      ],
@@ -503,7 +503,7 @@ window.CURRICULUM = {
     {
      "file": "sliding_window.py",
      "module": "sliding_window",
-     "title": "Two pointers, sliding window, prefix sums",
+     "title": "Two pointers, sliding windows, prefix sums: stop redoing work",
      "topics": [
       "02.04"
      ],
@@ -1539,5 +1539,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-19 22:02"
+ "generated": "2026-11-20 10:43"
 };

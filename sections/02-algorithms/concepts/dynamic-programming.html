@@ -10,168 +10,944 @@
   <script src="../../../assets/curriculum.js"></script>
   <script src="../../../assets/viz.js"></script>
   <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
 </head>
 <body data-root="../../.." data-section="02" data-page="concept">
-<main class="content">
-  <p class="muted small"><span class="badge P0">P0</span> &nbsp;02.07 · Dynamic programming: 1D/2D, knapsack family, LIS, edit distance, interval DP</p>
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 7</div>
   <h1>Dynamic programming</h1>
-  <p class="lede">DP has a reputation for being clever. It's really bookkeeping: name the subproblem, write how a big one is built from smaller ones, and never solve the same one twice.</p>
-  <details class="box accent" open id="idea">
-    <summary><span class="kicker">Core</span><span class="label">The one-sentence idea</span></summary>
-    <div class="box-body">
-      <p class="one-liner">DP is recursion plus a cache. When a problem breaks into overlapping subproblems with optimal substructure, solve each distinct subproblem once and store it. Time becomes (number of states) × (work per state).</p>
+  <div class="meta"><span><span class="badge P0">P0</span> a favorite in coding rounds</span><span>about 60 minutes</span><span>10 quick checks · 10 exercises</span></div>
+</header>
+
+<p>Dynamic programming (DP) has a scary name and a simple core. If a recursive solution keeps asking the same smaller question, write the answer down the first time and look it up after that. That one change turns hours of work into milliseconds. The hard part is never the code. It's deciding <em>what</em> to write down, and this chapter gives you a recipe for that, plus the handful of problem shapes that cover most interview questions.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Spot repeated subproblems in a recursion and count how much work they waste.</li>
+    <li>Turn slow recursion into memoization, then into a bottom-up table, then shrink the table.</li>
+    <li>Use the recipe: state in words, recurrence from the last choice, base cases, fill order, where the answer is, and the cost.</li>
+    <li>Solve the classic shapes: 1D (coins, house robber), knapsack, longest increasing subsequence, two strings (edit distance), and ranges (interval DP).</li>
+    <li>Rebuild the actual answer (which coins, which items), not just the number.</li>
+    <li>Tell when a problem needs DP, greedy or backtracking, and say why out loud.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom, like a book. It builds on <a href="complexity.html">How fast is your code?</a> (exponential growth), <a href="binary-search.html">Binary search</a> (used in section 6) and <a href="backtracking.html">Recursion and backtracking</a> (decision trees). Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: the same question, millions of times</h2>
+
+<div class="story">
+  <p>A staircase has 30 steps. You can climb 1 or 2 steps at a time. In how many different ways can you reach the top?</p>
+  <p>A friend writes the natural recursion. To stand on step 30, your last move came either from step 29 (a 1-step) or from step 28 (a 2-step). So the ways to reach 30 are the ways to reach 29 plus the ways to reach 28. Neat and correct.</p>
+</div>
+
+<pre><code>calls = 0
+
+def climb(n):
+    global calls
+    calls += 1
+    if n &lt;= 1:                          # step 0 or step 1: exactly one way
+        return 1
+    return climb(n - 1) + climb(n - 2)  # last move was 1 step, or 2 steps
+
+climb(30)    # 1,346,269 ways, and calls is now 2,692,537</code></pre>
+
+<p>Right answer. Now watch the calls as the staircase grows (timed on a fast laptop, about 30 million calls a second):</p>
+
+<div class="table-wrap"><table class="steps-table">
+  <thead><tr><th>steps n</th><th>ways</th><th>calls made</th><th>time</th></tr></thead>
+  <tbody>
+    <tr><td>10</td><td>89</td><td>177</td><td>instant</td></tr>
+    <tr><td>20</td><td>10,946</td><td>21,891</td><td>instant</td></tr>
+    <tr><td>30</td><td>1,346,269</td><td>2,692,537</td><td>about 0.1 s</td></tr>
+    <tr><td>40</td><td>165,580,141</td><td>331,160,281</td><td>about 10 s</td></tr>
+    <tr><td>50</td><td>20,365,011,074</td><td>40,730,022,147</td><td>about 20 minutes</td></tr>
+    <tr><td>60</td><td>2,504,730,781,961</td><td>5,009,461,563,921</td><td><b>almost 2 days</b></td></tr>
+  </tbody>
+</table></div>
+
+<p>Every 10 extra steps multiply the work by about 123: exponential growth, roughly 1.6ⁿ (see the <a href="complexity.html">complexity chapter</a>). Yet <code>climb(30)</code> can only ever ask "how many ways to reach step k?" for k = 0 to 30. That's <b>31 questions</b>, answered with 2.7 million calls. Almost every call is a repeat.</p>
+
+<h3>A real one: making change</h3>
+<p>A vending machine owes you 6 cents and has coins of 1, 3 and 4 cents. It should use as few coins as possible. A cashier's instinct is <b>greedy</b>: take the biggest coin that fits, repeat. That gives 4 + 1 + 1, three coins. But 3 + 3 is two coins. Greedy grabbed the 4 and could never take it back.</p>
+<p>The safe way is to try every coin as the <em>last</em> coin and keep the best:</p>
+
+<pre><code>def fewest(amount, coins):
+    if amount == 0:
+        return 0                       # nothing left to pay: no coins
+    best = float("inf")                # "impossible" until shown otherwise
+    for c in coins:
+        if c &lt;= amount:                # try c as the last coin
+            best = min(best, 1 + fewest(amount - c, coins))
+    return best</code></pre>
+
+<p>Correct, and slow again: 2,550,408 calls for 30 cents, and 313,679,521 calls (about 20 seconds) for 40 cents. Yet there are only 41 different amounts, 0 to 40, it could ever ask about.</p>
+
+<div class="check" id="check-problem">
+  <p class="q"><code>climb(30)</code> makes 2,692,537 calls. How many <em>different</em> values of n does it call with?</p>
+  <div class="opts">
+    <button>2,692,537: every call is a different question</button>
+    <button data-correct>31: the values 0 through 30</button>
+    <button>1,346,269: one per way of climbing</button>
+  </div>
+  <div class="fb right"><p>Right. n starts at 30, drops by 1 or 2 each call, and stops at 1 or 0, so it's always one of 0 to 30. Every other call repeats one of those 31. That gap, 31 questions versus 2.7 million calls, is why DP exists.</p></div>
+  <div class="fb wrong"><p>Look at what the argument can be: it starts at 30, each call subtracts 1 or 2, and it stops at 1 or 0. So n is a whole number from 0 to 30, only 31 possibilities, asked over and over. (1,346,269 is the <em>answer</em>, not a count of questions.)</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Why it's slow: the same subproblems, over and over</h2>
+
+<p>Draw the calls as a tree, like the decision trees in the <a href="backtracking.html">backtracking chapter</a>. Each node is one call; its children are the calls it makes. A <b>subproblem</b> is a smaller version of the same question: <code>climb(4)</code> is a subproblem of <code>climb(6)</code>.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <span class="small">n =</span><input type="range" id="ct-n" min="4" max="40" value="6" style="width:180px"><b id="ct-nval"></b>
+      <select id="ct-mode"><option value="plain">Plain recursion</option><option value="memo">With a memo</option></select>
     </div>
-  </details>
+    <div id="ct-count" class="small" style="margin-top:10px"></div>
+    <div id="ct-wrap" style="overflow-x:auto;margin-top:6px"><svg class="viz" id="ct-svg"></svg></div>
+  </div>
+  <div class="cap">The calls made by <code>climb(n)</code>. In plain mode, the yellow subtrees are the same question, <code>climb(n − 3)</code>, solved from scratch three times. Switch to "With a memo" to see the repeats become green leaves that answer instantly. Then drag n up to 30 and compare the two call counts. (On a phone, the tree scrolls sideways.)</div>
+</div>
 
-  <details class="box" open id="first-principles">
-    <summary><span class="kicker">Build it</span><span class="label">From first principles: the four questions</span></summary>
-    <div class="box-body">
-      <p>Answer these in words <em>before</em> any code. In interviews, say them out loud.</p>
-      <ol>
-        <li><b>State:</b> what does <code>dp[i]</code> (or <code>dp[i][j]</code>) mean, in one sentence? "dp[i][j] = the edit distance between the first i chars of a and the first j chars of b."</li>
-        <li><b>Transition:</b> how is a state built from smaller states? Think about the <em>last decision</em>: what happened to the last character, item, or step?</li>
-        <li><b>Base cases:</b> the smallest states you can answer directly (empty string, zero capacity).</li>
-        <li><b>Order and answer:</b> fill states so dependencies are computed first; say which cell holds the final answer.</li>
-      </ol>
-      <h3>Top-down vs bottom-up</h3>
-      <div class="cols">
-        <div class="panel"><h4>Top-down (memoization)</h4><p class="small">Write the natural recursion and add <code>@functools.cache</code>. Only computes the states you actually reach. Easy to get right; recursion depth can be an issue.</p></div>
-        <div class="panel"><h4>Bottom-up (tabulation)</h4><p class="small">Fill a table in dependency order. No recursion, and you can often shrink space to one or two rows because each row only depends on the previous one.</p></div>
-      </div>
-      <h3>The families worth recognizing</h3>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Family</th><th>State</th><th>Examples</th></tr></thead>
-        <tbody>
-          <tr><td>1D linear</td><td>dp[i] = best answer for prefix i</td><td>climbing stairs, house robber, decode ways</td></tr>
-          <tr><td>Two sequences</td><td>dp[i][j] over prefixes of both</td><td>edit distance, LCS, regex/wildcard matching</td></tr>
-          <tr><td>Knapsack</td><td>dp[i][c] = best using first i items, capacity c</td><td>0/1 knapsack, subset sum, coin change, partition</td></tr>
-          <tr><td>LIS</td><td>dp[i] = best subsequence ending at i</td><td>longest increasing subsequence, Russian dolls</td></tr>
-          <tr><td>Interval</td><td>dp[l][r] over a range, fill by length</td><td>burst balloons, matrix chain, palindrome partitioning</td></tr>
-          <tr><td>Grid</td><td>dp[r][c] from up/left</td><td>unique paths, minimum path sum</td></tr>
-        </tbody>
-      </table></div>
+<p>In <code>climb(6)</code>, the subproblem <code>climb(3)</code> is solved 3 times, <code>climb(2)</code> 5 times and <code>climb(1)</code> 8 times. The tree has 25 nodes, but only 7 different questions. This is the first ingredient of DP:</p>
+<ul>
+  <li><b>Overlapping subproblems.</b> The same subproblem shows up in many branches of the recursion. If you remember its answer, every repeat becomes free.</li>
+</ul>
+<p>Not every recursion has this. Merge sort (from the <a href="sorting.html">sorting chapter</a>) splits a list into halves that never overlap, so each piece is sorted exactly once. Remembering answers would never help it. That's plain divide and conquer, not DP.</p>
+
+<p>The second ingredient is about <em>correctness</em>, and the coin problem shows it best:</p>
+<ul>
+  <li><b>Optimal substructure.</b> The best answer to the big problem is built from best answers to smaller ones. Suppose the best way to pay 6 cents ends with a 3-cent coin. Then the coins before it pay 3 cents, and they must be a best way to pay 3 cents. If there were a better way to pay those 3 cents, you could swap it in and get a better way to pay 6, which is impossible.</li>
+</ul>
+<p>Not every problem has this. For the longest route between two cities that never repeats a city, the best route A to B and the best route B to C may share a city, so gluing them breaks the rule. When pieces interfere like that, a DP recurrence gives wrong answers.</p>
+
+<div class="keyidea">Dynamic programming is recursion plus a notebook. It works when the recursion asks the same questions many times (overlapping subproblems) and the best answer is built from best answers to smaller questions (optimal substructure). The cost becomes: number of different questions × work per question.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: the tutor's notebook</summary>
+  <p>A student asks a tutor "what's 17 × 23?" The tutor works it out: 391. Ten minutes later, in a different problem, the same question comes up. A tutor without a notebook works it out again. A tutor with a notebook glances at the page: 391.</p>
+  <p>The plain recursion is the tutor without the notebook: it redoes the whole <code>climb(3)</code> subtree every time. DP is the notebook. (The name means nothing deep; Richard Bellman picked "dynamic" in the 1950s partly because it sounded impressive.)</p>
+</details>
+
+<div class="check" id="check-overlap">
+  <p class="q">Which of these recursions gains the most from remembering answers?</p>
+  <div class="opts">
+    <button>Merge sort on a list of 1,000 numbers</button>
+    <button>Binary search for one number in a sorted list</button>
+    <button data-correct>Fewest coins for 30 cents, trying every coin as the last one</button>
+  </div>
+  <div class="fb right"><p>Yes. The amount 26 is reached as 30 − 4, 30 − 1 − 3, 30 − 3 − 1 and more, and each path re-solves it. Merge sort's halves never overlap, and binary search never comes back to a range, so a notebook would sit empty.</p></div>
+  <div class="fb wrong"><p>Ask: "can two different paths reach the <em>same</em> subproblem?" Merge sort's two halves share no items; each piece is sorted once. Binary search throws half away and never revisits it. In the coin recursion, 30 − 4, 30 − 1 − 3 and 30 − 3 − 1 all arrive at 26, and each re-solves it from scratch. Only overlap makes a memo pay.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Remember the answers: a memo, then a table</h2>
+
+<h3>Top-down: memoization</h3>
+<p><b>Memoization</b> means keeping a dictionary (the <b>memo</b>) from subproblem to answer. Before solving a subproblem, look it up; after solving it, store it. The recursion stays exactly the same.</p>
+
+<pre><code>memo = {}
+
+def climb(n):
+    if n &lt;= 1:
+        return 1
+    if n in memo:                  # asked before? read the notebook
+        return memo[n]
+    memo[n] = climb(n - 1) + climb(n - 2)
+    return memo[n]</code></pre>
+
+<p>Each n from 2 to 30 is now computed once and makes 2 calls: 29 × 2 + 1 = <b>59 calls</b> instead of 2,692,537. The coin recursion with a memo makes <b>86 calls</b> for 30 cents instead of 2,550,408. In Python, <code>@functools.cache</code> above the <code>def</code> keeps the memo for you.</p>
+<p>The cost rule from now on: <b>number of states × work per state</b>. A <b>state</b> is one distinct subproblem, like "n = 17" or "amount = 26". Stairs: 31 states × O(1) = O(n). Coins: 31 amounts × 3 coins each = O(amount × coins).</p>
+
+<h3>The flaw: recursion depth</h3>
+<p>The memoized <code>climb(5000)</code> crashes with <code>RecursionError</code>. The memo saves <em>work</em>, not <em>depth</em>: the first call goes 5000 → 4999 → … all the way down before anything returns, and Python allows about 1,000 nested calls. (In a plain script on Python 3.13, <code>climb(999)</code> works and <code>climb(1000)</code> fails.)</p>
+
+<h3>Bottom-up: tabulation</h3>
+<p>Turn it around: start from the smallest subproblems and build up, writing each answer into a list. This is <b>tabulation</b>, and the list is the <b>table</b>.</p>
+
+<pre><code>def climb(n):
+    ways = [1] * (n + 1)           # ways[0] = ways[1] = 1
+    for i in range(2, n + 1):      # small to big: ways[i-1] and ways[i-2] are ready
+        ways[i] = ways[i - 1] + ways[i - 2]
+    return ways[n]</code></pre>
+
+<p>No recursion, so no depth limit; <code>climb(5000)</code> is instant. The one rule of tabulation: <b>fill the table in an order where every cell you read is already filled.</b> Here that's left to right, because cell i reads cells i − 1 and i − 2.</p>
+
+<h3>Shrinking the table</h3>
+<p>Look at what the loop reads: only the last two cells. Everything older is dead weight. So keep two variables instead of a list:</p>
+
+<pre><code>def climb(n):
+    two_back, one_back = 1, 1      # ways[i-2] and ways[i-1]
+    for _ in range(2, n + 1):
+        two_back, one_back = one_back, one_back + two_back
+    return one_back                # also right for n = 0 and n = 1</code></pre>
+
+<p>O(n) time, O(1) memory. This "rolling" trick works whenever each cell looks a fixed distance back; in a 2D table, it means keeping only the previous row.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>Top-down (memo)</th><th>Bottom-up (table)</th></tr></thead>
+  <tbody>
+    <tr><td>Starts from</td><td>the question you were asked</td><td>the smallest subproblems</td></tr>
+    <tr><td>Solves</td><td>only the states it actually reaches</td><td>every cell in the table</td></tr>
+    <tr><td>Recursion depth</td><td>can hit Python's limit (about 1,000)</td><td>none</td></tr>
+    <tr><td>Shrinking memory</td><td>hard</td><td>easy: keep only what the next step reads</td></tr>
+    <tr><td>Easiest when</td><td>the recurrence is clear but the fill order isn't</td><td>the fill order is obvious</td></tr>
+  </tbody>
+</table></div>
+
+<div class="keyidea">Memoization is the recursion plus a dictionary: same code, each state solved once. Tabulation fills a table from the smallest states up, in an order where every cell it reads is already done; it has no depth limit and makes it easy to keep only the last row or two.</div>
+
+<div class="check" id="check-depth">
+  <p class="q">Your memoized <code>climb</code> works for n = 500 but raises <code>RecursionError</code> for n = 5,000. What's the best fix?</p>
+  <div class="opts">
+    <button>Use a bigger dictionary for the memo</button>
+    <button data-correct>Fill a table bottom-up from 0 to n</button>
+    <button>Add <code>@functools.cache</code> on top of the dictionary</button>
+  </div>
+  <div class="fb right"><p>Right. The error is about how deep the calls nest, not how many there are, and a loop doesn't nest. (<code>sys.setrecursionlimit</code> can raise the limit, but that only moves the wall: see the box below.)</p></div>
+  <div class="fb wrong"><p>Picture the call stack: <code>climb(5000)</code> waits on <code>climb(4999)</code>, which waits on <code>climb(4998)</code>, 5,000 calls stacked up. Any memo, dict or <code>functools.cache</code>, only helps once answers exist; on the first trip down it's empty. A loop from 0 up to n never stacks calls.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: functools.cache, its traps, and the recursion limit</summary>
+  <p><code>@functools.cache</code> (Python 3.9+) is <code>@functools.lru_cache(maxsize=None)</code>, an unlimited memo keyed by the arguments. For <code>climb(30)</code>, <code>cache_info()</code> reports 31 misses and 28 hits.</p>
+  <ul>
+    <li><b>Arguments must be hashable:</b> no lists. Pass a tuple, or better, indexes into a list the function closes over.</li>
+    <li><b>The cache outlives the call.</b> A module-level cached function that reads <code>coins</code> from outside gives stale answers when called again with different coins. Define the cached helper <em>inside</em> the function.</li>
+    <li><b>The recursion limit</b> is 1,000 by default. <code>sys.setrecursionlimit</code> raises it, but every waiting call still holds a frame in memory, a <code>@functools.cache</code> function still stops at the real C stack (on Python 3.13, 100,000 levels still fail with the limit set to 10 million), and older Pythons could crash outright instead of raising. In interviews: "this recursion is n deep, so for large n I'd go bottom-up".</li>
+    <li><b>Memory:</b> a dict entry costs several times a list slot, and a memo keeps every state forever.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>The recipe, on coin change</h2>
+
+<p>Every DP solution answers the same six questions. Answer them in words first and the code nearly writes itself. Here they are for "fewest coins", with coins 1, 3 and 4.</p>
+
+<ol>
+  <li><b>State, in words.</b> <code>best[a]</code> = the fewest coins that pay exactly a cents. Say it as a full sentence; most DP bugs are a fuzzy state.</li>
+  <li><b>Recurrence, from the last choice.</b> The best way to pay a has some last coin c. Remove it and what's left pays a − c, which must also be paid the best way (optimal substructure). We don't know which coin is last, so try them all: <code>best[a] = 1 + min(best[a − c])</code> over every coin c ≤ a.</li>
+  <li><b>Base cases.</b> <code>best[0] = 0</code>: paying nothing takes no coins. An amount you can't pay at all gets ∞ (infinity), so it never wins a <code>min</code>.</li>
+  <li><b>Fill order.</b> <code>best[a]</code> only reads smaller amounts, so fill a = 1, 2, 3, … upward.</li>
+  <li><b>Where the answer is.</b> <code>best[amount]</code>. If it's still ∞, the amount can't be paid.</li>
+  <li><b>Cost.</b> States × work per state = (amount + 1) × (number of coins). For 10,000 cents and 5 coins, about 50,000 steps.</li>
+</ol>
+
+<div class="figure">
+  <div id="coin-player"></div>
+  <div class="cap">Filling <code>best</code> for coins 1, 3, 4 up to 6 cents. The blue cell is being decided; the yellow cell is the amount left after trying one coin as the last coin. The second row remembers which coin won, which section 9 uses to list the coins. Step through, and watch <code>best[6]</code> pick 3 + 3 over greedy's 4 + 1 + 1.</div>
+</div>
+
+<pre><code>def fewest_coins(coins, amount):
+    INF = float("inf")
+    best = [0] + [INF] * amount            # best[0] = 0; the rest unknown
+    for a in range(1, amount + 1):         # small amounts first
+        for c in coins:                    # try each coin as the last coin
+            if c &lt;= a and best[a - c] + 1 &lt; best[a]:
+                best[a] = best[a - c] + 1
+    return best[amount] if best[amount] &lt; INF else -1</code></pre>
+
+<p>Trace the edges before trusting it. Amount 0: the loop never runs and it returns 0. No coins at all: every <code>best[a]</code> stays ∞, so it returns −1. Coins larger than the amount: skipped by <code>c &lt;= a</code>.</p>
+
+<div class="keyidea">The recipe: (1) the state in one sentence, (2) a recurrence that tries every possible last choice, (3) base cases, (4) a fill order where every read is already filled, (5) where the answer sits, (6) cost = states × work per state.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: think about the last step</summary>
+  <p>Stop thinking about the whole solution and think about its <em>last step</em>. You don't know the best way to pay 6 cents, but you know it ends by dropping one coin into the tray: a 1, a 3 or a 4. If it's a 3, the rest is "the best way to pay 3", a smaller question already answered. Three possible last steps, three lookups, take the best.</p>
+  <p>Greedy also thinks about one step, but it picks the <em>first</em> step by a rule and commits. DP checks every possible last step against stored answers, which it can afford because each lookup is O(1).</p>
+</details>
+
+<h3>Run it again: house robber</h3>
+<p>A thief walks down a street of houses holding 2, 7, 9, 3 and 1 thousand dollars. Robbing two houses side by side sets off an alarm. What's the most cash he can take?</p>
+<p><b>State:</b> <code>best[i]</code> = the most cash from houses 0 to i. <b>Last choice</b>, about house i: rob it and add <code>best[i − 2]</code> (house i − 1 is off limits), or skip it and keep <code>best[i − 1]</code>. <b>Base:</b> before the street, 0. <b>Order:</b> left to right; <b>answer:</b> the last cell; <b>cost:</b> O(n), and two rolling variables are enough, as with the stairs.</p>
+
+<div class="table-wrap"><table class="dp-table">
+  <tr><th>house</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th></tr>
+  <tr><th>cash</th><td>2</td><td>7</td><td>9</td><td>3</td><td>1</td></tr>
+  <tr><th>best</th><td>2</td><td>7</td><td>11</td><td>11</td><td class="path">12</td></tr>
+</table></div>
+<p>At house 2: rob it for 9 + <code>best[0]</code> = 11, or skip it for <code>best[1]</code> = 7, so 11. At house 4: rob it for 1 + <code>best[2]</code> = 12, or skip it for 11, so <b>12</b> (houses 0, 2 and 4). Greedy "richest house first" happens to get 12 here, but on [6, 9, 6] it takes the 9 and loses to 6 + 6.</p>
+
+<div class="check" id="check-greedy">
+  <p class="q">Coins are 1, 7 and 10 cents, and you owe 14 cents. How many coins does greedy (biggest coin first) use, and how many does the DP use?</p>
+  <div class="opts">
+    <button>Both use 5 coins: 10 + 1 + 1 + 1 + 1</button>
+    <button data-correct>Greedy uses 5 (10 + 1 + 1 + 1 + 1); the DP finds 2 (7 + 7)</button>
+    <button>Both find 2 coins: greedy also picks 7 + 7</button>
+  </div>
+  <div class="fb right"><p>Right. Greedy takes the 10, and then only 1s fit the remaining 4 cents. The DP checks every last coin: <code>best[14]</code> = 1 + min(<code>best[13]</code> = 4, <code>best[7]</code> = 1, <code>best[4]</code> = 4) = 2.</p></div>
+  <div class="fb wrong"><p>Run greedy by hand: 10 fits, leaving 4, and only the 1 fits that, four times: 5 coins. Greedy never asks "what if I hadn't taken the 10?" The DP asks it for every coin: with 7 as the last coin, the rest is 7 cents, one coin, so 2 in total. A choice that looks best now can force bad choices later.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Knapsack: take it or leave it</h2>
+
+<p>You're packing a backpack that holds 7 kg. There are four items, and you can take each one <em>at most once</em>:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>item</th><th>A</th><th>B</th><th>C</th><th>D</th></tr></thead>
+  <tbody><tr><td>weight (kg)</td><td>1</td><td>3</td><td>4</td><td>5</td></tr><tr><td>value</td><td>1</td><td>4</td><td>5</td><td>7</td></tr></tbody>
+</table></div>
+
+<p>Greedy by value per kg takes D (1.4 per kg) first, then nothing fits but A: value 8. The best is B + C: 7 kg, value 9. This is the <b>0/1 knapsack</b>: each item is either in (1) or out (0).</p>
+
+<h3>Why one number isn't enough state</h3>
+<p>In coin change, "amount left" was the whole story, because coins can be reused. Here "4 kg of room left" doesn't say which items are still available. Fix: decide the items <em>in order</em>, A, then B, then C. Then "which items have I decided?" is always "the first i", one more number.</p>
+<ol>
+  <li><b>State:</b> <code>best[i][c]</code> = the best value using only the first i items, with capacity c.</li>
+  <li><b>Last choice:</b> what happens to item i − 1 (the newest one)? <b>Leave it:</b> <code>best[i − 1][c]</code>. <b>Take it</b> (if its weight w fits): its value v plus the best from the earlier items in the room that's left, <code>best[i − 1][c − w] + v</code>. Take the larger.</li>
+  <li><b>Base:</b> with no items, every capacity is worth 0: row 0 is all zeros.</li>
+  <li><b>Order:</b> row by row, since each row reads only the row above. <b>Answer:</b> <code>best[n][W]</code>, bottom right. <b>Cost:</b> (n + 1)(W + 1) cells × O(1) = O(n·W).</li>
+</ol>
+
+<div class="figure">
+  <div class="table-wrap"><table class="dp-table">
+    <tr><th></th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th></tr>
+    <tr><th>none</th><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+    <tr><th>+A</th><td>0</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>
+    <tr><th>+B</th><td>0</td><td>1</td><td>1</td><td class="dep">4</td><td>5</td><td>5</td><td>5</td><td class="dep">5</td></tr>
+    <tr><th>+C</th><td>0</td><td>1</td><td>1</td><td>4</td><td>5</td><td>6</td><td>6</td><td class="cur">9</td></tr>
+    <tr><th>+D</th><td>0</td><td>1</td><td>1</td><td>4</td><td>5</td><td>7</td><td>8</td><td class="path">9</td></tr>
+  </table></div>
+  <div class="cap">Rows: how many items are allowed. Columns: capacity 0 to 7 kg. The blue cell, best with A, B, C at 7 kg, picks the larger of its two yellow inputs: leave C (the cell above, 5) or take C (4 kg, so the cell 4 columns left in the row above, 4, plus C's value 5, which is 9). The answer is the bottom-right cell: 9.</div>
+</div>
+
+<pre><code>def knapsack(weights, values, W):
+    n = len(weights)
+    best = [[0] * (W + 1) for _ in range(n + 1)]   # row 0: no items, value 0
+    for i in range(1, n + 1):
+        w, v = weights[i - 1], values[i - 1]       # the newest item
+        for c in range(W + 1):
+            best[i][c] = best[i - 1][c]             # leave it
+            if w &lt;= c:                              # or take it, if it fits
+                best[i][c] = max(best[i][c], best[i - 1][c - w] + v)
+    return best[n][W]</code></pre>
+
+<h3>One row is enough, if you go backwards</h3>
+<p>Each row reads only the row above, so you can keep one row and overwrite it in place. But now the direction of the inner loop matters. This is the most-asked knapsack follow-up, so take it slowly.</p>
+
+<pre><code>def knapsack(weights, values, W):
+    best = [0] * (W + 1)                   # the "row above", reused
+    for w, v in zip(weights, values):
+        for c in range(W, w - 1, -1):      # BACKWARDS: big capacities first
+            best[c] = max(best[c], best[c - w] + v)
+    return best[W]</code></pre>
+
+<p>When you compute <code>best[c]</code>, the "take it" option reads <code>best[c − w]</code>, and it must be the <em>old</em> value, from before this item was considered. Going backwards, you write big capacities first, so the smaller cell <code>c − w</code> hasn't been touched yet in this pass: it's still the old row. Going forwards, <code>c − w</code> was already rewritten a moment ago, and it may already include this item. Then "take it" takes it a second time.</p>
+
+<div class="figure">
+  <div id="kn-player"></div>
+  <div class="cap">One pass of the 1D knapsack: adding item B (3 kg, value 4) to the row that already has A. Blue is the cell being written, green cells were already rewritten in this pass, yellow is an old value being read, red is a new value being read by mistake. Run Backwards, then switch to Forwards and watch capacity 6 pack B twice.</div>
+</div>
+
+<p>Here's the twist: sometimes using an item many times is exactly what you want. In the <b>unbounded knapsack</b>, each item can be taken any number of times, and the forwards loop is the correct one, because reading a cell that already includes the item is how you take it again. Coin change is an unbounded knapsack: coins are the items, and you minimize the count instead of maximizing value. One loop direction is the whole difference between the two problems.</p>
+
+<div class="keyidea">0/1 knapsack: state (items considered, capacity), choice "leave it or take it", O(n·W). With one row, loop capacity <b>backwards</b> so every read sees the old row and each item is used at most once. Loop <b>forwards</b> and an item can be reused, which is right for the unbounded knapsack and coin change.</div>
+
+<div class="check" id="check-backwards">
+  <p class="q">In the 1D 0/1 knapsack, someone changes the inner loop to go forwards: <code>for c in range(w, W + 1)</code>. What happens?</p>
+  <div class="opts">
+    <button>Nothing changes: the order of a loop doesn't affect a max</button>
+    <button data-correct>Items can be used more than once, so it now solves the unbounded knapsack</button>
+    <button>It crashes, because <code>c − w</code> goes negative</button>
+  </div>
+  <div class="fb right"><p>Right. Forwards, <code>best[c − w]</code> was already updated for this item, so "take it" can stack the item again. That's the unbounded knapsack. At capacity 6, B (3 kg) gets packed twice for 8.</p></div>
+  <div class="fb wrong"><p>Think of the row as two rows on one sheet: the old row (without the item) being overwritten by the new one (with it). "Take it" must read the old row. Backwards, you only overwrite cells nobody reads again in this pass. Forwards, you overwrite <code>best[3]</code> with "B in the bag", then <code>best[6]</code> reads it and adds B again. Nothing crashes (the loop starts at w); the answer is just quietly wrong for 0/1.</p></div>
+</div>
+
+<h3>"O(n·W)" is not as fast as it looks</h3>
+<p>O(n·W) looks polynomial, but W is a <em>number</em>, not a count of things. A capacity of 2,000,000,000 is written with 10 digits, and it means 2 billion columns. Each extra digit multiplies the work by 10. An algorithm that's polynomial in the numeric value but exponential in the number of digits is called <b>pseudo-polynomial</b>. Great for capacity 10,000; useless for 2 billion.</p>
+
+<div class="check" id="check-pseudo">
+  <p class="q">You have 50 files and a 2,000,000,000-byte disk, and you want the most valuable set that fits. Is the O(n·W) knapsack DP a good plan?</p>
+  <div class="opts">
+    <button>Yes: it's polynomial, and 50 items is tiny</button>
+    <button data-correct>No: that's 10¹¹ cells, hours of work and a 2-billion-entry row</button>
+    <button>Yes, as long as you use the 1D version</button>
+  </div>
+  <div class="fb right"><p>Right. 50 × 2 × 10⁹ = 10¹¹ steps is about 3 hours at 10 million a second, and even one row has 2 billion entries (16 GB as a Python list). Better: measure sizes in megabytes, DP over <em>values</em> if they're small, or meet in the middle (2²⁵ subsets per half).</p></div>
+  <div class="fb wrong"><p>Count the table: a column for every capacity from 0 to 2,000,000,000, so 50 × 2 billion = 10¹¹ cells. The 1D version saves rows, not columns: one list of 2 billion entries (16 GB) and still 10¹¹ updates. O(n·W) is only fast when W itself is small.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: knapsack is NP-hard, and what people do about it</summary>
+  <p>The 0/1 knapsack is <b>NP-hard</b>: no one knows an algorithm polynomial in the input's <em>size</em> (items plus digits of the weights), and finding one would settle P vs NP. The DP doesn't contradict this: its time grows with the <em>value</em> of W, which is exponential in W's digit count.</p>
+  <ul>
+    <li><b>DP over value:</b> state = (items considered, total value), storing the lightest weight that reaches it. O(n · total value): good when values are small and weights huge.</li>
+    <li><b>Meet in the middle:</b> for n up to about 40, list the 2²⁰ ≈ 1 million subsets of each half. Sort one side by weight and keep a running best value (so each weight maps to the best value at that weight or less), then, for each subset of the other side, binary search for the room it leaves. Any W.</li>
+    <li><b>Approximation:</b> round values to a coarser scale, then DP over value: within any chosen percentage of the best, in polynomial time.</li>
+    <li><b>Branch and bound</b> (backtracking that cuts branches that can't beat the best so far), often mixed with DP, is how practical solvers handle big instances.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Longest increasing subsequence: choosing the state</h2>
+
+<p>Given <code>[10, 9, 2, 5, 3, 7, 101, 18]</code>, find the longest <b>strictly increasing subsequence</b> (LIS). A <b>subsequence</b> keeps the original order but may skip items; it doesn't have to be one unbroken block. Here the answer is 4, for example 2, 3, 7, 18 or 2, 5, 7, 101.</p>
+
+<h3>The obvious state doesn't work</h3>
+<p>Try the stairs pattern: "<code>best[i]</code> = the LIS among the first i + 1 numbers". To decide whether <code>nums[i]</code> can extend that subsequence, you need to know its <em>last value</em>, and the state doesn't record it. Two subsequences of length 3, one ending in 7 and one ending in 101, are very different futures.</p>
+<p>The fix is a move you'll use again and again: <b>pin down the end</b>. Make the last element part of the state.</p>
+<ol>
+  <li><b>State:</b> <code>ends[i]</code> = the length of the longest increasing subsequence that <em>ends exactly at</em> index i.</li>
+  <li><b>Last choice:</b> what came just before <code>nums[i]</code>? Some earlier j with <code>nums[j] &lt; nums[i]</code>. So <code>ends[i] = 1 + max(ends[j])</code> over those j, or 1 if there are none.</li>
+  <li><b>Answer:</b> the <em>largest</em> <code>ends[i]</code>, not the last one, because the best subsequence can end anywhere.</li>
+  <li><b>Cost:</b> n states × O(n) each = O(n²).</li>
+</ol>
+
+<div class="table-wrap"><table class="dp-table">
+  <tr><th>i</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th></tr>
+  <tr><th>nums</th><td>10</td><td>9</td><td>2</td><td>5</td><td>3</td><td>7</td><td>101</td><td>18</td></tr>
+  <tr><th>ends</th><td>1</td><td>1</td><td>1</td><td>2</td><td>2</td><td>3</td><td class="path">4</td><td class="path">4</td></tr>
+</table></div>
+
+<pre><code>def lis_length(nums):
+    ends = [1] * len(nums)            # ends[i]: longest run ending AT i
+    for i in range(len(nums)):
+        for j in range(i):            # every earlier number
+            if nums[j] &lt; nums[i]:     # nums[i] can extend that run
+                ends[i] = max(ends[i], ends[j] + 1)
+    return max(ends, default=0)       # the best run can end anywhere</code></pre>
+
+<h3>Faster: keep only the best tails</h3>
+<p>For 100,000 numbers, O(n²) is 5 × 10⁹ comparisons, a few minutes of pure Python. The faster idea keeps a different table. For each length k, remember the <b>smallest possible last value</b> of any increasing subsequence of length k seen so far. Call that list <code>tails</code>. A smaller tail is always at least as good: anything that can extend a run ending in 7 can also extend a run ending in 3.</p>
+<p>Two facts make it fast. First, <code>tails</code> is always sorted (strictly increasing). Second, a new number x only ever changes one entry: find the first tail that is ≥ x and replace it with x (x makes a run of that length end lower), or, if x is bigger than every tail, append it (x extends the longest run). Finding that spot in a sorted list is a <a href="binary-search.html">binary search</a>: O(log n). So the whole thing is <b>O(n log n)</b>, about 1.7 million steps for 100,000 numbers.</p>
+
+<pre class="diagram"><code>x = 10    tails = [10]
+x = 9     tails = [9]               9 replaces 10: a length-1 run can end lower
+x = 2     tails = [2]
+x = 5     tails = [2, 5]            5 is bigger than every tail: append
+x = 3     tails = [2, 3]            3 replaces 5: same length, lower tail
+x = 7     tails = [2, 3, 7]
+x = 101   tails = [2, 3, 7, 101]
+x = 18    tails = [2, 3, 7, 18]     length 4</code></pre>
+
+<p>One warning that catches people: <b><code>tails</code> is not itself a subsequence.</b> For <code>[2, 5, 3, 7, 1]</code> it ends as <code>[1, 3, 7]</code>, but the 1 comes <em>after</em> the 7 in the input. The length, 3, is right. The list is a record of the best tail for each length, mixed from different runs. To get a real subsequence you need extra bookkeeping, which is exercise 6.</p>
+
+<div class="keyidea">When "best so far" doesn't carry enough information to continue, put the missing piece into the state: "the LIS that ends at i". That gives O(n²). The O(n log n) version keeps the smallest tail for each length; the list stays sorted, so each number costs one binary search. Its length is the answer; its contents are not.</div>
+
+<div class="check" id="check-lis">
+  <p class="q">For <code>[2, 5, 3, 7, 1]</code>, the tails method ends with <code>tails = [1, 3, 7]</code>. What does that tell you?</p>
+  <div class="opts">
+    <button>The longest increasing subsequence is 1, 3, 7</button>
+    <button data-correct>The LIS has length 3, but [1, 3, 7] is not one of them</button>
+    <button>There's a bug: 1 should never replace 2</button>
+  </div>
+  <div class="fb right"><p>Right. 1 replaced 2 because 1 is now the smallest possible end of a length-1 run: true and useful later, but it mixes runs, since the 1 comes after the 7. The real answers are 2, 3, 7 and 2, 5, 7.</p></div>
+  <div class="fb wrong"><p>Read <code>tails</code> as separate facts: "the best length-1 run ends in 1", "the best length-2 run ends in 3", "the best length-3 run ends in 7". Each is about a <em>different</em> run, and each is true, so replacing 2 with 1 is no bug. But stringing them together ignores the input order: 1 comes last. Only the length, 3, is the answer.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: why tails stays sorted, and where LIS hides</summary>
+  <p><b>Why sorted:</b> take a run of length k + 1 ending in <code>tails[k]</code>. Its first k items are a length-k run whose last value is smaller than <code>tails[k]</code>. <code>tails[k − 1]</code>, the smallest length-k tail, is at most that value, so it's smaller than <code>tails[k]</code> too.</p>
+  <p><b>Variants:</b> for "non-decreasing", search for the first tail <em>greater than</em> x (<code>bisect_right</code>) instead of ≥ x (<code>bisect_left</code>). The method is also called <em>patience sorting</em>, after a card game that deals cards onto piles the same way.</p>
+  <p><b>Where it hides:</b> "Russian doll envelopes" is LIS on heights after sorting by width (equal widths by height descending).</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Two sequences: edit distance and friends</h2>
+
+<p>A spell checker sees "kitten" and wonders whether you meant "sitting". How far apart are they? The <b>edit distance</b> (also called Levenshtein distance) is the fewest single-letter edits that turn one word into the other, where an edit is inserting a letter, deleting a letter or replacing one letter with another. kitten → sitten (replace k with s) → sittin (replace e with i) → sitting (insert g): <b>3</b>.</p>
+
+<p>With two inputs, the state needs a position in each. Think about prefixes: the first i letters of a and the first j letters of b.</p>
+<ol>
+  <li><b>State:</b> <code>d[i][j]</code> = the fewest edits to turn the first i letters of a into the first j letters of b.</li>
+  <li><b>Last choice:</b> look at the last letters, <code>a[i − 1]</code> and <code>b[j − 1]</code>. If they're the same, keep them, no edit: <code>d[i − 1][j − 1]</code>. If they differ, the last edit was one of three, each costing 1:
+    <ul>
+      <li><b>delete</b> a's last letter, then solve the rest: <code>d[i − 1][j]</code> (the cell above),</li>
+      <li><b>insert</b> b's last letter at the end: <code>d[i][j − 1]</code> (the cell to the left),</li>
+      <li><b>replace</b> a's last letter with b's: <code>d[i − 1][j − 1]</code> (the cell up and to the left).</li>
+    </ul>
+  </li>
+  <li><b>Base cases:</b> <code>d[i][0] = i</code> (delete all i letters) and <code>d[0][j] = j</code> (insert all j letters).</li>
+  <li><b>Order:</b> row by row, left to right, since every cell reads up, left and up-left. <b>Answer:</b> bottom right. <b>Cost:</b> (n + 1)(m + 1) cells × O(1) = O(n·m).</li>
+</ol>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <span class="small">from</span><input type="text" id="ed-a" value="kitten" maxlength="9">
+      <span class="small">to</span><input type="text" id="ed-b" value="sitting" maxlength="9">
+      <button class="btn" id="ed-go">Build table</button>
     </div>
+    <div id="ed-player" style="margin-top:10px"></div>
+  </div>
+  <div class="cap">The edit-distance table, one cell per step. Rows are prefixes of the first word, columns prefixes of the second; ε means the empty prefix. The blue cell is being filled and the yellow cells are what it reads. The last frame walks back from the corner (green) and lists the edits. Try your own words, up to 9 letters each.</div>
+</div>
+
+<pre><code>def edit_distance(a, b):
+    d = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]
+    for i in range(len(a) + 1): d[i][0] = i         # delete everything
+    for j in range(len(b) + 1): d[0][j] = j         # insert everything
+    for i in range(1, len(a) + 1):
+        for j in range(1, len(b) + 1):
+            if a[i - 1] == b[j - 1]:
+                d[i][j] = d[i - 1][j - 1]           # same last letter: free
+            else:
+                d[i][j] = 1 + min(d[i - 1][j],      # delete
+                                  d[i][j - 1],      # insert
+                                  d[i - 1][j - 1])  # replace
+    return d[len(a)][len(b)]</code></pre>
+
+<p>Each row reads only itself and the row above, so two rows are enough: O(min(n, m)) memory if you make the shorter word the columns. The plain recursion, by comparison, makes 3,032 calls for kitten and sitting, against 56 cells, and that gap explodes for longer words.</p>
+
+<h3>The same table answers other questions</h3>
+<p><b>Longest common subsequence (LCS):</b> the longest sequence that appears, in order, in both inputs. Same state and same table shape; only the rule changes. If the last letters match, it's 1 + the up-left cell; otherwise, the larger of the cell above and the cell to the left. For "ABCBDAB" and "BDCABA" it's 4 (for example BCBA). Run it on <em>lines</em> instead of letters and you have the core of <code>diff</code>: lines in the LCS are unchanged, and every other line is a deletion or an addition. That's exercise 7.</p>
+<p><b>Grid paths:</b> a robot in a 3 × 7 grid moves only right or down. How many routes go from the top-left to the bottom-right? <code>paths[r][c] = paths[r − 1][c] + paths[r][c − 1]</code>, with 1s along the top row and the left column: 28. Same "read up and left" shape, with no strings at all.</p>
+
+<div class="keyidea">Two sequences, so two indexes: <code>d[i][j]</code> is about the first i items of one and the first j of the other. The recurrence looks at the last items: match, or one of a few edits. Fill row by row; the answer is in the bottom-right corner; the cost is n·m.</div>
+
+<div class="check" id="check-edit">
+  <p class="q">In the table for a = "kitten" and b = "sitting", what does the cell <code>d[2][3]</code> mean?</p>
+  <div class="opts">
+    <button data-correct>The fewest edits to turn "ki" into "sit"</button>
+    <button>The fewest edits to turn "kit" into "si"</button>
+    <button>How many letters of "kitten" and "sitting" match so far</button>
+  </div>
+  <div class="fb right"><p>Right: rows go with a, columns with b. Its value is 2 (replace k with s, insert t). Every cell is a complete smaller edit-distance question, which is what lets later cells reuse it.</p></div>
+  <div class="fb wrong"><p>Go back to the state sentence: "<code>d[i][j]</code> = fewest edits to turn the first i letters of a into the first j letters of b". i = 2, j = 3 gives "ki" into "sit". A cell is never a count of matches; it's the full answer to a smaller question (here 2).</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: edit distance in real systems</summary>
+  <ul>
+    <li><b>Spell checkers and fuzzy search</b> use Levenshtein distance, often adding a fourth edit, swapping neighbors (Damerau–Levenshtein), because "teh" for "the" is so common. Search engines use automata or trees that only explore words within distance 1 or 2, instead of comparing against the whole dictionary.</li>
+    <li><b>diff and git</b> output an <em>edit script</em>: the kept, deleted and inserted lines that LCS describes. A full table for two 10,000-line files is 10⁸ cells, so real tools use Myers' algorithm, O((n + m)·D) where D is the number of differences: fast when files are similar. git also offers "patience" and "histogram" diffs, which first anchor on lines that are unique (or rare) in both files.</li>
+    <li><b>Bioinformatics</b> aligns DNA and proteins with the same table, scoring matches, mismatches and gaps: Needleman–Wunsch (whole sequences) and Smith–Waterman (best-matching parts).</li>
+    <li><b>Hirschberg's trick</b> recovers the full alignment, not just the distance, in O(n + m) memory: find the middle of the best path with two half passes, then recurse on each half.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Ranges: interval DP</h2>
+
+<p>So far every subproblem was a <em>prefix</em>: the first i stairs, items or letters. Some problems shrink from both ends, and then the natural subproblem is a <b>range</b>, from index i to index j.</p>
+<p>Example: the <b>longest palindromic subsequence</b> of "bbbab". A palindrome reads the same backwards. The answer is 4 ("bbbb").</p>
+<ol>
+  <li><b>State:</b> <code>best[i][j]</code> = the longest palindromic subsequence inside <code>s[i..j]</code>.</li>
+  <li><b>Choice, at the two ends:</b> if <code>s[i] == s[j]</code>, both ends can wrap whatever is best inside: <code>best[i + 1][j − 1] + 2</code>. Otherwise at least one end isn't used: <code>max(best[i + 1][j], best[i][j − 1])</code>.</li>
+  <li><b>Base:</b> a single letter is a palindrome of length 1; an empty range is 0.</li>
+  <li><b>Order:</b> every cell reads <em>shorter</em> ranges inside it, so fill by increasing length: all ranges of length 1, then 2, and so on. <b>Answer:</b> <code>best[0][n − 1]</code>, the whole string. <b>Cost:</b> about n²/2 ranges × O(1) = O(n²).</li>
+</ol>
+
+<pre><code>def longest_palindrome_subseq(s):
+    n = len(s)
+    best = [[0] * n for _ in range(n)]
+    for i in range(n):
+        best[i][i] = 1                          # one letter: a palindrome
+    for length in range(2, n + 1):              # short ranges before long ones
+        for i in range(n - length + 1):
+            j = i + length - 1
+            if s[i] == s[j]:
+                best[i][j] = best[i + 1][j - 1] + 2   # both ends join in
+            else:
+                best[i][j] = max(best[i + 1][j], best[i][j - 1])
+    return best[0][n - 1] if n else 0</code></pre>
+
+<div class="table-wrap"><table class="dp-table">
+  <tr><th>i \ j</th><th>0 b</th><th>1 b</th><th>2 b</th><th>3 a</th><th>4 b</th></tr>
+  <tr><th>0 b</th><td>1</td><td>2</td><td>3</td><td>3</td><td class="path">4</td></tr>
+  <tr><th>1 b</th><td></td><td>1</td><td>2</td><td>2</td><td>3</td></tr>
+  <tr><th>2 b</th><td></td><td></td><td>1</td><td>1</td><td>3</td></tr>
+  <tr><th>3 a</th><td></td><td></td><td></td><td>1</td><td>1</td></tr>
+  <tr><th>4 b</th><td></td><td></td><td></td><td></td><td>1</td></tr>
+</table></div>
+<p>Only the triangle with i ≤ j is used; each diagonal is one range length, and the answer, 4, is the top-right corner, filled last. For "bb" the code reads <code>best[i + 1][i]</code>, an empty range below the diagonal, still 0, so "bb" gets 2, as it should.</p>
+
+<h3>When the choice is a split point: O(n³)</h3>
+<p>In a second family of interval problems, solving a range means choosing a point k inside it to split at, or to act on: in what order to multiply a chain of matrices, where to cut a stick first (exercise 8), which balloon to burst. Each range tries every k, and each try adds the two smaller ranges on either side. That's n² ranges × O(n) splits = <b>O(n³)</b>, fine for n in the low hundreds.</p>
+<p>The art is choosing <em>what</em> k stands for. In "burst balloons" (popping a balloon earns its number times its two current neighbors', and a missing neighbor counts as 1), "which balloon is popped <em>first</em>?" doesn't split cleanly: afterwards the two sides become neighbors, so they aren't independent. "Which is popped <em>last</em> in this range?" does: until its turn it stands as a wall between the sides, and when it pops, its neighbors are the range's two edges. For [3, 1, 5, 8] the best total is 167.</p>
+
+<div class="keyidea">Interval DP: the state is a range (i, j). Each range reads only shorter ranges inside it, so fill by increasing length, and the answer is the whole range, (0, n − 1). If each range tries every split point, the cost is O(n³).</div>
+
+<div class="check" id="check-interval">
+  <p class="q">Why does interval DP fill the table in order of increasing range length?</p>
+  <div class="opts">
+    <button>Because short ranges are cheaper to compute</button>
+    <button data-correct>Because each range's answer reads only shorter ranges inside it, so those must be filled first</button>
+    <button>So that the answer is in the last row of the table</button>
+  </div>
+  <div class="fb right"><p>Right. It's section 3's rule: fill so that every cell you read is done. Range (i, j) reads (i + 1, j), (i, j − 1) and (i + 1, j − 1), all shorter. (Filling i from n − 1 down to 0, j upward, also works, for the same reason.)</p></div>
+  <div class="fb wrong"><p>The fill order is never about cost; every cell costs about the same. It's about reading only finished cells. Range (i, j) reads (i + 1, j − 1), or (i + 1, j) and (i, j − 1): ranges one or two letters shorter, which read shorter ranges still. And the answer, the whole range (0, n − 1), sits in the top-right corner, not the last row.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Getting the answer, not just the number</h2>
+
+<p>You've told the interviewer "2 coins". The next question is always: <em>which</em> coins? The table only holds numbers. There are two ways to get the choices back, and both rely on the same fact: every cell was won by one specific choice.</p>
+<ol>
+  <li><b>Parent pointers.</b> When you write a cell, also write down which choice won (the last coin, the item taken, the edit made). At the end, start at the answer cell and follow the pointers back to a base case.</li>
+  <li><b>Walk back through the table.</b> Keep the full table and, at the answer cell, ask again: "which choice produces exactly this number?" Move to the cell that choice came from, and repeat. The edit-distance figure in section 7 does this in its last frame.</li>
+</ol>
+
+<p>For coins, add a list <code>last</code> to <code>fewest_coins</code> from section 4, and next to <code>best[a] = best[a - c] + 1</code> also write <code>last[a] = c</code>. Then, if <code>best[amount]</code> isn't ∞:</p>
+
+<pre><code>def coins_used(last, amount):
+    out = []
+    while amount &gt; 0:                 # follow the pointers back to 0
+        out.append(last[amount])      # the coin that won for this amount
+        amount -= last[amount]        # ...and the amount it came from
+    return out                        # coins 1, 3, 4 and amount 6: [3, 3]</code></pre>
+
+<p>For coins 1, 3, 4 and 6 cents: <code>last[6] = 3</code>, so pay a 3 and go to amount 3; <code>last[3] = 3</code>, pay another 3 and reach 0. Answer: [3, 3]. Amount 0 returns an empty list, which is right: no coins.</p>
+<p>Walking back needs the history, which is exactly what the space tricks throw away. The 1D knapsack row only knows the final values, not which items made them. So it's a real trade-off: <b>if you need the choice, keep the full table (or a table of pointers)</b>, and say so when you choose the space-saving version. In the 2D knapsack table, each row answers "did this item matter here?": compare a cell with the one above it.</p>
+
+<div class="keyidea">Every cell was won by one choice. Record it (parent pointers), or re-derive it from the full table, then walk from the answer back to a base case. Shrinking the table to one row loses that history, so reconstruction needs the full table or a pointer table.</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>Is it DP? DP vs greedy vs backtracking</h2>
+
+<p>The hardest part in an interview is noticing that a problem <em>is</em> DP. These signals are worth checking:</p>
+<ul>
+  <li>The question asks for a <b>count</b> ("how many ways"), a <b>best value</b> ("fewest", "most", "longest") or <b>whether something is possible</b>, not for a list of every solution.</li>
+  <li>The solution is a <b>sequence of choices</b>: take or skip, which coin, which letter edit, where to split.</li>
+  <li>The brute force is exponential, but you can describe "where you are" with <b>a few small numbers</b>: an index, an amount left, a range (i, j). Ask: "if I know these numbers, does the rest of the problem care how I got here?" If not, those numbers are your state.</li>
+  <li>The sizes fit: n up to a few thousand suggests O(n²), a few hundred O(n³), an amount up to about 10⁵ a table over it.</li>
+</ul>
+
+<div class="table-wrap"><table style="min-width:600px">
+  <thead><tr><th>Tool</th><th>What it does</th><th>Use it when</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><b>Greedy</b></td><td>takes the best-looking choice and never looks back</td><td>you can prove the local choice is always safe</td><td>most meetings in one room (earliest end first); change with 1, 5, 10, 25 cents</td></tr>
+    <tr><td><b>DP</b></td><td>tries every choice, but solves each state once</td><td>choices interact, and the state is a few small numbers</td><td>fewest coins with any coins, knapsack, edit distance</td></tr>
+    <tr><td><b>Backtracking</b></td><td>walks every path of the decision tree, cutting dead ends</td><td>you need every solution, or the state is the whole path so far</td><td>list all combinations, N-queens, sudoku</td></tr>
+  </tbody>
+</table></div>
+
+<p>They're closer than they look. Backtracking plus a memo <em>is</em> top-down DP, which is where the <a href="backtracking.html">backtracking chapter</a> ended. And greedy is DP where you've proved that only one choice ever needs checking. If you can't prove that, the coins 1, 3, 4 story says: don't trust it.</p>
+
+<div class="check" id="check-recognise">
+  <p class="q">Which of these is a job for backtracking rather than DP?</p>
+  <div class="opts">
+    <button>Count the ways to make 50 cents from coins 1, 5 and 10</button>
+    <button data-correct>List every way to make 50 cents from coins 1, 5 and 10</button>
+    <button>Find the fewest coins that make 50 cents from coins 1, 5 and 10</button>
+  </div>
+  <div class="fb right"><p>Right. A count or a minimum is one number per state, which DP stores and reuses. A list must contain every solution, so you walk every path anyway. (50 cents from 1, 5, 10 has 36 ways; for bigger amounts it's millions.)</p></div>
+  <div class="fb wrong"><p>Compare what each question returns. "How many" and "fewest" return one number per state ("ways to make 37 cents"), which you store and reuse. "List every way" must write out every solution, and no table shortcuts that. Huge output means walking the whole tree: backtracking. A number means look for DP.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: bitmasks, DAGs, Viterbi and other DP in the wild</summary>
+  <ul>
+    <li><b>Bitmask DP:</b> when the state must include a <em>set</em> of things used, store it as the bits of an integer. Traveling salesman becomes state (cities visited, current city): n² · 2ⁿ work (Held–Karp). For 20 cities that's about 4 × 10⁸ steps, against 19! ≈ 1.2 × 10¹⁷ routes. Still exponential, so n stays around 20.</li>
+    <li><b>DP is a path problem on a DAG:</b> states are nodes, choices are edges, and the fill order is a topological order. A cycle would mean a state depending on itself. Graphs with cycles need shortest-path tools (Dijkstra, Bellman-Ford), the next topic in this chapter.</li>
+    <li><b>DP on trees:</b> each node's answer is built from its children's ("invite the most people, but never someone together with their direct boss"). Post-order is the fill order.</li>
+    <li><b>Viterbi:</b> the most likely hidden states behind noisy observations, with state (time step, hidden state). It decodes error-correcting codes in phones and modems, and powered classic speech recognition.</li>
+    <li><b>TeX line breaking</b> (Knuth–Plass) picks every line end in a paragraph by DP over "best layout up to word i".</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>What to say in the interview</h2>
+
+<p>A strong DP answer follows the recipe out loud, before any code:</p>
+<ol>
+  <li><b>Start with the brute force, and name the repeat.</b> "Try every coin as the last coin. That's exponential, but the only thing that matters is the amount left, and there are only amount + 1 of those, so the same subproblems repeat."</li>
+  <li><b>Say the state in one sentence.</b> "<code>best[a]</code> is the fewest coins that make exactly a."</li>
+  <li><b>Give the recurrence and the base cases.</b> "<code>best[a] = 1 + min(best[a − c])</code> over coins up to a; <code>best[0] = 0</code>; impossible amounts are infinity."</li>
+  <li><b>Say the cost as states × work.</b> "amount + 1 states, one step per coin: O(amount × coins) time, O(amount) space."</li>
+  <li><b>Pick top-down or bottom-up, and mention the follow-ups.</b> "I'll go bottom-up to avoid recursion depth. If you need the coins themselves, I'll store the winning coin per amount and walk back."</li>
+</ol>
+<p>Then code it, and trace it on the smallest inputs: amount 0, no coins, a coin bigger than the amount.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"Can you use less memory?"</b> If each row reads only the previous row, keep one or two rows. Say what you lose: the ability to walk back for the actual choice.</li>
+    <li><b>"Does order matter?"</b> When counting ways to make change, <em>combinations</em> (1 + 2 and 2 + 1 are the same) and <em>sequences</em> (they're different) give different counts: 4 versus 9 for coins 1, 2, 5 and 5 cents. Know which one your loops compute, and why.</li>
+    <li><b>"Each coin only once?"</b> Then it's a 0/1 knapsack: loop the amount backwards.</li>
+    <li><b>"The amount is up to 10⁹."</b> The table is pseudo-polynomial; say so, then look for structure (small values, few items, meet in the middle) or a greedy that you can prove.</li>
+    <li><b>"Return every optimal solution."</b> Keep every winning choice per cell and walk back through all branches: backtracking guided by the table.</li>
+    <li><b>"Why not greedy?"</b> Have a counterexample ready: coins 1, 3, 4 and amount 6.</li>
+    <li><b>"The count is huge."</b> Python ints never overflow; in Java or C++ the problem will ask for the count modulo a prime such as 10⁹ + 7, so take the remainder after every addition.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>DP = recursion + a notebook. It needs overlapping subproblems and optimal substructure. Cost = states × work per state (stairs: 2.7 million calls became 59).</li>
+  <li>Memoization keeps the recursion and adds a dict, but can hit Python's ~1,000 depth limit. Tabulation fills a table so every read is ready, and can keep just the last row or two.</li>
+  <li>The recipe: state in a sentence, recurrence from the last choice, base cases, fill order, answer location, cost.</li>
+  <li>Greedy can be wrong (coins 1, 3, 4 for 6 cents). DP tries every last choice.</li>
+  <li>0/1 knapsack: O(n·W); with one row, loop capacity <b>backwards</b>. Forwards reuses items: unbounded knapsack, coin change. O(n·W) is pseudo-polynomial.</li>
+  <li>Missing information? Put it in the state: "LIS ending at i", O(n²). Smallest tails + binary search: O(n log n), but <code>tails</code> isn't the subsequence.</li>
+  <li>Two sequences: <code>d[i][j]</code> over prefixes, answer bottom right. Ranges: <code>best[i][j]</code>, filled by increasing length; O(n³) with a split point.</li>
+  <li>To return the choice, keep parent pointers or the full table and walk back.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first. The coding exercises are in <code>exercises/dp.py</code>. Their tests use special numbers and strings that count every time your code uses them, so a correct but brute-force solution runs out of budget and fails. Run them with <code>python3 -m pytest -k dp</code>.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Fill the coin table by hand</h4>
+  <p>Coins are 1, 5, 6 and 9 cents. Write out <code>best[0]</code> to <code>best[11]</code> and, under each, the coin that won. Then walk back from 11 to list the coins. What does greedy (biggest coin first) give for 11?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p><code>best</code> = 0, 1, 2, 3, 4, 1, 1, 2, 3, 1, 2, 2 for amounts 0 to 11. Trying coins in the order 1, 5, 6, 9 and keeping only strict improvements, the winning coins for 1 to 11 are 1, 1, 1, 1, 5, 6, 1, 1, 9, 1, 5. Walk back: 11 used a 5, leaving 6, which used a 6: <b>5 + 6, two coins</b>. Greedy takes 9, then 1 and 1: three coins.</p>
   </details>
+</div>
 
-  <details class="box analogy" open id="analogy">
-    <summary><span class="kicker">Intuition</span><span class="label">Analogy: a filled-in crossword</span></summary>
-    <div class="box-body">
-      <p>Recursion without memoization is answering the same crossword clue every time it intersects another word. DP is writing the answer in the grid once, so every later clue just reads it.</p>
-      <p class="muted small">Physical picture for a 2D table: water flowing from the top-left corner. Each cell's value depends only on cells water has already reached: up, left, and up-left. Fill in the direction of the flow.</p>
-    </div>
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. The recipe on a grid with a rock</h4>
+  <p>A robot starts in the top-left of a grid with 3 rows and 4 columns and must reach the bottom-right, moving only right or down. The cell in row 1, column 1 (counting from 0) holds a rock it can't enter. Write the six recipe answers (state, recurrence, base cases, fill order, answer, cost), then fill the table. How many routes are there? How many without the rock?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>State: <code>paths[r][c]</code> = routes from the start to cell (r, c). Recurrence: <code>paths[r − 1][c] + paths[r][c − 1]</code> (it arrived from above or from the left), and 0 for the rock. Base: <code>paths[0][0] = 1</code>; anything outside the grid counts 0. Order: row by row, left to right. Answer: bottom-right cell. Cost: rows × columns.</p>
+    <p>Rows: 1 1 1 1 / 1 0 1 2 / 1 1 2 4. So <b>4 routes</b>. Without the rock, 10.</p>
   </details>
+</div>
 
-  <details class="box viz" open id="see-it">
-    <summary><span class="kicker">See it</span><span class="label">Playground: edit distance table</span></summary>
-    <div class="box-body">
-      <p class="small muted">Cell (i, j) = edits to turn the first i letters of <b>a</b> into the first j letters of <b>b</b>. Yellow cells are the three dependencies: up = delete, left = insert, diagonal = replace (or free if the letters match). At the end, green traces one optimal edit path back from the answer.</p>
-      <div class="viz-controls"><span class="small">a</span><input id="ed-a" type="text" value="horse" maxlength="9" style="width:7em"><span class="small">b</span><input id="ed-b" type="text" value="ros" maxlength="9" style="width:7em"><button class="btn" id="ed-go">Run</button></div>
-      <div id="ed-player" style="margin-top:12px"></div>
-    </div>
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. DP, greedy or backtracking?</h4>
+  <p>For each, pick the tool and give a one-line reason. (a) Fewest coins with coins 1, 5, 10, 25. (b) Fewest coins with coins 1, 3, 4. (c) List every subset of 15 numbers that adds up to 30. (d) Attend as many meetings as possible in one room, no overlaps. (e) Can the string "applepenapple" be split into words from a given dictionary?</p>
+  <details class="aside another">
+    <summary>Answers</summary>
+    <p>(a) Greedy works: for these coins you can prove the biggest coin is always safe (DP also works). (b) DP: greedy gives 4 + 1 + 1 for 6. (c) Backtracking: you must output every subset, so you walk the tree; if you only had to <em>count</em> them, DP over (index, sum left) would do. (d) Greedy: always take the meeting that ends earliest. (e) DP over prefixes: "the first i letters can be split" is true if some dictionary word ends at i and the prefix before that word can be split.</p>
   </details>
+</div>
 
-  <details class="box" open id="recurrences">
-    <summary><span class="kicker">Reference</span><span class="label">Recurrences for the exercise</span></summary>
-    <div class="box-body">
-      <pre><code># Edit distance
-dp[i][j] = dp[i-1][j-1]                         if a[i-1] == b[j-1]
-         = 1 + min(dp[i-1][j],    # delete a[i-1]
-                   dp[i][j-1],    # insert b[j-1]
-                   dp[i-1][j-1])  # replace
-dp[i][0] = i,  dp[0][j] = j
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>count_ways(coins, amount)</code></h4>
+  <p>Count the ways to make an amount, where order doesn't matter: 2 + 1 + 1 and 1 + 2 + 1 are the same way. Careful: the obvious edit of <code>fewest_coins</code> (min becomes sum) counts sequences instead, 9 instead of 4 for coins 1, 2, 5 and 5 cents, and the tests check exactly that. The work test makes 500 cents from 8 coins (6,295,434 ways), so visiting the ways one by one runs out of budget.</p>
+</div>
 
-# 0/1 knapsack (1D, iterate capacity DOWNWARD so each item is used once)
-for w, v in items:
-    for c in range(cap, w - 1, -1):
-        dp[c] = max(dp[c], dp[c - w] + v)
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>best_knapsack(weights, values, capacity)</code>, with the choice</h4>
+  <p>Return the best value <em>and</em> the sorted indices of the items to take. The tests check that the items fit, add up to your value, and that the value is the best (against brute force on small inputs, and two 40-item inputs that have 2⁴⁰ subsets). Section 9 explains why the one-row version can't tell you which items it took.</p>
+</div>
 
-# LIS in O(n log n): tails[k] = smallest tail of an increasing subsequence of length k+1
-for x in nums:
-    k = bisect_left(tails, x)
-    tails[k:k+1] = [x]</code></pre>
-    </div>
-  </details>
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>longest_increasing_subsequence(nums)</code> in O(n log n)</h4>
+  <p>Return an actual longest strictly increasing subsequence, not just its length. The test counts comparisons between numbers on a list of 4,000, allowing 4·n·log₂ n (about 190,000), while the O(n²) method needs about 8 million. Returning <code>tails</code> fails (section 6 says why). Hint: when a number goes into position k of <code>tails</code>, the number at position k − 1 at that moment can come right before it.</p>
+</div>
 
-  <details class="box senior" open id="interview">
-    <summary><span class="kicker">Interview</span><span class="label">What a senior answer adds</span></summary>
-    <div class="box-body">
-      <ul>
-        <li><b>Start from brute-force recursion</b>, point out the repeated subproblems, add memoization, then optionally convert to a table and compress space. That progression is exactly what interviewers want to hear.</li>
-        <li><b>Name the state space size</b> to justify complexity: "n × capacity states, O(1) each."</li>
-        <li><b>Reconstruct the solution,</b> not just the number: keep parent pointers or walk back through the table.</li>
-        <li><b>DP in real systems:</b> diff tools and spell checkers (edit distance), sequence alignment in genomics, query optimizers choosing join orders, Viterbi decoding in speech and early NLP, and line breaking in text layout (TeX).</li>
-      </ul>
-    </div>
-  </details>
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>diff_lines(old, new)</code></h4>
+  <p>Write the heart of <code>diff</code>: a list of kept (<code>" "</code>), deleted (<code>"-"</code>) and added (<code>"+"</code>) lines, with as few deletions and additions as possible. That's the LCS table from section 7 over lines, plus a walk back. The tests check that the output rebuilds both files, that it's minimal (against brute force on small inputs), and they count line comparisons on 250-line files: 3 per table cell is the budget. Watch out for repeated lines like <code>}</code>, which make greedy matching go wrong.</p>
+</div>
 
-  <details class="box trap" open id="traps">
-    <summary><span class="kicker">Traps</span><span class="label">Common mistakes</span></summary>
-    <div class="box-body">
-      <ul>
-        <li>An off-by-one between "first i characters" (table size n + 1) and "index i" (size n). Pick one and write it down.</li>
-        <li>0/1 knapsack in 1D iterating capacity upward, which silently turns it into unbounded knapsack.</li>
-        <li>A state that doesn't capture everything the future depends on (e.g. forgetting "holding a stock or not").</li>
-        <li><code>@cache</code> on a function taking lists (unhashable). Pass indexes, or convert to tuples.</li>
-      </ul>
-    </div>
-  </details>
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>8. <code>min_cut_cost(length, cuts)</code></h4>
+  <p>Cutting a stick costs the length of the piece you cut, and you choose the order. Interval DP: sort the cut positions, add the two ends, and let the state be the piece between two of those positions. Which cut inside the piece do you make first? The test has 60 cuts (60! orders) and allows 4·(m + 2)³ uses of the positions, about 950,000.</p>
+</div>
 
-  <details class="box" open id="check">
-    <summary><span class="kicker">Recall</span><span class="label">Check yourself</span></summary>
-    <div class="box-body">
-      <details class="qa"><summary>Greedy vs DP for coin change: when does greedy fail?</summary><p>With coins {1, 3, 4} and amount 6, greedy takes 4 + 1 + 1 (3 coins), but 3 + 3 is 2. Greedy works for "canonical" systems like US coins; DP works for all.</p></details>
-      <details class="qa"><summary>Why does edit distance only need the previous row?</summary><p>Each cell depends on (i−1, j), (i, j−1) and (i−1, j−1): the current and previous rows only. Keep two rows: O(min(m, n)) space.</p></details>
-      <details class="qa"><summary>How do you know a problem is DP rather than greedy or backtracking?</summary><p>You're asked for an optimum or a count over many choices, the choices form overlapping subproblems (the same smaller state reached many ways), and the optimal answer is built from optimal answers to substates.</p></details>
-    </div>
-  </details>
+<div class="exercise">
+  <div class="tier stretch">Stretch · design</div>
+  <h4>9. Burst balloons, on paper</h4>
+  <p>Balloons in a row hold numbers [3, 1, 5, 8]. Popping one earns its number times its two current neighbors' numbers (a missing neighbor counts as 1); then the neighbors become adjacent. Find the order that earns the most. Write the state, the recurrence and the fill order, and explain in two sentences why choosing the balloon popped <em>last</em> in a range works while choosing the one popped <em>first</em> doesn't. Check your recurrence by hand against the best total, 167.</p>
+</div>
 
-  <details class="box" open id="practice">
-    <summary><span class="kicker">Do</span><span class="label">Practice</span></summary>
-    <div class="box-body">
-      <p><b>Exercise:</b> <code>exercises/dp.py</code>: edit distance, LIS (O(n²), then O(n log n)), 0/1 knapsack.</p>
-      <p><b>Classic problems:</b> Climbing Stairs · House Robber · Coin Change · Longest Common Subsequence · Word Break · Partition Equal Subset Sum · Burst Balloons (interval DP).</p>
-    </div>
-  </details>
+<div class="exercise">
+  <div class="tier stretch">Stretch · explain</div>
+  <h4>10. Say it out loud</h4>
+  <p>Set a 3-minute timer. Explain to an imaginary interviewer: the 0/1 knapsack state and recurrence, why the one-row version loops capacity backwards, what the forwards loop computes instead, and why O(n·W) doesn't make knapsack an "easy" problem. Did you mention the old-row/new-row picture, the unbounded knapsack and pseudo-polynomial time?</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="backtracking.html"><small>← Previous</small>Recursion and backtracking</a>
+  <a class="next" href="../index.html"><small>Next →</small>Back to Algorithms</a>
+</nav>
+
 </main>
 <script>
 (function () {
-  const $ = (id) => document.getElementById(id);
-  function frames(a, b) {
-    const m = a.length, n = b.length, dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(null)), fr = [];
-    for (let i = 0; i <= m; i++) dp[i][0] = i;
-    for (let j = 0; j <= n; j++) dp[0][j] = j;
-    fr.push({ dp: dp.map((r) => [...r]), msg: "Base cases: turning i letters into the empty string takes i deletions (first column), and the reverse takes j insertions (first row)." });
-    for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
-      const same = a[i - 1] === b[j - 1];
-      dp[i][j] = same ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-      fr.push({ dp: dp.map((r) => [...r]), cur: [i, j], dep: same ? [[i - 1, j - 1]] : [[i - 1, j], [i, j - 1], [i - 1, j - 1]],
-        msg: same ? `'${a[i - 1]}' == '${b[j - 1]}': free, copy the diagonal → <b>${dp[i][j]}</b>.` : `'${a[i - 1]}' ≠ '${b[j - 1]}': 1 + min(delete ${dp[i - 1][j]}, insert ${dp[i][j - 1]}, replace ${dp[i - 1][j - 1]}) = <b>${dp[i][j]}</b>.` });
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- Call tree for climb(n) (section 2) ----------
+  (function () {
+    var fib = function (k) { var a = 0n, b = 1n; for (var i = 0; i < k; i++) { var t = a + b; a = b; b = t; } return a; };
+    function plain(n, inRepeat, target) {
+      var hot = inRepeat || n === target;
+      return { val: n, hot: hot, left: n > 1 ? plain(n - 1, hot, target) : null, right: n > 1 ? plain(n - 2, hot, target) : null };
     }
-    const path = []; let i = m, j = n; const ops = [];
-    while (i > 0 || j > 0) {
-      path.push([i, j]);
-      if (i > 0 && j > 0 && a[i - 1] === b[j - 1] && dp[i][j] === dp[i - 1][j - 1]) { i--; j--; }
-      else if (i > 0 && j > 0 && dp[i][j] === dp[i - 1][j - 1] + 1) { ops.push(`replace '${a[i - 1]}'→'${b[j - 1]}'`); i--; j--; }
-      else if (i > 0 && dp[i][j] === dp[i - 1][j] + 1) { ops.push(`delete '${a[i - 1]}'`); i--; }
-      else { ops.push(`insert '${b[j - 1]}'`); j--; }
+    function memo(n) {
+      var seen = {};
+      function go(k) {
+        if (k > 1 && seen[k]) return { val: k, hit: true };
+        seen[k] = true;
+        var node = { val: k };
+        if (k > 1) { node.left = go(k - 1); node.right = go(k - 2); }
+        return node;
+      }
+      return go(n);
     }
-    path.push([0, 0]);
-    fr.push({ dp, path, msg: `Answer in the bottom-right corner: <b>${dp[m][n]}</b>. Walking back: ${ops.reverse().join(", ") || "no edits"}. ${(m + 1) * (n + 1)} cells, O(1) each.` });
-    return { fr, a, b };
-  }
-  let A = "", B = "";
-  const player = V.player($("ed-player"), {
-    speed: 380,
-    draw(f, stage) {
-      const has = (list, i, j) => list && list.some(([x, y]) => x === i && y === j);
-      stage.append(V.el("div", { class: "table-wrap" }, V.el("table", { class: "dp-table" },
-        V.el("tr", {}, V.el("th", {}), V.el("th", {}, "ε"), [...B].map((c, j) => V.el("th", { style: f.cur && f.cur[1] === j + 1 ? "color:var(--warn)" : "" }, c))),
-        f.dp.map((row, i) => V.el("tr", {}, V.el("th", { style: f.cur && f.cur[0] === i ? "color:var(--warn)" : "" }, i ? A[i - 1] : "ε"),
-          row.map((v, j) => V.el("td", { class: f.cur && f.cur[0] === i && f.cur[1] === j ? "cur" : has(f.dep, i, j) ? "dep" : has(f.path, i, j) ? "path" : "" }, v == null ? "" : v)))))));
-    },
-  });
-  const run = () => { A = $("ed-a").value || "a"; B = $("ed-b").value || "b"; player.load(frames(A, B).fr); };
-  $("ed-go").onclick = run; run();
+    function draw() {
+      var n = Number($("ct-n").value), mode = $("ct-mode").value;
+      $("ct-nval").textContent = n;
+      var plainCalls = 2n * fib(n + 1) - 1n, memoCalls = 2 * n - 1;
+      $("ct-count").innerHTML = "Plain recursion: <b>" + plainCalls.toLocaleString() + "</b> calls. With a memo: <b>" + memoCalls + "</b> calls. Different questions: <b>" + (n + 1) + "</b> (n = 0 to " + n + ").";
+      var svg = $("ct-svg");
+      if (n > 6) {
+        svg.replaceChildren();
+        svg.setAttribute("viewBox", "0 0 400 40"); svg.style.minWidth = "";
+        svg.append(V.s("text", { x: 200, y: 24, class: "label", "text-anchor": "middle", text: "Too big to draw. Slide n down to 6 or less to see the tree." }));
+        return;
+      }
+      var root = mode === "memo" ? memo(n) : plain(n, false, n - 3);
+      var count = 0; (function c(x) { if (!x) return; count++; c(x.left); c(x.right); })(root);
+      V.binaryTree(svg, root, { dx: 34, dy: 50, r: 15, cls: function (x) { return x.hit ? "done" : x.hot ? "warn" : ""; } });
+      svg.style.minWidth = count > 11 ? Math.min(60 + (count - 1) * 34, 600) + "px" : "";
+      var wrap = $("ct-wrap"), rootAt = V.layoutTree(root).findIndex(function (it) { return it.node === root; });
+      wrap.scrollLeft = Math.max(0, (30 + rootAt * 34) / (60 + (count - 1) * 34) * wrap.scrollWidth - wrap.clientWidth / 2);
+    }
+    $("ct-n").oninput = draw; $("ct-mode").onchange = draw; draw();
+    addEventListener("load", function () { setTimeout(draw, 0); });   // re-center once the page shell has settled
+  })();
+
+  // ---------- Coin change table (section 4) ----------
+  (function () {
+    var coins = [1, 3, 4], A = 6, INF = Infinity;
+    var best = [0], last = [null], fr = [];
+    for (var k = 1; k <= A; k++) { best.push(INF); last.push(null); }
+    var fmt = function (v) { return v === INF ? "∞" : String(v); };
+    var snap = function (o) { fr.push(Object.assign({ best: best.slice(), last: last.slice() }, o)); };
+    snap({ msg: "best[0] = 0: paying 0 cents takes no coins. Every other amount starts at ∞ (not possible yet). Coins: 1, 3, 4." });
+    for (var a = 1; a <= A; a++) {
+      for (var ci = 0; ci < coins.length; ci++) {
+        var c = coins[ci];
+        if (c > a) { snap({ a: a, msg: "a = " + a + ": a " + c + "-cent coin is bigger than " + a + " cents, so it can't be the last coin. Skip." }); continue; }
+        var cand = best[a - c] + 1, before = best[a];
+        var better = cand < before;
+        if (better) { best[a] = cand; last[a] = c; }
+        snap({ a: a, read: a - c, c: c, msg: "a = " + a + ", last coin " + c + ": best[" + a + " − " + c + "] = best[" + (a - c) + "] = " + fmt(cand - 1) + ", so " + fmt(cand - 1) + " + 1 = <b>" + cand + "</b> coins. " +
+          (better ? (before === INF ? "First way found: keep it." : "Better than " + before + ": keep it.") : "Not better than " + before + ": keep " + before + ".") });
+      }
+    }
+    snap({ path: [6, 3, 0], msg: "Done: <b>best[6] = 2</b>. Follow the last-coin row back: last[6] = 3, go to 6 − 3 = 3; last[3] = 3, go to 0. The coins are 3 + 3. Greedy's 4 + 1 + 1 uses 3. Work: 6 amounts × 3 coins = 18 tries (5 of them skipped because the coin was too big)." });
+    V.player($("coin-player"), {
+      frames: fr, speed: 900,
+      draw: function (f, stage) {
+        var row = function (label, vals, cls, ptrs, idx) {
+          return V.el("div", { style: "display:flex;align-items:center;gap:10px;margin:4px 0" },
+            V.el("span", { class: "small muted", style: "width:64px;flex:none" }, label),
+            V.cells(vals, { cls: cls, ptrs: ptrs || {}, idx: idx, label: function (v) { return fmt(v); } }));
+        };
+        var ptrs = {};
+        if (f.a !== undefined) { ptrs[f.a] = "a"; if (f.read !== undefined) ptrs[f.read] = "a−" + f.c; }
+        var cls = function (i) {
+          if (f.path) return f.path.indexOf(i) >= 0 ? "done" : "";
+          if (i === f.a) return "hl";
+          if (i === f.read) return "cmp";
+          return f.a !== undefined && i > f.a ? "dim" : "";
+        };
+        stage.append(row("best", f.best, cls, ptrs, true),
+          row("last coin", f.last.map(function (v) { return v === null ? null : v; }), function (i) { return f.path && (i === 6 || i === 3) ? "done" : i === f.a ? "hl" : ""; }, {}, false));
+      },
+    });
+  })();
+
+  // ---------- 1D knapsack, backwards vs forwards (section 5) ----------
+  (function () {
+    var W = 7, w = 3, v = 4, start = [0, 1, 1, 1, 1, 1, 1, 1], correct = [0, 1, 1, 4, 5, 5, 5, 5];
+    function frames(dir) {
+      var best = start.slice(), written = {}, changed = {}, fr = [];
+      fr.push({ best: best.slice(), written: {}, msg: "The row after item A: best[c] for capacity c = 0 to 7. Now add item B (3 kg, value 4), going " + (dir === "back" ? "<b>backwards</b> (c = 7 down to 3)" : "<b>forwards</b> (c = 3 up to 7)") + ". B may be used at most once." });
+      var cs = [];
+      if (dir === "back") for (var c = W; c >= w; c--) cs.push(c); else for (var c2 = w; c2 <= W; c2++) cs.push(c2);
+      cs.forEach(function (c) {
+        var old = best[c], rd = best[c - w], stale = !!changed[c - w], cand = rd + v, nw = Math.max(old, cand);
+        best[c] = nw; written[c] = true; if (nw !== old) changed[c] = true;
+        var m = "c = " + c + ": max(leave B: " + old + ", take B: best[" + (c - w) + "] + 4 = " + rd + " + 4 = " + cand + ") = <b>" + nw + "</b>. ";
+        m += stale ? "But best[" + (c - w) + "] = " + rd + " was rewritten earlier in this pass and already has B in it, so " + cand + " packs B twice."
+                   : "best[" + (c - w) + "] is still the old value, without B, so B is used at most once.";
+        var wr = {}; for (var k in written) wr[k] = true;
+        fr.push({ best: best.slice(), written: wr, cur: c, read: c - w, stale: stale, msg: m });
+      });
+      var ok = best.every(function (x, i) { return x === correct[i]; });
+      fr.push({ best: best.slice(), written: {}, done: true, msg: ok
+        ? "Row done: [" + best.join(", ") + "], exactly row +B of the 2D table. Every read saw the old row, so B was used at most once."
+        : "Row done: [" + best.join(", ") + "]. The correct 0/1 row is [" + correct.join(", ") + "]. Capacities 6 and 7 counted B twice: right for the unbounded knapsack, wrong for 0/1." });
+      return fr;
+    }
+    var sel = V.el("select", {}, V.el("option", { value: "back" }, "Backwards (0/1, correct)"), V.el("option", { value: "fwd" }, "Forwards (reuses B)"));
+    var p = V.player($("kn-player"), {
+      frames: frames("back"), speed: 1100, extraControls: [sel],
+      draw: function (f, stage) {
+        var ptrs = {};
+        if (f.cur !== undefined) { ptrs[f.cur] = "c"; ptrs[f.read] = "c−3"; }
+        stage.append(V.el("div", { class: "small muted" }, "best[c], one row reused"),
+          V.cells(f.best, { ptrs: ptrs, cls: function (i) {
+            if (f.done) return f.best[i] === correct[i] ? "done" : "bad";
+            if (i === f.cur) return "hl";
+            if (i === f.read) return f.stale ? "bad" : "cmp";
+            return f.written[i] ? "win" : "";
+          } }));
+      },
+    });
+    sel.onchange = function () { p.load(frames(sel.value)); };
+  })();
+
+  // ---------- Edit distance table (section 7) ----------
+  (function () {
+    function frames(a, b) {
+      var m = a.length, n = b.length, d = [], fr = [], i, j;
+      for (i = 0; i <= m; i++) { d.push([]); for (j = 0; j <= n; j++) d[i].push(null); }
+      for (i = 0; i <= m; i++) d[i][0] = i;
+      for (j = 0; j <= n; j++) d[0][j] = j;
+      var copy = function () { return d.map(function (r) { return r.slice(); }); };
+      fr.push({ d: copy(), msg: "Base cases. First column: turning the first i letters of \"" + a + "\" into nothing takes i deletions. First row: building the first j letters of \"" + b + "\" from nothing takes j insertions." });
+      for (i = 1; i <= m; i++) for (j = 1; j <= n; j++) {
+        var x = a[i - 1], y = b[j - 1], pre = "d[" + i + "][" + j + "], \"" + a.slice(0, i) + "\" → \"" + b.slice(0, j) + "\": ";
+        if (x === y) {
+          d[i][j] = d[i - 1][j - 1];
+          fr.push({ d: copy(), cur: [i, j], dep: [[i - 1, j - 1]], msg: pre + "last letters '" + x + "' and '" + y + "' match, so no edit: copy the up-left cell, <b>" + d[i][j] + "</b>." });
+        } else {
+          var up = d[i - 1][j], left = d[i][j - 1], diag = d[i - 1][j - 1];
+          d[i][j] = 1 + Math.min(up, left, diag);
+          fr.push({ d: copy(), cur: [i, j], dep: [[i - 1, j], [i, j - 1], [i - 1, j - 1]], msg: pre + "'" + x + "' ≠ '" + y + "', so 1 + min(delete " + up + ", insert " + left + ", replace " + diag + ") = <b>" + d[i][j] + "</b>." });
+        }
+      }
+      var path = [], ops = [];
+      i = m; j = n;
+      while (i > 0 || j > 0) {
+        path.push([i, j]);
+        if (i > 0 && j > 0 && a[i - 1] === b[j - 1] && d[i][j] === d[i - 1][j - 1]) { i--; j--; }
+        else if (i > 0 && j > 0 && d[i][j] === d[i - 1][j - 1] + 1) { ops.push("replace '" + a[i - 1] + "' with '" + b[j - 1] + "'"); i--; j--; }
+        else if (i > 0 && d[i][j] === d[i - 1][j] + 1) { ops.push("delete '" + a[i - 1] + "'"); i--; }
+        else { ops.push("insert '" + b[j - 1] + "'"); j--; }
+      }
+      path.push([0, 0]);
+      fr.push({ d: copy(), path: path, msg: "Answer, bottom right: <b>" + d[m][n] + "</b>. Walking back from the corner, each step asks which choice produced this cell's number: " + (ops.length ? ops.reverse().join(", ") : "no edits needed") + ". " + ((m + 1) * (n + 1)) + " cells, O(1) each." });
+      return fr;
+    }
+    var A = "", B = "";
+    var has = function (list, i, j) { return !!list && list.some(function (p) { return p[0] === i && p[1] === j; }); };
+    var player = V.player($("ed-player"), {
+      speed: 450,
+      draw: function (f, stage) {
+        var hdr = V.el("tr", {}, V.el("th", {}), V.el("th", {}, "ε"), B.split("").map(function (c, j) { return V.el("th", { style: f.cur && f.cur[1] === j + 1 ? "color:var(--warn)" : "" }, c); }));
+        var rows = f.d.map(function (row, i) {
+          return V.el("tr", {}, V.el("th", { style: f.cur && f.cur[0] === i ? "color:var(--warn)" : "" }, i ? A[i - 1] : "ε"),
+            row.map(function (val, j) { return V.el("td", { class: f.cur && f.cur[0] === i && f.cur[1] === j ? "cur" : has(f.dep, i, j) ? "dep" : has(f.path, i, j) ? "path" : "" }, val === null ? "" : val); }));
+        });
+        stage.append(V.el("div", { class: "table-wrap" }, V.el("table", { class: "dp-table" }, hdr, rows)));
+      },
+    });
+    var run = function () {
+      A = ($("ed-a").value.trim() || "kitten").slice(0, 9); B = ($("ed-b").value.trim() || "sitting").slice(0, 9);
+      player.load(frames(A, B));
+    };
+    $("ed-go").onclick = run; run();
+  })();
 })();
 </script>
 </body>
