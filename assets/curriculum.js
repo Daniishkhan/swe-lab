@@ -8,10 +8,22 @@ window.CURRICULUM = {
     "label": "Week 1",
     "title": "Data structures first",
     "goal": "Hash maps, stacks, queues, trees and heaps feel routine at medium level, and you know what every operation costs.",
-    "daily": "Two timed problems a day from the chapters you have read, 25 minutes each. Say the brute force and its cost first, then improve it, then test it by hand before you run it.",
+    "daily": "Two timed problems a day from the chapters you have read, 25 minutes each, by the method in the algorithmic round chapter: say the brute force and its cost first, then improve it, then test it by hand before you run it. Log each one.",
     "steps": [
      {
       "topic": "02.01"
+     },
+     {
+      "topic": "15.01",
+      "do": "Read it on day 1, before your first timed drill: it's the method for every drill and mock. Reread it the day before each coding mock."
+     },
+     {
+      "topic": "14.01",
+      "do": "Write your project deep dive, plus a 60-second answer to “tell me about yourself”. Recruiter and hiring manager screens open with these."
+     },
+     {
+      "topic": "10.01",
+      "do": "Read it, make the one-page cheat sheet in exercise 3, then do py_toolkit. Keep the cheat sheet next to you for every drill this week."
      },
      {
       "topic": "01.01",
@@ -30,20 +42,181 @@ window.CURRICULUM = {
       "topic": "02.02"
      },
      {
-      "topic": "10.01",
-      "do": "Ask Claude: “teach me Python for interviews” (45 minutes). Make a one-page cheat sheet of Counter, defaultdict, deque, heapq, bisect, itertools, functools.cache, dataclasses and sorted with a key, then reach for them in every drill."
-     },
-     {
-      "topic": "14.01",
-      "do": "Write your project deep dive, plus a 60-second answer to “tell me about yourself”. Recruiter and hiring manager screens open with these."
-     },
-     {
       "topic": "14.09",
       "do": "Read the Netflix culture memo, and Anthropic's mission, Core Views on AI Safety and Responsible Scaling Policy. Write a 90-second “why Netflix” and “why Anthropic”, each tying two of their values to something you did. In every recruiter call, ask for the screen's format and the onsite round list."
      },
      {
       "topic": "15.10",
       "do": "Ask Claude: “mock interview, past-project deep dive, 45 minutes”. Expect a follow-up on every choice: why this design, what broke, what you'd change."
+     }
+    ],
+    "dayNote": "About 33 hours. Times include each drill (25 minutes plus logging). Stretch exercises are optional this week. If a day runs long, move a drill to the next day rather than skip testing by hand. If you finish early, redo any drill you needed a hint for.",
+    "days": [
+     {
+      "label": "Day 1 · Monday",
+      "plan": [
+       {
+        "t": "1h 15m",
+        "topic": "02.01",
+        "do": "Read it and answer every quick check"
+       },
+       {
+        "t": "1h 30m",
+        "topic": "02.01",
+        "do": "Warm-ups 1 to 3 on paper, then complexity_drills"
+       },
+       {
+        "t": "50m",
+        "topic": "15.01",
+        "do": "Read it, then warm-ups 1 and 2 on paper: it's how you'll run every drill"
+       },
+       {
+        "t": "45m",
+        "topic": "14.01",
+        "do": "Read it, then score three projects (exercise 1)"
+       }
+      ],
+      "drills": []
+     },
+     {
+      "label": "Day 2 · Tuesday",
+      "plan": [
+       {
+        "t": "1h",
+        "topic": "10.01",
+        "do": "Read it and write your one-page cheat sheet (exercise 3)"
+       },
+       {
+        "t": "1h",
+        "topic": "10.01",
+        "do": "py_toolkit"
+       },
+       {
+        "t": "1h 30m",
+        "topic": "01.01",
+        "do": "Read it and answer every quick check"
+       }
+      ],
+      "drills": [
+       "Contains Duplicate",
+       "Group Anagrams"
+      ]
+     },
+     {
+      "label": "Day 3 · Wednesday",
+      "plan": [
+       {
+        "t": "2h 15m",
+        "topic": "01.01",
+        "do": "Warm-ups, then hash_map, probing_map and hash_patterns (leave subarray_sum_count for week 2)"
+       },
+       {
+        "t": "1h 30m",
+        "topic": "01.02",
+        "do": "Read it and answer every quick check"
+       }
+      ],
+      "drills": [
+       "Longest Consecutive Sequence",
+       "Valid Parentheses"
+      ]
+     },
+     {
+      "label": "Day 4 · Thursday",
+      "plan": [
+       {
+        "t": "2h 15m",
+        "topic": "01.02",
+        "do": "Warm-ups, then linked_lists, ring_deque and monotonic"
+       },
+       {
+        "t": "1h 30m",
+        "topic": "01.03",
+        "do": "Read it and answer every quick check"
+       }
+      ],
+      "drills": [
+       "Daily Temperatures",
+       "Min Stack"
+      ]
+     },
+     {
+      "label": "Day 5 · Friday",
+      "plan": [
+       {
+        "t": "2h",
+        "topic": "01.03",
+        "do": "Warm-ups, then bst and tree_traversals"
+       },
+       {
+        "t": "1h 15m",
+        "topic": "01.04",
+        "do": "Read it and answer every quick check"
+       },
+       {
+        "t": "45m",
+        "topic": "14.01",
+        "do": "Tell me about yourself (exercise 3), then start your deep dive worksheet (exercise 4)"
+       }
+      ],
+      "drills": [
+       "Validate Binary Search Tree",
+       "Binary Tree Level Order Traversal"
+      ]
+     },
+     {
+      "label": "Day 6 · Saturday",
+      "plan": [
+       {
+        "t": "1h 45m",
+        "topic": "01.04",
+        "do": "Warm-ups, then min_heap and heap_patterns"
+       },
+       {
+        "t": "1h 15m",
+        "topic": "02.02",
+        "do": "Read it and answer every quick check"
+       },
+       {
+        "t": "1h",
+        "topic": "14.01",
+        "do": "Finish the worksheet, then the timed 5-minute map and two ladders (exercise 5)"
+       },
+       {
+        "t": "1h",
+        "topic": "14.09",
+        "do": "Read it and the four sources (exercise 1)"
+       }
+      ],
+      "drills": []
+     },
+     {
+      "label": "Day 7 · Sunday",
+      "plan": [
+       {
+        "t": "1h 30m",
+        "topic": "02.02",
+        "do": "Warm-ups, then sorts"
+       },
+       {
+        "t": "1h",
+        "topic": "14.09",
+        "do": "Write and say both answers (exercises 2 to 4)"
+       },
+       {
+        "t": "1h",
+        "topic": "15.10",
+        "do": "45 minutes plus feedback, with your worksheet closed"
+       },
+       {
+        "t": "1h",
+        "topic": "m1",
+        "do": "Skim the algorithmic round chapter's section 10, then 45 minutes plus feedback"
+       }
+      ],
+      "drills": [
+       "Kth Largest Element in an Array"
+      ]
      }
     ],
     "milestone": {
@@ -2995,7 +3168,10 @@ window.CURRICULUM = {
      "id": "10.01",
      "tag": "P0",
      "text": "Clean, idiomatic code in your primary language; deep knowledge of its standard library",
-     "short": "Idiomatic code and the standard library"
+     "short": "Idiomatic code and the standard library",
+     "requires": [
+      "02.01"
+     ]
     },
     {
      "id": "10.02",
@@ -3044,8 +3220,24 @@ window.CURRICULUM = {
      "text": "Dependency management, build systems, monorepo trade-offs"
     }
    ],
-   "concepts": [],
-   "exercises": []
+   "concepts": [
+    {
+     "file": "python-toolkit.html",
+     "topic": "10.01",
+     "title": "Python for interviews: the toolkit"
+    }
+   ],
+   "exercises": [
+    {
+     "file": "py_toolkit.py",
+     "module": "py_toolkit",
+     "title": "Python toolkit drills: the standard library tools that turn O(n²) into O(n)",
+     "topics": [
+      "10.01"
+     ],
+     "result": null
+    }
+   ]
   },
   {
    "num": 11,
@@ -3334,7 +3526,10 @@ window.CURRICULUM = {
      "id": "14.09",
      "tag": "P1",
      "text": "Company specifics: Netflix culture memo (freedom and responsibility, candor, context not control); Anthropic's mission, values, and views on AI safety",
-     "short": "Company culture: Netflix and Anthropic"
+     "short": "Company culture: Netflix and Anthropic",
+     "requires": [
+      "14.01"
+     ]
     },
     {
      "id": "14.10",
@@ -3342,7 +3537,18 @@ window.CURRICULUM = {
      "text": "Product sense: why are we building this, how would we measure it?"
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "project-deep-dive.html",
+     "topic": "14.01",
+     "title": "Your project deep dive"
+    },
+    {
+     "file": "why-this-company.html",
+     "topic": "14.09",
+     "title": "Why this company: Netflix and Anthropic"
+    }
+   ],
    "exercises": []
   },
   {
@@ -3355,7 +3561,10 @@ window.CURRICULUM = {
     {
      "id": "15.01",
      "tag": "Format",
-     "text": "Algorithmic coding (45 to 60 min, one or two problems)"
+     "text": "Algorithmic coding (45 to 60 min, one or two problems)",
+     "requires": [
+      "02.01"
+     ]
     },
     {
      "id": "15.02",
@@ -3437,7 +3646,13 @@ window.CURRICULUM = {
      ]
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "algorithmic-round.html",
+     "topic": "15.01",
+     "title": "The algorithmic coding round"
+    }
+   ],
    "exercises": []
   }
  ],

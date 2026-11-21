@@ -73,4 +73,4 @@ four themes (Ayu Dark, Ayu Mirage, Gruvbox Dark Hard, Ayu Light). Cell and node 
 ## Markdown worksheets
 
 `design-case.md` (45-minute system design), `star-story.md` (behavioral),
-`lld-worksheet.md` (object-oriented design), `mock-log.md` (mock interview log).
+`lld-worksheet.md` (object-oriented design), `deep-dive.md` (past-project deep dive), `mock-log.md` (mock interview log).

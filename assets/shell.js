@@ -75,7 +75,7 @@
       isDone: (x, st = status()) => st[x.key] === "confident",
       readPct: (x, r = read()) => (x.pages && x.pages.length ? Math.min(...x.pages.map((c) => r[pagePath(x, c)] || 0)) : 0),
       title: (x) => (x.isMilestone ? x.title : x.pages.length ? x.pages[0].title : short(x.t)),
-      kindLabel: (x) => ({ learn: x.pages && x.pages.length ? "Read" : "Learn", design: "Design", story: "Story", mock: "Mock", milestone: "Milestone" })[x.kind],
+      kindLabel: (x) => ({ learn: x.pages && x.pages.length ? "Read" : "Learn", design: "Design", story: "Story", mock: x.pages && x.pages.length ? "Read" : "Mock", milestone: "Milestone" })[x.kind],
       href: (x, root) => x.isMilestone ? `${root}/index.html#stage-${x.stage.id}`
         : x.pages.length ? `${root}/${pagePath(x, x.pages[0])}` : `${root}/sections/${x.s.slug}/index.html#t-${x.id}`,
       // What to do for this step, as DOM nodes
