@@ -51,14 +51,18 @@
       const x = T.byTopic[id];
       return x ? h("a", { href: T.href(x, ROOT) }, T.title(x)) : id;
     };
+    // "1h 15m" → 75; each drill is 30 minutes (25 timed plus logging)
+    const mins = (t) => { const m = /(?:(\d+)h)?\s*(?:(\d+)m)?/.exec(t); return (+m[1] || 0) * 60 + (+m[2] || 0); };
+    const total = (d) => d.plan.reduce((a, p) => a + mins(p.t), 0) + 30 * (d.drills || []).length;
+    const fmt = (m) => `${Math.floor(m / 60)}h${m % 60 ? " " + (m % 60) + "m" : ""}`;
     return h("details", { class: "days", id: "days-" + st.id },
       h("summary", {}, "Day by day", h("span", { class: "aside-note" }, " · " + st.days.length + " days, 4 to 5 hours each")),
       st.dayNote ? h("p", { class: "day-note" }, st.dayNote) : null,
       h("ol", { class: "day-list" }, st.days.map((d) => h("li", { class: "day" },
-        h("div", { class: "day-head" }, h("b", {}, d.label), h("span", { class: "hrs" }, `about ${d.hours} h`)),
+        h("div", { class: "day-head" }, h("b", {}, d.label), h("span", { class: "hrs" }, "about " + fmt(total(d)))),
         h("ul", {}, d.plan.map((p) => h("li", {}, h("span", { class: "t" }, p.t), h("span", {}, link(p.topic), ": ", p.do))),
-          d.drills && d.drills.length ? h("li", {}, h("span", { class: "t" }, "1h"),
-            h("span", {}, "Two timed drills: ", d.drills.map((n, i) => [i ? " and " : "", h("span", { class: "lvl " + (drill[n] || "M"), title: level[drill[n]] || "" }, drill[n] || "M"), " " + n]))) : null)))));
+          d.drills && d.drills.length ? h("li", {}, h("span", { class: "t" }, fmt(30 * d.drills.length)),
+            h("span", {}, d.drills.length === 1 ? "One timed drill: " : `${d.drills.length} timed drills: `, d.drills.map((n, i) => [i ? " and " : "", h("span", { class: "lvl " + (drill[n] || "M"), title: level[drill[n]] || "" }, drill[n] || "M"), " " + n]))) : null)))));
   }
 
   function renderHome(root) {

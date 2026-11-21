@@ -12,6 +12,7 @@ Functions
 top_k_frequent(words, k) -> list[tuple[str, int]]
     The k most common words as (word, count), most common first; equal counts
     in alphabetical order. Fewer than k distinct words: return them all.
+    k <= 0 returns [].
     top_k_frequent(["b", "a", "b", "c", "a", "b"], 2) == [("b", 3), ("a", 2)]
     Target: O(n log k) or O(n + m log m) for m distinct words. Not O(n · m).
 

@@ -18,7 +18,7 @@
 <header class="chapter-head">
   <div class="eyebrow">Chapter 15 · Part 1</div>
   <h1>The algorithmic coding round</h1>
-  <div class="meta"><span><span class="badge Format">Format</span> the most common screen, and part of most onsites</span><span>about 30 minutes</span><span>8 quick checks · 5 exercises</span></div>
+  <div class="meta"><span><span class="badge Format">Format</span> the most common screen, and part of most onsites</span><span>about 30 minutes</span><span>7 quick checks · 5 exercises</span></div>
 </header>
 
 <p>Knowing the data structures is half of a coding round. The other half is running the 45 minutes: what to say first, when to start typing, how to test, what to do when you're stuck. People who know enough still fail by skipping steps under pressure. This chapter is the playbook, and the method for the two timed problems you'll do every day.</p>
@@ -41,8 +41,8 @@
 <h2 id="s1"><span class="sec-num">1</span>The problem: solved it, still failed</h2>
 
 <div class="story">
-  <p>Sam gets "find the length of the longest run of consecutive numbers in an unsorted list". He recognizes it. He says "OK" and starts typing. Eighteen minutes later he has a working solution: put everything in a set, and start counting only from numbers that have no smaller neighbor. He says, "Done, I think."</p>
-  <p>The interviewer asks: "What's the complexity? What happens with an empty list? With duplicates?" Sam isn't sure the empty case works. He runs through it, finds a bug, fixes it. "It's O(n), I think, because of the set."</p>
+  <p>Sam gets "return the first character in a string that appears only once". He says "OK" and starts typing. Eighteen minutes later he has a working solution: count each character in a dict, then scan the string again for the first character with a count of 1. He says, "Done, I think."</p>
+  <p>The interviewer asks: "What's the complexity? What happens with an empty string? If every character repeats?" Sam isn't sure. He runs through it, finds a bug (it returns the wrong thing when nothing is unique), fixes it. "It's O(n), I think, because of the dict."</p>
   <p>The feedback: <em>"Got to a solution, but didn't clarify, didn't explain the approach before coding, couldn't state complexity confidently, and didn't test. Lean no hire."</em></p>
 </div>
 
@@ -51,12 +51,12 @@
 <div class="check" id="check-round-why">
   <p class="q">Sam's code was correct in the end. What would most have changed the outcome?</p>
   <div class="opts">
-    <button>Solving it faster, so there was time left over</button>
-    <button data-correct>Clarifying the inputs, saying the approach and its cost before typing, and testing it himself on small cases, empty input and duplicates</button>
-    <button>Writing more comments in the code</button>
+    <button data-correct>Clarifying, saying the plan and its cost before typing, and testing it himself</button>
+    <button>Solving it faster, so there was time left to optimize and discuss follow-ups at the end</button>
+    <button>Writing clearer code with comments, so the interviewer could follow it without asking</button>
   </div>
   <div class="fb right"><p>Right. Those are the visible parts of problem solving, communication and testing. The same code, with those around it, is a hire.</p></div>
-  <div class="fb wrong"><p>Imagine a maths exam where only the final answer is written down. The grader can't tell if you understood it or got lucky, and if there's a mistake they can't give partial credit. A coding interview is graded the same way, except the "working" is what you say out loud. Speed was not his problem: 18 minutes is fine. Comments don't replace explaining the idea before you code, or finding your own bug.</p></div>
+  <div class="fb wrong"><p>Imagine a maths exam where only the final answer is written down. The grader can't tell if you understood it or got lucky, and if there's a mistake they can't give partial credit. A coding interview is graded the same way, except the "working" is what you say out loud. Speed was not his problem: 18 minutes is fine. Clearer code and comments help, but they don't replace explaining the idea before you code, or finding your own bug.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -101,9 +101,9 @@
 <div class="check" id="check-round-clock">
   <p class="q">It's minute 8. You have a brute force that works, and a hunch about a faster approach but haven't worked it out. What do you do?</p>
   <div class="opts">
-    <button>Start coding the brute force now so you have something</button>
-    <button data-correct>Say the brute force and its cost, then spend a few minutes on the faster idea out loud; if it isn't clear by about minute 12 to 15, code the brute force and say you'll improve it</button>
-    <button>Stay silent and think until the faster idea is complete</button>
+    <button>Start coding the brute force now, so that a working solution is on the screen before you explore anything else</button>
+    <button data-correct>State the brute force, explore the faster idea out loud, fall back by minute 12 to 15</button>
+    <button>Think quietly until the faster idea is complete, so you don't confuse the interviewer with half-formed ideas</button>
   </div>
   <div class="fb right"><p>Right. You've already banked the brute force by stating it. Now you explore, out loud, with a deadline. Interviewers often nudge here if they hear your reasoning.</p></div>
   <div class="fb wrong"><p>Think of the waypoints as a budget. Coding the brute force at minute 8 spends most of your time on the version that scores lowest, when the better idea may be two minutes away. Thinking silently burns the same minutes, and the interviewer can't help or give credit for reasoning they can't hear. The middle path keeps both: say the brute force (that's on the record), think out loud toward the better one, and fall back by a set time.</p></div>
@@ -121,12 +121,13 @@
 </ul>
 <p>Then work one small example by hand, out loud, before planning. It catches misunderstandings while they cost nothing.</p>
 
-<p>The size question deserves its own table. A computer does very roughly 10⁷ to 10⁸ simple Python steps per second, and interview problems are usually set so the intended solution runs in about a second. So the size hints at the cost they expect:</p>
+<p>The size question deserves its own table. Python does very roughly 10⁷ simple steps per second (a few times more on a fast laptop; compiled languages do 10⁸ to 10⁹), and interview problems are usually set so the intended solution runs in about a second. So the size hints at the cost they expect:</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>n up to about</th><th>Likely target</th><th>Typical shape</th></tr></thead>
   <tbody>
-    <tr><td>10 to 20</td><td>O(2ⁿ) or O(n!)</td><td>try every subset or order (backtracking)</td></tr>
+    <tr><td>about 10</td><td>O(n!)</td><td>try every order (backtracking)</td></tr>
+    <tr><td>about 20</td><td>O(2ⁿ)</td><td>try every subset (backtracking)</td></tr>
     <tr><td>a few hundred</td><td>O(n³)</td><td>three nested loops, some dynamic programming</td></tr>
     <tr><td>a few thousand</td><td>O(n²)</td><td>every pair</td></tr>
     <tr><td>10⁵ to 10⁶</td><td>O(n log n) or O(n)</td><td>sort, heap, hash map, one pass</td></tr>
@@ -139,12 +140,12 @@
 <div class="check" id="check-round-size">
   <p class="q">You're told n can be up to 200,000. Your idea compares every pair. What does that tell you?</p>
   <div class="opts">
-    <button>Fine: 200,000 isn't that big</button>
-    <button data-correct>Every pair is about 2 × 10¹⁰ comparisons, minutes to hours in Python; they expect O(n log n) or O(n), so look for sorting, a hash map or a single pass</button>
-    <button>Use a faster language</button>
+    <button>About 4 × 10¹⁰ steps, but simple comparisons are fast, so a tight double loop finishes in a few seconds</button>
+    <button>Too slow in Python, so mention you'd rewrite the double loop in C++ or Rust for production</button>
+    <button data-correct>About 2 × 10¹⁰ pairs, 10 to 30 minutes in Python: they expect O(n log n) or O(n)</button>
   </div>
-  <div class="fb right"><p>Right. n²/2 at n = 200,000 is 2 × 10¹⁰. At 10⁷ to 10⁸ steps a second that's minutes to over half an hour. Say the brute force anyway, then use the size to justify looking for something better.</p></div>
-  <div class="fb wrong"><p>Do the arithmetic out loud: 200,000 × 200,000 / 2 = 20 billion pairs. Python manages roughly 10 to 100 million simple steps a second, so that's 200 to 2,000 seconds: far too slow. A faster language buys maybe 10× to 50×; the gap between n² and n log n here is about 10,000×. The size is telling you which family of solutions they have in mind.</p></div>
+  <div class="fb right"><p>Right. n²/2 at n = 200,000 is 2 × 10¹⁰. At 10 to 30 million simple steps a second that's about 10 to 30 minutes. Say the brute force anyway, then use the size to justify looking for something better.</p></div>
+  <div class="fb wrong"><p>Do the arithmetic out loud: 200,000 × 200,000 / 2 = 20 billion pairs (not 40: each pair once). Python manages roughly 10 to 30 million simple steps a second, so that's about 700 to 2,000 seconds: far too slow. Even a tight loop doesn't change that by more than a small factor. Rewriting in a faster language buys maybe 10× to 50×, and the interviewer wants the better algorithm, not a port; the gap between n² and n log n here is about 10,000×. The size is telling you which family of solutions they have in mind.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -156,7 +157,7 @@
 <ol>
   <li><b>Brute force:</b> try every pair. O(n²) time, O(1) extra space.</li>
   <li><b>What's repeated?</b> For each number x, the inner loop scans the whole list looking for target − x. We search for things again and again.</li>
-  <li><b>Remove it:</b> remember what we've seen in a hash map from value to position. Then "is target − x there?" is one O(1) lookup.</li>
+  <li><b>Remove it:</b> remember what we've seen in a hash map from value to position. Then "is target − x there?" is one O(1) lookup on average (a hash map can degrade to O(n) with many collisions, which the hash maps chapter covers).</li>
   <li><b>New cost:</b> O(n) time, O(n) space. We traded memory for time, and we say so.</li>
 </ol>
 
@@ -180,12 +181,12 @@
 <div class="check" id="check-round-repeat">
   <p class="q">"For each day's temperature, how many days until a warmer one?" The brute force scans forward from each day. What's the repeated work, and the tool?</p>
   <div class="opts">
-    <button>Sorting is repeated; sort the temperatures once</button>
-    <button data-correct>Each scan re-reads days that earlier scans already passed over; a stack of days still waiting for a warmer day lets each day be pushed and popped once</button>
-    <button>The comparisons are repeated; a hash map of temperatures fixes it</button>
+    <button data-correct>Scans re-read the same days; a stack of days still waiting pops each day once</button>
+    <button>Each scan sorts the days after it; sort all the temperatures once up front and binary search each day's answer</button>
+    <button>The same temperatures get compared again; a hash map from temperature to day finds each warmer day in O(1)</button>
   </div>
   <div class="fb right"><p>Right: the monotonic stack from the linear structures chapter. Each day enters the stack once and leaves once, so O(n) instead of O(n²).</p></div>
-  <div class="fb wrong"><p>Picture the scans as arrows starting from each day and moving right until they hit a warmer day. For a cooling stretch like 70, 69, 68, 67 followed by 75, every arrow runs over the same days to reach 75. That's the repeated work. If instead you keep the "still waiting" days in a stack, a single 75 answers all of them at once as it pops them. Sorting loses the order of the days, which the answer depends on, and a hash map finds equal values, not the next warmer one.</p></div>
+  <div class="fb wrong"><p>Picture the scans as arrows starting from each day and moving right until they hit a warmer day. For a cooling stretch like 70, 69, 68, 67 followed by 75, every arrow runs over the same days to reach 75. That's the repeated work. If instead you keep the "still waiting" days in a stack, a single 75 answers all of them at once as it pops them. Sorting loses the order of the days, which the answer depends on, and a hash map finds equal values, not the next warmer one (you'd have to check every warmer temperature).</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -221,17 +222,19 @@ i=1  x=7   need 2   seen={2: 0}    → found 0 → return [0, 1]  ✓</code></pr
   <li>negative numbers, zero, the largest values.</li>
 </ul>
 
+<p>If the environment runs code, still trace by hand first, then turn your edge cases into asserts and run them.</p>
+
 <p>Finding your own bug is a <em>positive</em> signal: it's exactly what the testing score is for. When you find one, say what it was and why the fix is right, then re-trace the case that broke.</p>
 
 <div class="check" id="check-round-test">
   <p class="q">You've finished coding with 12 minutes left. Best next move?</p>
   <div class="opts">
-    <button>Say "I think it works" and ask if they want you to optimize</button>
-    <button>Ask the interviewer to run it</button>
-    <button data-correct>Trace the earlier small example line by line, then walk through empty, one-item, duplicate and no-answer cases, fixing what you find</button>
+    <button>Say it's done, give the complexity, and ask whether they'd like you to optimize it further</button>
+    <button>Ask the interviewer to run it on their test cases, since that's faster and more thorough than tracing</button>
+    <button data-correct>Trace the earlier example line by line, then walk the edge cases and fix bugs</button>
   </div>
   <div class="fb right"><p>Right. Twelve minutes is plenty for both passes. You turn "I think it works" into "it works on these cases, and here's why".</p></div>
-  <div class="fb wrong"><p>"I think it works" hands the testing job to the interviewer, and they'll do it, but you get no credit and they'll find the bug. Many interviews don't run code at all, so asking them to run it may not be an option. Test it the way a careful reviewer would: one normal case traced through every line, then the edge cases where code usually breaks. That's the testing signal, and it usually finds a bug in time to fix it.</p></div>
+  <div class="fb wrong"><p>"It's done, here's the complexity" hands the testing job to the interviewer, and they'll do it, but you get no credit and they'll find the bug. Many interviews don't run code at all, and even when they do, their tests finding your bug scores worse than you finding it. Test it the way a careful reviewer would: one normal case traced through every line, then the edge cases where code usually breaks. That's the testing signal, and it usually finds a bug in time to fix it.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -249,12 +252,12 @@ i=1  x=7   need 2   seen={2: 0}    → found 0 → return [0, 1]  ✓</code></pr
 <div class="check" id="check-round-stuck">
   <p class="q">You've been stuck for three minutes. The interviewer says, "What if the array were sorted?" What do you do?</p>
   <div class="opts">
-    <button>Explain that the problem says it isn't sorted</button>
-    <button data-correct>Think out loud about the sorted case, find what it lets you do, then ask whether sorting first is allowed and what it costs</button>
-    <button>Ask for the full solution so you don't waste more time</button>
+    <button>Point out that the input isn't sorted, and that sorting costs O(n log n), which is too slow here</button>
+    <button>Ask them to say more about the approach they have in mind, so you don't lose more time</button>
+    <button data-correct>Work through the sorted case out loud, then weigh sorting first and its cost</button>
   </div>
   <div class="fb right"><p>Right. A hint is a door; walk through it out loud. Often the answer is "sort first, O(n log n), then do the easy sorted version".</p></div>
-  <div class="fb wrong"><p>Hints in interviews are rarely random. "What if it were sorted?" usually means "sorting is part of the answer" or "there's a sorted-case trick that adapts". Pushing back treats the hint as a mistake, and asking for the full answer gives up the problem-solving signal entirely. Following it, out loud, shows that you can take an idea and run with it, which is what working with a colleague looks like.</p></div>
+  <div class="fb wrong"><p>Hints in interviews are rarely random. "What if it were sorted?" usually means "sorting is part of the answer" or "there's a sorted-case trick that adapts". Pushing back ("sorting is too slow") treats the hint as a mistake, though sorting in O(n log n) is often fine; asking them to explain their approach hands them the problem-solving work. Following it, out loud, shows that you can take an idea and run with it, which is what working with a colleague looks like.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -274,12 +277,12 @@ i=1  x=7   need 2   seen={2: 0}    → found 0 → return [0, 1]  ✓</code></pr
 <div class="check" id="check-round-drill">
   <p class="q">You can't solve a drill in 25 minutes. What's the most useful thing to do?</p>
   <div class="opts">
-    <button>Keep going for as long as it takes; struggling is how you learn</button>
-    <button data-correct>Stop, read just the key idea, finish it yourself, log what you missed, and redo it from scratch in three days</button>
-    <button>Read the full solution carefully and move on</button>
+    <button>Keep going without help for as long as it takes, since struggling through it is how the pattern sticks</button>
+    <button data-correct>Read just the key idea, finish it yourself, log it, redo it in three days</button>
+    <button>Read a full solution carefully, line by line, until you could write it again from memory</button>
   </div>
   <div class="fb right"><p>Right. You get the idea you were missing, you still write it yourself, and the redo checks whether it stuck. That's spaced practice.</p></div>
-  <div class="fb wrong"><p>Picture learning a song on guitar. Struggling for an hour on one bar trains frustration more than the bar; reading the sheet music and never playing it trains nothing. What works: look up just the chord you're missing, play it yourself, and come back to the song in a few days to see if it stuck. A drill works the same way: a small hint, your own code, a logged lesson, and a redo.</p></div>
+  <div class="fb wrong"><p>Picture learning a song on guitar. Struggling for an hour on one bar trains frustration more than the bar; reading the full sheet music until you can recite it trains recall, not playing. What works: look up just the chord you're missing, play it yourself, and come back to the song in a few days to see if it stuck. A drill works the same way: a small hint, your own code, a logged lesson, and a redo.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -315,7 +318,7 @@ i=1  x=7   need 2   seen={2: 0}    → found 0 → return [0, 1]  ✓</code></pr
   <h4>1. Read the size</h4>
   <p>For each limit, name the likely target complexity and one kind of approach: (a) n ≤ 15 (b) n ≤ 2,000 (c) n ≤ 500,000 (d) values up to 10¹², asking for a square root rounded down (e) a 100 × 100 grid.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) O(2ⁿ): try every subset, 32,768 of them. (b) O(n²): every pair, 2 million. (c) O(n log n) or O(n): sort, heap, hash map, one pass. (d) O(log n) in the value: binary search on the answer, about 40 steps. (e) 10,000 cells: O(cells) or O(cells · log cells), a walk over the grid; even O(cells²) = 10⁸ would be slow in Python.</p>
+    <p>(a) O(2ⁿ): try every subset, 32,768 of them (O(n!) would be 1.3 × 10¹², too many). (b) O(n²): every pair, 2 million. (c) O(n log n) or O(n): sort, heap, hash map, one pass. (d) O(log n) in the value: binary search on the answer, about 40 steps. (e) 10,000 cells: O(cells) or O(cells · log cells), a walk over the grid; even O(cells²) = 10⁸ would be slow in Python.</p>
   </details>
 </div>
 
@@ -324,14 +327,14 @@ i=1  x=7   need 2   seen={2: 0}    → found 0 → return [0, 1]  ✓</code></pr
   <h4>2. Grade a transcript</h4>
   <p>Reread Sam's story in section 1. Score him 1 to 4 on each of the four signals, with one piece of evidence each. Then write the first three things he should have said, word for word.</p>
   <details class="aside another"><summary>One way to answer</summary>
-    <p>Problem solving 2 (reached the O(n) idea, but couldn't state its cost with confidence); code quality 3 (it worked after one fix); testing 1 (tested only when asked, and the interviewer prompted the bug); communication 1 (silent for 18 minutes). Better opening: "So I get an unsorted list and return the length of the longest run of consecutive values. Can there be duplicates, and can the list be empty? How big can it get?" Then: "Brute force: sort and scan, O(n log n). To get O(n) I'd put everything in a set and only start counting at numbers whose predecessor isn't there, so each number is visited about twice. Shall I code that?"</p>
+    <p>Problem solving 2 (reached the O(n) idea, but couldn't state its cost with confidence); code quality 3 (it worked after one fix); testing 1 (tested only when asked, and the interviewer prompted the bug); communication 1 (silent for 18 minutes). Better opening: "So I return the first character that appears exactly once. What should I return if there isn't one, and can the string be empty? Is it ASCII or any Unicode? How long can it be?" Then: "Brute force: for each character, count it across the whole string, O(n²). The repeated work is the recounting, so I'll count everything once in a dict, then scan the string in order for the first count of 1. That's O(n) time and O(k) space for k distinct characters. Shall I code that?"</p>
   </details>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · timed</div>
   <h4>3. Two drills, by the method</h4>
-  <p>Do two problems from the hash maps drill list (Two Sum, then Group Anagrams) exactly as section 9 says: 25-minute timer each, out loud, tested by hand before running, logged in <code>sections/15-interview-formats/notes.md</code>. Write them in a scratch file outside the repo.</p>
+  <p>Do two problems from the hash maps drill list (Contains Duplicate, then Group Anagrams) exactly as section 9 says: 25-minute timer each, out loud, tested by hand before running, logged in <code>sections/15-interview-formats/notes.md</code>. Write them in a scratch file outside the repo.</p>
 </div>
 
 <div class="exercise">

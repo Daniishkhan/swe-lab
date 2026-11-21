@@ -18,6 +18,10 @@ window.CURRICULUM = {
       "do": "Read it on day 1, before your first timed drill: it's the method for every drill and mock. Reread it the day before each coding mock."
      },
      {
+      "topic": "14.01",
+      "do": "Write your project deep dive, plus a 60-second answer to “tell me about yourself”. Recruiter and hiring manager screens open with these."
+     },
+     {
       "topic": "10.01",
       "do": "Read it, make the one-page cheat sheet in exercise 3, then do py_toolkit. Keep the cheat sheet next to you for every drill this week."
      },
@@ -35,10 +39,6 @@ window.CURRICULUM = {
       "topic": "01.04"
      },
      {
-      "topic": "14.01",
-      "do": "Write your project deep dive, plus a 60-second answer to “tell me about yourself”. Recruiter and hiring manager screens open with these."
-     },
-     {
       "topic": "02.02"
      },
      {
@@ -50,11 +50,10 @@ window.CURRICULUM = {
       "do": "Ask Claude: “mock interview, past-project deep dive, 45 minutes”. Expect a follow-up on every choice: why this design, what broke, what you'd change."
      }
     ],
-    "dayNote": "About 33 hours. Stretch exercises are optional this week. If a day runs long, move its drills to the next day rather than skipping the tests by hand. If you finish early, redo any drill you needed a hint for.",
+    "dayNote": "About 33 hours. Times include each drill (25 minutes plus logging). Stretch exercises are optional this week. If a day runs long, move a drill to the next day rather than skip testing by hand. If you finish early, redo any drill you needed a hint for.",
     "days": [
      {
       "label": "Day 1 · Monday",
-      "hours": "4¼",
       "plan": [
        {
         "t": "1h 15m",
@@ -67,19 +66,20 @@ window.CURRICULUM = {
         "do": "Warm-ups 1 to 3 on paper, then complexity_drills"
        },
        {
-        "t": "30m",
+        "t": "50m",
         "topic": "15.01",
-        "do": "Read the whole chapter: it's how you'll run every drill"
+        "do": "Read it, then warm-ups 1 and 2 on paper: it's how you'll run every drill"
+       },
+       {
+        "t": "45m",
+        "topic": "14.01",
+        "do": "Read it, then score three projects (exercise 1)"
        }
       ],
-      "drills": [
-       "Two Sum",
-       "Contains Duplicate"
-      ]
+      "drills": []
      },
      {
       "label": "Day 2 · Tuesday",
-      "hours": "4½",
       "plan": [
        {
         "t": "1h",
@@ -98,13 +98,12 @@ window.CURRICULUM = {
        }
       ],
       "drills": [
-       "Group Anagrams",
-       "Longest Consecutive Sequence"
+       "Contains Duplicate",
+       "Group Anagrams"
       ]
      },
      {
       "label": "Day 3 · Wednesday",
-      "hours": "4¾",
       "plan": [
        {
         "t": "2h 15m",
@@ -118,13 +117,12 @@ window.CURRICULUM = {
        }
       ],
       "drills": [
-       "Valid Parentheses",
-       "Min Stack"
+       "Longest Consecutive Sequence",
+       "Valid Parentheses"
       ]
      },
      {
       "label": "Day 4 · Thursday",
-      "hours": "4¾",
       "plan": [
        {
         "t": "2h 15m",
@@ -139,12 +137,11 @@ window.CURRICULUM = {
       ],
       "drills": [
        "Daily Temperatures",
-       "Insert Delete GetRandom O(1)"
+       "Min Stack"
       ]
      },
      {
       "label": "Day 5 · Friday",
-      "hours": "4¾",
       "plan": [
        {
         "t": "2h",
@@ -157,9 +154,9 @@ window.CURRICULUM = {
         "do": "Read it and answer every quick check"
        },
        {
-        "t": "30m",
+        "t": "45m",
         "topic": "14.01",
-        "do": "Read sections 1 to 3 and score three projects (exercise 1)"
+        "do": "Tell me about yourself (exercise 3), then start your deep dive worksheet (exercise 4)"
        }
       ],
       "drills": [
@@ -169,7 +166,6 @@ window.CURRICULUM = {
      },
      {
       "label": "Day 6 · Saturday",
-      "hours": "5",
       "plan": [
        {
         "t": "1h 45m",
@@ -184,17 +180,18 @@ window.CURRICULUM = {
        {
         "t": "1h",
         "topic": "14.01",
-        "do": "Finish reading, then fill your deep dive worksheet (exercise 4) and the 60-second intro; close any gaps before Sunday's mock"
+        "do": "Finish the worksheet, then the timed 5-minute map and two ladders (exercise 5)"
+       },
+       {
+        "t": "1h",
+        "topic": "14.09",
+        "do": "Read it and the four sources (exercise 1)"
        }
       ],
-      "drills": [
-       "Kth Largest Element in an Array",
-       "Lowest Common Ancestor of a Binary Tree"
-      ]
+      "drills": []
      },
      {
       "label": "Day 7 · Sunday",
-      "hours": "5",
       "plan": [
        {
         "t": "1h 30m",
@@ -202,9 +199,9 @@ window.CURRICULUM = {
         "do": "Warm-ups, then sorts"
        },
        {
-        "t": "1h 30m",
+        "t": "1h",
         "topic": "14.09",
-        "do": "Read it and the sources, then write and say both answers"
+        "do": "Write and say both answers (exercises 2 to 4)"
        },
        {
         "t": "1h",
@@ -214,10 +211,12 @@ window.CURRICULUM = {
        {
         "t": "1h",
         "topic": "m1",
-        "do": "45 minutes plus feedback; skim the algorithmic round chapter first"
+        "do": "Skim the algorithmic round chapter's section 10, then 45 minutes plus feedback"
        }
       ],
-      "drills": []
+      "drills": [
+       "Kth Largest Element in an Array"
+      ]
      }
     ],
     "milestone": {
@@ -3626,5 +3625,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-21 21:04"
+ "generated": "2026-11-21 21:14"
 };

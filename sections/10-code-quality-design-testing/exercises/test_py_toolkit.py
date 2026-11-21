@@ -44,7 +44,7 @@ def test_top_k_small_cases():
     assert top_k_frequent(["x", "y", "x"], 10) == [("x", 2), ("y", 1)]
 
 
-def test_top_k_million_words():
+def test_top_k_670k_words():
     # 10 "top" words with known counts (two of them tied), then 60,000 rare
     # words appearing 1 to 20 times each, all shuffled together.
     rng = random.Random(10)
@@ -76,10 +76,10 @@ def test_group_anagrams_edges():
 
 
 def test_group_anagrams_many():
-    # 20,000 distinct letter sets (5-letter combinations), 3 orderings of each.
+    # 40,000 distinct letter sets (5-letter combinations), 3 orderings of each.
     rng = random.Random(20)
     tagged = []
-    for gid, combo in enumerate(itertools.islice(itertools.combinations("abcdefghijklmnopqrstuvwxyz", 5), 20_000)):
+    for gid, combo in enumerate(itertools.islice(itertools.combinations("abcdefghijklmnopqrstuvwxyz", 5), 40_000)):
         letters = list(combo)
         for _ in range(3):
             rng.shuffle(letters)

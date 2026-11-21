@@ -35,7 +35,7 @@
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom, then write your own deep dive with exercise 4. Nothing here needs another chapter. Your written deep dive goes in <code>sections/14-behavioral-leadership/stories/</code>, which the published site leaves out.</p>
+<p class="muted small">How to read this: top to bottom, then write your own deep dive with exercise 4. Nothing here needs another chapter. Your written deep dive goes in <code>sections/14-behavioral-leadership/stories/</code>, which the published site leaves out, but it is still in the git repo, so leave out anything your employer would treat as confidential.</p>
 
 <!-- ============================================================ -->
 <h2 id="s1"><span class="sec-num">1</span>The problem: a great project, a weak answer</h2>
@@ -46,14 +46,14 @@
   <p>The feedback says: <em>"Couldn't explain design decisions. Unclear what the candidate personally owned. Limited reflection."</em> The project was senior. The answer wasn't.</p>
 </div>
 
-<p>Nothing Priya said was false. The problem is that she answered a question nobody asked ("what does the system do?") instead of the one being scored ("how do you think, and what did you own?"). A deep dive is usually 45 to 60 minutes. You talk for about 5 of them. The other 40 are follow-up questions, and that's where the score comes from.</p>
+<p>Nothing Priya said was false. The problem is that she answered a question nobody asked ("what does the system do?") instead of the one being scored ("how do you think, and what did you own?"). A deep dive is usually 45 to 60 minutes. You present for about 5 minutes. The other 40 are follow-up questions, and that's where the score comes from.</p>
 
 <div class="check" id="check-dive-what">
   <p class="q">What is a deep-dive interviewer mainly trying to learn?</p>
   <div class="opts">
-    <button>How impressive and large your project was</button>
-    <button data-correct>How you made decisions, what you personally owned, and what you learned, using your project as the evidence</button>
-    <button>Whether you remember every technical detail of the system</button>
+    <button>How large and complex your project was, since scope is the main thing senior candidates are judged on</button>
+    <button data-correct>How you decide, what you owned and what you learned, with the project as evidence</button>
+    <button>Whether you know the system's technical details well enough to rebuild it from memory if asked</button>
   </div>
   <div class="fb right"><p>Right. The project is the evidence, not the thing being graded. A medium-sized project explained with clear reasons and owned mistakes beats a huge one explained as a tour.</p></div>
   <div class="fb wrong"><p>Think of a driving test. The examiner doesn't care where you drive; the route is just a way to watch how you check mirrors, merge and react. The deep dive works the same way. Size helps only if you can show the decisions inside it. And nobody expects you to remember every config value, but you must know why each major piece exists, and what happens when it fails.</p></div>
@@ -83,12 +83,12 @@
 <div class="check" id="check-dive-architect">
   <p class="q">Which sentence gives the most signal?</p>
   <div class="opts">
-    <button>"The service has a REST API, a Postgres database and a Redis cache."</button>
-    <button>"We used Redis because it's fast and industry standard."</button>
     <button data-correct>"Reads were 50× writes and the same 1% of products got most traffic, so I added a Redis cache in front of Postgres; we accepted up to 60 seconds of stale prices, which product signed off on."</button>
+    <button>"The service has a REST API, a Postgres database and a Redis cache."</button>
+    <button>"We put Redis in front of Postgres because caching is the standard way to cut latency, and Redis is fast, mature and well supported."</button>
   </div>
   <div class="fb right"><p>Right. It has the constraint (read-heavy, skewed traffic), the choice, who made it, and the cost you accepted (staleness) with who agreed to it. That covers judgment, ownership and depth in one sentence.</p></div>
-  <div class="fb wrong"><p>Ask of each sentence: "so what did the candidate decide, and why?" The first is a parts list: it says what exists, not why. The second gives a reason, but "fast and industry standard" is true of a dozen tools, so it explains nothing about <em>your</em> problem. The strong answer ties the choice to a measured fact about the workload and names what you gave up. That's the architect talking.</p></div>
+  <div class="fb wrong"><p>Ask of each sentence: "so what did the candidate decide, and why?" The REST-API-Postgres-Redis sentence is a parts list: it says what exists, not why. The "standard way to cut latency" one gives a reason, but it is true of a dozen tools and every service, so it explains nothing about <em>your</em> problem. The strong answer ties the choice to a measured fact about the workload and names what you gave up. That's the architect talking.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -109,12 +109,12 @@
 <div class="check" id="check-dive-pick">
   <p class="q">Which project is the best choice?</p>
   <div class="opts">
-    <button>A company-wide platform migration of 200 engineers, where you implemented two of the services to someone else's spec</button>
-    <button data-correct>A billing reconciliation job you designed and led with two other engineers: it cut mismatches from 4% to 0.1%, and its first version double-charged some customers before you added idempotency keys</button>
-    <button>Your side project, a chess engine, because you made every decision yourself</button>
+    <button>A company-wide migration across 200 engineers, the biggest thing you've worked on, where you built two services to someone else's spec</button>
+    <button data-correct>A reconciliation job you designed with two others: mismatches fell from 4% to 0.1%, after a bad first version</button>
+    <button>Your side project, a chess engine, because you made every single decision and can explain each one in depth</button>
   </div>
-  <div class="fb right"><p>Right. It passes all five: your decisions, a trade-off, numbers, a real failure with a fix, and recent enough to draw. The double-charge is a gift: it lets you show depth (why it happened) and reflection (what you changed).</p></div>
-  <div class="fb wrong"><p>Run the five tests on each. The migration is big, but you followed someone else's spec, so you fail "owned decisions" and you'll stall on "why was it designed this way?". The side project passes ownership but usually has no production numbers, no users and no incidents, so there's little to probe on scale or failure; save it for when you have nothing at work. The billing job is smaller and passes every test.</p></div>
+  <div class="fb right"><p>Right. It passes all five: your decisions, a trade-off, numbers, a real failure with a fix, and recent enough to draw. The bad first version is a gift: say it re-read a bank file after a crash and raised thousands of false mismatches until you made ingestion idempotent. It lets you show depth (why it happened) and reflection (what you changed).</p></div>
+  <div class="fb wrong"><p>Run the five tests on each. The migration is big, but you followed someone else's spec, so you fail "owned decisions" and you'll stall on "why was it designed this way?". The side project passes ownership but usually has no production numbers, no users and no incidents, so there's little to probe on scale or failure; save it for when you have nothing at work. The reconciliation job is smaller and passes every test.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -126,7 +126,7 @@
 <ol>
   <li><b>Context:</b> "At Acme I was the tech lead on payments, a team of five."</li>
   <li><b>Problem, with a number:</b> "Reconciling our records with the bank took two days and 4% of transactions didn't match."</li>
-  <li><b>What you built:</b> "I designed a streaming reconciliation job that matches each transaction within minutes."</li>
+  <li><b>What you built:</b> "I designed a streaming reconciliation job that matches each transaction within minutes of the bank's hourly file arriving."</li>
   <li><b>The hardest decision:</b> "The big call was matching on a key we generate ourselves instead of the bank's id, which meant changing three upstream services."</li>
   <li><b>Result, with a number:</b> "Mismatches went from 4% to 0.1%, and finance stopped needing a two-day close."</li>
 </ol>
@@ -134,21 +134,20 @@
 <h3>The 5 minutes: draw the boxes</h3>
 <p>Draw 4 to 7 boxes, with arrows that say what flows (requests, events, rows) and how much. Talk through one request from start to end. Then stop and ask, "Where would you like to go deeper?" Stopping is a skill: it hands the interviewer the wheel before they have to take it.</p>
 
-<pre class="diagram">  bank files ──(1×/hour, ~2M rows)──▶ [ingest] ──▶ [match on our key] ──▶ [ledger DB]
-                                                        │
-  our payments ──(~300 events/s)──▶ [event queue] ──────┘
-                                                        └──▶ [mismatch alerts → finance]</pre>
+<pre class="diagram">  bank files ──(1×/hour, ~400k rows)──▶ [ingest] ──▶ [match on our key] ──▶ [ledger DB]
+                                                         ▲      │
+  our payments ──(~300/s peak, ~10M/day)──▶ [event queue] ┘      └──▶ [mismatch alerts → finance]</pre>
 
-<p>Have your numbers ready, rounded and with how you know them: "about 300 events a second at peak, from our dashboards". If you don't remember, give a range and say so: "somewhere between 1 and 2 terabytes; I'd have to check". Making up a precise number is worse than a range, because the next question will be "how did you measure that?".</p>
+<p>Have your numbers ready, rounded and with how you know them: "about 300 events a second at peak, from our dashboards". If you don't remember, give a range and say so: "somewhere between 1 and 2 terabytes; I'd have to check". Making up a precise number is worse than a range, because the next question will be "how did you measure that?". If a number is confidential, say so and give an order of magnitude or a ratio ("tens of millions a day", "20× growth"). Interviewers expect this.</p>
 
 <div class="keyidea">Zoom like a map: 60 seconds for the whole picture, 5 minutes for the boxes and one request through them, then let the interviewer pick where to go deeper.</div>
 
 <div class="check" id="check-dive-open">
   <p class="q">The interviewer says "Tell me about a project you're proud of." What's the best first minute?</p>
   <div class="opts">
-    <button>Start with the database schema, since it's the most technical part</button>
-    <button data-correct>Context, the problem with a number, what you built, your hardest decision, and the result with a number; then offer to draw it</button>
-    <button>Give the full history from the first meeting, so they have every detail</button>
+    <button data-correct>Five sentences: context, problem, what you built, hardest decision, result</button>
+    <button>Start with the database schema and the hardest code, since technical depth is what they're scoring</button>
+    <button>Tell it in order from the first planning meeting, so the interviewer can follow how it unfolded</button>
   </div>
   <div class="fb right"><p>Right. That's the whole country before the streets. The interviewer now knows the stakes and where the interesting decision is, so their follow-ups go where you're strongest.</p></div>
   <div class="fb wrong"><p>Picture someone giving you directions who starts with "turn left at the bakery" before telling you which town you're in. Starting deep (the schema) or starting with the full timeline both leave the listener lost and spend your minutes on things they may not care about. Five sentences of overview give them a map, and they'll ask to zoom in, often exactly where you hoped.</p></div>
@@ -168,7 +167,7 @@
 <div class="table-wrap"><table>
   <thead><tr><th>Chose</th><th>Rejected</th><th>Because (a constraint)</th><th>What it cost</th></tr></thead>
   <tbody>
-    <tr><td>Managed queue</td><td>Self-run Kafka</td><td>Three engineers, nobody had run Kafka, and 300 events/s is far below what either needs</td><td>About 3× the price per message; no replay of old events</td></tr>
+    <tr><td>Managed queue</td><td>Self-run Kafka</td><td>Three engineers, nobody had run Kafka, and 300 events/s is far below what either needs. Managed Kafka would remove the ops work, but we didn't need replay and it cost more at our volume</td><td>About 3× the price per message; no replay of old events</td></tr>
     <tr><td>Our own matching key</td><td>The bank's transaction id</td><td>The bank reuses ids across days, which caused most of the 4%</td><td>Changes in three upstream services, six extra weeks</td></tr>
     <tr><td>Postgres</td><td>A NoSQL store</td><td>Matching needs transactions across two tables; data fits on one machine for years</td><td>We'll need to partition if volume grows 20×</td></tr>
   </tbody>
@@ -181,12 +180,12 @@
 <div class="check" id="check-dive-why">
   <p class="q">"Why did you pick Postgres?" Which answer is strongest?</p>
   <div class="opts">
-    <button>"It's the most reliable database and it scales well."</button>
+    <button>"We needed strong consistency and Postgres is ACID, so it was the safe default; NoSQL stores are eventually consistent."</button>
+    <button data-correct>"We needed multi-table transactions, the data fits one machine for years, and we'll have to partition at about 20×."</button>
     <button>"I didn't pick it; it was already there."</button>
-    <button data-correct>"We needed transactions across two tables and the data fits on one machine for years. A NoSQL store would scale further, but we'd have had to build those transactions ourselves. The cost is that we'll have to partition if volume grows about 20×."</button>
   </div>
-  <div class="fb right"><p>Right: the need (multi-table transactions), the size fact, the rejected option and why, and the cost you accepted. If it really was already there, say that, and then say why you <em>kept</em> it: "it was in place, and I checked it still fit because…". Keeping something is a decision too.</p></div>
-  <div class="fb wrong"><p>A reason only counts if it would change when your situation changed. "Reliable and scales well" is true of many databases, so it doesn't explain why this one for this job. "It was already there" is honest, but it stops the conversation and gives no judgment signal. The strong answer would flip if the facts flipped: if you didn't need transactions, or the data were 100× bigger, you'd choose differently, and it says so.</p></div>
+  <div class="fb right"><p>Right: the need (multi-table transactions), the size fact, and the cost you accepted (partitioning at 20×). In the interview, also name the rejected option: "a NoSQL store would scale further, but we'd have built those transactions ourselves". If it really was already there, say that, and then say why you <em>kept</em> it: "it was in place, and I checked it still fit because…". Keeping something is a decision too.</p></div>
+  <div class="fb wrong"><p>A reason only counts if it would change when your situation changed. "ACID, the safe default" is true of many databases, so it doesn't explain why this one for this job, and "NoSQL is eventually consistent" is a generalization that several NoSQL stores disprove. "It was already there" is honest, but it stops the conversation and gives no judgment signal. The strong answer would flip if the facts flipped: if you didn't need transactions, or the data were 100× bigger, you'd choose differently, and it says so.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -209,12 +208,12 @@
 <div class="check" id="check-dive-fail">
   <p class="q">Which failure answer is strongest?</p>
   <div class="opts">
-    <button>"Nothing major went wrong; we tested thoroughly."</button>
-    <button>"The deploy broke because another team changed an API without telling us."</button>
-    <button data-correct>"We hit the database's connection limit on day three, and checkout failed for 20 minutes. I'd never load-tested past 2× normal traffic. We added a connection pool and a load test at 5× to the release checklist, and it caught two more limits before later launches."</button>
+    <button>"Nothing major went wrong in production, because we spent two extra weeks on testing and code review before launch."</button>
+    <button data-correct>"Checkout failed for 20 minutes: I'd never load-tested past 2×. Now 5× is on the checklist."</button>
+    <button>"A deploy broke because another team changed an API without telling us; we rolled back within an hour and escalated to their manager."</button>
   </div>
-  <div class="fb right"><p>Right. Impact, cause, fix, prevention, and you own your part. It even shows the prevention working later.</p></div>
-  <div class="fb wrong"><p>Imagine a pilot asked about a hard landing. "It never happens to me" isn't believable, and "the tower gave bad info" may be true but says nothing about the pilot. What earns trust is "here's what happened, here's my part in it, and here's what I do differently now". Blaming another team, even fairly, gives no reflection signal unless you add what <em>you</em> changed, such as a contract test on their API.</p></div>
+  <div class="fb right"><p>Right. Impact, cause, your part, and the prevention, in two sentences. In the interview, expand it: the fix (a connection pool) and the prevention working later (the 5× test caught two more limits).</p></div>
+  <div class="fb wrong"><p>Imagine a pilot asked about a hard landing. "Nothing went wrong because we tested a lot" isn't believable, and "the tower gave bad info" may be true but says nothing about the pilot. What earns trust is "here's what happened, here's my part in it, and here's what I do differently now". Blaming another team, even fairly, gives no reflection signal unless you add what <em>you</em> changed, such as a contract test on their API.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -225,7 +224,7 @@
 <pre class="diagram">"Why a queue?"                    → to absorb bursts; senders were slower than the API
   "What if a sender crashes?"     → the message isn't acknowledged, so it's redelivered
     "So a message can be sent twice?" → yes; senders check an idempotency key first
-      "Where is the key stored?"  → a table with a unique index, written in the same transaction
+      "Where is the key stored?"  → a table with a unique index; claim the key before sending, mark it sent after
         "What if that table is down?" → we stop consuming and alert; we chose late over duplicated</pre>
 
 <p>Five rungs, and each answer had to be true and specific. You can't improvise that for a system you only half know, but you <em>can</em> prepare it. For each box, write answers to six standard questions:</p>
@@ -246,9 +245,9 @@
 <div class="check" id="check-dive-unknown">
   <p class="q">Four rungs deep you're asked about a part another engineer built, and you don't know the answer. Best move?</p>
   <div class="opts">
-    <button>Give a confident answer that sounds right; they can't check</button>
-    <button data-correct>Say you didn't own that part, give what you do know, and reason out loud about how it should work and how you'd find out</button>
-    <button>Change the subject to a part you know well</button>
+    <button data-correct>Say you didn't own it, give what you know, and reason about how it should work</button>
+    <button>Give your best-guess answer confidently, since hesitating this deep in looks like you didn't really own the system</button>
+    <button>Steer back to a nearby part you built yourself, where you can show real depth instead</button>
   </div>
   <div class="fb right"><p>Right. It's honest about ownership (a scored signal) and still shows depth: you can reason about the design even where you didn't write it.</p></div>
   <div class="fb wrong"><p>Interviewers climb the ladder exactly to find where your knowledge ends, and they've heard many systems like yours; a made-up answer usually breaks on the next rung, and then everything you said earlier is in doubt. Dodging looks like hiding. The clean move is a clear boundary ("Sam built that") followed by real thinking ("it must handle X, so I'd expect Y, and I'd check Z"). That turns a gap into evidence of judgment.</p></div>
@@ -269,12 +268,12 @@
 <div class="check" id="check-dive-we">
   <p class="q">Which sentence is best in a deep dive?</p>
   <div class="opts">
-    <button>"We decided to move to event sourcing and we rebuilt the ledger."</button>
+    <button>"We decided as a team to move to event sourcing, and together we rebuilt the ledger over two quarters."</button>
     <button data-correct>"I proposed event sourcing and wrote the design; two of us rebuilt the ledger, and I owned the migration."</button>
-    <button>"I rebuilt the whole ledger myself."</button>
+    <button>"I designed and rebuilt the ledger on event sourcing, end to end, over two quarters."</button>
   </div>
   <div class="fb right"><p>Right: your part is clear, others' part is clear, and it's believable.</p></div>
-  <div class="fb wrong"><p>Read each one as the interviewer filling in a form called "what did this person do?". After the first, the form is blank: "we" could mean you led it or watched it. The third fills the form, but if two people did it, the first follow-up ("how did you split the work?") exposes it. The precise version fills the form truthfully.</p></div>
+  <div class="fb wrong"><p>Read each one as the interviewer filling in a form called "what did this person do?". After the "as a team" answer, the form is blank: "we" could mean you led it or watched it. The "end to end" answer fills the form, but if two people did it, the first follow-up ("how did you split the work?") exposes it. The precise version fills the form truthfully.</p></div>
 </div>
 
 <!-- ============================================================ -->
