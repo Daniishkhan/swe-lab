@@ -7,6 +7,7 @@ Scaffold new study material from templates/ and refresh the dashboard data.
   python tools/new.py case     "URL shortener"
   python tools/new.py story    "Led the payments migration"
   python tools/new.py lld      "Parking lot"
+  python tools/new.py deepdive "Checkout service rewrite"
 
 Exercise module names must be unique across the whole repo (pytest imports
 them by bare name).
@@ -71,12 +72,13 @@ def main(argv: list[str]) -> None:
                 sys.exit(f"An exercise module named {mod} already exists; pick a unique name.")
             write(d / "exercises" / f"{mod}.py", fill((T / "exercise.py").read_text(), MODULE=mod, **kw))
             write(d / "exercises" / f"test_{mod}.py", fill((T / "test_exercise.py").read_text(), MODULE=mod))
-    elif kind in ("case", "story", "lld"):
+    elif kind in ("case", "story", "lld", "deepdive"):
         title = argv[1]
         where, tpl = {
             "case": ("sections/07-system-design-cases/cases", "design-case.md"),
             "story": ("sections/14-behavioral-leadership/stories", "star-story.md"),
             "lld": ("sections/10-code-quality-design-testing/lld", "lld-worksheet.md"),
+            "deepdive": ("sections/14-behavioral-leadership/stories", "deep-dive.md"),
         }[kind]
         write(ROOT / where / f"{slugify(title)}.md", fill((T / tpl).read_text(), TITLE=title, DATE=today))
     else:

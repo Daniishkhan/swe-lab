@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="14.01">
+  <title>Your project deep dive</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="14" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 14 · Part 1</div>
+  <h1>Your project deep dive</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> recruiter, hiring manager and onsite rounds all use it</span><span>about 35 minutes, plus 2 hours writing</span><span>8 quick checks · 6 exercises</span></div>
+</header>
+
+<p>At senior level, someone will ask you to explain a system you built and then spend half an hour pulling on every thread. It's the round where you have the most control: you pick the project, you know the answers, and you can prepare every follow-up. This chapter shows what the interviewer is scoring, how to pick the project, and how to build an answer that survives "why?" five times in a row.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Say what a deep-dive interviewer is actually measuring, and why a feature tour scores badly.</li>
+    <li>Pick the right project from your history, using five tests.</li>
+    <li>Give a 60-second version and a 5-minute map, both with numbers.</li>
+    <li>Defend each decision by naming the alternative you rejected and the constraint that ruled it out.</li>
+    <li>Answer "what broke?" and "what would you change?" in a way that shows judgment, not weakness.</li>
+    <li>Give a 60-second "tell me about yourself" that leads into this project.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom, then write your own deep dive with exercise 4. Nothing here needs another chapter. Your written deep dive goes in <code>sections/14-behavioral-leadership/stories/</code>, which the published site leaves out.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: a great project, a weak answer</h2>
+
+<div class="story">
+  <p>Priya spent 18 months leading a rewrite of her company's notification system. It went from 2 million to 40 million messages a day, and on-call pages for it dropped from about 30 a month to 2. That's a strong senior project.</p>
+  <p>In the interview she spends 12 minutes walking through features: the email templates, the admin dashboard, the retry button. Then the interviewer asks, "Why did you use a queue between the API and the senders?" She says, "That's how the team did it." "What happens if a sender crashes halfway through a batch?" She isn't sure; another engineer wrote that part. "What would you do differently?" "Honestly, I think it went well."</p>
+  <p>The feedback says: <em>"Couldn't explain design decisions. Unclear what the candidate personally owned. Limited reflection."</em> The project was senior. The answer wasn't.</p>
+</div>
+
+<p>Nothing Priya said was false. The problem is that she answered a question nobody asked ("what does the system do?") instead of the one being scored ("how do you think, and what did you own?"). A deep dive is usually 45 to 60 minutes. You talk for about 5 of them. The other 40 are follow-up questions, and that's where the score comes from.</p>
+
+<div class="check" id="check-dive-what">
+  <p class="q">What is a deep-dive interviewer mainly trying to learn?</p>
+  <div class="opts">
+    <button>How impressive and large your project was</button>
+    <button data-correct>How you made decisions, what you personally owned, and what you learned, using your project as the evidence</button>
+    <button>Whether you remember every technical detail of the system</button>
+  </div>
+  <div class="fb right"><p>Right. The project is the evidence, not the thing being graded. A medium-sized project explained with clear reasons and owned mistakes beats a huge one explained as a tour.</p></div>
+  <div class="fb wrong"><p>Think of a driving test. The examiner doesn't care where you drive; the route is just a way to watch how you check mirrors, merge and react. The deep dive works the same way. Size helps only if you can show the decisions inside it. And nobody expects you to remember every config value, but you must know why each major piece exists, and what happens when it fails.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>What gets scored: the architect, not the tour guide</h2>
+
+<p>Picture two people showing you around a building. A <b>tour guide</b> says: "This is the lobby. This is the atrium. Here are the elevators." An <b>architect</b> says: "We put the elevators in the middle because the site is narrow and fire code needs two exits within 30 meters. We wanted glass, but it blew the heating budget, so we went with brick and bigger windows on the south side."</p>
+
+<p>The architect tells you about constraints, choices and costs. That's what the interviewer is listening for. Most companies write it down as a handful of signals; the names vary, but they come to these:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Signal</th><th>The question behind it</th><th>Strong evidence sounds like</th></tr></thead>
+  <tbody>
+    <tr><td><b>Scope</b></td><td>How big a problem can you own?</td><td>"Three teams depended on it; I set the design and the migration plan."</td></tr>
+    <tr><td><b>Depth</b></td><td>Do you understand your own system down to how it fails?</td><td>"If a sender dies mid-batch, the messages stay unacknowledged and redeliver after 30 seconds, so the senders must be idempotent."</td></tr>
+    <tr><td><b>Judgment</b></td><td>Do your choices follow from constraints?</td><td>"We rejected Kafka because we had 3 engineers and no one to run it; a managed queue cost more per message but no on-call."</td></tr>
+    <tr><td><b>Ownership</b></td><td>What did <em>you</em> do?</td><td>"I wrote the design doc and the idempotency layer; Sam built the dashboard."</td></tr>
+    <tr><td><b>Impact</b></td><td>Did it matter, and how do you know?</td><td>"Pages went from about 30 a month to 2, measured from the paging tool over two quarters."</td></tr>
+    <tr><td><b>Reflection</b></td><td>Do you learn?</td><td>"I'd add load tests before launch; we found the database limit in production."</td></tr>
+  </tbody>
+</table></div>
+
+<div class="keyidea">Every sentence you say should give evidence for one of six signals: scope, depth, judgment, ownership, impact, reflection. A feature description gives evidence for none of them.</div>
+
+<div class="check" id="check-dive-architect">
+  <p class="q">Which sentence gives the most signal?</p>
+  <div class="opts">
+    <button>"The service has a REST API, a Postgres database and a Redis cache."</button>
+    <button>"We used Redis because it's fast and industry standard."</button>
+    <button data-correct>"Reads were 50× writes and the same 1% of products got most traffic, so I added a Redis cache in front of Postgres; we accepted up to 60 seconds of stale prices, which product signed off on."</button>
+  </div>
+  <div class="fb right"><p>Right. It has the constraint (read-heavy, skewed traffic), the choice, who made it, and the cost you accepted (staleness) with who agreed to it. That covers judgment, ownership and depth in one sentence.</p></div>
+  <div class="fb wrong"><p>Ask of each sentence: "so what did the candidate decide, and why?" The first is a parts list: it says what exists, not why. The second gives a reason, but "fast and industry standard" is true of a dozen tools, so it explains nothing about <em>your</em> problem. The strong answer ties the choice to a measured fact about the workload and names what you gave up. That's the architect talking.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Pick the project: five tests</h2>
+
+<p>Most people pick their biggest project. Pick the one that passes the most of these tests instead:</p>
+
+<ol>
+  <li><b>You owned decisions.</b> Not "I was on the team", but "I chose X over Y". If someone else made every big call, you can't defend them.</li>
+  <li><b>There was a real trade-off.</b> Something you gave up: cost, latency, consistency, time, simplicity. No trade-off means nothing to discuss.</li>
+  <li><b>It has numbers.</b> Traffic, data size, latency, cost, error rate, team size, timeline. Even rough ones.</li>
+  <li><b>Something went wrong.</b> An incident, a bad estimate, a design you had to undo. It's your best material for reflection.</li>
+  <li><b>You can draw it.</b> Recent enough (ideally the last 2 to 3 years) that you can sketch the boxes and say what flows between them.</li>
+</ol>
+
+<p>Score your top three candidates, one point per test. A project that scores 5 beats a bigger one that scores 3. Keep the runner-up ready too: some interviewers ask for a second project, and a hiring manager may ask for "the one you're proudest of" and "the one that went worst".</p>
+
+<div class="check" id="check-dive-pick">
+  <p class="q">Which project is the best choice?</p>
+  <div class="opts">
+    <button>A company-wide platform migration of 200 engineers, where you implemented two of the services to someone else's spec</button>
+    <button data-correct>A billing reconciliation job you designed and led with two other engineers: it cut mismatches from 4% to 0.1%, and its first version double-charged some customers before you added idempotency keys</button>
+    <button>Your side project, a chess engine, because you made every decision yourself</button>
+  </div>
+  <div class="fb right"><p>Right. It passes all five: your decisions, a trade-off, numbers, a real failure with a fix, and recent enough to draw. The double-charge is a gift: it lets you show depth (why it happened) and reflection (what you changed).</p></div>
+  <div class="fb wrong"><p>Run the five tests on each. The migration is big, but you followed someone else's spec, so you fail "owned decisions" and you'll stall on "why was it designed this way?". The side project passes ownership but usually has no production numbers, no users and no incidents, so there's little to probe on scale or failure; save it for when you have nothing at work. The billing job is smaller and passes every test.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>The shape: zoom in like a map</h2>
+
+<p>When you open a map app, you see the whole country first, then you zoom in to a city, then a street. If it opened on one street, you'd have no idea where you were. Your answer works the same way. First the 60-second version, so the interviewer knows where they are. Then the 5-minute map. Then they choose where to zoom.</p>
+
+<h3>The 60 seconds: five sentences</h3>
+<ol>
+  <li><b>Context:</b> "At Acme I was the tech lead on payments, a team of five."</li>
+  <li><b>Problem, with a number:</b> "Reconciling our records with the bank took two days and 4% of transactions didn't match."</li>
+  <li><b>What you built:</b> "I designed a streaming reconciliation job that matches each transaction within minutes."</li>
+  <li><b>The hardest decision:</b> "The big call was matching on a key we generate ourselves instead of the bank's id, which meant changing three upstream services."</li>
+  <li><b>Result, with a number:</b> "Mismatches went from 4% to 0.1%, and finance stopped needing a two-day close."</li>
+</ol>
+
+<h3>The 5 minutes: draw the boxes</h3>
+<p>Draw 4 to 7 boxes, with arrows that say what flows (requests, events, rows) and how much. Talk through one request from start to end. Then stop and ask, "Where would you like to go deeper?" Stopping is a skill: it hands the interviewer the wheel before they have to take it.</p>
+
+<pre class="diagram">  bank files ──(1×/hour, ~2M rows)──▶ [ingest] ──▶ [match on our key] ──▶ [ledger DB]
+                                                        │
+  our payments ──(~300 events/s)──▶ [event queue] ──────┘
+                                                        └──▶ [mismatch alerts → finance]</pre>
+
+<p>Have your numbers ready, rounded and with how you know them: "about 300 events a second at peak, from our dashboards". If you don't remember, give a range and say so: "somewhere between 1 and 2 terabytes; I'd have to check". Making up a precise number is worse than a range, because the next question will be "how did you measure that?".</p>
+
+<div class="keyidea">Zoom like a map: 60 seconds for the whole picture, 5 minutes for the boxes and one request through them, then let the interviewer pick where to go deeper.</div>
+
+<div class="check" id="check-dive-open">
+  <p class="q">The interviewer says "Tell me about a project you're proud of." What's the best first minute?</p>
+  <div class="opts">
+    <button>Start with the database schema, since it's the most technical part</button>
+    <button data-correct>Context, the problem with a number, what you built, your hardest decision, and the result with a number; then offer to draw it</button>
+    <button>Give the full history from the first meeting, so they have every detail</button>
+  </div>
+  <div class="fb right"><p>Right. That's the whole country before the streets. The interviewer now knows the stakes and where the interesting decision is, so their follow-ups go where you're strongest.</p></div>
+  <div class="fb wrong"><p>Picture someone giving you directions who starts with "turn left at the bakery" before telling you which town you're in. Starting deep (the schema) or starting with the full timeline both leave the listener lost and spend your minutes on things they may not care about. Five sentences of overview give them a map, and they'll ask to zoom in, often exactly where you hoped.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Every box has a rejected alternative</h2>
+
+<p>The most common follow-up is some version of "why this and not that?". It's the hardest part to improvise, and the easiest to prepare. For each box on your diagram, write down:</p>
+<ul>
+  <li>what you chose,</li>
+  <li>the alternative a smart person would have suggested,</li>
+  <li>the <b>constraint</b> that ruled it out (scale, latency, cost, team skills, deadline, a dependency), and</li>
+  <li>what your choice cost you.</li>
+</ul>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Chose</th><th>Rejected</th><th>Because (a constraint)</th><th>What it cost</th></tr></thead>
+  <tbody>
+    <tr><td>Managed queue</td><td>Self-run Kafka</td><td>Three engineers, nobody had run Kafka, and 300 events/s is far below what either needs</td><td>About 3× the price per message; no replay of old events</td></tr>
+    <tr><td>Our own matching key</td><td>The bank's transaction id</td><td>The bank reuses ids across days, which caused most of the 4%</td><td>Changes in three upstream services, six extra weeks</td></tr>
+    <tr><td>Postgres</td><td>A NoSQL store</td><td>Matching needs transactions across two tables; data fits on one machine for years</td><td>We'll need to partition if volume grows 20×</td></tr>
+  </tbody>
+</table></div>
+
+<p>Notice the "because" column never says "it's better" or "it's what we knew". It names a fact about <em>your</em> situation. "We knew Postgres" can be a fine reason if you say it as a constraint: "the team knew Postgres, and the deadline was eight weeks, so learning a new store was a risk we didn't need".</p>
+
+<p>And notice the last column. Every choice costs something. Saying the cost out loud shows you saw it. Claiming there was no downside sounds like you didn't look.</p>
+
+<div class="check" id="check-dive-why">
+  <p class="q">"Why did you pick Postgres?" Which answer is strongest?</p>
+  <div class="opts">
+    <button>"It's the most reliable database and it scales well."</button>
+    <button>"I didn't pick it; it was already there."</button>
+    <button data-correct>"We needed transactions across two tables and the data fits on one machine for years. A NoSQL store would scale further, but we'd have had to build those transactions ourselves. The cost is that we'll have to partition if volume grows about 20×."</button>
+  </div>
+  <div class="fb right"><p>Right: the need (multi-table transactions), the size fact, the rejected option and why, and the cost you accepted. If it really was already there, say that, and then say why you <em>kept</em> it: "it was in place, and I checked it still fit because…". Keeping something is a decision too.</p></div>
+  <div class="fb wrong"><p>A reason only counts if it would change when your situation changed. "Reliable and scales well" is true of many databases, so it doesn't explain why this one for this job. "It was already there" is honest, but it stops the conversation and gives no judgment signal. The strong answer would flip if the facts flipped: if you didn't need transactions, or the data were 100× bigger, you'd choose differently, and it says so.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>What broke, and what you'd change</h2>
+
+<p>Two questions come in almost every deep dive: "What went wrong?" and "What would you do differently?". People fear them because they sound like traps. They're the opposite: they're where seniority shows. A junior engineer's story ends at launch. A senior engineer's story includes what happened after, and what they changed because of it.</p>
+
+<p>Tell a failure in four beats:</p>
+<ol>
+  <li><b>What happened, with the impact:</b> "In week two, about 1,200 customers were charged twice."</li>
+  <li><b>How you found it and the cause:</b> "Support tickets spiked. A retry after a timeout re-sent a charge the bank had already accepted."</li>
+  <li><b>The fix:</b> "I added idempotency keys, so the bank rejects a repeat with the same key, and we refunded everyone within a day."</li>
+  <li><b>What changed so it can't recur:</b> "Every payment call now needs a key; a test fails the build if one is missing, and we alert on duplicate charges."</li>
+</ol>
+
+<p>For "what would you change", give two real things, each with the cost: "I'd load-test against a copy of production before launch. That's two weeks we said we didn't have, and it would have found the connection limit we hit on day three." "I think it went well" scores a 1 on reflection, however true it is.</p>
+
+<div class="keyidea">A failure story is impact, cause, fix, and the change that prevents it next time. The last beat is the senior one: the system or process got better, not just the bug.</div>
+
+<div class="check" id="check-dive-fail">
+  <p class="q">Which failure answer is strongest?</p>
+  <div class="opts">
+    <button>"Nothing major went wrong; we tested thoroughly."</button>
+    <button>"The deploy broke because another team changed an API without telling us."</button>
+    <button data-correct>"We hit the database's connection limit on day three, and checkout failed for 20 minutes. I'd never load-tested past 2× normal traffic. We added a connection pool and a load test at 5× to the release checklist, and it caught two more limits before later launches."</button>
+  </div>
+  <div class="fb right"><p>Right. Impact, cause, fix, prevention, and you own your part. It even shows the prevention working later.</p></div>
+  <div class="fb wrong"><p>Imagine a pilot asked about a hard landing. "It never happens to me" isn't believable, and "the tower gave bad info" may be true but says nothing about the pilot. What earns trust is "here's what happened, here's my part in it, and here's what I do differently now". Blaming another team, even fairly, gives no reflection signal unless you add what <em>you</em> changed, such as a contract test on their API.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>The follow-up ladder</h2>
+
+<p>Interviewers don't ask one question per topic. They climb: each answer becomes the next question. A typical climb on one box:</p>
+
+<pre class="diagram">"Why a queue?"                    → to absorb bursts; senders were slower than the API
+  "What if a sender crashes?"     → the message isn't acknowledged, so it's redelivered
+    "So a message can be sent twice?" → yes; senders check an idempotency key first
+      "Where is the key stored?"  → a table with a unique index, written in the same transaction
+        "What if that table is down?" → we stop consuming and alert; we chose late over duplicated</pre>
+
+<p>Five rungs, and each answer had to be true and specific. You can't improvise that for a system you only half know, but you <em>can</em> prepare it. For each box, write answers to six standard questions:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Question</th><th>What it tests</th></tr></thead>
+  <tbody>
+    <tr><td>What happens at 10× the traffic?</td><td>Do you know your bottleneck?</td></tr>
+    <tr><td>What fails first, and what does the user see?</td><td>Failure modes</td></tr>
+    <tr><td>How did you test it?</td><td>Quality habits</td></tr>
+    <tr><td>How did you roll it out, and roll it back?</td><td>Operations</td></tr>
+    <tr><td>How did you know it was healthy?</td><td>Monitoring and metrics</td></tr>
+    <tr><td>Who disagreed, and how was it settled?</td><td>Influence and conflict</td></tr>
+  </tbody>
+</table></div>
+
+<p>When you reach a rung you don't know, say so and reason out loud: "I didn't own that part. My understanding is it retries three times; if I were designing it, I'd want…". That still scores. Bluffing, then getting caught one rung later, scores badly on everything.</p>
+
+<div class="check" id="check-dive-unknown">
+  <p class="q">Four rungs deep you're asked about a part another engineer built, and you don't know the answer. Best move?</p>
+  <div class="opts">
+    <button>Give a confident answer that sounds right; they can't check</button>
+    <button data-correct>Say you didn't own that part, give what you do know, and reason out loud about how it should work and how you'd find out</button>
+    <button>Change the subject to a part you know well</button>
+  </div>
+  <div class="fb right"><p>Right. It's honest about ownership (a scored signal) and still shows depth: you can reason about the design even where you didn't write it.</p></div>
+  <div class="fb wrong"><p>Interviewers climb the ladder exactly to find where your knowledge ends, and they've heard many systems like yours; a made-up answer usually breaks on the next rung, and then everything you said earlier is in doubt. Dodging looks like hiding. The clean move is a clear boundary ("Sam built that") followed by real thinking ("it must handle X, so I'd expect Y, and I'd check Z"). That turns a gap into evidence of judgment.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>"I" and "we"</h2>
+
+<p>Good engineers are team players, so they say "we" by habit. In a deep dive that hides you. The interviewer can't hire your team, so every "we" makes them guess what you did. The fix isn't to claim everything; it's to be precise:</p>
+<ul>
+  <li><b>"I"</b> for what you decided, built, wrote or drove: "I wrote the design doc and chose the matching key."</li>
+  <li><b>"We"</b> for team outcomes, after you've said your part: "We shipped it in eight weeks."</li>
+  <li><b>Names or roles</b> for others' work: "Sam built the dashboard; the data team owned the bank import."</li>
+</ul>
+
+<p>Giving credit by name makes your "I" more believable, not less. It shows you know exactly where the line was.</p>
+
+<div class="check" id="check-dive-we">
+  <p class="q">Which sentence is best in a deep dive?</p>
+  <div class="opts">
+    <button>"We decided to move to event sourcing and we rebuilt the ledger."</button>
+    <button data-correct>"I proposed event sourcing and wrote the design; two of us rebuilt the ledger, and I owned the migration."</button>
+    <button>"I rebuilt the whole ledger myself."</button>
+  </div>
+  <div class="fb right"><p>Right: your part is clear, others' part is clear, and it's believable.</p></div>
+  <div class="fb wrong"><p>Read each one as the interviewer filling in a form called "what did this person do?". After the first, the form is blank: "we" could mean you led it or watched it. The third fills the form, but if two people did it, the first follow-up ("how did you split the work?") exposes it. The precise version fills the form truthfully.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>"Tell me about yourself" in 60 seconds</h2>
+
+<p>Recruiter calls and hiring manager rounds often open with "tell me about yourself", and a good answer leads straight into your deep dive. Use three beats, about 20 seconds each:</p>
+<ol>
+  <li><b>Present:</b> your role and scope now. "I'm a senior engineer on the payments team at Acme, where I lead a team of five on billing and reconciliation."</li>
+  <li><b>Past:</b> one or two things that shaped you, ending on your deep-dive project. "Before that I spent three years on infrastructure, which is why the reconciliation rewrite I led last year went the way it did: we treated it as a data pipeline, not a batch job."</li>
+  <li><b>Future:</b> why this role, now. "I want to work on systems at a bigger scale, closer to the product, and that's what drew me to this team."</li>
+</ol>
+<p>It isn't your life story or a list of every job. It's a 60-second trailer, and it ends on a hook the interviewer can ask about.</p>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>What to say in the interview</h2>
+<ol>
+  <li>Give the 60-second version: context, problem with a number, what you built, your hardest decision, result with a number.</li>
+  <li>Offer to draw it. Five minutes: the boxes, what flows, one request end to end. Then ask where they'd like to go deeper.</li>
+  <li>For each "why", name the alternative, the constraint that ruled it out, and what your choice cost.</li>
+  <li>Say "I" for your part and name others for theirs.</li>
+  <li>Bring the failure and the change yourself if they don't ask; end with what you'd do differently now.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>The project is evidence. The score is scope, depth, judgment, ownership, impact and reflection.</li>
+  <li>Pick by five tests: you owned decisions, a real trade-off, numbers, something broke, you can draw it.</li>
+  <li>Zoom like a map: 60 seconds, then 5 minutes of boxes, then let them pick.</li>
+  <li>Every box: chose, rejected, the constraint that decided it, what it cost.</li>
+  <li>Failure: impact, cause, fix, prevention. "What I'd change" needs two real answers.</li>
+  <li>Prepare the ladder: 10×, first failure, testing, rollout, monitoring, disagreement.</li>
+  <li>Don't bluff a rung you don't know; mark the boundary and reason out loud.</li>
+  <li>"I" for yours, names for others'. Tell-me-about-yourself: present, past, future, ending on a hook.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>These are writing and speaking exercises. Speak every timed one out loud, with a timer, ideally recorded: you'll hear the "we"s and the vague reasons that reading silently hides.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Score three projects</h4>
+  <p>List three projects from the last three years. Score each on section 3's five tests, one point per test. Pick the winner and a runner-up. For the winner, write the one decision you'd most like to be asked about.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Fix the weak answers</h4>
+  <p>Rewrite each so it gives a signal: (a) "We used microservices because they scale better." (b) "The project went really well." (c) "I worked on the backend." (d) "It was much faster after."</p>
+  <details class="aside another"><summary>One way to answer</summary>
+    <p>(a) Name the constraint and the cost: "We split out the pricing service because it deployed 10× a day and the rest of the app weekly, so it was blocking releases. It cost us a network hop and a second on-call rota." (b) Give a number and a reflection: "It cut mismatches from 4% to 0.1%. I'd load-test earlier next time." (c) Say what you decided or built: "I designed the matching service and its schema, and led the migration." (d) Say by how much and how you measured: "p99 latency went from 900 ms to 120 ms on our dashboards, over the following month."</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · speak</div>
+  <h4>3. Tell me about yourself</h4>
+  <p>Write section 9's three beats for yourself, then say it with a 60-second timer. Cut until it fits. It should end on your deep-dive project.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · write</div>
+  <h4>4. Write your deep dive</h4>
+  <p>Run <code>python3 tools/new.py deepdive "Your project name"</code>. It creates a worksheet in <code>sections/14-behavioral-leadership/stories/</code> with every part of this chapter: the 60-second version, the map and its numbers, what you did, the decision table, what broke, what you'd change, and the follow-up ladder. Fill all of it. Plan on about 90 minutes. The decision table needs at least four rows, and the ladder needs every box.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · speak</div>
+  <h4>5. The 5-minute map, timed</h4>
+  <p>Draw your diagram on paper from memory and talk through it with a 5-minute timer, ending with "where would you like to go deeper?". Then pick two boxes and climb section 7's ladder out loud, five rungs each. Note every rung where you hesitated, and add the answer to your worksheet.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · mock</div>
+  <h4>6. Get grilled</h4>
+  <p>Ask Claude: "mock interview, past-project deep dive, 45 minutes". Expect a follow-up on every choice. Afterwards, fix the two weakest answers in your worksheet.</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="../../02-algorithms/concepts/sorting.html"><small>← Previous</small>Sorting</a>
+  <a class="next" href="why-this-company.html"><small>Next →</small>Why this company</a>
+</nav>
+
+</main>
+</body>
+</html>

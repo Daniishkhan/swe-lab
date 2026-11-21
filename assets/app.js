@@ -42,6 +42,25 @@
     h("summary", {}, `${t.drills.length} timed drills`),
     h("ol", {}, t.drills.map(([name, d]) => h("li", {}, h("span", { class: "lvl " + d, title: level[d] }, d), name)))) : null;
 
+  // A stage's day-by-day schedule (curriculum.json "days"): what to do each day, with rough times
+  function dayPlan(st, T) {
+    const drill = {};
+    C.sections.forEach((s) => s.topics.forEach((t) => (t.drills || []).forEach(([n, d]) => (drill[n] = d))));
+    const link = (id) => {
+      if (st.milestone && st.milestone.id === id) return h("a", { href: `#milestone-${id}` }, st.milestone.title);
+      const x = T.byTopic[id];
+      return x ? h("a", { href: T.href(x, ROOT) }, T.title(x)) : id;
+    };
+    return h("details", { class: "days", id: "days-" + st.id },
+      h("summary", {}, "Day by day", h("span", { class: "aside-note" }, " · " + st.days.length + " days, 4 to 5 hours each")),
+      st.dayNote ? h("p", { class: "day-note" }, st.dayNote) : null,
+      h("ol", { class: "day-list" }, st.days.map((d) => h("li", { class: "day" },
+        h("div", { class: "day-head" }, h("b", {}, d.label), h("span", { class: "hrs" }, `about ${d.hours} h`)),
+        h("ul", {}, d.plan.map((p) => h("li", {}, h("span", { class: "t" }, p.t), h("span", {}, link(p.topic), ": ", p.do))),
+          d.drills && d.drills.length ? h("li", {}, h("span", { class: "t" }, "1h"),
+            h("span", {}, "Two timed drills: ", d.drills.map((n, i) => [i ? " and " : "", h("span", { class: "lvl " + (drill[n] || "M"), title: level[drill[n]] || "" }, drill[n] || "M"), " " + n]))) : null)))));
+  }
+
   function renderHome(root) {
     const T = window.SWETrack;
     const allPages = C.sections.flatMap((s) => s.concepts.map((c) => ({ s, c, path: pagePath(s, c) })));
@@ -133,6 +152,7 @@
           h("span", { class: "side" }, prog, pbar)),
         steps,
         st.daily ? h("p", { class: "daily" }, h("b", {}, "Every day: "), st.daily) : null,
+        st.days ? dayPlan(st, T) : null,
         m ? h("div", { class: "ms-box", id: "milestone-" + m.id }, statusButton(m.key, refresh),
           h("div", { class: "body" }, h("div", { class: "line" }, icon("flag"), h("b", {}, m.title)), h("div", { class: "todo" }, T.todo(m)))) : null);
       box.open = st === focus || openSet.has(st.id) || location.hash === "#stage-" + st.id;
