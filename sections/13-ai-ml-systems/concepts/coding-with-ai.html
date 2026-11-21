@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <meta name="topic" content="13.06">
+  <title>Code you didn't write (Coding with AI: write, debug, refactor)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="13" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 13 · Part 6</div>
+  <h1>Code you didn't write</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> what an AI-assisted round watches</span><span>about 60 minutes</span><span>10 quick checks · 8 exercises</span></div>
+</header>
+
+<p>An AI assistant can write forty lines of plausible code in a few seconds. Reading those forty lines carefully takes you several minutes. So writing code got cheap, and <em>checking</em> it became the job. In a round that allows an assistant, assume the interviewer sees every prompt you type. They're watching how you steer it, how you check what comes back, and when you overrule it. This chapter builds those skills from first principles: why small mistakes pile up, how context and small checked steps stop them, and how to debug, refactor and review code you didn't write.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain, with numbers, why small error rates pile up over a session, and why a check after every step stops that.</li>
+    <li>Write a context block for a task: signature, sizes, invariants, constraints, examples with the hard case, and a data-flow sketch.</li>
+    <li>Split a task into small steps that each end with a check you can run.</li>
+    <li>Decide what "right" means before you see the code: examples, edge cases, properties, and a slow oracle that judges the fast version.</li>
+    <li>Debug step by step: shrink the failing input, test one hypothesis at a time, and bisect the history to find the change that broke it.</li>
+    <li>Refactor behind characterization tests, one named change at a time.</li>
+    <li>Review AI-written code against a catalogue of typical mistakes, and know when not to use the assistant at all.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom, like a book. It builds on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a> (hidden loops), <a href="../../01-data-structures/concepts/hash-maps.html">Find anything in one step</a> (counting with a dict), <a href="../../02-algorithms/concepts/sorting.html">Putting things in order</a> (tuple keys for ties), <a href="../../01-data-structures/concepts/heaps.html">The most urgent thing first</a> (top k) and <a href="../../02-algorithms/concepts/binary-search.html">Binary search</a> (the first bad version). Warm-up 2 uses <a href="../../01-data-structures/concepts/lru-lfu-cache.html">What to forget first</a> (the LRU cache). You don't need any particular AI tool until the stretch exercises. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The problem: it passed the examples</h2>
+
+<div class="story">
+  <p>A 45-minute practical round, assistant allowed. The task: write <code>top_k_words(lines, k)</code>. It returns the k most common words in a log as (word, count) pairs, most common first, and ties go to the alphabetically first word.</p>
+  <p>You paste the task into the assistant. Ten seconds later you have six tidy lines. You run the two examples from the task, and both pass. "Looks good," you say, and move on. Then the interviewer types one more input.</p>
+</div>
+
+<pre><code>from collections import Counter
+
+def top_k_words(lines, k):
+    counts = Counter()
+    for line in lines:
+        counts.update(line.lower().split())
+    return counts.most_common(k)</code></pre>
+
+<pre class="plain"><code>&gt;&gt;&gt; top_k_words(["disk full",
+...     "disk slow", "net down"], 1)
+[('disk', 2)]
+&gt;&gt;&gt; top_k_words(["apple banana",
+...     "apple banana cherry"], 2)
+[('apple', 2), ('banana', 2)]
+&gt;&gt;&gt; top_k_words(["beta alpha",
+...     "alpha beta"], 1)
+[('beta', 2)]</code></pre>
+
+<p>The first two answers match the task's examples. The third should be <code>[("alpha", 2)]</code>: "alpha" and "beta" both appear twice, and ties go to the alphabetically first word.</p>
+
+<p>What happened? <code>Counter.most_common</code> breaks ties by the order in which words were <em>first seen</em>, not alphabetically. In the third input "beta" is seen first, so it wins. The code ignored one sentence of the task, and nothing you ran could notice.</p>
+
+<p>Look again at the second example. It <em>has</em> a tie: apple and banana both appear twice. But apple is also seen first, so "first seen" and "alphabetical" give the same answer there. That example could never have caught the bug. <b>A test only tells you something if it could have failed.</b></p>
+
+<h3>Small risks multiply</h3>
+<p>One bug in six lines is easy to fix once you see it. The bigger trouble is that a session isn't one answer. Building anything with an assistant is a chain of changes: write this function, now handle empty input, now rename that, now make it faster. Say 10 to 20 changes in a round.</p>
+
+<p>Picture an old string of Christmas lights, wired one after another. If any single bulb is dead, the whole string stays dark. Each bulb is probably fine. The string needs <em>all</em> of them to be fine.</p>
+
+<p>Put numbers on it. <b>Assume</b> each change is right 90% of the time, independently of the others. (90% is a number to think with, not a measurement of any tool.) The chance that two changes are both right is 0.9 × 0.9 = 0.81. For n changes it's 0.9 multiplied by itself n times, written 0.9<sup>n</sup>:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>changes in the session</th><th>chance all of them are right (0.9 each)</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>90%</td></tr>
+    <tr><td>2</td><td>81%</td></tr>
+    <tr><td>5</td><td>59%</td></tr>
+    <tr><td>10</td><td>35%</td></tr>
+    <tr><td>20</td><td>12%</td></tr>
+  </tbody>
+</table></div>
+
+<p>Ten changes at 90% each, and about two sessions in three contain at least one mistake. The picture also breaks in a way that makes things worse. A dead bulb is easy to see. A wrong change usually isn't: it hides until one particular input, like the tie above, shows it.</p>
+
+<div class="keyidea">A session is a chain of changes. The chance that every one is right is the product of the chances for each, p × p × … = pⁿ, and even good odds fall fast. And passing examples prove nothing unless they could have failed.</div>
+
+<div class="check" id="check-compound">
+  <p class="q">Your assistant's changes are each right 95% of the time (assume they're independent). You make 14 changes and test only at the end. What's the chance that everything is right?</p>
+  <div class="opts">
+    <button>About 95%: each change is that good</button>
+    <button data-correct>About 49%</button>
+    <button>About 30%</button>
+  </div>
+  <div class="fb right"><p>Yes: 0.95<sup>14</sup> ≈ 0.49. Square 0.95 to get 0.9025 for two changes, square again for four (0.815), and again for eight (0.663). Fourteen is eight plus four plus two, so multiply: 0.663 × 0.815 × 0.9025 ≈ 0.49. A coin flip, from changes that are each 95% good.</p></div>
+  <div class="fb wrong"><p>Think of 14 hurdles in a row, each cleared 95% of the time, and you have to clear all of them. After the first hurdle, 95% of runners are still going. After the second, 95% of <em>those</em>: about 90%. Every hurdle takes another 5% of whoever is left, and after 14 about 49% remain. 95% is the chance for one change; the session needs all fourteen.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: when pⁿ is too simple</summary>
+  <p>pⁿ assumes every change is right or wrong independently, like separate coin flips. Real mistakes are often <b>correlated</b>: if the assistant misunderstood the tie rule once, it tends to misunderstand it in every change that touches ties. That cuts both ways. One misunderstanding can show up in five places, but fixing that one wrong assumption fixes all five.</p>
+  <p>Two numbers people mix up: the <b>expected number</b> of wrong changes is n(1 − p), while the chance of <b>at least one</b> is 1 − pⁿ. For 10 changes at 90%, the expected number is 10 × 0.1 = 1, and the chance of at least one is 1 − 0.35 = 65%. "On average only one mistake" sounds harmless. "Two sessions in three end with a bug" doesn't.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>What you're working with</h2>
+
+<p>To use a tool well, you need a picture of how it works. Here's the one-paragraph version. An AI coding assistant is built on a <b>language model</b>: a program trained on a huge amount of text and code to predict what comes next. Ask it for a function, and it writes the code that most plausibly follows your request, based on the enormous number of programs it has read. Nothing in that process runs the code. So "looks right" and "is right" can come apart, and when they do, the code still looks right.</p>
+
+<p>Think of it as a very well-read contractor on the phone. They've seen more houses than anyone alive, they answer instantly, and they never get tired. But they can't see <em>your</em> house. They know only what you tell them and what you show them. For the assistant, that's its <b>context</b>: everything it can see when it answers. That means your messages, any files you pasted or it opened, and the earlier messages in the same session. Nothing outside the context exists for it.</p>
+
+<h3>Where the picture is wrong</h3>
+<ul>
+  <li><b>No memory between sessions.</b> Tomorrow you get a fresh contractor who has never heard of your project. Some tools let you keep a notes file that gets added to every session, but that's still context you wrote.</li>
+  <li><b>The same calm voice, right or wrong.</b> A contractor who's guessing usually sounds unsure. The assistant often doesn't. It's more like a GPS voice that says "turn left" in exactly the same tone whether or not the road exists. Its confidence is not evidence.</li>
+  <li><b>It may be able to run things.</b> A <b>coding agent</b> is an assistant that can also edit files and run commands, such as your tests, in a loop: change, run, read the output, change again. That lets it check its own work, but only with the checks it chose to run. Which checks count is still your call.</li>
+  <li><b>Asking again is nearly free.</b> A human contractor charges for a second opinion. The assistant will write three versions, explain its code, or criticize it, in seconds. Use that.</li>
+</ul>
+
+<h3>The slow part moved</h3>
+<p>Some rough numbers, to show the shape. Typing 40 careful lines yourself might take 10 minutes. The assistant takes seconds. Reading those 40 lines carefully, at about 10 seconds a line (an assumption; it depends on the code), takes about 7 minutes. Writing is no longer the slow part. <b>Checking is.</b> The rest of this chapter is about two things: giving the assistant what it needs to be right more often, and making your checks cheaper and more reliable.</p>
+
+<div class="keyidea">An assistant is fast, well read, and blind to everything outside its context. It can sound just as sure when it's wrong as when it's right. So your job moves from typing to two things: choosing what goes into its context, and checking what comes out.</div>
+
+<details class="aside another">
+  <summary>Explain it another way: the brilliant new hire</summary>
+  <p>Imagine a new hire who has read every programming book ever written and types faster than anyone on the team. Two quirks: they forget everything about your project every night, and they hardly ever say "I'm not sure". You'd brief them every morning, give them small tasks you can check, and then check them. You wouldn't let them push a week of unreviewed work on their second day. Same here.</p>
+</details>
+
+<div class="check" id="check-confident">
+  <p class="q">The assistant finishes and says: "This handles all edge cases, including ties." What do you now know about ties?</p>
+  <div class="opts">
+    <button>Ties are handled: it says it checked them</button>
+    <button>Probably fine, but ask it to double-check to be sure</button>
+    <button data-correct>Nothing yet. Run a tie where first-seen and alphabetical differ, like <code>["b a"]</code> with k = 1</button>
+  </div>
+  <div class="fb right"><p>Right. That sentence is part of the output, produced the same way as the code: it's what plausibly comes next, not a report of a test that ran. <code>["b a"]</code> with k = 1 should give <code>[("a", 1)]</code>; the code from section 1 gives <code>[("b", 1)]</code>. One run settles what no sentence can.</p></div>
+  <div class="fb wrong"><p>Picture the GPS again: "turn left" sounds the same whether or not the road exists. "This handles all edge cases" is the same kind of sentence. Asking it to double-check gets you another sentence: it may agree with itself, or apologize and "fix" code that was fine. Neither is evidence. Evidence is an input you choose, where the right rule and the wrong rule give different answers: <code>["b a"]</code> with k = 1 must return <code>[("a", 1)]</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Context is the input</h2>
+
+<p>Suppose you type only "write a function that returns the top k words". Count the guesses the assistant has to make:</p>
+<ol>
+  <li>What's a word? Split on spaces? Strip punctuation?</li>
+  <li>Are "Disk" and "disk" the same word?</li>
+  <li>What's the input: a list of lines, a file path, one big string?</li>
+  <li>What's the output: pairs, just the words, a dict?</li>
+  <li>How are ties broken?</li>
+  <li>How big is the input? Does it fit in memory?</li>
+  <li>What if k is bigger than the number of distinct words?</li>
+</ol>
+<p>Seven guesses. If each guess matches what you meant 80% of the time (an assumption), all seven match 0.8<sup>7</sup> ≈ 21% of the time: about one time in five. That's section 1's multiplication again, before any code exists. The fix is to stop making it guess.</p>
+
+<h3>The context block</h3>
+<p>Here's a <b>context block</b>: a short, structured description of the task, written before you ask for any code. It starts with the <b>signature</b>: the function's name, its inputs and their types, and what it returns.</p>
+
+<pre class="plain"><code>Task: top_k_words(lines, k)
+      -&gt; list of (word, count) pairs
+Input: lines is an iterable of str, read
+  one at a time from a log: about
+  2 billion words, about 100,000
+  distinct. k is between 1 and 100.
+Words: split on whitespace, then
+  lowercase. Nothing else.
+Output: the k most common words, most
+  common first. Ties: alphabetical.
+  Fewer than k distinct words: return
+  all of them.
+Must stay true: at most k pairs; every
+  count exact; lines not stored.
+Cost: one pass over lines; memory for
+  the counts only.
+Don't: change the signature, add
+  libraries, touch other files.
+Examples:
+  ["disk full", "disk slow",
+   "net down"], 1 -&gt; [("disk", 2)]
+  ["beta alpha", "alpha beta"], 1
+    -&gt; [("alpha", 2)]
+  [], 3 -&gt; []
+Before writing code, list your
+assumptions and a plan.</code></pre>
+
+<p>Each part removes guesses:</p>
+<ul>
+  <li><b>Sizes</b> decide the design. 2 billion words can't sit in a list: on a 64-bit machine the list alone holds an 8-byte pointer per word, 16 GB before counting the words themselves. A dict of 100,000 short words is about 10 MB. So stream the lines and keep only the counts. Sorting 100,000 counts is about 1.7 million comparisons, well under a second, so you don't need the heaps chapter's size-k heap here.</li>
+  <li>A <b>constraint</b> is a limit the solution must respect: one pass, memory for the counts only, no new libraries.</li>
+  <li>An <b>invariant</b>, as in the <a href="../../02-algorithms/concepts/binary-search.html#s3">binary search chapter</a>, is something that must stay true the whole time. Here: never more than k pairs, every count exact, lines not stored. Invariants are also the first tests you'll write.</li>
+  <li>The <b>examples</b> include the hard case: a tie where first-seen and alphabetical disagree. That one line would have caught section 1's bug.</li>
+  <li>The <b>don't</b> line stops helpful extras: a new library, a changed signature, edits to files you never mentioned.</li>
+</ul>
+
+<h3>Draw the data flow</h3>
+<p>For anything bigger than one function, add a sketch of how the data moves. Think of a subway map. The stations are the steps that change the data, the lines between them are what flows, and next to each station you note what it keeps. A <b>data-flow sketch</b> is that map for your code. It tells the assistant where the state lives, and it tells <em>you</em> where to put the checks.</p>
+
+<div class="figure">
+<pre class="diagram"><code>log lines (streamed, ~2 billion words)
+   │
+   ▼
+[ split + lowercase ]   word by word
+   │
+   ▼
+[ count ]   STATE: dict word → count
+   │               ~100,000 keys
+   ▼
+[ top k ]   sort by (-count, word)
+   │
+   ▼
+k pairs (word, count)</code></pre>
+  <div class="cap">Three boxes and one piece of state. The sketch shows where the memory goes (only the dict), which step owns the tie rule (top k), and where to check: the words after the first box, the counts after the second, the order after the third.</div>
+</div>
+
+<p>The sketch also shows what <em>doesn't</em> exist: no box holds all the words. If the assistant's code keeps a list of every word, it doesn't match the picture, and you can see that at a glance.</p>
+
+<h3>Read it back</h3>
+<p>Air traffic control radios a pilot: "climb to flight level 350". The pilot doesn't just climb. They read it back: "climbing to 350". A misheard "250" gets caught on the radio, not in the air. Do the same. End your context block with "list your assumptions and a plan", and read the answer before any code exists. A reply might look like this:</p>
+
+<pre class="plain"><code>Assumptions:
+1. A word is a run of non-whitespace,
+   so "disk," and "disk" differ.
+2. Ties: sort by (-count, word); I
+   won't rely on most_common's order.
+3. k larger than the number of words
+   returns them all.
+4. I'll take a file path, not lines,
+   and open the file myself.
+Plan: one pass into a dict, then sort.</code></pre>
+
+<p>Assumption 1 is a fair reading of what you wrote, and now you know about it. If you wanted punctuation stripped, this is the cheapest moment to say so. Assumption 4 is wrong: your callers pass lines, and some of them read from a network stream, not a file. One sentence fixes it now. Once the code exists, the same mistake is a changed interface you have to spot in review (section 9).</p>
+
+<div class="keyidea">Every gap in your request is a guess, and guesses multiply. Give the signature, the sizes, the invariants and constraints, a data-flow sketch, and examples that include the hard case. Then have it read its assumptions back before it writes a line.</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: context in a real codebase</summary>
+  <ul>
+    <li><b>Point at the right files.</b> The interface it must call, one similar function to copy the style of, and the tests that cover the area. Three relevant files beat thirty: a big paste of unrelated code buries what matters, and the assistant may copy patterns from the wrong file.</li>
+    <li><b>State the house rules.</b> How errors are reported, how logging works, which libraries are allowed, what the tests use.</li>
+    <li><b>Ask it to read before it writes.</b> "Trace what happens to a request from here to the database, and list the files involved" changes nothing. You check the trace against what you know, and the answer becomes context for the change.</li>
+    <li><b>Keep a decisions file on long tasks.</b> The assistant forgets between sessions, and a very long session can push early messages out of what it sees. A short file with the decisions so far ("ties are alphabetical", "lines, not paths") goes in at the start of each session.</li>
+  </ul>
+</details>
+
+<div class="check" id="check-context">
+  <p class="q">Your context block leaves out one thing: the sizes. Which result is most likely?</p>
+  <div class="opts">
+    <button>It streams the lines anyway, since streaming is always best</button>
+    <button data-correct>It holds everything, with something like <code>list(lines)</code> or <code>f.read().split()</code>: it passes every example and runs out of memory on 2 billion words</button>
+    <button>It refuses to answer until you give the size</button>
+  </div>
+  <div class="fb right"><p>Yes. On the examples, the list version and the streaming version give identical answers, so nothing in the examples pushes it toward streaming, and holding everything is often the shorter way to write it. Only the size makes one version wrong, so only you, by stating the size, can make it choose.</p></div>
+  <div class="fb wrong"><p>Ask what in the request could tell the two versions apart. On three tiny examples, holding all the words in a list and streaming them give exactly the same output, so the examples can't steer it. Assistants rarely refuse an underspecified request; they fill the gap with a guess, often the shorter version that holds everything. The size is the fact that turns "fine" into "16 GB of pointers", so it has to be in the context.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Small steps, each with a check</h2>
+
+<p>Now suppose you send the whole context block and ask for everything at once. Back comes 200 lines with, say, 10 separate decisions inside. At 90% each, all ten are right only 35% of the time (section 1). And when the final test fails, which of the ten is wrong? The failure doesn't say. You read all 200 lines.</p>
+
+<p>Rock climbers solved this long ago. A climber clips the rope into an anchor every few meters, so a fall costs a few meters, not the whole climb. A check after each small change is an anchor: a mistake costs you one step, never the session.</p>
+
+<h3>Why checks change the math</h3>
+<p>After each change, run a check (a test, say) that catches a wrong change 90% of the time. That's another assumption to play with. A wrong change now gets through only if it's wrong <em>and</em> its check misses it: 0.1 × 0.1 = 0.01. Assume a caught change gets redone and comes out right. (It may take a second try; that costs time, not correctness.) Then each step ends right with chance 0.99, and ten steps with 0.99<sup>10</sup> ≈ 90%. Same assistant, same 90% per change: 35% without checks, 90% with them.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div class="viz-controls" style="margin-top:0">
+      <label class="small" style="display:inline-flex;align-items:center;gap:6px">each change right <input type="range" id="cp-p" min="50" max="99" value="90" style="width:110px"><b id="cp-pv"></b></label>
+      <label class="small" style="display:inline-flex;align-items:center;gap:6px">changes <input type="range" id="cp-n" min="1" max="30" value="10" style="width:110px"><b id="cp-nv"></b></label>
+      <label class="small" style="display:inline-flex;align-items:center;gap:6px">check catches <input type="range" id="cp-c" min="0" max="99" value="90" style="width:110px"><b id="cp-cv"></b></label>
+      <button class="btn" id="cp-run">Run one session</button>
+    </div>
+    <div id="cp-out" style="margin-top:14px"></div>
+    <div class="legend"><span><i style="background:var(--ok)"></i>right</span><span><i style="background:var(--warn)"></i>wrong, caught by its check and redone</span><span><i style="background:var(--bad)"></i>wrong, and nothing caught it</span></div>
+    <div class="viz-caption" id="cp-msg"></div>
+  </div>
+  <div class="cap">Both rows replay the same changes: a change that's wrong in one row is wrong in the other, so you can compare them square by square. The percentages are the chance that a whole session ends right, and "Run one session" plays out a random one. The slider values are assumptions to play with, not measurements of any tool.</div>
+</div>
+
+<p>Try it. Drag "check catches" to 0% and the two rows become the same. Drag it back up and watch the second row climb, even when each change is right only 70% of the time. Checks don't make the assistant any better. They stop its mistakes from piling up.</p>
+
+<p>One more habit makes the anchors real: <b>commit</b> after every check that passes. A commit is a saved snapshot of the code in version control (git), with a message saying what changed. If a later step goes wrong, you go back to the last good commit instead of untangling the mess.</p>
+
+<h3>What makes a good step</h3>
+<ul>
+  <li><b>Small.</b> One idea, and a diff you can read in about two minutes: 12 lines at 10 seconds a line.</li>
+  <li><b>Checkable.</b> It ends with something you run: a test, a printed value, an assertion. "Make it better" isn't a step. "Make <code>count</code> accept any iterable, checked by passing it a generator" is.</li>
+  <li><b>In order.</b> Each check builds on the last one: words, then counts, then the top k, then the glue.</li>
+</ul>
+
+<p>For <code>top_k_words</code>, the steps follow the boxes of the data-flow sketch:</p>
+<ol>
+  <li><b>Words.</b> Ask for <code>words(line)</code>: split on whitespace, then lowercase. Check: <code style="white-space:pre">words("Disk  FULL")</code> gives <code>["disk", "full"]</code>, and <code>words("")</code> gives <code>[]</code>.</li>
+  <li><b>Count.</b> Ask for <code>count(lines)</code>, returning a dict. Check: <code>count(["a b", "b"]) == {"a": 1, "b": 2}</code>. Pass it a generator too: code that reads the lines twice gets nothing the second time, and the counts come out wrong.</li>
+  <li><b>Top k.</b> Ask for <code>top(counts, k)</code>, ties alphabetical. Check: <code>top({"b": 1, "a": 1}, 1) == [("a", 1)]</code>, and a k bigger than the dict returns everything.</li>
+  <li><b>Glue.</b> Ask for <code>top_k_words</code> built from the three. Check: the examples from the context block, then the oracle from section 5.</li>
+</ol>
+
+<p>Ask for the plan before any code ("list the steps and the check for each"), fix the plan, and then ask for one step at a time.</p>
+
+<div class="keyidea">Ask for one small step at a time, and end each one with a check you run. A wrong change then gets through only if it's wrong <em>and</em> its check misses it, which is far rarer than either. Commit after every passing check, so a mistake costs one step, never the session.</div>
+
+<div class="check" id="check-steps">
+  <p class="q">A session has 8 steps. Each is right 70% of the time, and the check after each catches 80% of wrong steps (a caught step is redone right). What's the chance the whole session ends right?</p>
+  <div class="opts">
+    <button>About 6%</button>
+    <button data-correct>About 61%</button>
+    <button>About 80%</button>
+  </div>
+  <div class="fb right"><p>Yes. A wrong step gets through with 0.3 × 0.2 = 0.06, so each step ends right with 0.94, and 0.94<sup>8</sup> ≈ 0.61. With no checks it would be 0.7<sup>8</sup> ≈ 6%. That's ten times better, with checks that miss one wrong step in five.</p></div>
+  <div class="fb wrong"><p>Count 100 steps. 30 of them are wrong. The check catches 80% of those, so 24 get caught and redone, and 6 slip through. That leaves 94 of every 100 steps ending right. The session needs 8 in a row: 0.94 multiplied by itself 8 times is about 0.61. (6% is the answer with no checks at all, 0.7<sup>8</sup>. 80% is how good one check is, not how good the session is.)</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Write the check before the code</h2>
+
+<p>The easy way to get tests is to ask for the code, then "now write tests for it". They come back green. But look where their expected values came from: the code. A test written by reading section 1's Counter version expects <code>[("b", 1)]</code> for <code>["b a"]</code>, because that's what the code does. The bug and the test agree with each other.</p>
+
+<p>That's a student writing the answer key after taking the exam: every answer gets marked correct. The key has to come from somewhere else. Decide what "right" means <em>before</em> you see the code, from the task. Writing a failing test first and then the code that makes it pass is called <b>test-first</b> development (test-driven development, or TDD, is the strict version).</p>
+
+<p>Three layers, cheapest first:</p>
+<ol>
+  <li><b>Examples</b>: inputs with outputs you worked out by hand, including the hard case. <code>["beta alpha", "alpha beta"]</code> with k = 1 gives <code>[("alpha", 2)]</code>.</li>
+  <li><b>Edge cases</b>: the smallest and strangest inputs. <code>[]</code>, <code>[""]</code>, a line of only spaces, one word repeated, a k bigger than the number of distinct words.</li>
+  <li><b>Properties</b>: rules that hold for <em>every</em> input, so you can check them on thousands of random ones. At most k pairs. Counts never go up as you read down the list. Equal counts are in alphabetical order. Every count matches a recount.</li>
+</ol>
+
+<h3>Two answers that must agree</h3>
+<p>Properties catch a lot, but not everything: a list can obey every rule above and still hold the wrong words. The strongest check is a second answer. Picture splitting a restaurant bill. One friend adds up the items one by one; another reads the total off the card machine. If they agree, you pay. If they don't, someone slipped, and you look at that bill. Nobody had to know the right total in advance.</p>
+
+<p>In code, the second friend is an <b>oracle</b>: a second version that is slow but obviously right. "Obviously right" means short enough that you can see it's correct by reading it, with no cleverness at all:</p>
+
+<pre><code>def top_k_oracle(lines, k):
+    # Slow, but obviously right.
+    words = []
+    for line in lines:
+        words += line.lower().split()
+    pairs = []
+    for w in set(words):
+        pairs.append((w, words.count(w)))
+    pairs.sort(key=lambda p: (-p[1], p[0]))
+    return pairs[:k]</code></pre>
+
+<p>It holds every word in a list and counts each one with a full scan of that list: hopeless on 2 billion words, perfect on six. Write it yourself. An oracle from the same assistant, in the same conversation, can share the same misunderstanding, and then the two versions agree on the wrong answer.</p>
+
+<p>Now let the two versions argue. Run both on every small input, smallest first, and stop at the first disagreement. This is <b>differential testing</b>. Using three words, there are 1 + 3 + 9 + 27 + 81 + 243 + 729 = 1,093 lines of up to 6 words, and each one takes microseconds. Against section 1's Counter version, the first disagreement comes almost at once: the line <code>"b a"</code> with k = 1. The oracle says <code>[("a", 1)]</code>; the candidate says <code>[("b", 1)]</code>.</p>
+
+<p>Smallest first matters. The smallest input that shows a bug is the easiest one to understand, the best one to paste back into the assistant, and the best regression test. A two-word counterexample explains itself; a forty-word one takes a while. Exercise 6 builds this search.</p>
+
+<div class="keyidea">Decide what "right" means before you see the code: hand-worked examples with the hard case, edge cases, and properties. Then let a slow, obviously right oracle that you wrote judge the fast version on every small input, smallest first.</div>
+
+<div class="check" id="check-tests-after">
+  <p class="q">You ask for code, then "now write tests for this code". All 12 tests pass. What have they shown?</p>
+  <div class="opts">
+    <button>That the code is right: 12 separate checks agree</button>
+    <button data-correct>Mostly that the code does what the code does: expected values read off the code share its mistakes</button>
+    <button>Nothing at all: tests written by an assistant are always wrong</button>
+  </div>
+  <div class="fb right"><p>Right. A test is only as good as the source of its expected value. Read off the code, the tie test expects first-seen order, because that's what the code does. Such tests still have a use: they freeze today's behavior, which is exactly what a refactor needs (section 8). They just can't tell you that today's behavior is right.</p></div>
+  <div class="fb wrong"><p>Ask where each expected value came from. If it came from reading the code, the test checks the code against itself, like grading an exam with an answer key the student wrote afterwards. But assistant-written tests aren't worthless either: any test whose expected value you checked against the task is as good as one you typed. The question is never who typed a test, only where its expected value came from.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: property-based testing and the small scope hypothesis</summary>
+  <p><b>Property-based testing</b> automates layer 3. You state a property, and a library generates hundreds of random inputs, then <em>shrinks</em> any failing one to a small example (section 7 shows how shrinking works). QuickCheck, for Haskell, popularized the idea; Hypothesis does it for Python.</p>
+  <p>Why do tiny inputs catch so much? The <b>small scope hypothesis</b>, from Daniel Jackson's work on the Alloy modeling tool, is the observation that most bugs show up on some small input. A tie needs only two words. An off-by-one needs only a list of one or two items. So trying <em>every</em> small input often beats a few random big ones.</p>
+  <p>Differential testing works at large scale too. Csmith, a research tool, generated random C programs and compiled each one with several compilers. Whenever the compiled programs printed different results, at least one compiler had a bug. It found hundreds of previously unknown bugs in GCC and LLVM.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Checking you can afford</h2>
+
+<p>You can't read everything slowly. At 10 seconds a line, a 200-line change takes 33 minutes: most of a 45-minute round. So spend your checking the way airport security does. Everyone walks through the scanner: cheap, fast, automatic. A few bags get opened by hand, chosen by what the scanner showed. Nobody hand-searches every bag, and nobody skips the scanner.</p>
+
+<p>To review a change, read its <b>diff</b>: the list of lines it added and removed, usually shown with + and − in front. It's the change itself, without the hundreds of lines around it that didn't move.</p>
+
+<p>Here's the ladder, cheapest rung first. Climb as far as the risk deserves:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>rung</th><th>cost</th><th>what it catches</th></tr></thead>
+  <tbody>
+    <tr><td>Run the examples</td><td>seconds</td><td>crashes, plainly wrong output</td></tr>
+    <tr><td>Run your edge-case tests</td><td>seconds</td><td><code>[]</code>, <code>""</code>, ties, a k that's too big</td></tr>
+    <tr><td>Check properties on 1,000 random inputs</td><td>seconds</td><td>rare wrong answers</td></tr>
+    <tr><td>Compare with the oracle on every small input</td><td>seconds to a minute</td><td>the smallest disagreement</td></tr>
+    <tr><td>Read the diff</td><td>minutes</td><td>changed interfaces, extra features, memory use, hidden loops</td></tr>
+    <tr><td>Read every line slowly</td><td>10 seconds a line</td><td>whatever is left, at the highest price</td></tr>
+  </tbody>
+</table></div>
+
+<p>The bottom two rungs catch what tests can't see: a changed signature that the tests were changed to match, a list that holds 2 billion words but works fine on six, a loop that's quadratic but quick on small inputs. Where to read more carefully:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>code that…</th><th>why it's risky</th><th>how hard to look</th></tr></thead>
+  <tbody>
+    <tr><td>deletes data, moves money, or checks permissions</td><td>mistakes are expensive or can't be undone</td><td>every line, plus tests for the failure paths</td></tr>
+    <tr><td>parses or validates input</td><td>edge cases live here</td><td>edge cases and random inputs, then the diff</td></tr>
+    <tr><td>reads files or the network, or handles big data</td><td>small tests pass anyway</td><td>the diff, and one run at full size</td></tr>
+    <tr><td>formats output or glues steps together</td><td>mistakes are visible and cheap</td><td>run it</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Break it on purpose</h3>
+<p>You press the test button on a smoke alarm to check that it can beep. A test suite that has never failed hasn't shown it can. So break the code on purpose, once, and watch a test go red. Swap the tie rule, change <code>k</code> to <code>k + 1</code>, delete the call to <code>lower()</code>. If every test still passes, your tests can't see that kind of bug, and "all green" meant less than you thought.</p>
+
+<p>Each deliberate small bug is a <b>mutant</b>, and running your tests against many of them is <b>mutation testing</b>. In an interview you do it by hand, out loud, in thirty seconds: "Let me flip the tie rule and make sure a test catches it."</p>
+
+<p>It's also how you catch tests that test nothing, a classic in generated test files. Think of <code>assert result is not None</code>, or a test that <b>mocks</b> the very function it claims to test. A mock is a fake stand-in for a real part (a file, a network call, another function) that returns answers chosen in advance. A test that swaps the function under test for a mock only checks the mock.</p>
+
+<div class="keyidea">You can't read everything, so climb a ladder: cheap automatic checks on every change, careful reading where the risk is. And break the code on purpose once, to prove your tests can fail.</div>
+
+<div class="check" id="check-afford">
+  <p class="q">The assistant changed three files: the function, its test file, and a helper. All tests pass. You have five minutes. What do you read first?</p>
+  <div class="opts">
+    <button>The function, line by line from the top</button>
+    <button>Nothing: the tests pass, so you're done</button>
+    <button data-correct>The diff of the test file: a weakened or deleted test would make "all pass" meaningless</button>
+  </div>
+  <div class="fb right"><p>Yes. The tests are the ruler you measure with. If the change quietly shortened the ruler (deleted the tie test, loosened an assert, mocked the function), every other check inherits the problem. A test-file diff is usually short, and it tells you how much the green result is worth.</p></div>
+  <div class="fb wrong"><p>"All tests pass" is only as good as the tests, and this change edited them. Picture a luggage scale that someone recalibrated while weighing your bag: before you trust the number, check the scale. Reading the function from the top is the expensive rung, and it can't tell you whether the test that would have caught a bug was deleted. Five minutes on the test diff can.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: mutation testing tools</summary>
+  <p>Tools such as mutmut (Python) and PIT (Java) generate mutants automatically and report the <b>survivors</b>: mutants that no test killed. Each survivor points at a behavior your tests don't pin down. A survivor isn't always a gap, though. Some mutants don't change behavior at all (an <em>equivalent mutant</em>, like changing <code>&lt;</code> to <code>&lt;=</code> where the two values can never be equal), and you have to recognize those by reading.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Debugging: shrink, hypothesize, bisect</h2>
+
+<div class="story">
+  <p>A week later the function runs on the full log in production. The report comes back: the most common word is <code>""</code>, the empty string, counted 18,342 times.</p>
+</div>
+
+<p>The tempting move is the fix-and-pray loop: paste the error into the assistant, apply whatever fix it suggests, run again, repeat. Every suggestion is a guess about a cause nobody has found yet. If each guess fixes the real cause 30% of the time (an assumption), three guesses in a row all miss 0.7<sup>3</sup> ≈ 34% of the time. Worse, every wrong "fix" stays in the code as a change nobody needed.</p>
+
+<p>A good doctor doesn't hand out pills until the symptoms stop. They take a history, order tests that split the possible causes into "this one" and "not this one", and treat once they know. Debugging works the same way:</p>
+<ol>
+  <li><b>Reproduce</b>: make it fail on demand, with a command you can rerun.</li>
+  <li><b>Shrink</b>: cut the failing input down to the smallest piece that still fails.</li>
+  <li><b>Hypothesize</b>: list possible causes, each with an experiment that would rule it in or out.</li>
+  <li><b>Experiment</b>: run them one at a time, and write down what each one ruled out.</li>
+  <li><b>Fix the cause</b>, not the symptom.</li>
+  <li><b>Keep the evidence</b>: the shrunk input becomes a test.</li>
+</ol>
+<p>The assistant is useful at every step, especially for listing causes and writing experiments. The decisions in steps 4 and 5, what the evidence says and what to change, stay with you.</p>
+
+<h3>Shrink: 2 million lines down to one</h3>
+<p>The failing input is 2 million lines. Nobody can read that. But you can run the program on <em>part</em> of it and see whether the bug is still there. That's a yes/no question you can ask as often as you like, and halving answers it fast:</p>
+<ul>
+  <li>Cut out the first half. Still fails? Then those lines didn't matter: keep them out.</li>
+  <li>Bug gone? Then something in that half mattered: put it back and try cutting the other half.</li>
+  <li>If neither half can go on its own, the bug needs at least one line from each half. Try smaller pieces: quarters, then pairs, and so on down to single lines.</li>
+</ul>
+<p>Step through it on a toy: 16 lines, and a bug that only shows up when lines 4 and 13 are both present.</p>
+
+<div class="figure">
+  <div id="dd-player"></div>
+  <div class="cap">Green: cut, and the bug is still there, so those lines go for good. Red: cut, and the bug vanished, so they go back. Dashed: already gone. Blue at the end: what's left. Step with ▶| or press ▶ Play.</div>
+</div>
+
+<p>On 16 lines that took 16 runs, no better than trying one line at a time. The payoff comes with size. For a bug that needs two lines, this method takes about 40 runs on 1,000 lines and about 85 on 2 million. One line at a time would take 1,000 and 2 million runs. At 2 seconds a run, that's about 3 minutes instead of 46 days.</p>
+
+<p>This is <b>delta debugging</b>, Andreas Zeller's name for the systematic version: remove chunks, keep every removal that keeps the failure, and shrink the chunk size when no chunk can go. It ends with a <b>1-minimal</b> input: removing any single remaining piece makes the bug vanish, so every piece left matters. Our real bug needs only one line, and shrinking the log ends with exactly one: an empty line. So the shrunk test is <code>top_k_words([""], 1)</code>, which returns <code>[("", 1)]</code> instead of <code>[]</code>. Exercise 4 builds the shrinker.</p>
+
+<div class="check" id="check-halving">
+  <p class="q">You cut out the first half of the 16 lines, and the bug disappears. You put it back and cut out the second half, and the bug disappears again. What have you learned?</p>
+  <div class="opts">
+    <button>The bug is flaky, so shrinking can't work here</button>
+    <button data-correct>The bug needs at least one line from each half, so try smaller pieces</button>
+    <button>The bug isn't in the input at all</button>
+  </div>
+  <div class="fb right"><p>Yes. Removing the first half killed the bug, so it needs something in the first half; the same goes for the second half. Halves are too coarse, so drop to quarters: that lets you remove the parts of each half that don't matter and keep the parts that do. That's what runs 3 to 6 in the player do.</p></div>
+  <div class="fb wrong"><p>Read each result as a fact. "Without the first half, no bug" means the bug needs something from the first half. "Without the second half, no bug" means it needs something from the second half too. Both can be true at once if the bug needs two lines, one in each half, like lines 4 and 13. A flaky bug would give different answers for the same input; this one gives the same answers every time. The fix is smaller pieces: quarters, then pairs, then single lines.</p></div>
+</div>
+
+<h3>Hypotheses, one experiment each</h3>
+<p>A one-line input is something you can reason about. Now ask for causes, not fixes:</p>
+
+<pre class="plain"><code>top_k_words([""], 1) returns [("", 1)];
+I expect []. The function is below.
+List 3 possible causes. For each, give
+one experiment that would rule it in
+or out. Don't write a fix yet.</code></pre>
+
+<p>A useful answer looks something like this:</p>
+
+<pre class="plain"><code>1. split(" ") keeps empty strings:
+   "".split(" ") is [""].
+   Try top_k_words(["a  b"], 3), with
+   two spaces. A "" in the result
+   confirms it.
+2. Lines still end in "\n", so the
+   blank line isn't really "".
+   Try printing repr(line) for each.
+3. lower() changes something.
+   Try the same input without lower().</code></pre>
+
+<p>Run experiment 1 and you get <code>[("", 1), ("a", 1), ("b", 1)]</code>: an empty string, counted from between the two spaces. Cause found, in one run. In Python, <code>"".split(" ")</code> is <code>[""]</code> and <code style="white-space:pre">"a  b".split(" ")</code> is <code>["a", "", "b"]</code>. But <code>split()</code> with no argument splits on runs of any whitespace and never returns empty strings: <code>"".split()</code> is <code>[]</code>. Hypothesis 3 was never likely (lowercasing can't create an empty string), but listing it cost nothing, and ruling causes out is half the work.</p>
+
+<h3>Bisect: which change did it?</h3>
+<p>The function used to work, and there have been 12 commits since the last good release. Which one broke it? You've met this loop: it's the first-bad-version search from the <a href="../../02-algorithms/concepts/binary-search.html#s3">binary search chapter</a>. Test the commit in the middle. If it's bad, the first bad commit is at or before it; if it's good, it's after. log₂ 12 is about 3.6, so that's 4 runs instead of up to 12, and git does the bookkeeping: <code>git bisect run</code> takes a script that exits with 0 for good and 1 for bad, and finds the commit on its own.</p>
+
+<p>Here it lands on commit 7, "make splitting explicit": six changed lines, one of which turned <code>split()</code> into <code>split(" ")</code>. Now you know the cause <em>and</em> how it got in.</p>
+
+<p>Real histories add a twist: some commits can't be tested at all. They don't build, or the test needs a file that was added later. You can't call such a commit good or bad, so you test a neighbor instead (<code>git bisect skip</code>; in a script, exit code 125). Here are versions 1 to 8, with version 8 known bad and version 5 not building:</p>
+
+<div class="figure">
+<pre class="diagram"><code>version   1   2   3   4   5   6   7   8
+result    .   .   .   G   ?   B   .   B
+asked                 1st 3rd 2nd</code></pre>
+  <div class="cap">G = good, B = bad, ? = can't be tested, . = never asked. The search tests 4 (good), then 6 (bad), then wants 5, which doesn't build.</div>
+</div>
+
+<p>Nothing else is left between the last good version and the first bad one, so the honest answer is a range: "5 or 6". If 5 could be tested, one more run would settle it; since it can't, no test can. Exercise 5 builds this search, including which neighbor to test and when to stop.</p>
+
+<h3>Fix, then keep the evidence</h3>
+<p>The fix is one line: back to <code>split()</code>. Then the shrunk inputs become tests: <code>[""]</code> must give <code>[]</code>, and <code style="white-space:pre">["a  b"]</code> must count only "a" and "b". This is a <b>regression test</b>. A <em>regression</em> is something that used to work and broke, and the test keeps this one from sneaking back. Shrinking gave you the perfect size for one: small enough to read, and it failed before the fix.</p>
+
+<div class="keyidea">Debug like a doctor, not a gambler. Reproduce, shrink the input until every piece matters, list hypotheses with one experiment each, and bisect the history to find the change that did it. Then fix the cause and keep the shrunk input as a test. The assistant can propose causes and write experiments; you decide what the evidence says.</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: ddmin, 1-minimal vs smallest, and bisect scripts</summary>
+  <ul>
+    <li><b>ddmin.</b> Zeller and Hildebrandt's 2002 paper "Simplifying and Isolating Failure-Inducing Input" gave the classic algorithm. It tries each chunk on its own <em>and</em> each complement (everything except one chunk), and doubles the number of chunks when neither works. C-Reduce, which shrinks C programs that trigger compiler bugs, builds on the same idea with smarter, language-aware cuts.</li>
+    <li><b>1-minimal isn't smallest.</b> Say the bug shows up when the input contains A and B together, or C on its own. Start from {A, B, C, D}. Shrinking can remove C first (A and B still trigger the bug), then D, and stop at {A, B}: remove either one and the bug vanishes, so it's 1-minimal. Yet {C} alone would have been smaller. Finding the truly smallest failing subset can mean trying all 2ⁿ subsets; 1-minimal is the promise you can afford.</li>
+    <li><b>Bisect scripts.</b> For <code>git bisect run</code>, the script's exit code is its answer: 0 means good, and 1 to 127 means bad, except 125, which means "can't test this one, skip it". Any other exit code stops the bisect.</li>
+    <li><b>Flaky tests break both tools.</b> Shrinking and bisecting both assume the same input always gives the same answer. If a test fails only sometimes, run it several times per step, or fix the flakiness first.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Refactoring behind a photo</h2>
+
+<p>Where did commit 7 come from? A request to the assistant: "tidy up the splitting code". It came back cleaner, the tests passed, and it shipped. A <b>refactor</b> is a change to how code is written that must not change what it does. This one changed what it did, and nothing noticed.</p>
+
+<p>Before you rearrange a room, take a photo. Afterwards, compare: is every object still there? A <b>characterization test</b> is that photo for code. It records what the code does now, right or wrong, so you notice any change. (Michael Feathers coined the term for working with old code nobody fully understands, which is exactly what code you didn't write is.)</p>
+
+<h3>Taking the photo</h3>
+<p>You already own the best camera: the old code. Keep a copy, and use it as the oracle from section 5: run old and new on lots of inputs and compare. The photo only protects what's in the frame, so put the odd inputs in on purpose: empty lines, double spaces, tabs, uppercase, punctuation. A photo with no double spaces in it could never catch <code>split(" ")</code>. One with a tab would catch it too, since <code>"a\tb".split(" ")</code> is <code>["a\tb"]</code>, a single "word".</p>
+
+<h3>One thing at a time</h3>
+<ol>
+  <li><b>Pin the behavior.</b> Take the photo, and watch it pass on the old code.</li>
+  <li><b>Ask for one named change.</b> Not "clean this up", but "extract the counting loop into <code>count(lines)</code>" or "rename <code>w</code> to <code>word</code>". A named change has a shape you can check: a rename diff should change names and nothing else.</li>
+  <li><b>Compare after each change</b>, then commit.</li>
+  <li><b>Keep behavior changes separate.</b> If you spot a real bug mid-refactor, write it down. Finish the refactor with behavior unchanged, then fix the bug as its own step, with its own test.</li>
+</ol>
+<p>Diff size is the other half. The "tidy up" request came back as one 60-line diff: 10 minutes of careful reading, with five kinds of change mixed together, one of which changed behavior. Five named changes of about 12 lines each are the same reading in total. But each diff has one job, so you know what to look for, and when the photo fails you know which change broke it.</p>
+
+<div class="keyidea">A refactor must not change behavior, so prove it. Take a photo first (characterization tests, with the old code as the oracle and odd inputs in the frame). Then ask for one named change at a time and compare after each. Behavior changes get their own step.</div>
+
+<div class="check" id="check-refactor">
+  <p class="q">Halfway through a refactor, you notice that the old code counts "hello," and "hello" as different words. You think that's a bug. What do you do?</p>
+  <div class="opts">
+    <button data-correct>Finish the refactor with that behavior unchanged; then fix it as its own step, with its own test</button>
+    <button>Fix it now, in the same change, since you're touching that code anyway</button>
+    <button>Never fix it: a refactor must not change behavior</button>
+  </div>
+  <div class="fb right"><p>Yes. If you change structure and behavior in one step and something fails, you can't tell which change caused it, and the photo can't help, because you meant to change the picture. One kind of change per step keeps every failure explainable. And check that it really is a bug: the context block said "split on whitespace, nothing else", so stripping punctuation is a change to the spec, and it needs a yes from whoever owns that.</p></div>
+  <div class="fb wrong"><p>Think about what the photo is for: any difference from the old code means something broke. If the same step also fixes the comma, the photo shows a difference you wanted mixed in with any you didn't, and you can't tell them apart. So don't mix them. But "never" goes too far: the rule is about one step, not forever. Once the refactor is done and green, the fix is an ordinary change with its own test.</p></div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: golden masters and snapshot tests</summary>
+  <p>When the behavior is big (a report, a web page, a whole file of output), record the old code's output for many inputs into files, called a <b>golden master</b>, and compare new output against them exactly. Tools for this are called approval or snapshot tests. The trap is the same as test-after: when a snapshot changes, it's tempting to accept the new output without reading it. A snapshot is a photo, not a judgment of what's right.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Reviewing code you didn't write</h2>
+
+<p>When you proofread your own essay, you read what you meant to write, not what's on the page, so typos slip past. A fresh reader sees the page. AI-written code sets a different trap: it's fluent, well named and neatly formatted, which is how code from a careful person looks. Fluency isn't correctness, so don't let it set your trust.</p>
+
+<p>The fix is a checklist: a catalogue of the mistakes that come up again and again, so you look for each one on purpose instead of hoping it jumps out at you.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>look for</th><th>how to check</th></tr></thead>
+  <tbody>
+    <tr><td><b>A function that doesn't exist, or doesn't do that.</b> <code>counts.most_common(k, key=...)</code> raises <code>TypeError</code>: there's no <code>key</code> argument.</td><td>run it; read the docs</td></tr>
+    <tr><td><b>Off by one.</b> <code>ranked[:k + 1]</code>, <code>range(1, len(a))</code>.</td><td>k = 1; the first and last item</td></tr>
+    <tr><td><b>Inputs it forgot.</b> <code>[]</code>, <code>""</code>, ties, a k bigger than the data.</td><td>your edge-case tests</td></tr>
+    <tr><td><b>Errors swallowed.</b> <code>except Exception: return []</code>.</td><td>make it fail: does anyone find out?</td></tr>
+    <tr><td><b>A hidden loop.</b> <code>x in some_list</code> inside a loop.</td><td>count the loops (the <a href="../../02-algorithms/concepts/complexity.html#s5">complexity chapter</a>); time a big input</td></tr>
+    <tr><td><b>Tests that test nothing.</b> <code>assert result is not None</code>; a mock of the function under test.</td><td>break the code on purpose</td></tr>
+    <tr><td><b>Changing the caller's data.</b> <code>items.sort()</code> on an argument.</td><td>compare the input before and after the call</td></tr>
+    <tr><td><b>Scope creep.</b> Renames, new options, files you didn't mention.</td><td>read the list of changed files first</td></tr>
+    <tr><td><b>Everything in memory.</b> <code>f.read()</code>, <code>list(lines)</code>.</td><td>ask: what if the input were 100 times bigger?</td></tr>
+  </tbody>
+</table></div>
+
+<p>Try it. This version came back from a request to "make top_k_words more robust". Six problems hide in its 15 lines. Click every line you'd flag, then check your review.</p>
+
+<div class="figure">
+  <div class="viz-stage">
+    <div id="rv-code" role="group" aria-label="Code to review. Click a line to flag it." style="overflow-x:auto;padding:4px 0"></div>
+    <div class="viz-controls">
+      <button class="btn primary" id="rv-check">Check my review</button>
+      <button class="btn" id="rv-reset">Start over</button>
+      <span class="muted small" id="rv-count"></span>
+    </div>
+    <div id="rv-out"></div>
+  </div>
+  <div class="cap">A problem counts as found if you flag any of its lines. After checking, green lines are problems you found, red ones are problems you missed, and yellow ones are lines you flagged that are fine.</div>
+</div>
+
+<p>Read in a fixed order, cheapest first: the signature and the list of changed files (did it change what it promised?), then the tests (are they real?), then the risky lines: loops, error handling, and anything that reads input.</p>
+
+<div class="keyidea">AI-written code is fluent, so it looks reviewed when it isn't. Review it against a catalogue: invented functions, off by one, forgotten inputs, swallowed errors, hidden loops, empty tests, changed inputs, scope creep, and everything held in memory. Read the signature and the tests first.</div>
+
+<div class="check" id="check-review">
+  <p class="q">A teammate's AI-written helper counts 100,000 distinct words. Which of these lines hides a loop inside a loop?</p>
+  <div class="opts">
+    <button><code>counts = Counter(words)</code></button>
+    <button data-correct><code>counts = {w: words.count(w) for w in set(words)}</code></button>
+    <button><code>ranked = sorted(counts.items(), key=lambda wc: (-wc[1], wc[0]))</code></button>
+  </div>
+  <div class="fb right"><p>Yes. <code>words.count(w)</code> scans the whole list, and it runs once per distinct word. With 100,000 words, all different, that's 100,000 × 100,000 = 10¹⁰ steps: about 17 minutes at 10 million steps a second. Section 5's oracle counts the same way, and there it's fine, because the oracle only ever sees tiny inputs. The same code can be right in a test and wrong in production.</p></div>
+  <div class="fb wrong"><p>Look for a loop you can't see. <code>Counter(words)</code> walks the list once: O(n). <code>sorted</code> costs O(d log d) for d distinct words, about 1.7 million comparisons for 100,000. But inside the dict comprehension, <code>words.count(w)</code> is itself a full scan of the list, run once for every distinct word: n × d steps, 10¹⁰ when both are 100,000. A method call that hides a loop is the "know what Python hides" rule from the complexity chapter.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s10"><span class="sec-num">10</span>In the interview: direct, verify, judge</h2>
+
+<p>When a round allows an assistant, its typing isn't what's being assessed. Your decisions are what the interviewer can see. This book's interview-formats section sums them up in three words (topic 15.09, the AI-assisted round):</p>
+<ul>
+  <li><b>Direction.</b> You decide what gets built, in what order, from what context. It shows as a context block, a plan before code, and small steps.</li>
+  <li><b>Verification.</b> You prove each step works, with checks you chose. It shows as tests before code, an oracle, breaking things on purpose, and reading the diff.</li>
+  <li><b>Judgment.</b> You decide what to accept, what to push back on, and when to put the assistant away. It shows as reasons you say out loud.</li>
+</ul>
+
+<h3>Accept, push back, or write it yourself</h3>
+<ul>
+  <li><b>Accept</b> when the checks you chose pass and the diff does only what you asked.</li>
+  <li><b>Push back with evidence</b>, not doubt. "Are you sure?" invites a confident yes, or an apology that "fixes" correct code. A failing input works better: "For <code>top({"b": 1, "a": 1}, 1)</code> I get <code>[("b", 1)]</code>; I expect <code>[("a", 1)]</code>."</li>
+  <li><b>Write it yourself</b> when you can see the fix and explaining it would take longer than typing it, like a two-line change.</li>
+  <li><b>Change the approach</b> after two attempts that miss the same way. A third try with the same context tends to miss the same way too. Add the failing example, shrink the step, or take over.</li>
+</ul>
+
+<h3>When not to use it at all</h3>
+<ul>
+  <li><b>The rules say no.</b> Some rounds don't allow assistants. If it isn't clear, ask at the start; using one where it isn't allowed can end the interview.</li>
+  <li><b>Code or data that isn't yours to share:</b> secrets, customer data or private code, unless the tool is approved for it.</li>
+  <li><b>You can't check the answer.</b> If you couldn't tell a right answer from a wrong one, the answer is worth nothing to you. Learn enough to check it first.</li>
+  <li><b>The point is to learn.</b> The exercises in this book exist to build the skill in your own head. An assistant that writes them skips the part you came for.</li>
+  <li><b>Tiny changes.</b> If typing it is faster than describing it, type it.</li>
+</ul>
+
+<p>Here's what it sounds like, narrated as you work:</p>
+<div class="story">
+  <p>"First the context: the signature, the sizes, the tie rule, and one example where ties matter. I'm asking for its assumptions before any code. … It assumed a file path, but callers pass lines, so I'm correcting that now. … Step 3 is the tie rule. Before I run its version, I'm writing the tie test myself: <code>{"b": 1, "a": 1}</code> with k = 1 should give <code>[("a", 1)]</code>. … It returned <code>[("b", 1)]</code>. I'll paste that case back instead of asking it to double-check. … It passes now. Let me flip the tie order on purpose and make sure the test goes red. Good. Committing, then step 4."</p>
+</div>
+
+<div class="keyidea">You're judged on your decisions, not on the assistant's typing: direction (context, plan, small steps), verification (checks you chose, run before you trust), and judgment (accept, push back with evidence, or do it yourself). Say each decision out loud, with its reason.</div>
+
+<div class="check" id="check-pushback">
+  <p class="q">The assistant's <code>top</code> fails your tie test. Which reply is best?</p>
+  <div class="opts">
+    <button>"Are you sure that's right? Please double-check the tie handling."</button>
+    <button>"Rewrite the whole function from scratch, more carefully this time."</button>
+    <button data-correct>"<code>top({"b": 1, "a": 1}, 1)</code> returns <code>[("b", 1)]</code>; I expect <code>[("a", 1)]</code>, because ties go to the alphabetically first word. Fix only the tie rule."</button>
+  </div>
+  <div class="fb right"><p>Yes. It gives the assistant exactly what it was missing: a concrete input, the wrong output, the right output and the rule. It also limits the change, so the next diff is small and checkable. The interviewer hears the same thing: you found a bug with evidence and kept the fix contained.</p></div>
+  <div class="fb wrong"><p>Picture a mechanic. "Are you sure the car's fine?" gets you a shrug. "It squeals when I brake at low speed" gets you a fix. "Double-check" adds no information, and the reply may defend the code, or change something else, as easily as fix it. "Rewrite from scratch" throws away the steps that already passed their checks. A failing input with the expected output and the rule is the smallest message that can't be misread.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s11"><span class="sec-num">11</span>What to say in the interview</h2>
+
+<p>A strong session has a shape you can say out loud, one line per phase:</p>
+<ol>
+  <li><b>Context.</b> "Before I prompt: here's the signature, the sizes, and what must stay true. The input doesn't fit in memory, so I'm saying that up front."</li>
+  <li><b>Plan.</b> "I'll ask for its assumptions and a plan first, then one step at a time, each with a check."</li>
+  <li><b>Checks first.</b> "I'm writing the tie case and the empty input myself, plus a slow oracle to compare against."</li>
+  <li><b>Judgment.</b> "That step passed, so I'm committing. This diff also renamed a function I didn't ask about, so I'm undoing that part."</li>
+  <li><b>Debugging.</b> "It fails on one empty line. Three hypotheses, one experiment each. Experiment 1 shows <code>split(" ")</code> keeps empty strings."</li>
+</ol>
+
+<details class="aside deeper">
+  <summary>Go deeper: follow-up questions interviewers like</summary>
+  <ul>
+    <li><b>"How do you know your tests are any good?"</b> Their expected values come from the task, not the code, and I break the code on purpose to watch a test go red.</li>
+    <li><b>"Its version is faster than yours, but you can't follow it. Ship it?"</b> Not until I can explain it, or my checks are strong enough to trust it anyway: the oracle on every small input, plus properties at full size. Code nobody understands is a cost for the next person who has to change it.</li>
+    <li><b>"How would you use it in a big codebase you don't know?"</b> Read-only first: ask it to trace a request and list the files involved, check the trace, and draw the data flow. Then small changes behind characterization tests.</li>
+    <li><b>"It keeps making the same mistake. Now what?"</b> Change the input, not the volume: add the failing example, shrink the step, or write that part myself.</li>
+    <li><b>"Here's a 1,000-line AI-generated change to review."</b> Ask for it in reviewable pieces. Read the signature changes and the tests first, climb the ladder, and read every line only where the risk is.</li>
+    <li><b>"When does it hurt more than it helps?"</b> When I can't check the output, when the hard part is a decision rather than typing, and when the code or data can't be shared.</li>
+  </ul>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Writing code got cheap; checking it is the job. The assistant is fast and well read, sees only its context, and can sound just as sure when it's wrong.</li>
+  <li>Risks multiply: n changes that are each right with chance p are all right with chance pⁿ. 0.9<sup>10</sup> ≈ 35%. Examples prove something only if they could have failed.</li>
+  <li>A check after every step changes the math: a wrong step gets through with (1 − p)(1 − c), so 0.99<sup>10</sup> ≈ 90%. Commit after every passing check.</li>
+  <li>Context block: signature, sizes, invariants, constraints, a "don't" list, examples with the hard case, a data-flow sketch, and a read-back of its assumptions before any code.</li>
+  <li>Decide what "right" means first: examples, edge cases, properties. Tests whose expected values were read off the code share its bugs.</li>
+  <li>An oracle you wrote yourself judges the fast version on every small input, smallest first: differential testing.</li>
+  <li>Climb the ladder of checks as far as the risk deserves. Break the code on purpose to prove your tests can fail.</li>
+  <li>Debug like a doctor: reproduce, shrink to 1-minimal, hypotheses with experiments, bisect (and skip what can't be tested), fix the cause, keep the regression test.</li>
+  <li>Refactor behind a photo: characterization tests with the old code as the oracle, one named change at a time, behavior changes separately.</li>
+  <li>Review with a catalogue, push back with a failing input, and know when not to use the assistant at all.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the warm-ups on paper first, and commit to an answer before you open it. The core exercises are code: <code>exercises/delta_debug.py</code>, <code>exercises/bisect_skip.py</code> and <code>exercises/differential.py</code>, the tools from sections 5 and 7. Their tests <b>count every call</b> to the slow function you're handed (a test run, a build, a candidate), so a correct but wasteful answer fails. The stretch exercises use your own AI tool, with a timer and a rubric to score yourself.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Compounding by hand</h4>
+  <p>(a) Work out 0.9<sup>10</sup>, 0.95<sup>20</sup> and 0.99<sup>50</sup>, using repeated squaring for the first. (b) A 12-step session without checks: one assistant's steps are right 97% of the time, another's 85%. What's the chance of a fully right session with each? (c) A 20-step session whose steps are right 90% of the time. What catch rate c must the check after each step have for the whole session to end right 90% of the time?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) 0.9² = 0.81, 0.9⁴ ≈ 0.656, 0.9⁸ ≈ 0.430, so 0.9¹⁰ = 0.9⁸ × 0.9² ≈ 0.35. Then 0.95²⁰ ≈ 0.36 and 0.99⁵⁰ ≈ 0.61: twenty changes at 95% are about as risky as ten at 90%, and fifty at 99% still go wrong two sessions in five.</p>
+    <p>(b) 0.97¹² ≈ 0.69 and 0.85¹² ≈ 0.14. A gap of 12 points per step becomes a factor of about five per session.</p>
+    <p>(c) Each step must end right with some q where q²⁰ = 0.9, so q = 0.9<sup>1/20</sup> ≈ 0.99475. A wrong step gets through with 0.1 × (1 − c), so you need 0.1 × (1 − c) ≤ 0.00525, which means c ≥ 0.9475. The checks must catch about 95% of wrong steps.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. A context block for a TTL cache</h4>
+  <p>Write a context block and a data-flow sketch for an LRU cache whose entries also expire a fixed time after they're written (the same-TTL version from the <a href="../../01-data-structures/concepts/lru-lfu-cache.html">LRU chapter</a>). Include the signature, sizes, invariants, constraints, a "don't" line, three examples (one of them hard), and the questions you'd want the assistant's read-back to raise. Ten minutes.</p>
+  <details class="aside another"><summary>A model answer</summary>
+    <pre class="plain"><code>Task: a TTL cache
+  TTLCache(capacity, ttl, now)
+  get(key) -&gt; value or None
+  put(key, value) -&gt; None
+Sizes: capacity up to 100,000;
+  get and put each O(1).
+now: returns the time in
+  seconds; tests pass a fake
+  clock.
+Must stay true: at most
+  capacity live entries; get
+  never returns an entry older
+  than ttl; the dict and the
+  list hold the same keys.
+Don't: use threads or a
+  background sweeper; add
+  libraries.
+Examples (capacity 2, ttl 10):
+  put a at t=0, get a at t=5
+    -&gt; the value
+  put a at t=0, get a at t=10
+    -&gt; None (expired)
+  put a, put b, get a, put c
+    -&gt; b is evicted</code></pre>
+    <pre class="diagram"><code>get / put
+   │
+   ▼
+[ dict key → node ]
+   │   O(1) lookup
+   ▼
+[ list, most recent first ]
+   │  get, put: move to front
+   │  full: drop the back
+   ▼
+[ expired? ]
+     now() - written ≥ ttl:
+     on get, delete it; miss</code></pre>
+    <p>Questions the read-back should raise, each one a decision you make: Does <code>get</code> refresh the expiry, or only the recency? (Usually only the recency: the TTL is about how old the data is.) Does <code>put</code> on an existing key reset its expiry and move it to the front? When the cache is full, do you evict an expired entry first, or the least recently used one? Is an entry still live at exactly ttl seconds? (The second example says no.) What does capacity 0 do? And threads: out of scope, so say so. The injected <code>now</code> is what makes the expiry testable without waiting.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Review it on paper</h4>
+  <p>An assistant wrote this to return a list's items without repeats, keeping the first copy of each, in order. Find three problems, and for each give an input that shows it.</p>
+  <pre><code>def unique_in_order(items, seen=[]):
+    out = []
+    for i in range(1, len(items)):
+        if items[i] not in seen:
+            seen.append(items[i])
+            out.append(items[i])
+    return out</code></pre>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(1) Off by one: <code>range(1, len(items))</code> skips the first item, so <code>[1, 2]</code> gives <code>[2]</code>. (2) The default <code>seen=[]</code> is created once, when the function is defined, and every call shares it. Call it twice with <code>[1, 2]</code> and the second call returns <code>[]</code>. Make <code>seen</code> a fresh local set instead. (3) A hidden loop: <code>not in seen</code> scans a list, inside the loop over the items. For 100,000 distinct items that's about n²/2 = 5 × 10⁹ comparisons; a set makes each check O(1) on average. Edge-case tests with a one-item list and two calls in a row would have caught (1) and (2) without reading a line.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>shrink(items, fails)</code>: delta debugging</h4>
+  <p>In <code>exercises/delta_debug.py</code>. Return a sub-list of <code>items</code>, in the original order, that still fails and is 1-minimal (section 7). The tests count calls to <code>fails</code>, since each one stands for a slow run. With 4,000 items, a bug that needs 1 of them must take at most 100 calls, one that needs 2 at most 600, and one that needs 3 at most 1,000. Removing one item at a time costs about 4,000, so it fails. The tests also check that you remove by position (values repeat, and one bug needs three copies of the same value), keep the order, leave the input list alone, and cope with a test that isn't monotone.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>first_bad(n, is_bad)</code>: bisect with versions you can't test</h4>
+  <p>In <code>exercises/bisect_skip.py</code>. <code>is_bad(v)</code> returns True, False, or None for a version that can't be tested. Return the range <code>(lo, hi)</code> that the answers can prove, like "5 or 6" in section 7. The tests count calls: at most log₂ n rounded up, plus 1 (21 for a million versions), plus 2 for every None answer, and never the same version twice. They try every case up to n = 10, blocks of untestable versions next to the answer, and every 4,096th version untestable, which is exactly where a binary search over 2²⁰ versions probes first.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>find_counterexample(candidate, oracle, alphabet, max_len)</code>: differential testing</h4>
+  <p>In <code>exercises/differential.py</code>. Try every list over <code>alphabet</code>, shortest first, and return the first one where the candidate and the oracle disagree: a different answer, an exception, or a candidate that changed its input. The tests use a "most common value" problem with six wrong candidates and one correct one, and they count calls: at most 3 per list tried. Trying all 1,093 lists and then picking the smallest fails when the first disagreement is list 24.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · your AI tool, timed</div>
+  <h4>7. Plant and hunt (30 minutes)</h4>
+  <p>Take a solution of yours from an earlier chapter that has tests (merge intervals, the LRU cache, anything). In one session, ask your assistant to plant a single subtle bug in a copy, the kind that passes most tests, and to write down which bug it planted in a file you don't open. Then, in a <em>fresh</em> session that doesn't know the answer, hunt the bug with section 7's method. Start a timer, and score one point for each:</p>
+  <ol>
+    <li>You reproduced it with a failing test before changing any code.</li>
+    <li>You shrank the failing input to something you can explain in one sentence.</li>
+    <li>You asked for hypotheses with experiments, not for a fix.</li>
+    <li>You ran the experiments one at a time and wrote down what each ruled out.</li>
+    <li>Your fix changed only the cause (now open the file and compare).</li>
+    <li>The shrunk input is now a regression test, and it fails on the planted version.</li>
+  </ol>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · your AI tool, timed</div>
+  <h4>8. A narrated build (45 minutes)</h4>
+  <p>With your assistant, build a <code>Leaderboard</code> class with <code>add(player, points)</code>, <code>top(k)</code> (ties alphabetical) and <code>reset(player)</code>, narrating every decision out loud. Record yourself. Four stages: (1) context block and plan, 5 minutes; (2) tests and an oracle written by you, 10 minutes; (3) small steps, each with a check and a commit, 20 minutes; (4) one named refactor behind a photo, 10 minutes. Then play the recording back and score yourself from 1 to 4 on direction, verification and judgment (1: the assistant drove; 4: every step had a check you chose, and you overruled it at least once with evidence). When that feels routine, ask for a "mock interview, AI-assisted coding round".</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k "delta_debug or bisect_skip or differential"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="../index.html"><small>← Back to</small>Chapter 13 overview</a>
+  <a class="next" href="../../../index.html"><small>Next →</small>Your track</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- Checks after every change (section 4) ----------
+  (function () {
+    const P = $("cp-p"), N = $("cp-n"), C = $("cp-c");
+    // Fixed draws for the first session, so the page always opens the same way:
+    // changes 2 and 6 are wrong (draws above 0.9), and both of their checks catch them.
+    let seed = 20240611;
+    const next = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const r1 = [0.3, 0.95, 0.5, 0.1, 0.7, 0.97, 0.2, 0.4, 0.6, 0.8];
+    const r2 = [0.5, 0.35, 0.5, 0.5, 0.5, 0.62, 0.5, 0.5, 0.5, 0.5];
+    while (r1.length < 30) { r1.push(next()); r2.push(next()); }
+    const pct = (x) => (x >= 0.995 ? "over 99%" : x < 0.0001 ? "under 0.01%" : x < 0.01 ? (100 * x).toFixed(2) + "%" : Math.round(100 * x) + "%");
+    const OK = ["var(--ok)", "right"], CAUGHT = ["var(--warn)", "wrong, caught by its check and redone"], BAD = ["var(--bad)", "wrong, and nothing caught it"];
+    const plural = (k, one, many) => (k === 1 ? one : many);
+    const row = (title, prob, marks, note) => V.el("div", { style: "margin:0 0 16px" },
+      V.el("div", { style: "display:flex;justify-content:space-between;align-items:baseline;gap:2px 12px;flex-wrap:wrap" },
+        V.el("b", { class: "small" }, title),
+        V.el("span", { class: "small muted", html: `<b>${pct(prob)}</b> of sessions end all right` })),
+      V.el("div", { class: "bar", style: "margin-top:6px" }, V.el("span", { style: `width:${(100 * prob).toFixed(1)}%;background:var(--accent)` })),
+      V.el("div", { style: "display:flex;flex-wrap:wrap;gap:3px;margin-top:10px" },
+        marks.map(([bg, t], i) => V.el("span", { title: `change ${i + 1}: ${t}`, style: `display:inline-block;width:14px;height:14px;border-radius:3px;background:${bg}` }))),
+      V.el("div", { class: "small muted", style: "margin-top:6px" }, note));
+    function draw() {
+      const p = P.value / 100, n = Number(N.value), c = C.value / 100;
+      $("cp-pv").textContent = P.value + "%"; $("cp-nv").textContent = String(n); $("cp-cv").textContent = C.value + "%";
+      const all = Math.pow(p, n), slip = (1 - p) * (1 - c), checked = Math.pow(1 - slip, n);
+      const a = [], b = []; let wrong = 0, caught = 0, slipped = 0;
+      for (let i = 0; i < n; i++) {
+        if (r1[i] < p) { a.push(OK); b.push(OK); continue; }
+        wrong++; a.push(BAD);
+        if (r2[i] < c) { caught++; b.push(CAUGHT); } else { slipped++; b.push(BAD); }
+      }
+      const noteA = !wrong ? `This session: all ${n} ${plural(n, "change", "changes")} came out right.`
+        : `This session: ${wrong} wrong ${plural(wrong, "change", "changes")} got in. The final test fails, and it doesn't say which of the ${n} to blame.`;
+      const noteB = !wrong ? `This session: all ${n} ${plural(n, "change", "changes")} came out right.`
+        : slipped ? `This session: ${caught} caught and redone, but ${slipped} got past ${plural(slipped, "its check", "their checks")}.`
+        : `This session: ${caught} wrong ${plural(caught, "change was", "changes were")} caught right away and redone. Nothing got through.`;
+      $("cp-out").replaceChildren(row("Accept everything, test at the end", all, a, noteA), row("Check after every change", checked, b, noteB));
+      $("cp-msg").innerHTML = `Accept everything: p<sup>n</sup> = ${p.toFixed(2)}<sup>${n}</sup> ≈ <b>${pct(all)}</b>. `
+        + `Check every change: a wrong change gets through only if it's wrong <em>and</em> its check misses it, (1 − p)(1 − c) = ${(1 - p).toFixed(2)} × ${(1 - c).toFixed(2)} = ${slip.toFixed(4)}. `
+        + `So each step ends right with ${(1 - slip).toFixed(4)}, and ${(1 - slip).toFixed(4)}<sup>${n}</sup> ≈ <b>${pct(checked)}</b>.`;
+    }
+    $("cp-run").onclick = () => { for (let i = 0; i < 30; i++) { r1[i] = Math.random(); r2[i] = Math.random(); } draw(); };
+    [P, N, C].forEach((el) => el.addEventListener("input", draw));
+    draw();
+  })();
+
+  // ---------- Shrinking 16 lines (section 7) ----------
+  (function () {
+    // The runs are replayed, not computed: [lines cut, bug still there?, note].
+    // The toy bug needs lines 4 and 13 together.
+    const runs = [
+      [[1, 2, 3, 4, 5, 6, 7, 8], false],
+      [[9, 10, 11, 12, 13, 14, 15, 16], false, "Neither half can go on its own, so the bug needs a line from each half. Try quarters."],
+      [[1, 2, 3, 4], false],
+      [[5, 6, 7, 8], true],
+      [[9, 10, 11, 12], true],
+      [[13, 14, 15, 16], false, "No piece of 4 can go any more. Try pieces of 2."],
+      [[1, 2], true],
+      [[3, 4], false],
+      [[13, 14], false],
+      [[15, 16], true, "No piece of 2 can go any more. Try single lines."],
+      [[3], true],
+      [[4], false],
+      [[13], false],
+      [[14], true, "Lines went out in this pass, so try each remaining line once more."],
+      [[4], false],
+      [[13], false],
+    ];
+    const name = (a) => (a.length === 1 ? `line ${a[0]}` : a.length === 2 ? `lines ${a[0]} and ${a[1]}` : `lines ${a[0]}–${a[a.length - 1]}`);
+    const frames = [{ gone: new Set(), cut: [], msg: "16 lines, and the bug shows up. You can't read them; you can only run the program on fewer lines and ask one question: is the bug still there?" }];
+    const gone = new Set();
+    runs.forEach(([cut, still, note], k) => {
+      const many = cut.length > 1;
+      let msg = `Run ${k + 1}: cut ${name(cut)}. `;
+      msg += still
+        ? `The bug is still there, so ${many ? "they don't" : "it doesn't"} matter: ${many ? "they stay" : "it stays"} out. <b>${16 - gone.size - cut.length}</b> lines left.`
+        : `The bug vanished, so something in there matters: put ${many ? "them" : "it"} back.`;
+      if (note) msg += " " + note;
+      frames.push({ gone: new Set(gone), cut, still, msg });
+      if (still) cut.forEach((x) => gone.add(x));
+    });
+    frames.push({ gone: new Set(gone), cut: [], final: true, msg: `Done after ${runs.length} runs: <b>lines 4 and 13</b>. Removing either one makes the bug vanish, so every line left matters: the result is <b>1-minimal</b>.` });
+    V.player($("dd-player"), {
+      frames, speed: 1100,
+      draw(f, stage) {
+        const cells = [];
+        for (let x = 1; x <= 16; x++) {
+          const cls = f.gone.has(x) ? "empty" : f.cut.includes(x) ? (f.still ? "done" : "bad") : f.final ? "hl" : "";
+          cells.push(V.el("div", { class: "cell " + cls, style: "min-width:0;height:30px;padding:0;font-size:0.72rem" }, String(x)));
+        }
+        stage.append(
+          V.el("div", { class: "small muted", style: "margin-bottom:8px" }, `lines in the input: ${16 - f.gone.size}`),
+          V.el("div", { style: "display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:3px" }, cells));
+      },
+    });
+  })();
+
+  // ---------- Review the code (section 9) ----------
+  (function () {
+    const code = [
+      "def top_k_words(path, k):",
+      "    try:",
+      "        with open(path) as f:",
+      "            text = f.read()",
+      "    except Exception:",
+      "        return []",
+      "    counts = {}",
+      "    for w in text.lower().split():",
+      "        counts[w] = counts.get(w, 0) + 1",
+      "    ranked = []",
+      "    for w in counts:",
+      "        if w not in ranked:",
+      "            ranked.append(w)",
+      "    ranked.sort(key=lambda w: counts[w], reverse=True)",
+      "    return [(w, counts[w]) for w in ranked[:k + 1]]",
+    ];
+    const issues = [
+      { lines: [1], name: "Changed interface", why: "It was supposed to take <code>lines</code>; now it takes a file path. Every caller breaks, including the ones that read from a network stream." },
+      { lines: [4, 8], name: "Everything in memory", why: "<code>f.read()</code> loads the whole log into one string, and <code>split()</code> on line 8 turns it into a list of all 2 billion words: 16 GB of pointers alone. The task said one pass, counts only." },
+      { lines: [2, 5, 6], name: "Errors swallowed", why: "A missing file, a permission error, even a typo inside the <code>try</code>: they all return <code>[]</code>, which looks exactly like a log with no words. Let errors reach the caller." },
+      { lines: [12], name: "Hidden loop", why: "<code>ranked</code> is a list, so <code>not in</code> scans it. For D = 100,000 distinct words that's about D²/2 = 5 billion comparisons, around 8 minutes at 10 million a second. The check is pointless anyway: dict keys are already unique." },
+      { lines: [14], name: "Wrong tie order", why: "Python's sort is stable, and <code>reverse=True</code> keeps equal counts in first-seen order, not alphabetical. Sort by <code>(-counts[w], w)</code> instead, without <code>reverse</code>." },
+      { lines: [15], name: "Off by one", why: "<code>ranked[:k + 1]</code> returns k + 1 pairs: two of them for k = 1." },
+    ];
+    const fine = {
+      3: "<code>with</code> closes the file even when something fails. The trouble is around it: a path on line 1, and the whole file read at once on line 4.",
+      7: "an empty dict for the counts.",
+      9: "the standard way to count with a dict.",
+      10: "an empty list to fill.",
+      11: "looping over a dict gives each key once.",
+      13: "appending is cheap. The cost is the check on line 12 that guards it.",
+    };
+    const box = $("rv-code"), out = $("rv-out"), counter = $("rv-count");
+    const flagged = new Set();
+    let checked = false;
+    const issueOf = (n) => issues.find((it) => it.lines.includes(n));
+    const isFound = (it) => it.lines.some((x) => flagged.has(x));
+    function paint() {
+      box.replaceChildren(...code.map((src, i) => {
+        const n = i + 1, on = flagged.has(n);
+        let bg = on ? "var(--accent-soft)" : "transparent", edge = on ? "var(--accent)" : "transparent";
+        if (checked) {
+          const it = issueOf(n);
+          if (it) { bg = isFound(it) ? "var(--ok-soft)" : "var(--bad-soft)"; edge = isFound(it) ? "var(--ok)" : "var(--bad)"; }
+          else if (on) { bg = "var(--warn-soft)"; edge = "var(--warn)"; }
+        }
+        // Long lines wrap on narrow screens, with a hanging indent so the wrapped part sits under its own line.
+        const hang = src.length - src.trimStart().length + 4;
+        return V.el("button", {
+          type: "button", "aria-pressed": on ? "true" : "false",
+          style: `display:grid;grid-template-columns:2.4em minmax(0,1fr);width:100%;text-align:left;font:0.8rem/1.75 var(--mono);color:var(--text);background:${bg};border:0;border-left:3px solid ${edge};padding:0 10px 0 6px;cursor:${checked ? "default" : "pointer"}`,
+          onclick: () => { if (checked) return; if (on) flagged.delete(n); else flagged.add(n); paint(); },
+        }, V.el("span", { style: "color:var(--faint)" }, String(n)),
+          V.el("span", { style: `white-space:pre-wrap;overflow-wrap:anywhere;padding-left:${hang}ch;text-indent:-${hang}ch` }, src));
+      }));
+      counter.textContent = checked ? "" : `${flagged.size} ${flagged.size === 1 ? "line" : "lines"} flagged`;
+    }
+    const note = (tone, head, body) => V.el("div", {
+      style: `border-left:3px solid var(--${tone});background:var(--${tone}-soft);padding:8px 12px;border-radius:6px;margin-top:8px;font-size:0.92rem`,
+      html: `<b>${head}</b> ${body}`,
+    });
+    $("rv-check").onclick = () => {
+      checked = true; paint();
+      const found = issues.filter(isFound);
+      const alarms = [...flagged].filter((n) => !issueOf(n)).sort((x, y) => x - y);
+      const where = (it) => (it.lines.length > 1 ? "lines " + it.lines.join(", ") : "line " + it.lines[0]);
+      const head = found.length === issues.length && !alarms.length ? "All six, and no false alarms. That's a careful review."
+        : `You found ${found.length} of ${issues.length} problems${alarms.length ? `, with ${alarms.length} false ${alarms.length === 1 ? "alarm" : "alarms"}` : ""}.`;
+      out.replaceChildren(V.el("p", { style: "margin:14px 0 0" }, V.el("b", {}, head)),
+        ...issues.map((it) => note(isFound(it) ? "ok" : "bad", `${isFound(it) ? "Found" : "Missed"} · ${where(it)} · ${it.name}.`, it.why)),
+        ...alarms.map((n) => note("warn", `False alarm · line ${n}.`, "It's fine: " + fine[n])));
+    };
+    $("rv-reset").onclick = () => { flagged.clear(); checked = false; out.replaceChildren(); paint(); };
+    paint();
+  })();
+})();
+</script>
+</body>
+</html>
