@@ -22,8 +22,8 @@ No `make`? Use `python3 -m pytest`, `python3 -m pytest -k hash_map`, and
 
 ```
 swe-prep/
-├── index.html                 dashboard: order of attack, chapters, progress
-├── curriculum.json            the topic list (source of truth: ids, priorities)
+├── index.html                 dashboard: next step, the track, deferred topics, chapters
+├── curriculum.json            source of truth: the track (learning order) and every topic
 ├── assets/
 │   ├── style.css              Ayu themes (Dark/Mirage/Light), boxes, viz
 │   ├── shell.js               top bar, toggleable sidebar, pane state, shortcuts
@@ -63,17 +63,33 @@ swe-prep/
 - **P1**: common at senior level.
 - **P2**: differentiator or role-specific.
 
-## Order of attack
+## The track
 
-1. §01–§02 data structures and algorithm patterns, until medium problems are routine
-2. §03 concurrency, with hands-on implementations
-3. §04–§06 system design fundamentals, distributed systems, data-intensive design (read DDIA alongside)
-4. §07 case studies, two or three a week, out loud and timed
-5. §08 debugging and code reading, on real open-source repos
-6. §14 behavioral stories, in parallel from week one
-7. §09–§13 role-specific depth, based on the target company
+The home page shows one ordered track instead of fifteen chapters to pick from.
+It's built for interview speed: data structures and coding patterns first,
+because technical screens come first, then practical coding and system design
+from week 2, and behavioral stories throughout.
 
-§15 (interview formats) is a reference to rehearse against throughout.
+| Stage | Focus | Milestone |
+|---|---|---|
+| Week 1 | Complexity, hash maps, stacks and queues, trees, heaps, sorting; Python for speed; project deep dive, company research | Mock 1: algorithmic coding |
+| Week 2 | Binary search, two pointers, graphs, BFS/DFS; testing, designing for change, rate limiting, builds in levels; requirements and estimation | Mock 2: practical screen |
+| Week 3 | Backtracking, dynamic programming, bits, LRU cache, intervals; latency, networking; debugging, coding with AI | Mock 3: algorithmic screen (with Mock 2, you're screen-ready) |
+| Week 4 | Stateless services, load balancing, APIs, caching; SQL, storage engines, data modeling, indexes, transactions, choosing a database; URL shortener | Mock 4: AI-assisted coding |
+| Week 5 | Consistent hashing, replication and sharding, consistency, CAP, queues, delivery guarantees, SLOs; news feed; Dijkstra, greedy | Mock 5: system design |
+| Week 6 | Real-time delivery, clocks, quorums, failure modes, tries; chat, key-value store, typeahead | Mock 6: behavioral |
+| Week 7 | Processes and threads, races, locks, deadlock, thread pools; timeouts, retries, load shedding; rate limiter, notifications, job scheduler, web crawler | Mock 7: concurrency coding |
+| Onsite | Once an onsite is booked, wherever you are: reading code, stack traces, finding bugs, and only the round formats on your list | Full loop rehearsal |
+| Packs | Netflix or Anthropic, once that onsite is booked | |
+
+Everything else (the P2s and the deeper P1s) is listed as **Deferred** at the
+bottom of the home page. Pull one forward only when a company is known to ask
+it.
+
+Order matters more than speed: each topic lists what it `requires` in
+`curriculum.json`, and `tools/build.py` refuses a track where anything comes
+before what it builds on. Each coding topic also lists a few timed `drills`
+(LeetCode titles) for two problems a day.
 
 ## The study loop
 
@@ -83,8 +99,9 @@ swe-prep/
 3. Answer "Check yourself" out loud before expanding the answers.
 4. Do the exercise: read the docstring, say the brute force and its complexity,
    write the solution, run the tests. Then do one or two classic problems.
-5. Mark the topic `learning` or `confident` on the chapter page (stored in your
-   browser).
+5. Mark the step `learning` or `confident` on the home page or the chapter
+   page (stored in your browser). "Next on your track" moves on when a step is
+   confident.
 
 ## Using Claude here
 

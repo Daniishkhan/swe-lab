@@ -19,9 +19,9 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 - [ ] `02.11` **[P1]** Bit manipulation
 - [ ] `02.12` **[P1]** String algorithms: rolling hash, KMP at a conceptual level
 - [ ] `02.13` **[P2]** Streaming and external algorithms: reservoir sampling, external merge sort
-- [ ] `02.14` **[P2]** Rate limiting algorithms: token bucket, leaky bucket, sliding window log/counter
-- [ ] `02.15` **[P2]** Consistent hashing, rendezvous hashing
-- [ ] `02.16` **[P2]** Basic probability and estimation for capacity reasoning
+- [ ] `02.14` **[P1]** Rate limiting algorithms: token bucket, leaky bucket, sliding window log/counter
+- [ ] `02.15` **[P1]** Consistent hashing, rendezvous hashing
+- [ ] `02.16` **[P1]** Basic probability and estimation for capacity reasoning
 
 ## Layout
 

@@ -1,6 +1,6 @@
 """
 Consistent hashing ring with virtual nodes and replicas
-Topic: 02.15  |  Priority: P2
+Topic: 02.15  |  Priority: P1
 
 Problem
 -------

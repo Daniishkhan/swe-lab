@@ -1,6 +1,6 @@
 """
 Fan-out and tail latency
-Topic: 02.16  |  Priority: P2
+Topic: 02.16  |  Priority: P1
 
 Problem
 -------

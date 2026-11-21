@@ -19,7 +19,7 @@
 <header class="chapter-head">
   <div class="eyebrow">Chapter 2 · Part 14</div>
   <h1>Rate limiting</h1>
-  <div class="meta"><span><span class="badge P2">P2</span> a favourite system design follow-up</span><span>about 50 minutes</span><span>10 quick checks · 9 exercises</span></div>
+  <div class="meta"><span><span class="badge P1">P1</span> a favourite system design follow-up</span><span>about 50 minutes</span><span>10 quick checks · 9 exercises</span></div>
 </header>
 
 <p>Every public API, login page and payment endpoint has a bouncer that says "not so fast". The algorithms behind it are small: a counter, a queue, a jar of tokens. The interview questions around them are not. Why does the simple version let twice the limit through? How do you store this for 10 million users? What happens when 20 servers share one limit, or when the clock jumps? This chapter builds the four classic limiters one fix at a time, then takes them to many servers.</p>

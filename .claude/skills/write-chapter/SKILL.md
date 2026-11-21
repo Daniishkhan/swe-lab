@@ -13,8 +13,10 @@ this skill covers the page and the exercises.
 
 1. Read `templates/README.md` (the format spec) and the reference chapter
    `sections/02-algorithms/concepts/sorting.html`.
-2. Find the topic in `curriculum.json`: its id, tag, and the chapters before
-   and after it (for `chapter-nav`, and for what the reader already knows).
+2. Find the topic in `curriculum.json`: its id, tag, `requires` (what the
+   reader already knows) and its place in the `track`. Teach nothing that
+   leans on a topic later in the track; if the chapter truly needs one, move
+   it or the topic in the track rather than assume it.
 3. Write a short plan using `teach` steps 1–5:
    - The **pain**: one concrete story with real numbers for section 1.
    - The **rebuild**: 6–11 sections, each one idea or one fix that the
@@ -67,5 +69,7 @@ this skill covers the page and the exercises.
   `python3 tools/check_exercise.py <name> --pass ref.py --fail slow.py`.
   It confirms the stub fails, the reference passes and the slow one fails.
   Delete the scratch folder after.
-- `python3 tools/build.py`.
+- Set the topic's `requires` in `curriculum.json` to the chapters the "How to
+  read this" line names, then `python3 tools/build.py`. It warns when the two
+  disagree and fails if a requirement comes later in the track.
 - Hand off to `visuals-and-layout`, then `review-chapter`.

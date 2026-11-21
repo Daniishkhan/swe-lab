@@ -25,7 +25,7 @@
 <header class="chapter-head">
   <div class="eyebrow">Chapter 1 · Part 12</div>
   <h1>Almost right, in almost no memory</h1>
-  <div class="meta"><span><span class="badge P2">P2</span> system design follow-ups: "what if it doesn't fit in memory?"</span><span>about 60 minutes</span><span>10 quick checks · 9 exercises</span></div>
+  <div class="meta"><span><span class="badge P1">P1</span> system design follow-ups: "what if it doesn't fit in memory?"</span><span>about 60 minutes</span><span>10 quick checks · 9 exercises</span></div>
 </header>
 
 <p>Every structure so far gave exact answers. A hash set knows for certain whether it holds an item, because it stores the item. That stops working when the data is huge: a billion items don't fit on one machine, and they don't fit in a message you can send between machines. This chapter builds three structures that give up a <em>little</em> exactness, in a direction you choose and by an amount you can calculate, and in return shrink gigabytes to megabytes or even kilobytes. In system design interviews, "use a Bloom filter" or "use HyperLogLog" is a common move. The credit goes to saying what you give up, how much memory it saves, and what happens when it's wrong.</p>

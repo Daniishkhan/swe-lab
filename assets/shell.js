@@ -9,7 +9,8 @@
  *
  * This script adds:
  *   - the top bar: sidebar toggle, breadcrumbs, search, theme, Appearance (Aa), contents toggle
- *   - the left sidebar: every chapter as a collapsible tree, the current one open
+ *   - the left sidebar: the track (weekly stages from curriculum.json) or every chapter, as trees
+ *   - previous / next links on chapter pages that follow the track (window.SWETrack)
  *   - the right rail on book pages: "On this page" contents with scroll spy and reading progress
  *   - the Appearance panel: theme, reading font, text size, line width, code font
  *   - a jump-to palette (/ or Cmd-K) and a shortcuts sheet (?)
@@ -39,6 +40,77 @@
   };
   window.SWEStore = store;
   window.SWEh = h;
+
+  // ---- The track: the learning order in curriculum.json ("track"), shared by the
+  // sidebar, the home page, chapter pages and each page's previous / next links ----
+  function makeTrack(C) {
+    if (!C || !C.track) return null;
+    const topic = {};
+    C.sections.forEach((s) => s.topics.forEach((t) => (topic[t.id] = { t, s })));
+    const KIND = { "07": "design", "14": "story", "15": "mock" };
+    const stages = C.track.stages.map((st, si) => {
+      const o = Object.assign({}, st, { si });
+      o.steps = st.steps.map((x) => {
+        const { t, s } = topic[x.topic];
+        return Object.assign({}, x, {
+          id: x.topic, key: x.topic, t, s, stage: o, optional: !!x.optional, kind: KIND[s.id] || "learn",
+          pages: s.concepts.filter((c) => c.topic === x.topic),
+          exercises: s.exercises.filter((e) => e.topics.includes(x.topic)),
+        });
+      });
+      o.milestone = st.milestone ? Object.assign({}, st.milestone, { key: st.milestone.id, stage: o, isMilestone: true, kind: "milestone" }) : null;
+      o.code = /^Week (\d+)/.test(st.label) ? "W" + st.label.match(/^Week (\d+)/)[1] : st.label[0];
+      return o;
+    });
+    const items = (st) => st.steps.concat(st.milestone ? [st.milestone] : []);
+    const all = stages.flatMap((st) => st.steps);
+    const byTopic = Object.fromEntries(all.map((x) => [x.id, x]));
+    const main = stages.filter((st) => !st.pick).flatMap(items);
+    const status = () => store.get("status", {});
+    const read = () => store.get("read", {});
+    const pagePath = (x, c) => `sections/${x.s.slug}/concepts/${c.file}`;
+    const short = (t) => t.short || t.text.split(/[:;(]/)[0].trim();
+    const T = {
+      stages, all, byTopic, items, short, pagePath,
+      isDone: (x, st = status()) => st[x.key] === "confident",
+      readPct: (x, r = read()) => (x.pages && x.pages.length ? Math.min(...x.pages.map((c) => r[pagePath(x, c)] || 0)) : 0),
+      title: (x) => (x.isMilestone ? x.title : x.pages.length ? x.pages[0].title : short(x.t)),
+      kindLabel: (x) => ({ learn: x.pages && x.pages.length ? "Read" : "Learn", design: "Design", story: "Story", mock: "Mock", milestone: "Milestone" })[x.kind],
+      href: (x, root) => x.isMilestone ? `${root}/index.html#stage-${x.stage.id}`
+        : x.pages.length ? `${root}/${pagePath(x, x.pages[0])}` : `${root}/sections/${x.s.slug}/index.html#t-${x.id}`,
+      // What to do for this step, as DOM nodes
+      todo(x, root) {
+        const ask = (q) => ["Ask Claude: ", h("q", {}, q), "."];
+        // "Load balancing" becomes "load balancing"; "TCP vs UDP" stays as it is
+        const lower = (s) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
+        if (x.isMilestone) return [x.bar + " ", ...ask(x.ask)];
+        if (x.do) return [x.do];
+        if (x.kind === "design") return ["45 minutes, timed, out loud. Start a worksheet with ", h("code", {}, `python3 tools/new.py case "${short(x.t)}"`), "."];
+        if (x.kind === "story") return ["Write one STAR story that answers it: ", h("code", {}, 'python3 tools/new.py story "Your title"'), "."];
+        if (x.kind === "mock") return ask("mock interview, " + lower(short(x.t)));
+        if (!x.pages.length) return ["Not written yet. ", ...ask("teach me " + lower(short(x.t))), " Plan on 45 minutes, and end by explaining it back."];
+        const n = x.exercises.length;
+        const ex = n === 1 ? "the exercise" : `the ${n} exercises`;
+        return ["Read it and answer each quick check", n ? [", then do ", root ? h("a", { href: `${root}/sections/${x.s.slug}/index.html#exercises` }, ex) : ex] : null, "."];
+      },
+      progress(st, s = status()) {
+        const req = items(st).filter((x) => !x.optional);
+        return { done: req.filter((x) => T.isDone(x, s)).length, total: req.length };
+      },
+      // The next unfinished required step, in order: the main stages, then any pick stage already started
+      next(s = status()) {
+        return main.find((x) => !x.optional && !T.isDone(x, s)) || null;
+      },
+      // The ordered list a step belongs to: all main stages, or its own pick stage
+      flow: (x) => (x.stage.pick ? items(x.stage) : main),
+      // The track step whose chapter page is relPath
+      forPage: (relPath) => all.find((x) => x.pages.some((c) => pagePath(x, c) === relPath)) || null,
+      // Topics left off the track: deferred until onsites are booked
+      deferred: () => C.sections.map((s) => ({ s, topics: s.topics.filter((t) => !byTopic[t.id] && !stages.some((st) => st.milestone && st.milestone.format === t.id)) })).filter((g) => g.topics.length),
+    };
+    return T;
+  }
+  window.SWETrack = makeTrack(window.CURRICULUM);
 
   // ---- Preferences: applied right away (this script runs in <head>) so there's no flash ----
   const THEMES = [["dark", "Ayu Dark"], ["mirage", "Ayu Mirage"], ["gruvbox", "Gruvbox Dark Hard"], ["light", "Ayu Light"]];
@@ -80,6 +152,8 @@
     x: '<path d="M18 6 6 18M6 6l12 12"/>',
     check: '<path d="M20 6.5 9 17.5l-5-5"/>',
     expand: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
+    flag: '<path d="M5.5 21V4"/><path d="M5.5 4.5h11l-2.2 4 2.2 4h-11"/>',
+    route: '<circle cx="6" cy="18.5" r="2.2"/><circle cx="18" cy="5.5" r="2.2"/><path d="M8.2 18.5H16a3.2 3.2 0 0 0 0-6.4H8a3.2 3.2 0 0 1 0-6.4h7.8"/>',
   };
   const icon = (name) => { const w = document.createElement("span"); w.className = "svg-wrap"; w.innerHTML = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`; return w; };
 
@@ -203,54 +277,117 @@
   }
 
   // ---- Sidebar: every chapter as a tree; the current one open ----
-  function shortTitle(text) {
-    const cut = text.split(/[:;(]/)[0].trim();
+  function shortTitle(t) {
+    const cut = (t.short || t.text.split(/[:;(]/)[0]).trim();
     return cut.length > 48 ? cut.slice(0, 46) + "…" : cut;
   }
-  function buildSidebar() {
-    const nav = h("nav", { class: "nav", "aria-label": "Chapters" });
-    nav.append(h("a", { class: "nav-link" + (PAGE === "home" ? " active" : ""), href: `${ROOT}/index.html` }, icon("home"), "Home"));
-    nav.append(h("div", { class: "nav-label" }, "Chapters"));
-    const openSet = new Set(store.get("openSecs", []));
-    for (const s of C.sections) {
-      const isCur = s.id === SECTION;
-      const wrap = h("div", { class: "sec" + (isCur || openSet.has(s.id) ? " open" : "") + (isCur ? " current" : "") + (s.concepts.length ? "" : " empty-sec") });
-      const chev = h("button", { class: "chev", type: "button", "aria-label": `Show topics in ${s.title}`, "aria-expanded": String(wrap.classList.contains("open")) }, icon("chev"));
-      chev.addEventListener("click", () => {
-        const open = !wrap.classList.contains("open");
-        wrap.classList.toggle("open", open);
-        chev.setAttribute("aria-expanded", String(open));
-        if (open) openSet.add(s.id); else openSet.delete(s.id);
-        store.set("openSecs", [...openSet]);
-      });
-      const link = h("a", { href: chapterHref(s), class: isCur && PAGE === "chapter" ? "active" : null, title: `§${s.id} ${s.title}` },
-        h("span", { class: "no" }, s.id), h("span", { class: "title" }, s.title),
-        s.concepts.length ? h("span", { class: "count", title: `${s.concepts.length} pages written` }, s.concepts.length) : null);
+  // A collapsible group in the sidebar: a row (chevron + link) and its children
+  function navGroup(isOpen, isCur, extraClass, label, storeKey, id, link, kids) {
+    const wrap = h("div", { class: "sec" + (isOpen ? " open" : "") + (isCur ? " current" : "") + (extraClass ? " " + extraClass : "") });
+    const chev = h("button", { class: "chev", type: "button", "aria-label": `Show what is in ${label}`, "aria-expanded": String(isOpen) }, icon("chev"));
+    chev.addEventListener("click", () => {
+      const open = !wrap.classList.contains("open");
+      wrap.classList.toggle("open", open);
+      chev.setAttribute("aria-expanded", String(open));
+      const set = new Set(store.get(storeKey, []));
+      if (open) set.add(id); else set.delete(id);
+      store.set(storeKey, [...set]);
+    });
+    wrap.append(h("div", { class: "sec-row" }, chev, link), kids);
+    return wrap;
+  }
+
+  function buildTrackNav() {
+    const T = window.SWETrack;
+    const box = h("div", { class: "view", "data-view": "track" });
+    const openSet = new Set(store.get("openStages", []));
+    const status = store.get("status", {});
+    const cur = relPath ? T.forPage(relPath) : null;
+    const nextUp = T.next(status);
+    const focus = cur ? cur.stage : nextUp ? nextUp.stage : null;
+    let picked = false;
+    for (const st of T.stages) {
+      if (st.pick && !picked) { picked = true; box.append(h("div", { class: "nav-label" }, "When an onsite is booked")); }
+      const { done, total } = T.progress(st, status);
+      const link = h("a", { href: `${ROOT}/index.html#stage-${st.id}`, title: `${st.label}: ${st.title}` },
+        h("span", { class: "no" }, st.code), h("span", { class: "title" }, st.title),
+        h("span", { class: "count", title: `${done} of ${total} done` }, `${done}/${total}`));
       const kids = h("div", { class: "sec-kids" });
-      for (const t of s.topics) {
-        const pages = s.concepts.filter((c) => c.topic === t.id);
-        if (pages.length) {
-          for (const c of pages) {
-            const active = isCur && PAGE === "concept" && c.file === here;
-            const done = (readMap[`sections/${s.slug}/concepts/${c.file}`] || 0) >= 90;
-            kids.append(h("a", { class: "kid" + (active ? " active" : ""), href: conceptHref(s, c.file), title: `${t.tag} · ${t.text}`, "aria-current": active ? "page" : null },
-              h("span", { class: "dot " + t.tag }), h("span", {}, c.title), done && !active ? h("span", { class: "read-mark", title: "Read" }, "✓") : null));
-            if (active && heads.length) kids.append(tocList("toc-inline"));
-          }
-        } else {
-          kids.append(h("a", { class: "kid pending", href: chapterHref(s) + "#t-" + t.id, title: `${t.tag} · not written yet` },
-            h("span", { class: "dot " + t.tag }), shortTitle(t.text)));
-        }
+      for (const x of T.items(st)) {
+        const active = x === cur;
+        const done = T.isDone(x, status);
+        const tip = x.isMilestone ? x.bar : `${T.kindLabel(x)}${x.optional ? " (optional)" : ""} · ${x.t.tag} · ${x.t.text}`;
+        kids.append(h("a", { class: "kid" + (x.isMilestone ? " ms" : x.pages.length ? "" : " pending") + (active ? " active" : "") + (x === nextUp ? " next-up" : ""),
+          href: T.href(x, ROOT), title: tip, "aria-current": active ? "page" : null },
+          x.isMilestone ? icon("flag") : h("span", { class: "dot " + x.t.tag }),
+          h("span", {}, T.title(x)), x.optional ? h("span", { class: "opt" }, "opt") : null,
+          done && !active ? h("span", { class: "read-mark", title: "Done" }, "✓") : null));
+        if (active && heads.length) kids.append(tocList("toc-inline"));
       }
-      wrap.append(h("div", { class: "sec-row" }, chev, link), kids);
-      nav.append(wrap);
+      box.append(navGroup(st === focus || openSet.has(st.id), st === focus, null, st.title, "openStages", st.id, link, kids));
     }
+    const def = T.deferred().reduce((n, g) => n + g.topics.length, 0);
+    box.append(h("a", { class: "nav-link deferred-link", href: `${ROOT}/index.html#deferred`, title: "P2s and later topics, for after onsites are booked" }, icon("dot"), `Deferred: ${def} topics`));
+    return box;
+  }
+
+  function buildSidebar() {
+    const nav = h("nav", { class: "nav", "aria-label": "Track and chapters" });
+    nav.append(h("a", { class: "nav-link" + (PAGE === "home" ? " active" : ""), href: `${ROOT}/index.html` }, icon("home"), "Home"));
+    const chapters = buildChapterNav();
+    if (window.SWETrack) {
+      const track = buildTrackNav();
+      // A deferred page isn't on the track, so show it in the chapter tree (without saving that choice)
+      let view = (relPath && !window.SWETrack.forPage(relPath)) || store.get("navView", "track") === "chapters" ? "chapters" : "track";
+      const tabs = h("div", { class: "nav-tabs", role: "tablist", "aria-label": "Sidebar view" });
+      const paint = () => {
+        tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.v === view)));
+        track.hidden = view !== "track";
+        chapters.hidden = view !== "chapters";
+      };
+      const tab = (v, label, ic) => h("button", { type: "button", role: "tab", "data-v": v, onclick: () => { view = v; store.set("navView", v); paint(); } }, icon(ic), label);
+      tabs.append(tab("track", "Track", "route"), tab("chapters", "Chapters", "book"));
+      nav.append(tabs, track, chapters);
+      paint();
+    } else nav.append(chapters);
     const foot = h("div", { class: "side-foot" },
       h("span", { title: "Asked almost everywhere" }, h("span", { class: "dot P0" }), "P0"),
       h("span", { title: "Often asked" }, h("span", { class: "dot P1" }), "P1"),
       h("span", { title: "Nice to have" }, h("span", { class: "dot P2" }), "P2"),
       h("button", { type: "button", onclick: openKeys, title: "Keyboard shortcuts  ?" }, "Shortcuts ", h("kbd", {}, "?")));
     return h("aside", { class: "sidebar", id: "sidebar" }, nav, foot);
+  }
+
+  function buildChapterNav() {
+    const nav = h("div", { class: "view", "data-view": "chapters" });
+    const openSet = new Set(store.get("openSecs", []));
+    const T = window.SWETrack;
+    for (const s of C.sections) {
+      const isCur = s.id === SECTION;
+      const link = h("a", { href: chapterHref(s), class: isCur && PAGE === "chapter" ? "active" : null, title: `§${s.id} ${s.title}` },
+        h("span", { class: "no" }, s.id), h("span", { class: "title" }, s.title),
+        s.concepts.length ? h("span", { class: "count", title: `${s.concepts.length} pages written` }, s.concepts.length) : null);
+      const kids = h("div", { class: "sec-kids" });
+      for (const t of s.topics) {
+        const pages = s.concepts.filter((c) => c.topic === t.id);
+        const off = T && !T.byTopic[t.id] ? " off-track" : "";
+        const offTip = off ? " · deferred (not on the track)" : "";
+        if (pages.length) {
+          for (const c of pages) {
+            const active = isCur && PAGE === "concept" && c.file === here;
+            const done = (readMap[`sections/${s.slug}/concepts/${c.file}`] || 0) >= 90;
+            kids.append(h("a", { class: "kid" + off + (active ? " active" : ""), href: conceptHref(s, c.file), title: `${t.tag} · ${t.text}${offTip}`, "aria-current": active ? "page" : null },
+              h("span", { class: "dot " + t.tag }), h("span", {}, c.title), done && !active ? h("span", { class: "read-mark", title: "Read" }, "✓") : null));
+            if (active && heads.length) kids.append(tocList("toc-inline"));
+          }
+        } else {
+          kids.append(h("a", { class: "kid pending" + off, href: chapterHref(s) + "#t-" + t.id, title: `${t.tag} · not written yet${offTip}` },
+            h("span", { class: "dot " + t.tag }), shortTitle(t)));
+        }
+      }
+      nav.append(navGroup(isCur || openSet.has(s.id), isCur, s.concepts.length ? null : "empty-sec", s.title, "openSecs", s.id, link, kids));
+    }
+    return nav;
   }
 
   // ---- Right rail: contents + progress ----
@@ -298,6 +435,41 @@
     };
     addEventListener("scroll", update, { passive: true });
     update();
+  }
+
+  // ---- Previous / next follow the track, not the chapter's section ----
+  function trackPager() {
+    const T = window.SWETrack;
+    const navEl = document.querySelector("main nav.chapter-nav");
+    if (!T || !navEl || !relPath) return;
+    const x = T.forPage(relPath);
+    if (!x) {
+      navEl.before(h("div", { class: "track-between" }, h("b", {}, "Off the track. "),
+        "This chapter is deferred until onsites are booked, so the links below follow its section. ",
+        h("a", { href: `${ROOT}/index.html#deferred` }, "Back to the track")));
+      return;
+    }
+    const flow = T.flow(x);
+    const i = flow.indexOf(x);
+    const isPage = (y) => !y.isMilestone && !y.optional && y.pages.length > 0; // optional pages are listed in between
+    let p = i - 1; while (p >= 0 && !isPage(flow[p])) p--;
+    let n = i + 1; while (n < flow.length && !isPage(flow[n])) n++;
+    const prev = p >= 0 ? flow[p] : null, next = n < flow.length ? flow[n] : null;
+    const between = flow.slice(i + 1, n);
+    const where = (y) => (y.stage !== x.stage ? y.stage.label + " · " : "");
+    const named = (y) => T.title(y) + (y.optional ? " (optional)" : "");
+    navEl.replaceChildren(
+      prev ? h("a", { href: T.href(prev, ROOT) }, h("small", {}, "← " + where(prev) + "Previous on the track"), named(prev))
+        : h("a", { href: `${ROOT}/index.html` }, h("small", {}, "← Back to"), "Your track"),
+      next ? h("a", { class: "next", href: T.href(next, ROOT) }, h("small", {}, where(next) + "Next on the track →"), named(next))
+        : h("a", { class: "next", href: `${ROOT}/index.html#stage-${x.stage.id}` }, h("small", {}, "Next →"), "Back to your track"));
+    if (between.length) {
+      const shown = between.slice(0, 6);
+      navEl.before(h("div", { class: "track-between" }, h("b", {}, "Before the next chapter: "),
+        shown.map((y, k) => [k ? " · " : "", h("a", { href: T.href(y, ROOT) }, `${T.kindLabel(y)}: ${named(y)}`)]),
+        between.length > shown.length ? ` and ${between.length - shown.length} more.` : ".",
+        " ", h("a", { href: `${ROOT}/index.html#stage-${x.stage.id}` }, "See the track")));
+    }
   }
 
   // ---- Appearance panel ----
@@ -360,7 +532,7 @@
     for (const s of C.sections) {
       items.push({ grp: "Chapters", icon: "grid", title: `§${s.id} ${s.title}`, href: chapterHref(s), where: s.concepts.length ? `${s.concepts.length} written` : "" });
       for (const c of s.concepts) items.push({ grp: "Reading", icon: "book", title: c.title, href: conceptHref(s, c.file), where: `§${s.id} ${s.title}` });
-      for (const t of s.topics) if (!s.concepts.some((c) => c.topic === t.id)) items.push({ grp: "Topics not written yet", icon: "dot", title: shortTitle(t.text), href: chapterHref(s) + "#t-" + t.id, where: `§${s.id} · ${t.tag}`, extra: t.text });
+      for (const t of s.topics) if (!s.concepts.some((c) => c.topic === t.id)) items.push({ grp: "Topics not written yet", icon: "dot", title: shortTitle(t), href: chapterHref(s) + "#t-" + t.id, where: `§${s.id} · ${t.tag}`, extra: t.text });
     }
     return items;
   }
@@ -455,8 +627,9 @@
     setSidebar(mobile() ? true : store.get("sidebarHidden", false));
     if (hasRail) setRail(store.get("railHidden", false));
     const nav = document.querySelector(".sidebar .nav");
-    const active = nav.querySelector(".kid.active, .sec-row a.active");
+    const active = nav.querySelector(".view:not([hidden]) .kid.active, .view:not([hidden]) .sec-row a.active");
     if (active) nav.scrollTop = Math.max(0, active.offsetTop - nav.clientHeight / 3);
+    trackPager();
     scrollSpy();
     trackReading();
     highlightAll();

@@ -11,7 +11,7 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 - [ ] `13.03` **[P1]** Building on LLM APIs: tool use, structured output, retries, cost and latency budgets
 - [ ] `13.04` **[P1]** RAG design and its failure modes
 - [ ] `13.05` **[P1]** Evaluation: building eval sets, graders, regression detection, offline vs online metrics
-- [ ] `13.06` **[P1]** Working effectively with coding agents: task decomposition, verification, knowing when the model is wrong
+- [ ] `13.06` **[P0]** Coding with AI: give it context (diagrams, data flow, invariants), split work into checkable steps, write the tests first, verify every change; debug, refactor and review AI-written code; know when not to use it
 - [ ] `13.07` **[P2]** Quantization, distillation, speculative decoding
 - [ ] `13.08` **[P2]** GPU fundamentals: memory hierarchy, utilization, multi-GPU and multi-node serving
 - [ ] `13.09` **[P2]** Agent architecture: planning loops, memory, tool permissions, sandboxing

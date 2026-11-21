@@ -1,6 +1,6 @@
 """
 Sliding window counter (many keys, one process)
-Topic: 02.14  |  Priority: P2
+Topic: 02.14  |  Priority: P1
 
 Problem
 -------

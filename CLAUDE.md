@@ -46,6 +46,10 @@ through `write-chapter` and `visuals-and-layout`.
    bare name; there are no `__init__.py` files).
 6. After adding or renaming a page or exercise, run `python3 tools/build.py`
    and commit the regenerated `assets/curriculum.js`.
+7. **Keep the prerequisite order.** The `track` in `curriculum.json` is the
+   learning order. A topic's `requires` lists what it builds on, and every one
+   must come earlier in the track; `tools/build.py` fails if not. A new
+   chapter's `requires` matches its "How to read this" line.
 
 ## Skills (`.claude/skills/`)
 
@@ -68,8 +72,11 @@ node tools/check_page.js <page.html> [--shots DIR]  # console errors, offline, 3
 
 ## Layout
 
-- `curriculum.json`: source of truth for sections and topics (ids like `02.02`,
-  tags P0/P1/P2).
+- `curriculum.json`: source of truth. `track` is the learning order (weekly
+  stages with steps and a milestone mock each, then an onsite stage and company
+  packs that start when an onsite is booked; topics left off it are deferred).
+  `sections` hold the topics (ids like `02.02`, tags P0/P1/P2, `requires`,
+  timed `drills`).
 - `sections/NN-slug/concepts/*.html`: chapters, each with
   `<meta name="topic" content="NN.MM">`.
 - `sections/NN-slug/exercises/name.py` + `test_name.py`: stub and tests. The
