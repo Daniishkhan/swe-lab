@@ -65,7 +65,7 @@ through `write-chapter` and `visuals-and-layout`.
 ```bash
 python3 -m pytest -k <name>                         # one exercise's tests
 python3 tools/build.py                              # regenerate assets/curriculum.js
-python3 tools/new.py concept 03.01 slug "Title"     # also: exercise, case, story, lld
+python3 tools/new.py concept 03.01 slug "Title"     # also: exercise, case, story, lld, deepdive
 python3 tools/check_exercise.py <name> --pass ref.py --fail slow.py   # prove the tests work
 node tools/check_page.js <page.html> [--shots DIR]  # console errors, offline, 390px scroll, markup
 ```
