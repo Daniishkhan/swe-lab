@@ -17,7 +17,8 @@ def time_limit():
         return
 
     def boom(*_):
-        raise TimeoutError("over the 30 s cap: does the loop stop once only untestable versions are left?")
+        raise TimeoutError("over the 30 s cap: does the loop stop once only untestable versions are left? "
+                           "Or is each \"did I already ask?\" lookup a scan through a list?")
 
     old = signal.signal(signal.SIGALRM, boom)
     signal.alarm(30)
@@ -148,8 +149,8 @@ def test_a_block_in_the_middle_far_from_the_answer():
 
 
 def test_everything_before_the_first_bad_version_is_untestable():
-    v = run(5000, 3000, range(1, 3000))
-    assert v.expected() == (1, 3000)
+    v = run(2000, 1200, range(1, 1200))
+    assert v.expected() == (1, 1200)
 
 
 def test_every_second_version_untestable():
@@ -157,7 +158,10 @@ def test_every_second_version_untestable():
     assert v.expected() == (1000, 1001)
 
 
-def test_every_4096th_version_untestable():
-    # These are exactly the versions a binary search over 1..2**20 probes
-    # first, so every early probe needs a neighbor.
-    run(2 ** 20, 777_777, range(4096, 2 ** 20, 4096))
+def test_a_pair_of_untestable_versions_every_4096():
+    # Versions 4096k and 4096k + 1 can't be tested. A binary search over
+    # 1..2**20 probes 524,288 or 524,289 first, depending on where its range
+    # starts and how it rounds, and both are in here. So it has to step
+    # around an untestable version straight away.
+    untestable = set(range(4096, 2 ** 20, 4096)) | set(range(4097, 2 ** 20, 4096))
+    run(2 ** 20, 777_777, untestable)

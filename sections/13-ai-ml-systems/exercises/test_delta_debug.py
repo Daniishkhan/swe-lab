@@ -1,6 +1,7 @@
 # Tests for delta_debug.py: shrink(items, fails).
 # Every call to fails stands for one run of a slow program, so the tests
 # count them. 1-minimality is checked with calls that aren't counted.
+import itertools
 import random
 import signal
 
@@ -108,6 +109,9 @@ def test_keeps_the_original_order():
 
     result, _ = run(["b", "a", "c", "b"], a_then_b)
     assert result == ["a", "b"]
+    # Keep the order of positions, not of values: here 12 comes before 3.
+    result, _ = run(list(range(16))[::-1], needs(3, 12))
+    assert result == [12, 3]
 
 
 def test_repeated_values_are_removed_by_position():
@@ -120,11 +124,44 @@ def test_repeated_values_are_removed_by_position():
 
 def test_a_bug_that_is_not_monotone():
     # A parser that chokes on an unclosed quote: an odd number of " marks.
-    # Removing a quote can make the bug vanish *or* come back, so check
-    # every answer, not only the ones that look done.
+    # Not monotone: '"' fails, but '""' (more input) passes. Cutting two
+    # quotes keeps the bug and cutting one makes it vanish, so whether a
+    # piece can go depends on how many quotes it holds.
     items = list('say "hi", then "bye" and "ok" "')
     assert items.count('"') % 2 == 1
     run(items, lambda sub: sub.count('"') % 2 == 1)
+
+
+def x_and_open_bracket(sub):
+    """A parser that chokes on x when a bracket is left open: x, and more ( than )."""
+    return "x" in sub and sub.count("(") > sub.count(")")
+
+
+def test_a_cut_can_free_an_item_you_already_kept():
+    # In "((x)" neither ( can go while the ) is there, and the ) can't go
+    # in one piece with the x. Once the ) goes on its own, one ( can go too.
+    # A single pass over the single items keeps both (, which isn't
+    # 1-minimal: after a pass that removed something, try the rest again.
+    result, _ = run(list("((x)"), x_and_open_bracket)
+    assert result == ["(", "x"]
+    result, _ = run(list("x)(("), x_and_open_bracket)
+    assert result == ["x", "("]
+
+
+def test_freeing_can_chain_across_passes():
+    # More a than b, and more b than c. On the full list only the c can go
+    # on its own. Cutting it frees a b, and cutting that b frees an a, so two
+    # passes over the single items stop at "aaab", which isn't 1-minimal.
+    result, _ = run(list("aaabbc"), lambda sub: sub.count("a") > sub.count("b") > sub.count("c"))
+    assert result == ["a", "a", "b"]
+
+
+def test_every_short_bracket_string():
+    # All 1,219 strings of 1 to 7 characters over "()x" that fail.
+    for length in range(1, 8):
+        for chars in itertools.product("()x", repeat=length):
+            if x_and_open_bracket(chars):
+                run(list(chars), x_and_open_bracket)
 
 
 def test_noise_around_one_culprit():

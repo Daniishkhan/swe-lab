@@ -46,9 +46,13 @@ What the tests measure
 - Every n up to 10, with every set of untestable versions and every first
   bad version, against the answer built from the definition above.
 - Blocks of untestable versions right before the first bad one, starting at
-  it, and in the middle of the range; every 2nd version untestable; every
-  4,096th version untestable (where the first probes of a binary search
-  land).
+  it, and in the middle of the range; every 2nd version untestable; and a
+  pair of untestable versions every 4,096 (4096k and 4096k + 1), so that
+  the very first probe is untestable: 524,288 or 524,289, depending on
+  where your range starts and how you round the middle.
+- One test has 1,199 untestable versions in a row. A recursion that goes
+  one level deeper on every test run passes Python's limit of about 1,000
+  levels there, so use a loop.
 
 Before you code (say it out loud)
 ---------------------------------

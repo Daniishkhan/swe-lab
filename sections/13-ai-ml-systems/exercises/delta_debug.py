@@ -22,8 +22,11 @@ shrink(items, fails) -> list
   - Remove items by position, never by value: values can repeat, and a bug
     can need two copies of the same value.
   - Don't change the list you were given.
-  - fails can be any function. It doesn't have to be monotone (a piece of a
-    passing list may fail), so check what you return.
+  - fails can be any function. It doesn't have to be monotone (monotone:
+    adding items to a failing list never makes it pass). When it isn't,
+    removing one item can free another item that couldn't go before. So
+    after any pass over single items that removes something, make another,
+    until a whole pass removes nothing.
 
 What the tests measure
 ----------------------
@@ -34,11 +37,21 @@ What the tests measure
     in one half, one in each half, at the very ends): at most 600 calls.
   * 4,000 items, the bug needs 3 of them: at most 1,000 calls.
   Removing one item at a time costs about 4,000 calls, so it fails.
-  Cutting out halves, then quarters, and so on (section 7) takes about 25
-  to 70 calls here; Zeller's classic ddmin takes about 20 to 310.
+- Target: O(k log n) calls when the bug needs k of the n items. Cutting out
+  halves, then quarters, and so on (section 7) takes about 2k * log2(n/k)
+  calls: 24 for k = 1, 62 for k = 3. On the 4,000-item tests, four ways of
+  writing that halving took between 7 and 85 calls, and Zeller's classic
+  ddmin took up to about 300. Small details move the count (whether you
+  skip trying an empty list, how you split an odd length), so any count
+  inside the budget is fine.
 - 1-minimality is checked on every answer, with calls that aren't counted.
-- Repeated values, a bug that needs three copies of one value, order kept,
-  and a bug that isn't monotone (it needs an odd number of quote marks).
+- Repeated values, a bug that needs three copies of one value, order kept
+  (also on a reversed input), and three bugs that aren't monotone: an odd
+  number of quote marks; "an x plus more ( than )", where removing a )
+  lets a ( go that couldn't go before (run on all 1,219 failing strings of
+  up to 7 characters over "()x"); and a chain in "aaabbc" with more a than
+  b and more b than c, where cutting the c frees a b, and cutting that b
+  frees an a, so two passes over the single items aren't enough.
 
 Before you code (say it out loud)
 ---------------------------------
