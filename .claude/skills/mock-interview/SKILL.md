@@ -1,6 +1,6 @@
 ---
 name: mock-interview
-description: Run a timed mock interview at the senior bar (coding, practical coding, system design, debugging, code review, behavioral), score it with evidence, and log it. Use when Danish asks for a mock, a practice round, or to be grilled on a topic.
+description: Run a timed mock interview at the senior bar (coding, practical coding, AI-assisted coding, system design, debugging, code review, behavioral, or a full loop), score it with evidence, and log it. Use when Danish asks for a mock, a practice round, or to be grilled on a topic.
 ---
 
 # Run a mock interview
@@ -39,6 +39,16 @@ Per format:
   stages. Add a new requirement each time the current one works (persistence,
   concurrency, a limit, an API change). Judge whether the code survives the
   changes.
+- **AI-assisted coding (15.09):** Danish uses their own AI assistant, out
+  loud, and pastes each prompt and each diff into the chat as they go. Give a
+  small component (60 minutes by default) with one tricky edge case, and change
+  a requirement halfway. Score Danish's decisions, not the assistant's typing:
+  the context and plan before any code, the checks chosen and run before
+  trusting a diff, and each accept, push-back or "I'll type this myself", with
+  its reason. Point at any accepted line and ask what it does; "the assistant
+  wrote it" isn't an answer. If a wrong suggestion gets accepted unchecked,
+  say nothing until the end. The evidence to look for is the checklist in
+  exercise 8 of the coding-with-AI chapter (`13.06`).
 - **Debugging and code review (15.03, 15.04):** hand over a short broken
   program or diff you wrote for the mock. Watch for hypotheses, narrowing down
   (reproduce, bisect, logs) and prevention, not only the fix.
@@ -49,6 +59,10 @@ Per format:
   until the story's depth or gaps show: "What did *you* do?", "What was the
   measured result?", "What would you do differently?". The senior bar is
   scope, ambiguity, influence without authority, conflict and owned mistakes.
+- **Full loop (the onsite stage's rehearsal):** coding, system design and
+  behavioral back to back, one prompt each, short breaks, no feedback in
+  between. Score each round with its own signals, then make the overall call a
+  hiring committee would.
 
 ## Score
 
@@ -60,6 +74,7 @@ from what Danish actually said or wrote:
 | Format | Signals |
 |---|---|
 | Coding | problem solving · code quality · testing and edge cases · communication |
+| AI-assisted coding | direction · verification · judgment · communication |
 | System design | scoping · high-level design · trade-offs in the deep dive · scale, failure and operations |
 | Debugging, code review | hypotheses · narrowing down · fix and prevention · communication |
 | Behavioral | scope and ownership · ambiguity and conflict · measured impact · self-reflection |
