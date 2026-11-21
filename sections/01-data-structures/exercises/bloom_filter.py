@@ -1,6 +1,6 @@
 """
 Bloom filter
-Topic: 01.12  |  Priority: P2
+Topic: 01.12  |  Priority: P1
 
 Problem
 -------

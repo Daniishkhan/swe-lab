@@ -1,6 +1,6 @@
 """
 Count-Min Sketch and heavy hitters
-Topic: 01.12  |  Priority: P2
+Topic: 01.12  |  Priority: P1
 
 Problem
 -------

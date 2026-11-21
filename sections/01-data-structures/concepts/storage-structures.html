@@ -28,7 +28,7 @@
 <header class="chapter-head">
   <div class="eyebrow">Chapter 1 · Part 13</div>
   <h1>Built for the disk</h1>
-  <div class="meta"><span><span class="badge P2">P2</span> B-tree, B+tree, LSM tree, SSTable, write-ahead log</span><span>about 65 minutes</span><span>10 quick checks · 8 exercises</span></div>
+  <div class="meta"><span><span class="badge P1">P1</span> B-tree, B+tree, LSM tree, SSTable, write-ahead log</span><span>about 65 minutes</span><span>10 quick checks · 8 exercises</span></div>
 </header>
 
 <p>Every structure so far lived in memory, where reading any address costs about the same. Real databases keep most of their data on a disk, where one read costs as much as a thousand memory reads on an SSD and a hundred thousand on a hard disk, data arrives in fixed-size chunks, and the power can go out halfway through a write. This chapter rebuilds the two designs that almost every database engine uses under the hood, the <b>B-tree</b> and the <b>LSM tree</b>, from those three facts. Then it adds the <b>write-ahead log</b>, the trick that lets both of them survive a crash.</p>

@@ -26,6 +26,10 @@ reference. A book chapter reads top to bottom instead of being a stack of boxes:
 - End: "What to say in the interview", `#summary`, `<div class="review" id="review">`,
   `#exercises` with `.exercise` cards tiered `warm` (paper), `core` (code with
   tests that count work, not just answers), `stretch`; then `nav.chapter-nav`.
+  Point its links at the section neighbours; on track pages `shell.js`
+  rewrites them to follow the track.
+- The "How to read this" line names the chapters this one builds on. They are
+  the topic's `requires` in `curriculum.json`.
 - Voice: write for a smart high schooler. Short sentences, everyday analogies,
   real numbers. Define every term the first time it appears. Never "simply",
   "obviously" or "trivially". The explanation method itself (pain, primitives,

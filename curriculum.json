@@ -1,69 +1,399 @@
 {
-  "phases": [
-    {
-      "n": 1,
-      "title": "DS & algorithm patterns",
-      "sections": [
-        "01",
-        "02"
-      ],
-      "goal": "Until medium problems are routine"
-    },
-    {
-      "n": 2,
-      "title": "Concurrency",
-      "sections": [
-        "03"
-      ],
-      "goal": "Hands-on implementations"
-    },
-    {
-      "n": 3,
-      "title": "System design fundamentals + DDIA",
-      "sections": [
-        "04",
-        "05",
-        "06"
-      ],
-      "goal": "Read DDIA alongside"
-    },
-    {
-      "n": 4,
-      "title": "Case studies",
-      "sections": [
-        "07"
-      ],
-      "goal": "2-3 per week, out loud and timed"
-    },
-    {
-      "n": 5,
-      "title": "Debugging & code reading",
-      "sections": [
-        "08"
-      ],
-      "goal": "Use real open-source repos"
-    },
-    {
-      "n": 6,
-      "title": "Behavioral stories",
-      "sections": [
-        "14"
-      ],
-      "goal": "In parallel from week one"
-    },
-    {
-      "n": 7,
-      "title": "Role-specific depth",
-      "sections": [
-        "09",
-        "10",
-        "11",
-        "12",
-        "13"
-      ],
-      "goal": "Pick based on target company"
-    }
-  ],
+  "track": {
+    "rule": "Every step builds only on steps before it. tools/build.py fails the build if one doesn't.",
+    "stages": [
+      {
+        "id": "w1",
+        "label": "Week 1",
+        "title": "Data structures first",
+        "goal": "Hash maps, stacks, queues, trees and heaps feel routine at medium level, and you know what every operation costs.",
+        "daily": "Two timed problems a day from the chapters you have read, 25 minutes each. Say the brute force and its cost first, then improve it, then test it by hand before you run it.",
+        "steps": [
+          {"topic": "02.01"},
+          {
+            "topic": "01.01",
+            "do": "Read it and answer each quick check, then do the exercises. Save subarray_sum_count for week 2, after the two-pointers chapter: it needs prefix sums."
+          },
+          {"topic": "01.02"},
+          {"topic": "01.03"},
+          {"topic": "01.04"},
+          {"topic": "02.02"},
+          {
+            "topic": "10.01",
+            "do": "Ask Claude: “teach me Python for interviews” (45 minutes). Make a one-page cheat sheet of Counter, defaultdict, deque, heapq, bisect, itertools, functools.cache, dataclasses and sorted with a key, then reach for them in every drill."
+          },
+          {
+            "topic": "14.01",
+            "do": "Write your project deep dive, plus a 60-second answer to “tell me about yourself”. Recruiter and hiring manager screens open with these."
+          },
+          {
+            "topic": "14.09",
+            "do": "Read the Netflix culture memo, and Anthropic's mission, Core Views on AI Safety and Responsible Scaling Policy. Write a 90-second “why Netflix” and “why Anthropic”, each tying two of their values to something you did. In every recruiter call, ask for the screen's format and the onsite round list."
+          },
+          {
+            "topic": "15.10",
+            "do": "Ask Claude: “mock interview, past-project deep dive, 45 minutes”. Expect a follow-up on every choice: why this design, what broke, what you'd change."
+          }
+        ],
+        "milestone": {
+          "id": "m1",
+          "format": "15.01",
+          "title": "Mock 1: algorithmic coding",
+          "bar": "One medium solved, tested by hand and explained in 45 minutes, with a 3 or better on problem solving and communication.",
+          "ask": "mock interview, coding, 45 minutes"
+        }
+      },
+      {
+        "id": "w2",
+        "label": "Week 2",
+        "title": "Search, graphs and code built in levels; design starts",
+        "goal": "Binary search, two pointers and graph traversals are routine, you can build a component in levels with tests first, and you can size a system on paper.",
+        "daily": "Two timed problems a day, mixing this week's patterns with last week's. Once you've read the estimation chapter, add one back-of-envelope estimate a day: users, then requests per second, then storage.",
+        "steps": [
+          {"topic": "02.03"},
+          {"topic": "02.04"},
+          {"topic": "01.05"},
+          {"topic": "02.05"},
+          {
+            "topic": "10.03",
+            "do": "Ask Claude: “teach me testing for interviews” (45 minutes): which cases to write first, edge cases, and when a fake beats a mock. From now on, write three tests before you run any solution."
+          },
+          {
+            "topic": "10.02",
+            "do": "Ask Claude: “teach me designing for change” (45 minutes): small classes with one job, composition over inheritance, and adding a requirement without a rewrite."
+          },
+          {
+            "topic": "02.14",
+            "do": "Read it, then do token_bucket and rate_window_counter, the two an interviewer expects. The other two exercises are a stretch."
+          },
+          {
+            "topic": "10.04",
+            "do": "Two builds in levels, 90 minutes each, tests first: a key-value store with TTL and transactions, then an in-memory file system with sizes. Skip parking lot and elevator."
+          },
+          {
+            "topic": "04.01",
+            "do": "Ask Claude: “teach me requirements gathering” (30 minutes). Then open every design the same way: the features, the scale numbers, and what you will leave out."
+          },
+          {"topic": "02.16"},
+          {"topic": "14.02"},
+          {
+            "topic": "15.12",
+            "do": "Ask Claude: “mock interview, hiring manager round, 45 minutes”. Bring your deep dive, an ownership story and your “why this company”."
+          }
+        ],
+        "milestone": {
+          "id": "m2",
+          "format": "15.02",
+          "title": "Mock 2: practical screen",
+          "bar": "A problem in four levels in 90 minutes, each level adding a requirement. Levels 1 to 3 pass your own tests, no level forces a rewrite of the one before, and you score a 3 or better on code quality and on testing.",
+          "ask": "mock interview, practical coding, 4 levels, 90 minutes"
+        }
+      },
+      {
+        "id": "w3",
+        "label": "Week 3",
+        "title": "Recursion and DP; how a request travels; coding with AI",
+        "goal": "Dynamic programming stops feeling like magic, you can trace a request from DNS to response and say what each hop costs, and you can steer an AI assistant and check its work.",
+        "daily": "Two timed problems a day, one of them from an earlier week, plus the daily estimate. Review beats new material once a pattern has faded.",
+        "steps": [
+          {"topic": "02.06"},
+          {"topic": "02.07"},
+          {
+            "topic": "02.11",
+            "do": "Read it, then do bit_tricks. The other two exercises are a stretch. Tries, sketches and consistent hashing use its shifts and masks later."
+          },
+          {
+            "topic": "01.08",
+            "do": "Read it, then do lru_cache and ttl_cache. lfu_cache is a stretch. Section 11 previews week 7's locks, so skim it."
+          },
+          {
+            "topic": "01.09",
+            "do": "Read it, then do interval_merge and interval_sweep. Skip interval_tree for now."
+          },
+          {
+            "topic": "04.03",
+            "do": "Sections 5, 9 and 10 of the estimation chapter cover most of it. Ask Claude to quiz you on the numbers, then explain p99 under fan-out back."
+          },
+          {
+            "topic": "04.02",
+            "do": "Sections 3 and 4 of the estimation chapter are the method. Ask Claude for three prompts and size each one out loud in under five minutes."
+          },
+          {
+            "topic": "09.04",
+            "do": "Ask Claude: “teach me TCP, HTTP, TLS and DNS”, one 60-minute session for this step and the next: handshakes and what they cost, keep-alive and connection reuse, HTTP/2 multiplexing, TLS termination. Skip congestion-control internals."
+          },
+          {
+            "topic": "09.03",
+            "do": "Covered in the same session as TCP vs UDP. Then explain back, hop by hop, what happens when a browser loads a page."
+          },
+          {
+            "topic": "08.01",
+            "do": "Ask Claude: “teach me systematic debugging” (30 minutes): reproduce, shrink the input, test one hypothesis at a time, bisect, and prove the fix with a test."
+          },
+          {"topic": "13.06"},
+          {"topic": "14.03"}
+        ],
+        "milestone": {
+          "id": "m3",
+          "format": "15.01",
+          "title": "Mock 3: algorithmic screen",
+          "bar": "Two mediums in 45 minutes, both tested by hand, with a 3 or better on all four coding signals. Pass this and Mock 2, and you are ready for technical screens.",
+          "ask": "mock interview, coding, phone screen with two mediums, 45 minutes"
+        }
+      },
+      {
+        "id": "w4",
+        "label": "Week 4",
+        "title": "Load balancers, APIs, caches and databases; the first design",
+        "goal": "You can put a load balancer, an API and a cache in front of a database you chose and can defend, and you've done one design under time.",
+        "daily": "One timed problem a day, alternating between an algorithmic problem and one level of a practical build. Do each design as a 45-minute timed run, out loud, on the worksheet.",
+        "steps": [
+          {
+            "topic": "04.11",
+            "do": "Ask Claude: “teach me stateless services and load balancing”, one session for this step and the next: where session state lives and why that lets you add servers, then L4 vs L7, the balancing algorithms and health checks."
+          },
+          {
+            "topic": "04.04",
+            "do": "Covered in the same session as stateless services. Then explain back when you'd pick L4, when L7, and why sticky sessions hurt."
+          },
+          {"topic": "04.09"},
+          {"topic": "04.05"},
+          {
+            "topic": "06.03",
+            "do": "Ask Claude: “teach me SQL for interviews” (45 minutes). Then write five queries by hand: two joins, a GROUP BY with HAVING, a window function, and read one EXPLAIN."
+          },
+          {"topic": "01.12", "do": "Read it. Skip the three builds until after onsites."},
+          {
+            "topic": "01.13",
+            "do": "Read it through “B-tree or LSM tree?”. Skip bplus_tree, lsm_store and wal_log until after onsites."
+          },
+          {
+            "topic": "06.04",
+            "do": "Ask Claude: “teach me data modeling and indexes”, one session for this step and the next: normalize first, denormalize for a query you can name, then which index serves which query."
+          },
+          {
+            "topic": "06.01",
+            "do": "Covered in the same session as data modeling. Then explain back how to order a composite index's columns, and when a covering index never touches the table."
+          },
+          {"topic": "06.02"},
+          {
+            "topic": "04.06",
+            "do": "Ask Claude: “teach me choosing a database” (30 minutes). Make a one-page table: relational, document, key-value, wide-column and search, each with the access pattern it fits and the reason you'd reject it."
+          },
+          {"topic": "07.01"}
+        ],
+        "milestone": {
+          "id": "m4",
+          "format": "15.09",
+          "title": "Mock 4: AI-assisted coding",
+          "bar": "A small component built with an AI assistant in 60 minutes while you narrate: context first, small steps, tests before trusting any output. You catch at least one wrong suggestion and say how you caught it.",
+          "ask": "mock interview, AI-assisted coding round, 60 minutes"
+        }
+      },
+      {
+        "id": "w5",
+        "label": "Week 5",
+        "title": "Sharding, replication and queues",
+        "goal": "You can shard and replicate without hand-waving, say what consistency each read gets, and use a queue without losing or doubling messages.",
+        "daily": "One timed problem a day, alternating algorithmic and practical, plus one design run every other day.",
+        "steps": [
+          {
+            "topic": "02.15",
+            "do": "Read it, then do consistent_hash. Jump and rendezvous hashing are a stretch."
+          },
+          {"topic": "04.07"},
+          {
+            "topic": "05.02",
+            "do": "Ask Claude: “teach me consistency models and CAP”, one session for this step and the next."
+          },
+          {
+            "topic": "05.01",
+            "do": "Covered in the same session as consistency models. Then explain back what PACELC adds to CAP, with one real database on each side."
+          },
+          {
+            "topic": "04.08",
+            "do": "Ask Claude: “teach me message queues and delivery guarantees”, one session for this step and the next."
+          },
+          {
+            "topic": "05.03",
+            "do": "Covered in the same session as message queues. Then explain back how an idempotency key turns at-least-once delivery into effectively-once."
+          },
+          {
+            "topic": "11.01",
+            "do": "Ask Claude: “teach me SLIs, SLOs and error budgets” (45 minutes). From now on, end every design with your two SLOs and the one alert you'd page on."
+          },
+          {"topic": "07.03"},
+          {"topic": "02.08", "do": "Read it, then do dijkstra and its drills. Bellman-Ford and A* can wait."},
+          {
+            "topic": "02.10",
+            "do": "Read it, then do greedy_intervals, gas_station and job_scheduling. Skip huffman_code."
+          },
+          {"topic": "14.04"},
+          {"topic": "14.05"}
+        ],
+        "milestone": {
+          "id": "m5",
+          "format": "15.05",
+          "title": "Mock 5: system design",
+          "bar": "A 3 or better on scoping and on the trade-offs in the deep dive, and a 2 or better on scale, failure and operations.",
+          "ask": "mock interview, system design, 45 minutes"
+        }
+      },
+      {
+        "id": "w6",
+        "label": "Week 6",
+        "title": "Real-time delivery, ordering and the key-value store",
+        "goal": "Push delivery, clocks and quorums feel familiar, you know how systems fail, and the chat, key-value store and typeahead designs are done under time.",
+        "daily": "One timed problem a day, alternating algorithmic and practical, plus one design run every other day.",
+        "steps": [
+          {"topic": "04.14"},
+          {
+            "topic": "07.04",
+            "do": "Run this one as a scored mock. Ask Claude: “mock interview, system design, chat, 45 minutes”. Bar: a 3 or better on all four design signals, with one requirement changed at minute 25."
+          },
+          {"topic": "05.06"},
+          {"topic": "05.05"},
+          {"topic": "07.08"},
+          {"topic": "05.08"},
+          {"topic": "01.06", "do": "Read it, then do trie and trie_patterns. radix_tree is a stretch."},
+          {"topic": "07.06"},
+          {"topic": "14.06"},
+          {"topic": "14.07"}
+        ],
+        "milestone": {
+          "id": "m6",
+          "format": "15.11",
+          "title": "Mock 6: behavioral",
+          "bar": "Every answer names your own actions and a measured result, with a 3 or better on ownership and on conflict. Include a story about candid feedback given and received (Netflix), and a specific answer on why Anthropic's mission matters to you.",
+          "ask": "mock interview, behavioral, 45 minutes"
+        }
+      },
+      {
+        "id": "w7",
+        "label": "Week 7",
+        "title": "Concurrency, overload and the last designs",
+        "goal": "You can write thread-safe code and say why it is safe, you can keep a service up under overload, and the remaining classic designs are done.",
+        "daily": "One timed problem a day, every other one a concurrency problem, plus one design run every other day.",
+        "steps": [
+          {
+            "topic": "09.01",
+            "do": "Ask Claude: “teach me processes, threads and scheduling” (30 minutes): what a context switch costs, and what threads share that processes don't."
+          },
+          {
+            "topic": "03.01",
+            "do": "Ask Claude: “teach me threads, processes and asyncio” (60 minutes): the GIL, the event loop, gather, and a Semaphore to cap concurrency."
+          },
+          {"topic": "03.02"},
+          {"topic": "03.03"},
+          {"topic": "03.04"},
+          {
+            "topic": "01.14",
+            "optional": true,
+            "do": "Practice for Mock 7: read it, then do striped_hash_map. The two lock-free exercises are a stretch."
+          },
+          {"topic": "03.05"},
+          {"topic": "04.12"},
+          {"topic": "07.02"},
+          {"topic": "07.05"},
+          {"topic": "07.10"},
+          {
+            "topic": "07.07",
+            "do": "Design it on a worksheet first (python3 tools/new.py case \"Web crawler\"), 45 minutes. Then code a small version: a pool of workers, a visited set and a per-host rate limit. Mock 7 is a variation of it."
+          }
+        ],
+        "milestone": {
+          "id": "m7",
+          "format": "15.07",
+          "title": "Mock 7: concurrency coding",
+          "bar": "A concurrent web crawler with a per-host rate limit in 45 minutes, with a test that would catch a race and a clear account of why it is safe.",
+          "ask": "mock interview, concurrency coding: a concurrent web crawler with a per-host rate limit, 45 minutes"
+        }
+      },
+      {
+        "id": "onsite",
+        "label": "Onsite",
+        "title": "Every round on your list, before the day",
+        "pick": true,
+        "goal": "Start the day your first onsite is booked, wherever you are on the track. Ask the recruiter for the round list, rehearse only those formats, write any story you're missing, and run the full loop three or four days before.",
+        "daily": "One timed problem a day, and one mock every other day in the format you are weakest at.",
+        "steps": [
+          {
+            "topic": "08.03",
+            "do": "Ask Claude: “teach me reading unfamiliar code” (30 minutes): find the entry point, follow one request through, and write down the invariants. Then practice on a small open-source repository."
+          },
+          {"topic": "08.02"},
+          {"topic": "08.04"},
+          {
+            "topic": "15.03",
+            "optional": true,
+            "do": "Only if your round list has a debugging round. Ask Claude: “mock interview, debugging round, 45 minutes”."
+          },
+          {
+            "topic": "08.13",
+            "optional": true,
+            "do": "Only if your round list has a code review round. Ask Claude: “teach me reviewing a pull request” (30 minutes)."
+          },
+          {
+            "topic": "15.04",
+            "optional": true,
+            "do": "Only if your round list has a code review round. Ask Claude: “mock interview, code review round, 45 minutes”."
+          },
+          {
+            "topic": "15.06",
+            "optional": true,
+            "do": "Only if your round list has a low-level design round. Ask Claude: “mock interview, object-oriented design, 45 minutes”."
+          },
+          {"topic": "01.07", "optional": true},
+          {"topic": "02.12", "optional": true},
+          {"topic": "02.09", "optional": true}
+        ],
+        "milestone": {
+          "id": "m8",
+          "format": null,
+          "title": "Full loop rehearsal",
+          "bar": "Coding, system design and behavioral back to back in one afternoon, each a 3 or better. Run it three or four days before the onsite.",
+          "ask": "mock interview, full loop: coding, system design, behavioral"
+        }
+      },
+      {
+        "id": "netflix",
+        "label": "Netflix",
+        "title": "Netflix pack",
+        "pick": true,
+        "goal": "Start once a Netflix onsite is booked: their scale problems, their resilience habits and their culture. These designs build on replication and queues (week 5) and on failure handling (weeks 6 and 7). If the onsite is sooner, do those steps first, in track order.",
+        "steps": [
+          {"topic": "04.10"},
+          {"topic": "04.13"},
+          {"topic": "07.20"},
+          {"topic": "07.24"},
+          {
+            "topic": "11.02",
+            "do": "Ask Claude: “teach me deployment safety” (30 minutes): canary releases, feature flags and automatic rollback. Netflix asks how you ship safely, not only how you design."
+          },
+          {"topic": "07.21", "optional": true},
+          {"topic": "07.22", "optional": true}
+        ]
+      },
+      {
+        "id": "anthropic",
+        "label": "Anthropic",
+        "title": "Anthropic pack",
+        "pick": true,
+        "goal": "Start once an Anthropic onsite is booked: serving models and building on them. These designs build on real-time delivery (week 6) and on retries, load shedding and the rate limiter (week 7). If the onsite is sooner, do those steps first, in track order.",
+        "steps": [
+          {"topic": "13.01"},
+          {"topic": "13.02"},
+          {"topic": "13.03"},
+          {"topic": "07.25"},
+          {"topic": "07.26"},
+          {"topic": "07.27", "optional": true},
+          {"topic": "09.08", "optional": true},
+          {"topic": "12.08", "optional": true},
+          {"topic": "07.29", "optional": true}
+        ]
+      }
+    ]
+  },
   "sections": [
     {
       "num": 1,
@@ -75,72 +405,135 @@
         {
           "id": "01.01",
           "tag": "P0",
-          "text": "Arrays, strings, hash maps/sets: collision handling, load factor, resizing cost"
+          "text": "Arrays, strings, hash maps/sets: collision handling, load factor, resizing cost",
+          "requires": ["02.01"],
+          "drills": [
+            ["Two Sum", "E"],
+            ["Contains Duplicate", "E"],
+            ["Group Anagrams", "M"],
+            ["Longest Consecutive Sequence", "M"],
+            ["Insert Delete GetRandom O(1)", "M"]
+          ]
         },
         {
           "id": "01.02",
           "tag": "P0",
-          "text": "Linked lists, stacks, queues, deques, monotonic stack/queue"
+          "text": "Linked lists, stacks, queues, deques, monotonic stack/queue",
+          "requires": ["01.01", "02.01"],
+          "drills": [
+            ["Valid Parentheses", "E"],
+            ["Reverse Linked List", "E"],
+            ["Linked List Cycle", "E"],
+            ["Min Stack", "M"],
+            ["Daily Temperatures", "M"],
+            ["Sliding Window Maximum", "H"],
+            ["Largest Rectangle in Histogram", "H"]
+          ]
         },
         {
           "id": "01.03",
           "tag": "P0",
-          "text": "Trees: BST, balanced trees (red-black, AVL at a conceptual level), traversal orders"
+          "text": "Trees: BST, balanced trees (red-black, AVL at a conceptual level), traversal orders",
+          "requires": ["02.01", "01.01", "01.02"],
+          "drills": [
+            ["Maximum Depth of Binary Tree", "E"],
+            ["Invert Binary Tree", "E"],
+            ["Validate Binary Search Tree", "M"],
+            ["Binary Tree Level Order Traversal", "M"],
+            ["Lowest Common Ancestor of a Binary Tree", "M"],
+            ["Kth Smallest Element in a BST", "M"],
+            ["Serialize and Deserialize Binary Tree", "H"]
+          ]
         },
         {
           "id": "01.04",
           "tag": "P0",
-          "text": "Heaps and priority queues: top-k, k-way merge, scheduling"
+          "text": "Heaps and priority queues: top-k, k-way merge, scheduling",
+          "requires": ["01.03", "01.02"],
+          "drills": [
+            ["Kth Largest Element in an Array", "M"],
+            ["K Closest Points to Origin", "M"],
+            ["Task Scheduler", "M"],
+            ["Merge k Sorted Lists", "H"],
+            ["Find Median from Data Stream", "H"]
+          ]
         },
         {
           "id": "01.05",
           "tag": "P0",
-          "text": "Graphs: adjacency list vs matrix, directed/undirected, weighted"
+          "text": "Graphs: adjacency list vs matrix, directed/undirected, weighted",
+          "requires": ["01.01", "01.03"],
+          "drills": [["Find the Town Judge", "E"], ["Clone Graph", "M"]]
         },
         {
           "id": "01.06",
           "tag": "P1",
-          "text": "Tries, prefix/radix trees (autocomplete, routing tables)"
+          "text": "Tries, prefix/radix trees (autocomplete, routing tables)",
+          "requires": ["01.01", "01.03", "02.03", "02.05", "02.11"],
+          "drills": [
+            ["Implement Trie (Prefix Tree)", "M"],
+            ["Design Add and Search Words Data Structure", "M"],
+            ["Search Suggestions System", "M"],
+            ["Word Search II", "H"]
+          ]
         },
         {
           "id": "01.07",
           "tag": "P1",
-          "text": "Union-find (disjoint sets) with path compression"
+          "text": "Union-find (disjoint sets) with path compression",
+          "requires": ["01.05", "02.05", "01.03", "02.01"],
+          "drills": [
+            ["Number of Provinces", "M"],
+            ["Redundant Connection", "M"],
+            ["Accounts Merge", "M"],
+            ["Satisfiability of Equality Equations", "M"]
+          ]
         },
         {
           "id": "01.08",
           "tag": "P1",
-          "text": "LRU/LFU cache construction (hash map + doubly linked list)"
+          "text": "LRU/LFU cache construction (hash map + doubly linked list)",
+          "requires": ["01.01", "01.02", "01.04"],
+          "drills": [["LRU Cache", "M"], ["LFU Cache", "H"]]
         },
         {
           "id": "01.09",
           "tag": "P1",
-          "text": "Interval structures: merge, sweep line, interval tree basics"
+          "text": "Interval structures: merge, sweep line, interval tree basics",
+          "requires": ["02.02", "02.03", "02.04", "01.04", "01.03"],
+          "drills": [
+            ["Merge Intervals", "M"],
+            ["Insert Interval", "M"],
+            ["Non-overlapping Intervals", "M"],
+            ["Minimum Number of Arrows to Burst Balloons", "M"],
+            ["Car Pooling", "M"],
+            ["My Calendar I", "M"]
+          ]
         },
-        {
-          "id": "01.10",
-          "tag": "P2",
-          "text": "Segment trees, Fenwick trees"
-        },
+        {"id": "01.10", "tag": "P2", "text": "Segment trees, Fenwick trees", "requires": ["01.03", "01.04"]},
         {
           "id": "01.11",
           "tag": "P2",
-          "text": "Skip lists (and why Redis uses them)"
+          "text": "Skip lists (and why Redis uses them)",
+          "requires": ["01.02", "01.03"]
         },
         {
           "id": "01.12",
-          "tag": "P2",
-          "text": "Probabilistic structures: Bloom filter, Count-Min Sketch, HyperLogLog"
+          "tag": "P1",
+          "text": "Probabilistic structures: Bloom filter, Count-Min Sketch, HyperLogLog",
+          "requires": ["01.01", "01.04", "02.11"]
         },
         {
           "id": "01.13",
-          "tag": "P2",
-          "text": "Storage structures: B-tree, B+tree, LSM tree, SSTable, write-ahead log"
+          "tag": "P1",
+          "text": "Storage structures: B-tree, B+tree, LSM tree, SSTable, write-ahead log",
+          "requires": ["01.03", "01.04", "01.12"]
         },
         {
           "id": "01.14",
           "tag": "P2",
-          "text": "Concurrent structures: lock-free queue, ring buffer, concurrent hash map"
+          "text": "Concurrent structures: lock-free queue, ring buffer, concurrent hash map",
+          "requires": ["01.02", "01.01", "03.03"]
         }
       ]
     },
@@ -156,82 +549,167 @@
         {
           "id": "02.01",
           "tag": "P0",
-          "text": "Complexity analysis: time, space, amortized; knowing when constants matter"
+          "text": "Complexity analysis: time, space, amortized; knowing when constants matter",
+          "requires": []
         },
         {
           "id": "02.02",
           "tag": "P0",
-          "text": "Sorting and its trade-offs (quicksort, mergesort, heapsort, counting/radix); stability"
+          "text": "Sorting and its trade-offs (quicksort, mergesort, heapsort, counting/radix); stability",
+          "requires": ["02.01", "01.04"],
+          "drills": [["Merge Sorted Array", "E"], ["Sort Colors", "M"], ["Sort an Array", "M"], ["Largest Number", "M"]]
         },
         {
           "id": "02.03",
           "tag": "P0",
-          "text": "Binary search, including \"search on the answer\" variants"
+          "text": "Binary search, including \"search on the answer\" variants",
+          "requires": ["02.01", "02.02", "01.02"],
+          "drills": [
+            ["Binary Search", "E"],
+            ["Search in Rotated Sorted Array", "M"],
+            ["Find Minimum in Rotated Sorted Array", "M"],
+            ["Koko Eating Bananas", "M"],
+            ["Capacity To Ship Packages Within D Days", "M"],
+            ["Median of Two Sorted Arrays", "H"]
+          ]
         },
         {
           "id": "02.04",
           "tag": "P0",
-          "text": "Two pointers, sliding window, prefix sums"
+          "text": "Two pointers, sliding window, prefix sums",
+          "requires": ["02.01", "02.02", "02.03", "01.01"],
+          "drills": [
+            ["Valid Palindrome", "E"],
+            ["3Sum", "M"],
+            ["Container With Most Water", "M"],
+            ["Longest Substring Without Repeating Characters", "M"],
+            ["Product of Array Except Self", "M"],
+            ["Subarray Sum Equals K", "M"],
+            ["Minimum Window Substring", "H"]
+          ]
         },
         {
           "id": "02.05",
           "tag": "P0",
-          "text": "BFS/DFS, topological sort, cycle detection, connected components"
+          "text": "BFS/DFS, topological sort, cycle detection, connected components",
+          "requires": ["02.01", "01.01", "01.02", "01.05"],
+          "drills": [
+            ["Number of Islands", "M"],
+            ["Rotting Oranges", "M"],
+            ["Course Schedule", "M"],
+            ["Course Schedule II", "M"],
+            ["Pacific Atlantic Water Flow", "M"],
+            ["Word Ladder", "H"]
+          ]
         },
         {
           "id": "02.06",
           "tag": "P0",
-          "text": "Recursion and backtracking (permutations, subsets, constraint search)"
+          "text": "Recursion and backtracking (permutations, subsets, constraint search)",
+          "requires": ["02.01", "02.05"],
+          "drills": [
+            ["Subsets", "M"],
+            ["Permutations", "M"],
+            ["Combination Sum", "M"],
+            ["Generate Parentheses", "M"],
+            ["Word Search", "M"],
+            ["N-Queens", "H"]
+          ]
         },
         {
           "id": "02.07",
           "tag": "P0",
-          "text": "Dynamic programming: 1D/2D, knapsack family, LIS, edit distance, interval DP"
+          "text": "Dynamic programming: 1D/2D, knapsack family, LIS, edit distance, interval DP",
+          "requires": ["02.01", "02.03", "02.06"],
+          "drills": [
+            ["Climbing Stairs", "E"],
+            ["House Robber", "M"],
+            ["Coin Change", "M"],
+            ["Longest Increasing Subsequence", "M"],
+            ["Longest Common Subsequence", "M"],
+            ["Word Break", "M"],
+            ["Edit Distance", "M"]
+          ]
         },
         {
           "id": "02.08",
           "tag": "P1",
-          "text": "Shortest paths: Dijkstra, Bellman-Ford, A* basics"
+          "text": "Shortest paths: Dijkstra, Bellman-Ford, A* basics",
+          "requires": ["02.05", "01.04", "02.07"],
+          "drills": [
+            ["Network Delay Time", "M"],
+            ["Path With Minimum Effort", "M"],
+            ["Cheapest Flights Within K Stops", "M"],
+            ["Swim in Rising Water", "H"]
+          ]
         },
         {
           "id": "02.09",
           "tag": "P1",
-          "text": "Minimum spanning tree (Kruskal, Prim)"
+          "text": "Minimum spanning tree (Kruskal, Prim)",
+          "requires": ["01.07", "01.04", "02.08"],
+          "drills": [["Min Cost to Connect All Points", "M"]]
         },
         {
           "id": "02.10",
           "tag": "P1",
-          "text": "Greedy algorithms and how to argue correctness"
+          "text": "Greedy algorithms and how to argue correctness",
+          "requires": ["02.02", "01.09", "02.07"],
+          "drills": [
+            ["Jump Game", "M"],
+            ["Jump Game II", "M"],
+            ["Gas Station", "M"],
+            ["Partition Labels", "M"],
+            ["Hand of Straights", "M"]
+          ]
         },
         {
           "id": "02.11",
           "tag": "P1",
-          "text": "Bit manipulation"
+          "text": "Bit manipulation",
+          "requires": ["02.01", "02.06"],
+          "drills": [
+            ["Single Number", "E"],
+            ["Number of 1 Bits", "E"],
+            ["Counting Bits", "E"],
+            ["Missing Number", "E"],
+            ["Sum of Two Integers", "M"]
+          ]
         },
         {
           "id": "02.12",
           "tag": "P1",
-          "text": "String algorithms: rolling hash, KMP at a conceptual level"
+          "text": "String algorithms: rolling hash, KMP at a conceptual level",
+          "requires": ["02.01", "01.01", "02.03"],
+          "drills": [
+            ["Find the Index of the First Occurrence in a String", "E"],
+            ["Repeated DNA Sequences", "M"],
+            ["Longest Duplicate Substring", "H"]
+          ]
         },
         {
           "id": "02.13",
           "tag": "P2",
-          "text": "Streaming and external algorithms: reservoir sampling, external merge sort"
+          "text": "Streaming and external algorithms: reservoir sampling, external merge sort",
+          "requires": ["02.02", "01.04"]
         },
         {
           "id": "02.14",
-          "tag": "P2",
-          "text": "Rate limiting algorithms: token bucket, leaky bucket, sliding window log/counter"
+          "tag": "P1",
+          "text": "Rate limiting algorithms: token bucket, leaky bucket, sliding window log/counter",
+          "requires": ["02.04", "01.01", "01.02"]
         },
         {
           "id": "02.15",
-          "tag": "P2",
-          "text": "Consistent hashing, rendezvous hashing"
+          "tag": "P1",
+          "text": "Consistent hashing, rendezvous hashing",
+          "requires": ["01.01", "02.03", "02.11"]
         },
         {
           "id": "02.16",
-          "tag": "P2",
-          "text": "Basic probability and estimation for capacity reasoning"
+          "tag": "P1",
+          "text": "Basic probability and estimation for capacity reasoning",
+          "requires": ["02.01", "01.01"]
         }
       ]
     },
@@ -245,27 +723,34 @@
         {
           "id": "03.01",
           "tag": "P0",
-          "text": "Threads vs processes vs coroutines; when each is the right tool"
+          "text": "Threads vs processes vs coroutines; when each is the right tool",
+          "requires": ["09.01"]
         },
         {
           "id": "03.02",
           "tag": "P0",
-          "text": "Race conditions, critical sections, atomicity, visibility"
+          "text": "Race conditions, critical sections, atomicity, visibility",
+          "short": "Race conditions and atomicity",
+          "requires": ["03.01"]
         },
         {
           "id": "03.03",
           "tag": "P0",
-          "text": "Mutexes, read-write locks, semaphores, condition variables"
+          "text": "Mutexes, read-write locks, semaphores, condition variables",
+          "short": "Locks, semaphores and condition variables",
+          "requires": ["03.02"]
         },
         {
           "id": "03.04",
           "tag": "P0",
-          "text": "Deadlock, livelock, starvation: the four deadlock conditions and how to break them"
+          "text": "Deadlock, livelock, starvation: the four deadlock conditions and how to break them",
+          "requires": ["03.03"]
         },
         {
           "id": "03.05",
           "tag": "P0",
-          "text": "Thread pools, work queues, backpressure"
+          "text": "Thread pools, work queues, backpressure",
+          "requires": ["03.03", "01.02"]
         },
         {
           "id": "03.06",
@@ -282,11 +767,7 @@
           "tag": "P1",
           "text": "Memory model basics: happens-before, volatile/atomic, false sharing"
         },
-        {
-          "id": "03.09",
-          "tag": "P1",
-          "text": "Compare-and-swap, lock-free vs wait-free, the ABA problem"
-        },
+        {"id": "03.09", "tag": "P1", "text": "Compare-and-swap, lock-free vs wait-free, the ABA problem"},
         {
           "id": "03.10",
           "tag": "P1",
@@ -297,16 +778,8 @@
           "tag": "P1",
           "text": "Language specifics: Python GIL and multiprocessing, Go channels, C++ std::thread/std::atomic, Swift actors"
         },
-        {
-          "id": "03.12",
-          "tag": "P2",
-          "text": "Actor model and CSP"
-        },
-        {
-          "id": "03.13",
-          "tag": "P2",
-          "text": "Parallelism limits: Amdahl's law, contention, cache effects"
-        },
+        {"id": "03.12", "tag": "P2", "text": "Actor model and CSP"},
+        {"id": "03.13", "tag": "P2", "text": "Parallelism limits: Amdahl's law, contention, cache effects"},
         {
           "id": "03.14",
           "tag": "P2",
@@ -324,83 +797,95 @@
         {
           "id": "04.01",
           "tag": "P0",
-          "text": "Requirements gathering: functional vs non-functional, scoping, stating assumptions"
+          "text": "Requirements gathering: functional vs non-functional, scoping, stating assumptions",
+          "requires": []
         },
         {
           "id": "04.02",
           "tag": "P0",
-          "text": "Back-of-envelope estimation: QPS, storage, bandwidth, memory"
+          "text": "Back-of-envelope estimation: QPS, storage, bandwidth, memory",
+          "requires": ["04.01", "04.03", "02.16"]
         },
         {
           "id": "04.03",
           "tag": "P0",
-          "text": "Latency numbers every engineer should know; p50/p95/p99 thinking"
+          "text": "Latency numbers every engineer should know; p50/p95/p99 thinking",
+          "requires": ["02.01", "02.16"]
         },
         {
           "id": "04.04",
           "tag": "P0",
-          "text": "Load balancing: L4 vs L7, algorithms, health checks"
+          "text": "Load balancing: L4 vs L7, algorithms, health checks",
+          "requires": ["09.04", "09.03", "01.01", "04.11"]
         },
         {
           "id": "04.05",
           "tag": "P0",
-          "text": "Caching: cache-aside, write-through, write-behind, TTLs, invalidation, stampede protection"
+          "text": "Caching: cache-aside, write-through, write-behind, TTLs, invalidation, stampede protection",
+          "requires": ["01.08", "04.03", "04.02"]
         },
         {
           "id": "04.06",
           "tag": "P0",
-          "text": "Database choice: relational vs document vs key-value vs wide-column vs graph vs search"
+          "text": "Database choice: relational vs document vs key-value vs wide-column vs graph vs search",
+          "requires": ["06.04", "06.01", "06.02"]
         },
         {
           "id": "04.07",
           "tag": "P0",
-          "text": "Replication (leader-follower, multi-leader, leaderless) and sharding/partitioning strategies"
+          "text": "Replication (leader-follower, multi-leader, leaderless) and sharding/partitioning strategies",
+          "short": "Replication and sharding",
+          "requires": ["04.06", "02.15"]
         },
         {
           "id": "04.08",
           "tag": "P0",
-          "text": "Message queues and event streams (Kafka, SQS, RabbitMQ): ordering, delivery guarantees"
+          "text": "Message queues and event streams (Kafka, SQS, RabbitMQ): ordering, delivery guarantees",
+          "short": "Message queues and event streams",
+          "requires": ["01.02", "04.07"]
         },
         {
           "id": "04.09",
           "tag": "P0",
-          "text": "API design: REST, gRPC, GraphQL; pagination, versioning, idempotency keys"
+          "text": "API design: REST, gRPC, GraphQL; pagination, versioning, idempotency keys",
+          "requires": ["04.01", "09.03"]
         },
         {
           "id": "04.10",
           "tag": "P1",
-          "text": "CDNs, edge caching, object storage"
+          "text": "CDNs, edge caching, object storage",
+          "short": "CDNs and object storage",
+          "requires": ["04.05", "09.03"]
         },
         {
           "id": "04.11",
           "tag": "P1",
-          "text": "Stateless services, session handling, horizontal scaling"
+          "text": "Stateless services, session handling, horizontal scaling",
+          "short": "Stateless services",
+          "requires": ["09.03"]
         },
         {
           "id": "04.12",
           "tag": "P1",
-          "text": "Rate limiting, load shedding, circuit breakers, retries with jitter, timeouts, bulkheads"
+          "text": "Rate limiting, load shedding, circuit breakers, retries with jitter, timeouts, bulkheads",
+          "short": "Timeouts, retries, circuit breakers, load shedding",
+          "requires": ["02.14", "04.04", "04.03", "02.16", "03.05", "05.08"]
         },
         {
           "id": "04.13",
           "tag": "P1",
-          "text": "Multi-region design: active-active vs active-passive, failover, data residency"
+          "text": "Multi-region design: active-active vs active-passive, failover, data residency",
+          "requires": ["04.07", "05.01", "04.04", "05.08"]
         },
         {
           "id": "04.14",
           "tag": "P1",
-          "text": "Real-time delivery: WebSockets, SSE, long polling, pub/sub fan-out"
+          "text": "Real-time delivery: WebSockets, SSE, long polling, pub/sub fan-out",
+          "short": "Real-time delivery: WebSockets, SSE, pub/sub",
+          "requires": ["09.03", "09.04", "04.04", "04.08"]
         },
-        {
-          "id": "04.15",
-          "tag": "P1",
-          "text": "Search and indexing: inverted index, ranking basics"
-        },
-        {
-          "id": "04.16",
-          "tag": "P2",
-          "text": "Cost as a design constraint; build vs buy"
-        },
+        {"id": "04.15", "tag": "P1", "text": "Search and indexing: inverted index, ranking basics"},
+        {"id": "04.16", "tag": "P2", "text": "Cost as a design constraint; build vs buy"},
         {
           "id": "04.17",
           "tag": "P2",
@@ -418,17 +903,21 @@
         {
           "id": "05.01",
           "tag": "P0",
-          "text": "CAP and PACELC, and what they do and do not say"
+          "text": "CAP and PACELC, and what they do and do not say",
+          "short": "CAP and PACELC",
+          "requires": ["04.07", "05.02"]
         },
         {
           "id": "05.02",
           "tag": "P0",
-          "text": "Consistency models: linearizable, sequential, causal, eventual, read-your-writes"
+          "text": "Consistency models: linearizable, sequential, causal, eventual, read-your-writes",
+          "requires": ["04.07"]
         },
         {
           "id": "05.03",
           "tag": "P0",
-          "text": "Delivery semantics: at-most-once, at-least-once, effectively-once via idempotency"
+          "text": "Delivery semantics: at-most-once, at-least-once, effectively-once via idempotency",
+          "requires": ["04.08", "04.09"]
         },
         {
           "id": "05.04",
@@ -438,12 +927,15 @@
         {
           "id": "05.05",
           "tag": "P1",
-          "text": "Quorums, sloppy quorums, hinted handoff, read repair, anti-entropy (Merkle trees)"
+          "text": "Quorums, sloppy quorums, hinted handoff, read repair, anti-entropy (Merkle trees)",
+          "short": "Quorums, hinted handoff and read repair",
+          "requires": ["04.07", "05.02", "05.06"]
         },
         {
           "id": "05.06",
           "tag": "P1",
-          "text": "Time and ordering: clock skew, Lamport clocks, vector clocks, hybrid logical clocks"
+          "text": "Time and ordering: clock skew, Lamport clocks, vector clocks, hybrid logical clocks",
+          "requires": ["05.02"]
         },
         {
           "id": "05.07",
@@ -453,23 +945,12 @@
         {
           "id": "05.08",
           "tag": "P1",
-          "text": "Failure modes: partitions, split brain, gray failure, thundering herd, cascading failure, retry storms"
+          "text": "Failure modes: partitions, split brain, gray failure, thundering herd, cascading failure, retry storms",
+          "requires": ["04.04", "04.07"]
         },
-        {
-          "id": "05.09",
-          "tag": "P2",
-          "text": "Distributed locks, fencing tokens, leases"
-        },
-        {
-          "id": "05.10",
-          "tag": "P2",
-          "text": "CRDTs and conflict resolution"
-        },
-        {
-          "id": "05.11",
-          "tag": "P2",
-          "text": "Gossip protocols, membership, failure detection"
-        },
+        {"id": "05.09", "tag": "P2", "text": "Distributed locks, fencing tokens, leases"},
+        {"id": "05.10", "tag": "P2", "text": "CRDTs and conflict resolution"},
+        {"id": "05.11", "tag": "P2", "text": "Gossip protocols, membership, failure detection"},
         {
           "id": "05.12",
           "tag": "P2",
@@ -482,45 +963,39 @@
       "id": "06",
       "slug": "06-data-intensive-design",
       "title": "Data-Intensive Design",
-      "notes": [
-        "Core text: Designing Data-Intensive Applications (Kleppmann). Check for the second edition."
-      ],
+      "notes": ["Core text: Designing Data-Intensive Applications (Kleppmann). Check for the second edition."],
       "topics": [
         {
           "id": "06.01",
           "tag": "P0",
-          "text": "Indexing: B-tree vs LSM, composite and covering indexes, when an index hurts"
+          "text": "Indexing: B-tree vs LSM, composite and covering indexes, when an index hurts",
+          "requires": ["01.13", "06.04", "06.03"]
         },
         {
           "id": "06.02",
           "tag": "P0",
-          "text": "Transactions and ACID; isolation levels and their anomalies (dirty read, non-repeatable read, phantom, write skew)"
+          "text": "Transactions and ACID; isolation levels and their anomalies (dirty read, non-repeatable read, phantom, write skew)",
+          "requires": ["06.04", "01.13", "06.01"]
         },
         {
           "id": "06.03",
           "tag": "P0",
-          "text": "SQL fluency: joins, aggregation, window functions, reading an EXPLAIN plan"
+          "text": "SQL fluency: joins, aggregation, window functions, reading an EXPLAIN plan",
+          "requires": ["01.01", "02.02"]
         },
         {
           "id": "06.04",
           "tag": "P0",
-          "text": "Data modeling: normalization vs denormalization, access-pattern-driven design"
+          "text": "Data modeling: normalization vs denormalization, access-pattern-driven design",
+          "requires": ["04.01", "06.03"]
         },
-        {
-          "id": "06.05",
-          "tag": "P1",
-          "text": "MVCC, optimistic vs pessimistic locking"
-        },
+        {"id": "06.05", "tag": "P1", "text": "MVCC, optimistic vs pessimistic locking"},
         {
           "id": "06.06",
           "tag": "P1",
           "text": "Partitioning: hash vs range, hot keys, rebalancing, secondary indexes across shards"
         },
-        {
-          "id": "06.07",
-          "tag": "P1",
-          "text": "Batch vs stream processing; Lambda vs Kappa architecture"
-        },
+        {"id": "06.07", "tag": "P1", "text": "Batch vs stream processing; Lambda vs Kappa architecture"},
         {
           "id": "06.08",
           "tag": "P1",
@@ -536,16 +1011,8 @@
           "tag": "P1",
           "text": "OLTP vs OLAP, columnar storage, Parquet, data warehouse vs lakehouse"
         },
-        {
-          "id": "06.11",
-          "tag": "P2",
-          "text": "Online schema migrations and zero-downtime changes"
-        },
-        {
-          "id": "06.12",
-          "tag": "P2",
-          "text": "Data quality, lineage, backfills, reprocessing"
-        },
+        {"id": "06.11", "tag": "P2", "text": "Online schema migrations and zero-downtime changes"},
+        {"id": "06.12", "tag": "P2", "text": "Data quality, lineage, backfills, reprocessing"},
         {
           "id": "06.13",
           "tag": "P2",
@@ -565,63 +1032,64 @@
         {
           "id": "07.01",
           "tag": "Classic",
-          "text": "URL shortener; pastebin"
+          "text": "URL shortener; pastebin",
+          "short": "URL shortener",
+          "requires": ["04.01", "04.02", "04.05", "04.06", "04.09", "02.16"]
         },
         {
           "id": "07.02",
           "tag": "Classic",
-          "text": "Rate limiter (single node, then distributed)"
+          "text": "Rate limiter (single node, then distributed)",
+          "requires": ["02.14", "04.05", "04.12"]
         },
         {
           "id": "07.03",
           "tag": "Classic",
-          "text": "News feed / timeline (fan-out on write vs read)"
+          "text": "News feed / timeline (fan-out on write vs read)",
+          "short": "News feed",
+          "requires": ["04.05", "04.07", "04.08", "01.04"]
         },
         {
           "id": "07.04",
           "tag": "Classic",
-          "text": "Chat and messaging (1:1, group, presence, delivery receipts)"
+          "text": "Chat and messaging (1:1, group, presence, delivery receipts)",
+          "requires": ["04.14", "04.07", "05.03"]
         },
         {
           "id": "07.05",
           "tag": "Classic",
-          "text": "Notification system (multi-channel, dedup, preferences)"
+          "text": "Notification system (multi-channel, dedup, preferences)",
+          "requires": ["04.08", "05.03", "04.12"]
         },
         {
           "id": "07.06",
           "tag": "Classic",
-          "text": "Typeahead / autocomplete"
+          "text": "Typeahead / autocomplete",
+          "short": "Typeahead",
+          "requires": ["01.06", "04.05", "01.04"]
         },
         {
           "id": "07.07",
           "tag": "Classic",
-          "text": "Web crawler"
+          "text": "Web crawler",
+          "requires": ["02.05", "01.12", "02.14", "04.08", "03.05"]
         },
         {
           "id": "07.08",
           "tag": "Classic",
-          "text": "Distributed key-value store"
+          "text": "Distributed key-value store",
+          "requires": ["04.07", "05.01", "05.02", "05.05", "02.15", "01.13", "05.06"]
         },
-        {
-          "id": "07.09",
-          "tag": "Classic",
-          "text": "Distributed cache"
-        },
+        {"id": "07.09", "tag": "Classic", "text": "Distributed cache"},
         {
           "id": "07.10",
           "tag": "Classic",
-          "text": "Job scheduler / distributed cron / task queue"
+          "text": "Job scheduler / distributed cron / task queue",
+          "short": "Job scheduler and task queue",
+          "requires": ["04.08", "05.03", "01.04", "06.02", "03.05"]
         },
-        {
-          "id": "07.11",
-          "tag": "Classic",
-          "text": "Unique ID generator (Snowflake-style)"
-        },
-        {
-          "id": "07.12",
-          "tag": "Classic",
-          "text": "File sync and storage (Dropbox-style)"
-        },
+        {"id": "07.11", "tag": "Classic", "text": "Unique ID generator (Snowflake-style)"},
+        {"id": "07.12", "tag": "Classic", "text": "File sync and storage (Dropbox-style)"},
         {
           "id": "07.13",
           "tag": "Classic",
@@ -632,70 +1100,57 @@
           "tag": "Classic",
           "text": "Payment system and ledger (idempotency, reconciliation, double-entry)"
         },
-        {
-          "id": "07.15",
-          "tag": "Classic",
-          "text": "Ticketing / inventory with contention (flash sale)"
-        },
-        {
-          "id": "07.16",
-          "tag": "Classic",
-          "text": "Collaborative editor (OT vs CRDT)"
-        },
-        {
-          "id": "07.17",
-          "tag": "Classic",
-          "text": "Metrics, monitoring, and alerting pipeline"
-        },
-        {
-          "id": "07.18",
-          "tag": "Classic",
-          "text": "Log aggregation and search"
-        },
-        {
-          "id": "07.19",
-          "tag": "Classic",
-          "text": "Ad click aggregation; top-k / leaderboard"
-        },
+        {"id": "07.15", "tag": "Classic", "text": "Ticketing / inventory with contention (flash sale)"},
+        {"id": "07.16", "tag": "Classic", "text": "Collaborative editor (OT vs CRDT)"},
+        {"id": "07.17", "tag": "Classic", "text": "Metrics, monitoring, and alerting pipeline"},
+        {"id": "07.18", "tag": "Classic", "text": "Log aggregation and search"},
+        {"id": "07.19", "tag": "Classic", "text": "Ad click aggregation; top-k / leaderboard"},
         {
           "id": "07.20",
           "tag": "Netflix",
-          "text": "Video streaming: ingest, transcoding pipeline, adaptive bitrate, CDN placement"
+          "text": "Video streaming: ingest, transcoding pipeline, adaptive bitrate, CDN placement",
+          "requires": ["04.10", "04.08"]
         },
         {
           "id": "07.21",
           "tag": "Netflix",
-          "text": "Recommendation system serving and feature pipelines"
+          "text": "Recommendation system serving and feature pipelines",
+          "short": "Recommendation serving",
+          "requires": ["04.08", "04.05"]
         },
         {
           "id": "07.22",
           "tag": "Netflix",
-          "text": "A/B testing and experimentation platform"
+          "text": "A/B testing and experimentation platform",
+          "short": "A/B testing platform",
+          "requires": ["04.08", "02.16", "01.01"]
         },
-        {
-          "id": "07.23",
-          "tag": "Netflix",
-          "text": "Playback telemetry at scale"
-        },
+        {"id": "07.23", "tag": "Netflix", "text": "Playback telemetry at scale"},
         {
           "id": "07.24",
           "tag": "Netflix",
-          "text": "Resilience design: chaos engineering, regional evacuation, graceful degradation"
+          "text": "Resilience design: chaos engineering, regional evacuation, graceful degradation",
+          "requires": ["04.12", "04.13", "05.08"]
         },
         {
           "id": "07.25",
           "tag": "Anthropic",
-          "text": "LLM inference API: request routing, batching, streaming tokens, GPU scheduling"
+          "text": "LLM inference API: request routing, batching, streaming tokens, GPU scheduling",
+          "requires": ["13.02", "04.04", "04.12", "04.14"]
         },
         {
           "id": "07.26",
           "tag": "Anthropic",
-          "text": "Multi-tenant rate limiting and quota by tokens rather than requests"
+          "text": "Multi-tenant rate limiting and quota by tokens rather than requests",
+          "short": "Rate limiting by tokens",
+          "requires": ["02.14", "07.02", "13.01", "13.02"]
         },
         {
           "id": "07.27",
           "tag": "Anthropic",
-          "text": "Prompt/response caching (prefix caching, KV cache reuse)"
+          "text": "Prompt/response caching (prefix caching, KV cache reuse)",
+          "short": "Prompt and KV caching",
+          "requires": ["13.02", "04.05"]
         },
         {
           "id": "07.28",
@@ -705,7 +1160,8 @@
         {
           "id": "07.29",
           "tag": "Anthropic",
-          "text": "Agent execution platform: sandboxing, tool calls, long-running tasks, checkpointing"
+          "text": "Agent execution platform: sandboxing, tool calls, long-running tasks, checkpointing",
+          "requires": ["13.03", "04.08", "07.10", "09.08", "12.08"]
         },
         {
           "id": "07.30",
@@ -734,22 +1190,27 @@
         {
           "id": "08.01",
           "tag": "P0",
-          "text": "Systematic debugging: reproduce, isolate, hypothesize, bisect, verify the fix"
+          "text": "Systematic debugging: reproduce, isolate, hypothesize, bisect, verify the fix",
+          "requires": []
         },
         {
           "id": "08.02",
           "tag": "P0",
-          "text": "Reading stack traces across languages; following a failure through async boundaries"
+          "text": "Reading stack traces across languages; following a failure through async boundaries",
+          "requires": ["08.01"]
         },
         {
           "id": "08.03",
           "tag": "P0",
-          "text": "Reading unfamiliar code quickly: entry points, data flow, invariants"
+          "text": "Reading unfamiliar code quickly: entry points, data flow, invariants",
+          "requires": []
         },
         {
           "id": "08.04",
           "tag": "P0",
-          "text": "Finding bugs in provided code: off-by-one, null handling, races, resource leaks, wrong boundary conditions"
+          "text": "Finding bugs in provided code: off-by-one, null handling, races, resource leaks, wrong boundary conditions",
+          "short": "Finding bugs in given code",
+          "requires": ["03.02"]
         },
         {
           "id": "08.05",
@@ -781,11 +1242,7 @@
           "tag": "P1",
           "text": "Linux tooling: top/htop, strace, lsof, ss/netstat, tcpdump, perf, dmesg, /proc"
         },
-        {
-          "id": "08.11",
-          "tag": "P2",
-          "text": "Core dumps and debuggers (gdb, lldb)"
-        },
+        {"id": "08.11", "tag": "P2", "text": "Core dumps and debuggers (gdb, lldb)"},
         {
           "id": "08.12",
           "tag": "P2",
@@ -794,12 +1251,8 @@
         {
           "id": "08.13",
           "tag": "P2",
-          "text": "Reviewing a pull request live: correctness, readability, tests, failure modes"
-        },
-        {
-          "id": "08.14",
-          "tag": "P2",
-          "text": "Reviewing AI-generated code: spotting plausible-but-wrong logic, hallucinated APIs, missing edge cases"
+          "text": "Reviewing a pull request live: correctness, readability, tests, failure modes",
+          "requires": ["08.03", "08.04", "10.03"]
         }
       ]
     },
@@ -813,33 +1266,30 @@
         {
           "id": "09.01",
           "tag": "P0",
-          "text": "Processes, threads, context switches, scheduling"
+          "text": "Processes, threads, context switches, scheduling",
+          "short": "Processes and threads"
         },
-        {
-          "id": "09.02",
-          "tag": "P0",
-          "text": "Virtual memory, paging, stack vs heap, page cache"
-        },
+        {"id": "09.02", "tag": "P0", "text": "Virtual memory, paging, stack vs heap, page cache"},
         {
           "id": "09.03",
           "tag": "P0",
-          "text": "HTTP/1.1 vs HTTP/2 vs HTTP/3; TLS handshake; DNS resolution"
+          "text": "HTTP/1.1 vs HTTP/2 vs HTTP/3; TLS handshake; DNS resolution",
+          "short": "HTTP versions, TLS and DNS",
+          "requires": ["09.04"]
         },
         {
           "id": "09.04",
           "tag": "P0",
-          "text": "TCP vs UDP: handshake, flow control, congestion control, connection reuse"
+          "text": "TCP vs UDP: handshake, flow control, congestion control, connection reuse",
+          "short": "TCP vs UDP",
+          "requires": ["04.03"]
         },
         {
           "id": "09.05",
           "tag": "P1",
           "text": "File systems, file descriptors, blocking vs non-blocking I/O, fsync and durability"
         },
-        {
-          "id": "09.06",
-          "tag": "P1",
-          "text": "What happens when you type a URL and press enter, at depth"
-        },
+        {"id": "09.06", "tag": "P1", "text": "What happens when you type a URL and press enter, at depth"},
         {
           "id": "09.07",
           "tag": "P1",
@@ -850,21 +1300,9 @@
           "tag": "P1",
           "text": "Containers: namespaces, cgroups, images; Kubernetes scheduling basics"
         },
-        {
-          "id": "09.09",
-          "tag": "P2",
-          "text": "CPU caches, cache locality, branch prediction, SIMD awareness"
-        },
-        {
-          "id": "09.10",
-          "tag": "P2",
-          "text": "NUMA, zero-copy I/O, mmap, io_uring"
-        },
-        {
-          "id": "09.11",
-          "tag": "P2",
-          "text": "Proxies, service mesh, NAT, connection pooling pitfalls"
-        }
+        {"id": "09.09", "tag": "P2", "text": "CPU caches, cache locality, branch prediction, SIMD awareness"},
+        {"id": "09.10", "tag": "P2", "text": "NUMA, zero-copy I/O, mmap, io_uring"},
+        {"id": "09.11", "tag": "P2", "text": "Proxies, service mesh, NAT, connection pooling pitfalls"}
       ]
     },
     {
@@ -877,7 +1315,8 @@
         {
           "id": "10.01",
           "tag": "P0",
-          "text": "Clean, idiomatic code in your primary language; deep knowledge of its standard library"
+          "text": "Clean, idiomatic code in your primary language; deep knowledge of its standard library",
+          "short": "Idiomatic code and the standard library"
         },
         {
           "id": "10.02",
@@ -892,33 +1331,18 @@
         {
           "id": "10.04",
           "tag": "P1",
-          "text": "Low-level design exercises: parking lot, elevator, in-memory file system, LRU cache, key-value store with transactions, spreadsheet engine, text editor buffer"
+          "text": "Low-level design exercises: parking lot, elevator, in-memory file system, LRU cache, key-value store with transactions, spreadsheet engine, text editor buffer",
+          "requires": ["01.01", "01.04", "10.02", "10.03"]
         },
         {
           "id": "10.05",
           "tag": "P1",
           "text": "API and interface design: naming, error handling, extensibility, backward compatibility"
         },
-        {
-          "id": "10.06",
-          "tag": "P1",
-          "text": "Common design patterns and when they are overkill"
-        },
-        {
-          "id": "10.07",
-          "tag": "P1",
-          "text": "Refactoring legacy code safely; characterization tests"
-        },
-        {
-          "id": "10.08",
-          "tag": "P2",
-          "text": "Property-based testing, fuzzing, load testing, chaos testing"
-        },
-        {
-          "id": "10.09",
-          "tag": "P2",
-          "text": "Dependency management, build systems, monorepo trade-offs"
-        }
+        {"id": "10.06", "tag": "P1", "text": "Common design patterns and when they are overkill"},
+        {"id": "10.07", "tag": "P1", "text": "Refactoring legacy code safely; characterization tests"},
+        {"id": "10.08", "tag": "P2", "text": "Property-based testing, fuzzing, load testing, chaos testing"},
+        {"id": "10.09", "tag": "P2", "text": "Dependency management, build systems, monorepo trade-offs"}
       ]
     },
     {
@@ -928,41 +1352,22 @@
       "title": "Reliability, Observability, and Operations",
       "notes": [],
       "topics": [
-        {
-          "id": "11.01",
-          "tag": "P0",
-          "text": "SLIs, SLOs, error budgets"
-        },
+        {"id": "11.01", "tag": "P0", "text": "SLIs, SLOs, error budgets", "requires": ["04.03"]},
         {
           "id": "11.02",
           "tag": "P0",
-          "text": "Deployment safety: canary, blue-green, feature flags, automated rollback"
+          "text": "Deployment safety: canary, blue-green, feature flags, automated rollback",
+          "requires": ["11.01"]
         },
         {
           "id": "11.03",
           "tag": "P1",
           "text": "Incident response: mitigation before root cause, communication, blameless postmortems"
         },
-        {
-          "id": "11.04",
-          "tag": "P1",
-          "text": "Capacity planning, autoscaling, load testing"
-        },
-        {
-          "id": "11.05",
-          "tag": "P1",
-          "text": "Alert design: symptom-based alerts, avoiding alert fatigue"
-        },
-        {
-          "id": "11.06",
-          "tag": "P1",
-          "text": "CI/CD pipelines and infrastructure as code"
-        },
-        {
-          "id": "11.07",
-          "tag": "P2",
-          "text": "Disaster recovery: RPO/RTO, backups, restore drills"
-        },
+        {"id": "11.04", "tag": "P1", "text": "Capacity planning, autoscaling, load testing"},
+        {"id": "11.05", "tag": "P1", "text": "Alert design: symptom-based alerts, avoiding alert fatigue"},
+        {"id": "11.06", "tag": "P1", "text": "CI/CD pipelines and infrastructure as code"},
+        {"id": "11.07", "tag": "P2", "text": "Disaster recovery: RPO/RTO, backups, restore drills"},
         {
           "id": "11.08",
           "tag": "P2",
@@ -992,26 +1397,10 @@
           "tag": "P1",
           "text": "Encryption in transit and at rest; hashing vs encryption; password storage"
         },
-        {
-          "id": "12.04",
-          "tag": "P1",
-          "text": "Secrets management, least privilege, key rotation"
-        },
-        {
-          "id": "12.05",
-          "tag": "P1",
-          "text": "Multi-tenant isolation and data access boundaries"
-        },
-        {
-          "id": "12.06",
-          "tag": "P2",
-          "text": "Threat modeling a design"
-        },
-        {
-          "id": "12.07",
-          "tag": "P2",
-          "text": "Supply chain security and dependency risk"
-        },
+        {"id": "12.04", "tag": "P1", "text": "Secrets management, least privilege, key rotation"},
+        {"id": "12.05", "tag": "P1", "text": "Multi-tenant isolation and data access boundaries"},
+        {"id": "12.06", "tag": "P2", "text": "Threat modeling a design"},
+        {"id": "12.07", "tag": "P2", "text": "Supply chain security and dependency risk"},
         {
           "id": "12.08",
           "tag": "P2",
@@ -1024,30 +1413,29 @@
       "id": "13",
       "slug": "13-ai-ml-systems",
       "title": "AI and ML Systems",
-      "notes": [
-        "Required at AI labs, increasingly asked elsewhere."
-      ],
+      "notes": ["Required at AI labs, increasingly asked elsewhere."],
       "topics": [
         {
           "id": "13.01",
           "tag": "P1",
-          "text": "How transformers work at a systems level: tokens, context window, attention cost"
+          "text": "How transformers work at a systems level: tokens, context window, attention cost",
+          "short": "Transformers at a systems level",
+          "requires": []
         },
         {
           "id": "13.02",
           "tag": "P1",
-          "text": "Inference serving: batching (static, dynamic, continuous), KV cache, streaming, time-to-first-token vs throughput"
+          "text": "Inference serving: batching (static, dynamic, continuous), KV cache, streaming, time-to-first-token vs throughput",
+          "short": "Inference serving: batching and the KV cache",
+          "requires": ["13.01", "04.14", "04.03", "02.16"]
         },
         {
           "id": "13.03",
           "tag": "P1",
-          "text": "Building on LLM APIs: tool use, structured output, retries, cost and latency budgets"
+          "text": "Building on LLM APIs: tool use, structured output, retries, cost and latency budgets",
+          "requires": ["13.01", "04.12"]
         },
-        {
-          "id": "13.04",
-          "tag": "P1",
-          "text": "RAG design and its failure modes"
-        },
+        {"id": "13.04", "tag": "P1", "text": "RAG design and its failure modes"},
         {
           "id": "13.05",
           "tag": "P1",
@@ -1055,14 +1443,12 @@
         },
         {
           "id": "13.06",
-          "tag": "P1",
-          "text": "Working effectively with coding agents: task decomposition, verification, knowing when the model is wrong"
+          "tag": "P0",
+          "text": "Coding with AI: give it context (diagrams, data flow, invariants), split work into checkable steps, write the tests first, verify every change; debug, refactor and review AI-written code; know when not to use it",
+          "short": "Coding with AI: write, debug, refactor",
+          "requires": ["02.01", "01.01", "02.02", "01.04", "02.03", "01.08"]
         },
-        {
-          "id": "13.07",
-          "tag": "P2",
-          "text": "Quantization, distillation, speculative decoding"
-        },
+        {"id": "13.07", "tag": "P2", "text": "Quantization, distillation, speculative decoding"},
         {
           "id": "13.08",
           "tag": "P2",
@@ -1073,11 +1459,7 @@
           "tag": "P2",
           "text": "Agent architecture: planning loops, memory, tool permissions, sandboxing"
         },
-        {
-          "id": "13.10",
-          "tag": "P2",
-          "text": "Fine-tuning approaches (full, LoRA) and when not to fine-tune"
-        },
+        {"id": "13.10", "tag": "P2", "text": "Fine-tuning approaches (full, LoRA) and when not to fine-tune"},
         {
           "id": "13.11",
           "tag": "P2",
@@ -1117,27 +1499,22 @@
         {
           "id": "14.05",
           "tag": "P1",
-          "text": "Technical influence without authority; aligning multiple teams"
+          "text": "Technical influence without authority; aligning multiple teams",
+          "short": "Influence without authority"
         },
         {
           "id": "14.06",
           "tag": "P1",
-          "text": "Mentoring and raising the bar for others"
+          "text": "Mentoring and raising the bar for others",
+          "short": "Mentoring and raising the bar"
         },
-        {
-          "id": "14.07",
-          "tag": "P1",
-          "text": "Prioritization and saying no; trading scope, quality, and time"
-        },
-        {
-          "id": "14.08",
-          "tag": "P1",
-          "text": "Writing: design docs, RFCs, postmortems"
-        },
+        {"id": "14.07", "tag": "P1", "text": "Prioritization and saying no; trading scope, quality, and time"},
+        {"id": "14.08", "tag": "P1", "text": "Writing: design docs, RFCs, postmortems"},
         {
           "id": "14.09",
           "tag": "P1",
-          "text": "Company specifics: Netflix culture memo (freedom and responsibility, candor, context not control); Anthropic's mission, values, and views on AI safety"
+          "text": "Company specifics: Netflix culture memo (freedom and responsibility, candor, context not control); Anthropic's mission, values, and views on AI safety",
+          "short": "Company culture: Netflix and Anthropic"
         },
         {
           "id": "14.10",
@@ -1153,11 +1530,7 @@
       "title": "Interview Formats to Rehearse",
       "notes": [],
       "topics": [
-        {
-          "id": "15.01",
-          "tag": "Format",
-          "text": "Algorithmic coding (45 to 60 min, one or two problems)"
-        },
+        {"id": "15.01", "tag": "Format", "text": "Algorithmic coding (45 to 60 min, one or two problems)"},
         {
           "id": "15.02",
           "tag": "Format",
@@ -1166,57 +1539,36 @@
         {
           "id": "15.03",
           "tag": "Format",
-          "text": "Debugging round: broken code or failing tests in an unfamiliar repo"
+          "text": "Debugging round: broken code or failing tests in an unfamiliar repo",
+          "requires": ["08.01", "08.02", "08.03"]
         },
         {
           "id": "15.04",
           "tag": "Format",
-          "text": "Code review round: critique a pull request"
+          "text": "Code review round: critique a pull request",
+          "requires": ["08.03", "08.04", "08.13"]
         },
-        {
-          "id": "15.05",
-          "tag": "Format",
-          "text": "System design (high-level architecture)"
-        },
-        {
-          "id": "15.06",
-          "tag": "Format",
-          "text": "Low-level / object-oriented design"
-        },
-        {
-          "id": "15.07",
-          "tag": "Format",
-          "text": "Concurrency-focused coding"
-        },
-        {
-          "id": "15.08",
-          "tag": "Format",
-          "text": "Take-home or pair-programming project"
-        },
+        {"id": "15.05", "tag": "Format", "text": "System design (high-level architecture)"},
+        {"id": "15.06", "tag": "Format", "text": "Low-level / object-oriented design", "requires": ["10.04"]},
+        {"id": "15.07", "tag": "Format", "text": "Concurrency-focused coding"},
+        {"id": "15.08", "tag": "Format", "text": "Take-home or pair-programming project"},
         {
           "id": "15.09",
           "tag": "Format",
-          "text": "AI-assisted coding round (where permitted): graded on direction, verification, and judgment"
+          "text": "AI-assisted coding round (where permitted): graded on direction, verification, and judgment",
+          "requires": ["13.06"]
         },
         {
           "id": "15.10",
           "tag": "Format",
-          "text": "Project retrospective / past work deep dive"
+          "text": "Project retrospective / past work deep dive",
+          "short": "Past-project deep dive",
+          "requires": ["14.01"]
         },
-        {
-          "id": "15.11",
-          "tag": "Format",
-          "text": "Behavioral and values round"
-        },
-        {
-          "id": "15.12",
-          "tag": "Format",
-          "text": "Hiring manager round"
-        }
+        {"id": "15.11", "tag": "Format", "text": "Behavioral and values round"},
+        {"id": "15.12", "tag": "Format", "text": "Hiring manager round", "requires": ["14.01", "14.02"]}
       ]
     }
   ],
-  "reference": [
-    "15"
-  ]
+  "reference": ["15"]
 }

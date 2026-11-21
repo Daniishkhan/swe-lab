@@ -1,6 +1,6 @@
 """
 Rendezvous hashing (highest random weight)
-Topic: 02.15  |  Priority: P2
+Topic: 02.15  |  Priority: P1
 
 Problem
 -------

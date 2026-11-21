@@ -17,7 +17,6 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 - [ ] `08.11` **[P2]** Core dumps and debuggers (gdb, lldb)
 - [ ] `08.12` **[P2]** Tail latency investigation: queueing, head-of-line blocking, noisy neighbors
 - [ ] `08.13` **[P2]** Reviewing a pull request live: correctness, readability, tests, failure modes
-- [ ] `08.14` **[P2]** Reviewing AI-generated code: spotting plausible-but-wrong logic, hallucinated APIs, missing edge cases
 
 ## Layout
 

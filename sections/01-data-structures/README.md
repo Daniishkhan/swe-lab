@@ -15,8 +15,8 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 - [ ] `01.09` **[P1]** Interval structures: merge, sweep line, interval tree basics
 - [ ] `01.10` **[P2]** Segment trees, Fenwick trees
 - [ ] `01.11` **[P2]** Skip lists (and why Redis uses them)
-- [ ] `01.12` **[P2]** Probabilistic structures: Bloom filter, Count-Min Sketch, HyperLogLog
-- [ ] `01.13` **[P2]** Storage structures: B-tree, B+tree, LSM tree, SSTable, write-ahead log
+- [ ] `01.12` **[P1]** Probabilistic structures: Bloom filter, Count-Min Sketch, HyperLogLog
+- [ ] `01.13` **[P1]** Storage structures: B-tree, B+tree, LSM tree, SSTable, write-ahead log
 - [ ] `01.14` **[P2]** Concurrent structures: lock-free queue, ring buffer, concurrent hash map
 
 ## Layout

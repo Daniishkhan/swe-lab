@@ -19,7 +19,7 @@
 <header class="chapter-head">
   <div class="eyebrow">Chapter 2 · Part 15</div>
   <h1>Which server holds this key?</h1>
-  <div class="meta"><span><span class="badge P2">P2</span> the "how do you add a server?" follow-up in every cache and storage design</span><span>about 45 minutes</span><span>10 quick checks · 9 exercises</span></div>
+  <div class="meta"><span><span class="badge P1">P1</span> the "how do you add a server?" follow-up in every cache and storage design</span><span>about 45 minutes</span><span>10 quick checks · 9 exercises</span></div>
 </header>
 
 <p>Every system that spreads data over several machines has to answer one question millions of times a second: <em>which machine holds this key?</em> The obvious answer, <code>hash(key) % N</code>, works perfectly until N changes. Then it moves almost every key at once. This chapter builds the two standard fixes, the hash ring and rendezvous hashing, from scratch, and shows where real systems (Dynamo, Cassandra, Memcached clients, Google's load balancers) use each one.</p>

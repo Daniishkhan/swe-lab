@@ -1,6 +1,6 @@
 """
 LSM key-value store
-Topic: 01.13  |  Priority: P2
+Topic: 01.13  |  Priority: P1
 
 Problem
 -------
