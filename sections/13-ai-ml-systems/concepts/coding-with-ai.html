@@ -37,7 +37,7 @@
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom, like a book. It builds on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a> (hidden loops, the doubling test), <a href="../../01-data-structures/concepts/hash-maps.html">Find anything in one step</a> (counting with a dict), <a href="../../02-algorithms/concepts/sorting.html">Putting things in order</a> (tuple keys for ties), <a href="../../01-data-structures/concepts/heaps.html">The most urgent thing first</a> (top k) and <a href="../../02-algorithms/concepts/binary-search.html">Binary search</a> (invariants, and <code>first_broken</code>, the search for the first broken build). Sections 3 and 8 and warm-up 2 use <a href="../../01-data-structures/concepts/lru-lfu-cache.html">What to forget first</a> (the LRU cache), and warm-up 3 uses <a href="../../10-code-quality-design-testing/concepts/python-toolkit.html">Python for interviews</a> (mutable default arguments). You don't need any particular AI tool until the stretch exercises. It reads best in two sittings: sections 1 to 6, then 7 to 11. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+<p class="muted small">How to read this: top to bottom, like a book. It builds on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a> (hidden loops, the doubling test), <a href="../../01-data-structures/concepts/hash-maps.html">Find anything in one step</a> (counting with a dict), <a href="../../02-algorithms/concepts/sorting.html">Putting things in order</a> (tuple keys for ties), <a href="../../01-data-structures/concepts/heaps.html">The most urgent thing first</a> (top k) and <a href="../../02-algorithms/concepts/binary-search.html">Binary search</a> (invariants, and <code>first_broken</code>, the search for the first broken build). Section 1 and warm-up 3 use <a href="../../10-code-quality-design-testing/concepts/python-toolkit.html">Python for interviews</a> (<code>most_common</code>'s tie order, mutable default arguments). Sections 3 and 8 and warm-up 2 use <a href="../../01-data-structures/concepts/lru-lfu-cache.html">What to forget first</a> (the LRU cache), and warm-up 1 uses <a href="../../02-algorithms/concepts/probability-estimation.html#s8">Numbers on the back of an envelope</a> (small chances add). You don't need any particular AI tool until the stretch exercises. It reads best in two sittings: sections 1 to 6, then 7 to 11. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
 
 <!-- ============================================================ -->
 <h2 id="s1"><span class="sec-num">1</span>The problem: it passed the examples</h2>
@@ -531,7 +531,7 @@ for _ in range(1000):
   <div class="opts">
     <button>The function's diff, since that's where a bug would be</button>
     <button>None: all tests pass, and time is short</button>
-    <button data-correct>The test file's diff, since it decides what "pass" means</button>
+    <button data-correct>The test file's diff, since this change edited the tests</button>
   </div>
   <div class="fb right"><p>Yes. The list of changed files is already in front of you, and it says the tests changed. The tests are the ruler you measure with. If the change quietly shortened the ruler (deleted the tie test, loosened an assert, mocked the function), "all pass" means much less, and every other check inherits the problem. A test-file diff is usually short, and it tells you how much the green result is worth.</p></div>
   <div class="fb wrong"><p>"All tests pass" is only as good as the tests, and this change edited them. Picture a luggage scale that someone recalibrated while weighing your bag: before you trust the number, check the scale. The function's diff matters too, but it can't tell you whether the test that would have caught a bug was deleted, and stopping now trusts a scale nobody checked. A minute or two on the test diff tells you both what changed in the ruler and how far to trust the rest.</p></div>
@@ -577,7 +577,7 @@ for _ in range(1000):
   <div class="cap">Green: cut, and the bug is still there, so those lines go for good. Red: cut, and the bug vanished, so they go back. Dashed: already gone. Blue at the end: what's left. Step with ▶| or press ▶ Play.</div>
 </div>
 
-<p>On 16 lines that took 16 runs, no better than trying one line at a time. The payoff comes with size. For a bug that needs two lines, each halving level tries at most 4 pieces: the 2 pieces that still hold a needed line, each split in two. 1,000 lines take about 10 halvings (2¹⁰ = 1,024), so about 40 runs. 2 million lines take about 21 (2²¹ is about 2.1 million), so about 85. One line at a time would take 1,000 and 2 million runs. At 2 seconds a run, that's about 3 minutes instead of 46 days.</p>
+<p>On 16 lines that took 16 runs, barely better than trying one line at a time. The payoff comes with size. For a bug that needs two lines, each halving level tries at most 4 pieces: the 2 pieces that still hold a needed line, each split in two. 1,000 lines take about 10 halvings (2¹⁰ = 1,024), so about 40 runs. 2 million lines take about 21 (2²¹ is about 2.1 million), so about 85. One line at a time would take 1,000 and 2 million runs. At 2 seconds a run, that's about 3 minutes instead of 46 days.</p>
 
 <p>What counts as done? An input is <b>1-minimal</b> when removing any single piece that's left makes the bug vanish: every piece left matters. In the player that's lines 4 and 13. The halving gets there fast, and right, because of two moves: one skips runs it doesn't need, and the other guarantees a 1-minimal result. Each one needs a reason.</p>
 
@@ -740,7 +740,7 @@ def test_photo():
         after = new(lines, k)
         assert after == before, lines</code></pre>
 
-<p>Two questions decide whether a photo is good enough. <b>Does it cover the code you'll change?</b> Run it under a coverage tool (coverage.py, for Python) and check that every line you're about to touch actually ran. Or plant one mutant on each path you'll touch (both sides of an <code>if</code>, the body of a loop), and watch the photo go red. <b>Can old and new even run side by side?</b> Code that reads the clock, a file or random numbers gives different answers on two runs for reasons that have nothing to do with the refactor. So pass those in first, the way the <a href="../../01-data-structures/concepts/lru-lfu-cache.html#s11">LRU chapter's</a> <code>ttl_cache</code> takes a <code>clock</code>, and give both versions the same fake clock, the same seeded random generator and the same lines.</p>
+<p>Two questions decide whether a photo is good enough. <b>Does it cover the code you'll change?</b> Run it under a coverage tool (coverage.py, for Python) and check that every line you're about to touch actually ran. Then plant one mutant on each path you'll touch (both sides of an <code>if</code>, the body of a loop), and watch the photo go red. <b>Can old and new even run side by side?</b> Code that reads the clock, a file or random numbers gives different answers on two runs for reasons that have nothing to do with the refactor. So pass those in first, the way the <a href="../../01-data-structures/concepts/lru-lfu-cache.html#s11">LRU chapter's</a> <code>ttl_cache</code> takes a <code>clock</code>, and give both versions the same fake clock, the same seeded random generator and the same lines.</p>
 
 <p>Exercise 6's <code>find_counterexample</code> is this camera, made exhaustive: with the old version as the oracle, it hands you the smallest input where old and new disagree.</p>
 
@@ -753,7 +753,7 @@ def test_photo():
 </ol>
 <p>Diff size is the other half. The "tidy up" request came back as one 60-line diff: 10 minutes of careful reading, with five kinds of change mixed together: renames, a helper pulled out, new comments, three deleted tests, and the one line that changed behavior. Five named changes of about 12 lines each are the same reading in total. But each diff has one job, so you know what to look for, and when the photo fails you know which change broke it.</p>
 
-<div class="keyidea">A refactor must not change behavior, so prove it. Take a photo first: characterization tests, with the old code as the oracle, odd inputs in the frame, and every line you'll change covered. Then ask for one named change at a time and compare after each. Behavior changes get their own step.</div>
+<div class="keyidea">A refactor must not change behavior, so prove it. Take a photo first: characterization tests, with the old code as the oracle, odd inputs in the frame, and every path you'll change covered. Then ask for one named change at a time and compare after each. Behavior changes get their own step.</div>
 
 <div class="check" id="check-refactor">
   <p class="q">Halfway through a refactor, you notice that the old code counts "hello," and "hello" as different words. You think that's a bug. What do you do?</p>
@@ -902,7 +902,7 @@ def test_photo():
     <li><b>"How do you know your tests are any good?"</b> Their expected values come from the task, not the code, and I break the code on purpose to watch a test go red.</li>
     <li><b>"And if there's no slow version to compare with?"</b> Properties that pin the answer down, plus relations between runs: shuffled lines must give the same answer, and doubled lines must double every count.</li>
     <li><b>"Two versions it wrote disagree. Which do you trust?"</b> Neither, yet. I run both against my checks, and the disagreement itself hands me an input to test.</li>
-    <li><b>"Its version is faster than yours, but you can't follow it. Ship it?"</b> Not until I can explain it, or my checks are strong enough to trust it anyway: the oracle on every small input, plus properties at full size. Code nobody understands is a cost for the next person who has to change it.</li>
+    <li><b>"Its version is faster than yours, but you can't follow it. Ship it?"</b> Not until it passes my checks and I can explain it. If its walk-through of the trick doesn't get me there, I ship my slower version. Code nobody understands is a cost for the next person who has to change it.</li>
     <li><b>"How would you use it in a big codebase you don't know?"</b> Read-only first: ask it to trace a request and list the files involved, check the trace, and draw the data flow. Then small changes behind characterization tests.</li>
     <li><b>"How do you know your characterization tests are enough?"</b> I run them under coverage and check that every line I'm changing ran, and I plant a mutant on each path I'm changing to watch them go red.</li>
     <li><b>"Here's a 1,000-line AI-generated change to review."</b> Ask for it in reviewable pieces. Read the changed files, the signature changes and the tests first, climb the ladder, and read every line where the risk is. (In a 45-minute round the code is small, so there you read all of it.)</li>
@@ -920,7 +920,7 @@ def test_photo():
   <li>An oracle you wrote yourself judges the fast version on every small input, smallest first: differential testing. For a class, the oracle is a plain model that gets the same seeded random calls. When several answers are right, compare a canonical form or properties. With no second version, compare runs of one: shuffled input, same answer.</li>
   <li>Climb the ladder of checks as far as the risk deserves, starting with lint and type checks. Read the changed files, then the test diff, then the code. Double the input to catch hidden loops, and break the code on purpose to prove your tests can fail.</li>
   <li>Debug like a doctor: reproduce, shrink to 1-minimal with a precise yes/no test, locate the broken box by checking each arrow of the data-flow sketch (or, when an older version works and you don't know where to look, bisect with a script outside the repo that exits 125 for what it can't test), rank hypotheses and run the experiment that splits the top two, fix the cause, keep the regression test.</li>
-  <li>Refactor behind a photo: characterization tests with the old code as the oracle, covering every line you'll change, then one named change at a time, behavior changes separately.</li>
+  <li>Refactor behind a photo: characterization tests with the old code as the oracle, covering every path you'll change, then one named change at a time, behavior changes separately.</li>
   <li>Review with a catalogue, push back with a failing input, accept only code you can explain, read every command an agent wants to run that deletes or rewrites, treat what it reads as data rather than orders, and know when not to use the assistant at all.</li>
 </ol>
 
@@ -937,7 +937,7 @@ def test_photo():
   <details class="aside another"><summary>Answer</summary>
     <p>(a) 0.9² = 0.81, 0.9⁴ ≈ 0.656, 0.9⁸ ≈ 0.430, so 0.9¹⁰ = 0.9⁸ × 0.9² ≈ 0.35. Then 0.95²⁰ ≈ 0.36 and 0.99⁵⁰ ≈ 0.61: twenty changes at 95% are about as risky as ten at 90%, and fifty at 99% still go wrong two sessions in five.</p>
     <p>(b) 0.97¹² ≈ 0.69 and 0.85¹² ≈ 0.14. A gap of 12 points per step becomes a factor of about five per session.</p>
-    <p>(c) Each step must end right with some q where q²⁰ = 0.9. While they're small, chances add: if each of the twenty steps lets a mistake through with chance s = 1 − q, the session lets one through about 20 × s of the time, so s ≈ 0.1 / 20 = 0.005. A wrong step gets through with 0.1 × (1 − c), so 0.1 × (1 − c) ≤ 0.005 means c ≥ 0.95 (exactly 0.9475).</p>
+    <p>(c) Each step must end right with some q where q²⁰ = 0.9. While they're small, <a href="../../02-algorithms/concepts/probability-estimation.html#s8">chances add</a>: if each of the twenty steps lets a mistake through with chance s = 1 − q, the session lets one through about 20 × s of the time, so s ≈ 0.1 / 20 = 0.005. A wrong step gets through with 0.1 × (1 − c), so 0.1 × (1 − c) ≤ 0.005 means c ≥ 0.95 (0.9475 if a caught step is redone right).</p>
   </details>
 </div>
 
@@ -1063,15 +1063,15 @@ put of a new key, cache full:
 <div class="exercise">
   <div class="tier stretch">Stretch · your AI tool, timed</div>
   <h4>8. A narrated build (45 minutes)</h4>
-  <p>With your assistant, build a <code>Leaderboard</code> class with <code>add(player, points)</code>, <code>top(k)</code> (ties alphabetical) and <code>reset(player)</code>, narrating every decision out loud. Record yourself. Four stages: (1) context block and plan, 5 minutes; (2) tests and an oracle written by you, 10 minutes (here the oracle is a plain model that gets the same random calls, as in section 5); (3) small steps, each with a check and a commit, 20 minutes, changing one rule yourself at minute 25 (say, ties now go to whoever reached the score first); (4) one named refactor behind a photo, 10 minutes.</p>
-  <p>Then play the recording back. For each dimension, count how many of its three things you can hear yourself do, from 0 to 3. This is a checklist, not the mock's 1-to-4 hiring scale.</p>
+  <p>With your assistant, build a <code>Leaderboard</code> class with <code>add(player, points)</code>, <code>top(k)</code> (ties alphabetical) and <code>reset(player)</code>, narrating every decision out loud. Record your screen and voice. Four stages: (1) context block and plan, 5 minutes; (2) tests and an oracle written by you, 10 minutes (here the oracle is a plain model that gets the same random calls, as in section 5); (3) small steps, each with a check and a commit, 20 minutes, changing one rule yourself at minute 25 (say, ties now go to whoever reached the score first); (4) one named refactor behind a photo, 10 minutes.</p>
+  <p>Then play the recording back. For each dimension, count how many of its three things you can hear or see yourself do, from 0 to 3. This is a checklist, not the mock's 1-to-4 hiring scale.</p>
   <ul>
     <li><b>Direction:</b> a context block with the sizes and the hard example, before any code; a read-back and a plan, before any code; every diff small enough to read in about two minutes.</li>
     <li><b>Verification:</b> expected values from the task, written before the code; an oracle you wrote, run on small inputs; at least one deliberate mutant, seen to go red.</li>
     <li><b>Judgment:</b> at least one push-back with a failing input; at least one "I'll type this myself"; every accept, push-back and takeover said with its reason.</li>
     <li><b>Communication:</b> each phase named out loud before you start it, as in section 11; every assumption said out loud before it goes in the context block (section 3); the complexity said at the end (section 10's plan).</li>
   </ul>
-  <p>When you hear at least two of the three in every dimension, ask for a "mock interview, AI-assisted coding round, 60 minutes". The interviewer sees only the chat, so as you go, type what you'd say out loud and paste each prompt, each diff and each check's output.</p>
+  <p>When you count at least two of the three in every dimension, ask for a "mock interview, AI-assisted coding round, 60 minutes". The interviewer sees only the chat, so as you go, type what you'd say out loud and paste each prompt, each diff and each check's output.</p>
 </div>
 
 <p>Run the coding exercises from the repo root:</p>
