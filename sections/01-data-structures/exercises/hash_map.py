@@ -41,7 +41,7 @@ Before you code (say it out loud)
 3. What does a resize cost, and why is it still O(1) amortized?
 4. Why can't a resize copy bucket i to bucket i?
 
-Run:  pytest -k hash_map
+Run:  pytest -k test_hash_map
 """
 
 
