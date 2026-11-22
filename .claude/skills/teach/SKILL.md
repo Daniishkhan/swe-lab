@@ -28,8 +28,8 @@ List the few facts the idea rests on, then put each one through the
   a trade-off, never as a law.
 - Would a skeptical expert accept it without a "because"?
 
-Stop at things a smart high schooler already trusts: counting, halving,
-waiting in line, distance and time.
+Stop at things a working engineer already trusts: counting, halving, how a
+loop or an array index works, that a network round trip takes time.
 
 ## 3. Rebuild it, one fix at a time
 
@@ -45,22 +45,24 @@ that appears from nowhere gets memorized instead of understood.
 > by growing the table when it fills. That's a hash map, and every part of it
 > has a reason.
 
-## 4. Picture first, then numbers, words, code
+## 4. Point first, then a concrete case, the rule, the code
 
-Intuition comes before formalism, in this order:
+Intuition still comes before formalism, in this order:
 
-1. **Picture:** what the idea would look like if it were made of physical
-   things. What moves, what piles up, what waits, what blocks? Use an
-   everyday analogy or a visualization, and say where it breaks.
-2. **Numbers:** one worked example small enough to trace by hand.
-3. **Words:** only now the general rule and its name, each term defined in
-   plain words the first time.
+1. **Point:** one plain sentence that says what the idea is and what it buys,
+   using its standard name. "A hash function turns any key into a number, so
+   the key can pick an array slot."
+2. **Concrete case:** worked numbers small enough to trace by hand, an example
+   from real software, or a visualization. This is the picture.
+3. **Rule:** the general statement, each term defined in plain words the
+   first time.
 4. **Code:** 5–15 lines of Python, once the idea is already clear.
 
-Physical anchors that work: a queue is the line at a counter. A hash is a
-coat-check ticket. A lock is the one key to a single bathroom. Latency is
-distance and throughput is pipe width. Backpressure is a full sink you stop
-pouring into. Big-O is how the pile of work grows when the input doubles.
+An everyday analogy is a backup, not the default. Use one when the concrete
+case hasn't landed: a sentence or two, say where it breaks, then go back to
+the real terms. A chapter gets at most one. An analogy whose words replace
+the real ones (coats and hooks for keys and buckets) leaves Danish fluent in
+vocabulary no interviewer uses.
 
 When one way doesn't land, switch to a different one. Repeating the same
 explanation more slowly doesn't help.
@@ -107,6 +109,9 @@ fit in two sentences, the explanation isn't done.
 
 - One question at a time. Let Danish try before you explain.
 - Spend words where people get confused; an easy idea gets a paragraph.
+- Whole sentences, standard terms. Keep arithmetic and formulas in a block of
+  their own, then say in one sentence what they show. For chapters, the
+  writing rules are in `templates/README.md`.
 - Never write "simply", "obviously", "trivially" or "it's easy to see".
 - Say plainly when an answer is wrong. A correct model matters more than
   being agreeable.

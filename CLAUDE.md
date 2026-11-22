@@ -12,17 +12,22 @@ intuition before formalism:
 
 1. **Start from the pain:** a concrete problem with real numbers, never a
    definition.
-2. **Break it down** to facts a smart high schooler already trusts
-   (counting, halving, waiting in line, distance and time). Then rebuild the
-   idea one fix at a time, each step forced by the last one's flaw.
-3. **Picture first:** every idea gets a physical picture, an everyday analogy
-   (and where it breaks) or a visualization *before* any formula, jargon or
-   code. Then real numbers, then the general rule and its name, then code.
+2. **Break it down** to facts a working engineer already trusts (counting,
+   halving, how a loop or an array index works). Then rebuild the idea one
+   fix at a time, each step forced by the last one's flaw.
+3. **Point first, then make it concrete:** open each idea with one plain
+   sentence that says what it is, using its standard name. Then show it with
+   worked numbers, an example from real software or a visualization, *before*
+   any formula or code. At most one everyday analogy per chapter, and after
+   it the text goes back to the real terms.
 4. **Check by explaining back,** never by asking "does that make sense?".
 
-Short sentences, every term defined the first time, the most words on the
-hardest ideas. The full method is the `teach` skill. Chapters apply it
-through `write-chapter` and `visuals-and-layout`.
+Write for a colleague who is new to the topic: whole sentences that read
+well aloud, with arithmetic, arrows and formulas in their own block. Every
+term is defined the first time, and the hardest ideas get the most words.
+The full method is the `teach` skill and the writing rules are in
+`templates/README.md`. Chapters apply both through `write-chapter` and
+`visuals-and-layout`.
 
 ## Hard rules
 
@@ -68,6 +73,7 @@ python3 tools/build.py                              # regenerate assets/curricul
 python3 tools/new.py concept 03.01 slug "Title"     # also: exercise, case, story, lld, deepdive
 python3 tools/check_exercise.py <name> --pass ref.py --fail slow.py   # prove the tests work
 node tools/check_page.js <page.html> [--shots DIR]  # console errors, offline, 390px scroll, markup
+python3 tools/check_prose.py <page.html>            # the writing rules: working inside sentences, word budget
 ```
 
 ## Layout

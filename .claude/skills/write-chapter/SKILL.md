@@ -11,38 +11,50 @@ this skill covers the page and the exercises.
 
 ## Plan before any HTML
 
-1. Read `templates/README.md` (the format spec) and the reference chapter
-   `sections/02-algorithms/concepts/sorting.html`.
+1. Read `templates/README.md` (the format spec and the **writing rules**) and
+   `sections/01-data-structures/concepts/hash-maps.html`, the reference for
+   prose.
 2. Find the topic in `curriculum.json`: its id, tag, `requires` (what the
    reader already knows) and its place in the `track`. Teach nothing that
    leans on a topic later in the track; if the chapter truly needs one, move
    it or the topic in the track rather than assume it.
 3. Write a short plan using `teach` steps 1–5:
-   - The **pain**: one concrete story with real numbers for section 1.
+   - The **pain**: one concrete problem with real numbers for section 1.
    - The **rebuild**: 6–11 sections, each one idea or one fix that the
-     previous section's flaw forces.
-   - The **picture** for each section: the physical analogy, worked
-     numbers or visualization that carries it. If a section has none, it
-     isn't broken down far enough yet.
+     previous section's flaw forces. Each heading carries the standard term.
+   - For each section, its **point** in one plain sentence and the **concrete
+     case** that shows it: worked numbers, an example from real software or a
+     visualization. If the point won't fit in one sentence, the section isn't
+     broken down far enough yet.
    - The **hard ideas**, where people get confused or interviewers probe.
-     They get 2–3× the space: another example, a picture, an "another way"
-     aside, a quick check.
-   - **Go deeper** material: real systems, failure modes, proofs, and for
-     design topics the constraint table.
+     They get more words in the running text and a second worked case, not
+     more boxes.
+   - **Go deeper** material: caveats, real systems, failure modes, proofs,
+     and for design topics the constraint table.
+   - The **budget**: about 6,000 words on the main path (everything but the
+     collapsed asides and the exercises) and at most about 20 boxes. Decide
+     what to leave out now.
 
 ## Build the page
 
 - Scaffold with `python3 tools/new.py concept NN.MM slug "Title"`, which copies
   the book skeleton in `templates/concept.html`.
-- Each section, intuition before formalism: a sentence or two that raise
-  the question → the picture (analogy, worked numbers or `.figure`) → the
-  general rule and its name → code if needed → `.keyidea` → `.check`. No
-  definition, formula or code before the picture.
-- **Quick checks:** 3 options, one `data-correct`, wrong options are mistakes
-  real people make. `.fb.wrong` re-teaches from a different angle (a new
-  example, a picture in words, plugged-in numbers) and must make sense to
-  someone who picked *either* wrong option. 8–10 per chapter, ids
-  `check-<slug>`.
+- **Write the running text first,** as one explanation that reads complete
+  with no boxes. Each section opens with its point, then the concrete case,
+  then the general rule and its standard name, then code if needed. No
+  formula or code before the concrete case. Working (arithmetic, formulas,
+  traces) goes in a `pre.plain`, a table or a code block, and the sentence
+  after it says what it shows.
+- **Then add boxes only where they earn the interruption:**
+  - **Quick checks** at the end of a section, where a reader could predict
+    wrong: usually 5–8 per chapter, none for a section with nothing to
+    predict. 3 options, one `data-correct`, wrong options are mistakes real
+    people make. `.fb.wrong` re-teaches from a different angle (a new worked
+    case, plugged-in numbers) and must make sense to someone who picked
+    *either* wrong option. Ids `check-<slug>`.
+  - **Key ideas:** two or three per chapter, for the ideas the rest hangs on.
+  - **Asides:** "Go deeper" for caveats and real systems, "Explain it another
+    way" for a second route into a hard idea.
 - **Code** blocks are 5–15 lines of Python with comments on the lines that
   matter.
 - Close with "What to say in the interview" (a 3–5 step script), `#summary`,
@@ -72,4 +84,6 @@ this skill covers the page and the exercises.
 - Set the topic's `requires` in `curriculum.json` to the chapters the "How to
   read this" line names, then `python3 tools/build.py`. It warns when the two
   disagree and fails if a requirement comes later in the track.
+- Run `python3 tools/check_prose.py <page>` and fix what it prints: reword
+  the sentence, move the working into a block, or cut.
 - Hand off to `visuals-and-layout`, then `review-chapter`.
