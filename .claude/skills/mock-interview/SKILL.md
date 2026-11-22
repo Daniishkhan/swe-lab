@@ -43,13 +43,13 @@ Per format:
   into the chat what they'd say out loud, and pastes each prompt, each diff
   and each check's output as they go. Give a small component (60 minutes by
   default) with one tricky edge case, and change a requirement halfway. Score
-  Danish's decisions, not the assistant's typing:
-  the context and plan before any code, the checks chosen and run before
-  trusting a diff, and each accept, push-back or "I'll type this myself", with
-  its reason. Point at any accepted line and ask what it does; "the assistant
-  wrote it" isn't an answer. If a wrong suggestion gets accepted unchecked,
-  say nothing until the end. The evidence to look for is the checklist in
-  exercise 8 of the coding-with-AI chapter (`13.06`).
+  Danish's decisions, not the assistant's typing: the context and plan before
+  any code, the checks chosen and run before trusting a diff, and each accept,
+  push-back or "I'll type this myself", with its reason. Point at any accepted
+  line and ask what it does; "the assistant wrote it" isn't an answer. If a
+  wrong suggestion gets accepted unchecked, say nothing until the end. The
+  evidence to look for is the checklist in exercise 8 of the coding-with-AI
+  chapter (`13.06`).
 - **Debugging and code review (15.03, 15.04):** hand over a short broken
   program or diff you wrote for the mock. Watch for hypotheses, narrowing down
   (reproduce, bisect, logs) and prevention, not only the fix.
