@@ -3405,7 +3405,9 @@ window.CURRICULUM = {
       "02.02",
       "01.04",
       "02.03",
-      "01.08"
+      "01.08",
+      "10.01",
+      "02.16"
      ]
     },
     {
@@ -3434,8 +3436,42 @@ window.CURRICULUM = {
      "text": "Training infrastructure basics: data loaders, checkpointing, distributed training"
     }
    ],
-   "concepts": [],
-   "exercises": []
+   "concepts": [
+    {
+     "file": "coding-with-ai.html",
+     "topic": "13.06",
+     "title": "Code you didn't write (Coding with AI: write, debug, refactor)"
+    }
+   ],
+   "exercises": [
+    {
+     "file": "bisect_skip.py",
+     "module": "bisect_skip",
+     "title": "Bisect with versions you can't test",
+     "topics": [
+      "13.06"
+     ],
+     "result": null
+    },
+    {
+     "file": "delta_debug.py",
+     "module": "delta_debug",
+     "title": "Delta debugging: shrink a failing input until every piece matters",
+     "topics": [
+      "13.06"
+     ],
+     "result": null
+    },
+    {
+     "file": "differential.py",
+     "module": "differential",
+     "title": "Differential testing: the smallest input where two versions disagree",
+     "topics": [
+      "13.06"
+     ],
+     "result": null
+    }
+   ]
   },
   {
    "num": 14,
@@ -3625,5 +3661,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-21 21:14"
+ "generated": "2026-11-22 07:23"
 };
