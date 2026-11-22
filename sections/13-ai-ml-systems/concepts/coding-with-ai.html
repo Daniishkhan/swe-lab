@@ -37,7 +37,7 @@
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom, like a book. It builds on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a> (hidden loops, the doubling test), <a href="../../01-data-structures/concepts/hash-maps.html">Find anything in one step</a> (counting with a dict), <a href="../../02-algorithms/concepts/sorting.html">Putting things in order</a> (tuple keys for ties), <a href="../../01-data-structures/concepts/heaps.html">The most urgent thing first</a> (top k) and <a href="../../02-algorithms/concepts/binary-search.html">Binary search</a> (invariants, and <code>first_broken</code>, the search for the first broken build). Section 3 and warm-up 2 use <a href="../../01-data-structures/concepts/lru-lfu-cache.html">What to forget first</a> (the LRU cache). You don't need any particular AI tool until the stretch exercises. It reads best in two sittings: sections 1 to 6, then 7 to 11. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
+<p class="muted small">How to read this: top to bottom, like a book. It builds on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a> (hidden loops, the doubling test), <a href="../../01-data-structures/concepts/hash-maps.html">Find anything in one step</a> (counting with a dict), <a href="../../02-algorithms/concepts/sorting.html">Putting things in order</a> (tuple keys for ties), <a href="../../01-data-structures/concepts/heaps.html">The most urgent thing first</a> (top k) and <a href="../../02-algorithms/concepts/binary-search.html">Binary search</a> (invariants, and <code>first_broken</code>, the search for the first broken build). Sections 3 and 8 and warm-up 2 use <a href="../../01-data-structures/concepts/lru-lfu-cache.html">What to forget first</a> (the LRU cache), and warm-up 3 uses <a href="../../10-code-quality-design-testing/concepts/python-toolkit.html">Python for interviews</a> (mutable default arguments). You don't need any particular AI tool until the stretch exercises. It reads best in two sittings: sections 1 to 6, then 7 to 11. Answer each quick check before reading on; a wrong answer gets you a second explanation. "Go deeper" boxes are optional on a first read.</p>
 
 <!-- ============================================================ -->
 <h2 id="s1"><span class="sec-num">1</span>The problem: it passed the examples</h2>
@@ -120,7 +120,7 @@ def top_k_words(lines, k):
 
 <h3>Where the picture is wrong</h3>
 <ul>
-  <li><b>No memory between sessions.</b> Tomorrow you get a fresh contractor who has never heard of your project. Some tools let you keep a notes file that gets added to every session, but that's still context you wrote.</li>
+  <li><b>No memory between sessions.</b> Tomorrow you get a fresh contractor who has never heard of your project. Some tools add saved notes to every session, written by you or by the tool, but notes are still just context: check what they say.</li>
   <li><b>The same calm voice, right or wrong.</b> A contractor who's guessing usually sounds unsure. The assistant may not. It's more like a GPS voice that says "turn left" in exactly the same tone whether or not the road exists. Its confidence is not evidence.</li>
   <li><b>It may be able to run things.</b> A <b>coding agent</b> is an assistant that can also edit files and run commands, such as your tests, in a loop: change, run, read the output, change again. That lets it check its own work, but only with the checks it chose to run. Which checks count is still your call.</li>
   <li><b>Asking again is nearly free.</b> A human contractor charges for a second opinion. The assistant will write three versions, explain its code, or criticize it, in seconds. Use that: sections 4, 5 and 9 show where it pays.</li>
@@ -279,7 +279,7 @@ Plan: one pass into a dict, then sort.</code></pre>
   <ul>
     <li><b>Point at the right files.</b> The interface it must call, one similar function to copy the style of, and the tests that cover the area. Three relevant files beat thirty: a big paste of unrelated code buries what matters, and the assistant may copy patterns from the wrong file.</li>
     <li><b>State the house rules.</b> How errors are reported, how logging works, which libraries are allowed, what the tests use.</li>
-    <li><b>Ask it to read before it writes.</b> "Trace what happens to a request from here to the database, and list the files involved" changes nothing. You check the trace against what you know, and the answer becomes context for the change.</li>
+    <li><b>Ask it to read before it writes.</b> "Trace what happens to a request from here to the database, and list the files involved" edits no files. You check the trace against what you know, and the answer becomes context for the change.</li>
     <li><b>Keep a decisions file on long tasks.</b> The assistant forgets between sessions, and a very long session can push early messages out of what it sees. A short file with the decisions so far ("ties are alphabetical", "lines, not paths") goes in at the start of each session.</li>
   </ul>
 </details>
@@ -395,7 +395,7 @@ Plan: one pass into a dict, then sort.</code></pre>
 
 <p>It holds every word in a list and counts each one with a full scan of that list: hopeless on 2 billion words, perfect on six. Write it yourself. An oracle from the same assistant, in the same conversation, can share the same misunderstanding, and then the two versions agree on the wrong answer.</p>
 
-<p>Now let the two versions argue. Run both on every small input, smallest first, and stop at the first disagreement. This is <b>differential testing</b>. Using three words, there are 1 + 3 + 9 + 27 + 81 + 243 + 729 = 1,093 lines of up to 6 words, and each one takes microseconds. Against section 1's Counter version, the first disagreement comes almost at once: the line <code>"b a"</code> with k = 1. The oracle says <code>[("a", 1)]</code>; the candidate says <code>[("b", 1)]</code>.</p>
+<p>Now let the two versions argue. Run both on every small input, smallest first, and stop at the first disagreement. This is <b>differential testing</b>. With the words a, b and c and k = 1, there are 1 + 3 + 9 + 27 + 81 + 243 + 729 = 1,093 one-line inputs of up to 6 words, and each one takes microseconds. Against section 1's Counter version, the first disagreement comes almost at once: the line <code>"b a"</code>. The oracle says <code>[("a", 1)]</code>; the candidate says <code>[("b", 1)]</code>.</p>
 
 <p>Smallest first matters. The smallest input that shows a bug is the easiest one to understand, the best one to paste back into the assistant, and the best <b>regression test</b>: a test that keeps a fixed bug from coming back. (A <em>regression</em> is something that used to work and broke.) A two-word counterexample explains itself; a forty-word one takes a while. Exercise 6 builds this search.</p>
 
@@ -407,7 +407,7 @@ Plan: one pass into a dict, then sort.</code></pre>
   <tbody>
     <tr><td>the order of a set's items</td><td>both outputs sorted, or turned into sets</td></tr>
     <tr><td>float rounding</td><td>with a tolerance (<code>math.isclose</code>), not <code>==</code></td></tr>
-    <tr><td>ties the task left open</td><td>properties: the same counts in the same order, and every count correct</td></tr>
+    <tr><td>ties the task left open</td><td>properties: the same counts in the same order, no word twice, and every count correct</td></tr>
   </tbody>
 </table></div>
 <p>The sorted copy in the first row is a <b>canonical form</b>: one fixed shape that every right answer can be turned into. Call it a bug only when the task says the two answers can't both be right.</p>
@@ -442,7 +442,9 @@ Plan: one pass into a dict, then sort.</code></pre>
 
 <p>Then let a <b>seeded</b> random generator write the sequences: one started from a fixed number, so it makes the same "random" choices every run, and a failure comes back every time you rerun. It picks from a small menu of calls, odd lines included. When a sequence disagrees, it's your failing input, and section 7's shrinking (exercise 4's <code>shrink</code>) cuts it down. For the stale ranking, the first failing sequence of 12 calls shrinks to three calls shaped like the table's: a <code>top</code>, an <code>add</code>, and another <code>top</code>. Ask, add, ask again, and the second answer is stale.</p>
 
-<pre><code>CALLS = [("add", "b a"), ("add", "c"),
+<pre><code>import random
+
+CALLS = [("add", "b a"), ("add", "c"),
          ("add", ""), ("top", 1),
          ("top", 2)]
 
@@ -473,7 +475,7 @@ for _ in range(1000):
 
 <details class="aside deeper">
   <summary>Go deeper: property-based testing and the small scope hypothesis</summary>
-  <p><b>Property-based testing</b> automates layer 3. You state a property, and a library generates hundreds of random inputs, then <em>shrinks</em> any failing one to a small example (section 7 shows how shrinking works). QuickCheck, for Haskell, popularized the idea; Hypothesis does it for Python.</p>
+  <p><b>Property-based testing</b> automates layer 3. You state a property, and a library generates many random inputs, then <em>shrinks</em> any failing one to a small example (section 7 shows how shrinking works). QuickCheck, for Haskell, popularized the idea; Hypothesis does it for Python.</p>
   <p>Why do tiny inputs catch so much? The <b>small scope hypothesis</b>, from Daniel Jackson's work on the Alloy modeling tool and backed by some experiments, says that most bugs have a small counterexample. A tie needs only two words. An off-by-one needs only a list of one or two items. So trying <em>every</em> small input often beats a few random big ones.</p>
   <p>Differential testing works at large scale too. Csmith, a research tool, generates random C programs whose output the C standard fully defines, compiles each with several compilers, and flags any program where the results differ. Its authors found hundreds of previously unknown bugs in GCC and LLVM this way.</p>
 </details>
@@ -501,9 +503,9 @@ for _ in range(1000):
 
 <p>The first rung doesn't even run the code. A <b>linter</b> reads it and flags names that don't exist; a <b>type checker</b> also checks every call against the function's real signature. <code>counts.most_common(k, key=...)</code> looks plausible, but <code>most_common</code> takes no <code>key</code>, and the Python type checker mypy says "Unexpected keyword argument" before any test runs. (By default mypy skips functions without type hints; <code>mypy --check-untyped-defs</code> checks them too.) A coding agent can run both on every diff.</p>
 
-<p>The next four rungs check answers, and an answer can be right and still cost far too much. That's what the doubling rung is for. Say a version keeps its ranking in a list and guards each append with <code>if w not in ranked</code>, inside the loop over the distinct words (section 9's review has one). Every answer is right. Time it on 10,000 distinct words, then on 20,000. Each <code>not in</code> scans the whole list, so for D distinct words that's about D²/2 comparisons: 5 × 10⁷, then 2 × 10⁸. Four times the work for twice the input, while the rest of the function only doubles. So the time goes up about ×4: quadratic, found in seconds, with every correctness check green. (Time each size two or three times and keep the fastest, since a single run can be noisy.)</p>
+<p>The next four rungs check answers, and an answer can be right and still cost far too much. That's what the doubling rung is for. Say a version keeps its ranking in a list and guards each append with <code>if w not in ranked</code>, inside the loop over the distinct words (section 9's review code has this line). Every answer is right. Time it on 10,000 distinct words, then on 20,000. Each <code>not in</code> scans the whole list, so for D distinct words that's about D²/2 comparisons: 5 × 10⁷, then 2 × 10⁸. Four times the work for twice the input, while the rest of the function only doubles. So the time goes up about ×4: quadratic, found in seconds, with every correctness check green. (Time each size two or three times and keep the fastest, since a single run can be noisy.)</p>
 
-<p>The last two rungs catch what small runs can't show: a changed signature that the tests were changed to match, or a list that holds 2 billion words but works fine on six. Read in a fixed order: the list of changed files and the signature (seconds), then the test diff, then the code. The tests come before the code because they decide what "all green" means. A deleted case, a loosened assert or a new <b>mock</b> (a fake stand-in for a real part, such as a file, a network call or another function, that returns answers chosen in advance) changes how much every other rung is worth. Where to read more carefully:</p>
+<p>The last two rungs catch what small runs can't show: a changed signature that the tests were changed to match, or a list that holds 2 billion words but works fine on six. Read in a fixed order: the list of changed files and the signature (seconds), then the test diff, then the code. The tests come before the code because they decide what "all green" means. A deleted case, a loosened assert or a new <b>mock</b> (a stand-in for a real part, such as a file, a network call or another function, that returns answers chosen in advance) changes how much every other rung is worth. Where to read more carefully:</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>code that…</th><th>why it's risky</th><th>how hard to look</th></tr></thead>
@@ -544,7 +546,7 @@ for _ in range(1000):
 <h2 id="s7"><span class="sec-num">7</span>Debugging: shrink, locate, hypothesize, bisect</h2>
 
 <div class="story">
-  <p>A week later the function runs on the full log in production. The report comes back: the most common word is <code>""</code>, the empty string, counted 18,342 times.</p>
+  <p>A week later the function runs on the full log in production. The report comes back with a word that can't exist: <code>""</code>, the empty string.</p>
 </div>
 
 <p>The tempting move is the fix-and-pray loop: paste the error into the assistant, apply whatever fix it suggests, run again, repeat. Every suggestion is a guess about a cause nobody has found yet. If each guess fixes the real cause 30% of the time (an assumption), three guesses in a row all miss 0.7<sup>3</sup> ≈ 34% of the time. Worse, every wrong "fix" stays in the code as a change nobody needed.</p>
@@ -591,9 +593,9 @@ pass 1, one character at a time:
 ((x)   1st (     (x)      no: back
        2nd (     (x)      no: back
        x         (()      no: back
-       )         ((x      yes: gone
+       )         ((x      yes: out
 pass 2, since pass 1 removed one:
-((x    1st (     (x       yes: gone
+((x    1st (     (x       yes: out
 (x     (         x        no: back
        x         (        no: back
 pass 3 removes nothing: stop at (x</code></pre>
@@ -676,12 +678,12 @@ bad = top_k_words([""], 1) != []
 sys.exit(1 if bad else 0)  # 1 = bad</code></pre>
 
 <pre class="plain"><code>git bisect start HEAD v1.4  # bad, good
-git bisect run python3 /tmp/check.py
+git bisect run python3 -B /tmp/check.py
 git bisect reset  # back where you were</code></pre>
 
-<p>Run it from the repo's top folder, so that "." is the repo. Bisect lands on commit 7, "tidy up the splitting code": 60 changed lines across the function and its tests. Now you know the cause <em>and</em> how it got in. Section 8 asks how a change like that got through.</p>
+<p>Git runs the script from the repo's top folder, so "." is the repo. <code>-B</code> stops Python saving a compiled copy of each file for a later run to reuse: to Python, two checkouts in the same second with the same file size look unchanged, so the check could run the previous checkout's code. Bisect lands on commit 7, "tidy up the splitting code": 60 changed lines across the function and its tests. Now you know the cause <em>and</em> how it got in. Section 8 asks how a change like that got through.</p>
 
-<p>In this story bisect came last, and there it could have been one command. Once the experiment has found the line, <code>git blame top.py</code> prints every line next to the commit that last changed it, and the <code>split(" ")</code> line names commit 7. Bisect earns its runs when you don't know where to look: a pipeline too big to probe box by box, or a cause outside your code, such as a library upgrade. Then bisect first. Commit 7's 60 lines become the only place to look, and the hypotheses tell you what to look for in them. So when an interviewer says "it worked last week", a strong first move is to bisect between then and now, then read that one diff with your hypotheses in hand.</p>
+<p>In this story bisect came last, where it wasn't needed: once the experiment has found the line, <code>git blame top.py</code> prints every line next to the commit that last changed it, and the <code>split(" ")</code> line names commit 7. Bisect earns its runs when you don't know where to look: a pipeline too big to probe box by box, or a cause outside your code, such as a library upgrade (a checkout swaps files, not installed libraries, so have the script install each commit's library versions before it tests). Then bisect first. Commit 7's 60 lines become the only place to look, and the hypotheses tell you what to look for in them. So when an interviewer says "it worked last week", a strong first move is to bisect between then and now, then read that one diff with your hypotheses in hand.</p>
 
 <p>Real histories add a twist: some commits can't be tested at all. They don't build, or the test needs a file that was added later. That's what exit code 125 is for. You can't call such a commit good or bad, so bisect tests a neighbor instead (by hand, <code>git bisect skip</code>). Here are versions 1 to 8, with version 8 known bad and version 5 not building:</p>
 
@@ -738,7 +740,7 @@ def test_photo():
         after = new(lines, k)
         assert after == before, lines</code></pre>
 
-<p>Two questions decide whether a photo is good enough. <b>Does it cover the code you'll change?</b> Run it under a coverage tool (coverage.py, for Python) and check that every line you're about to touch actually ran. Or plant one mutant on each path you'll touch (both sides of an <code>if</code>, the body of a loop), and watch the photo go red. <b>Can old and new even run side by side?</b> Code that reads the clock, a file or random numbers gives different answers on two runs for reasons that have nothing to do with the refactor. So pass those in first, the way the TTL cache takes a <code>clock</code> (warm-up 2), and give both versions the same fake clock, the same seeded random generator and the same lines.</p>
+<p>Two questions decide whether a photo is good enough. <b>Does it cover the code you'll change?</b> Run it under a coverage tool (coverage.py, for Python) and check that every line you're about to touch actually ran. Or plant one mutant on each path you'll touch (both sides of an <code>if</code>, the body of a loop), and watch the photo go red. <b>Can old and new even run side by side?</b> Code that reads the clock, a file or random numbers gives different answers on two runs for reasons that have nothing to do with the refactor. So pass those in first, the way the <a href="../../01-data-structures/concepts/lru-lfu-cache.html#s11">LRU chapter's</a> <code>ttl_cache</code> takes a <code>clock</code>, and give both versions the same fake clock, the same seeded random generator and the same lines.</p>
 
 <p>Exercise 6's <code>find_counterexample</code> is this camera, made exhaustive: with the old version as the oracle, it hands you the smallest input where old and new disagree.</p>
 
@@ -760,7 +762,7 @@ def test_photo():
     <button>Fix it in this change, since you're editing those lines anyway</button>
     <button>Leave it for good, since a refactor must not change behavior</button>
   </div>
-  <div class="fb right"><p>Yes. Finish with that behavior unchanged, then fix it in a step of its own, with its own test. If you change structure and behavior in one step and something fails, you can't tell which change caused it, and the photo can't help, because you meant to change the picture. One kind of change per step keeps every failure explainable. And check that it really is a bug: the context block said "split on whitespace, nothing else", so stripping punctuation is a change to the spec, and it needs a yes from whoever owns that.</p></div>
+  <div class="fb right"><p>Yes. Finish with that behavior unchanged, then fix it in a step of its own, with its own test. If you change structure and behavior in one step and something fails, you can't tell which change caused it, and the photo can't help, because you meant to change the picture. One kind of change per step keeps every failure explainable. And check that it really is a bug. The context block said "split on whitespace, then lowercase. Nothing else." So stripping punctuation is a change to the spec, and it needs a yes from whoever owns that.</p></div>
   <div class="fb wrong"><p>Think about what the photo is for: any difference from the old code means something broke. If the same step also fixes the comma, the photo shows a difference you wanted mixed in with any you didn't, and you can't tell them apart. So don't mix them. But "never" goes too far: the rule is about one step, not forever. Once the refactor is done and green, the fix is an ordinary change with its own test.</p></div>
 </div>
 
@@ -820,7 +822,7 @@ def test_photo():
     <button data-correct><code>counts = {w: words.count(w) for w in set(words)}</code></button>
     <button><code>ranked = sorted(counts.items(), key=lambda wc: (-wc[1], wc[0]))</code></button>
   </div>
-  <div class="fb right"><p>Yes. <code>words.count(w)</code> scans the whole list, and it runs once per distinct word. With 100,000 words, all different, that's 100,000 × 100,000 = 10¹⁰ comparisons. <code>.count()</code> loops in C, about ten times faster than a Python loop, and that's still a minute or more, against milliseconds for <code>Counter</code>. Section 5's oracle counts the same way, and there it's fine, because the oracle only ever sees tiny inputs. The same code can be right in a test and wrong in production.</p></div>
+  <div class="fb right"><p>Yes. <code>words.count(w)</code> scans the whole list, and it runs once per distinct word. With 100,000 words, all different, that's 100,000 × 100,000 = 10¹⁰ comparisons. <code>.count()</code> runs in C, but at about 7 ns a comparison (the hash-maps chapter's 70 ms to scan 10 million names), that's still over a minute, against milliseconds for <code>Counter</code>. Section 5's oracle counts the same way, and there it's fine, because the oracle only ever sees tiny inputs. The same code can be right in a test and wrong in production.</p></div>
   <div class="fb wrong"><p>Look for a loop you can't see. <code>Counter(words)</code> walks the list once: O(n). <code>sorted</code> costs O(d log d) for d distinct words, about 1.7 million comparisons for 100,000. But inside the dict comprehension, <code>words.count(w)</code> is itself a full scan of the list, run once for every distinct word: n × d steps, 10¹⁰ when both are 100,000. A method call that hides a loop is the "know what Python hides" rule from the complexity chapter.</p></div>
 </div>
 
@@ -837,7 +839,7 @@ def test_photo():
   <li><b>Verification.</b> They proved each step worked, with checks they chose: tests from the task, an oracle, reading each diff.</li>
   <li><b>Judgment.</b> They decided what to accept and what to push back on, and said why: the turned-down diff, with its failing input.</li>
 </ul>
-<p>Expect an AI-assisted round to be graded on those three, because they're the part of the work the assistant can't do for you. They're also the three words this book's AI-assisted format uses, and <a href="../../../index.html#stage-w4">Mock 4</a> in week 4 is where you practise them under time. When you ask for that mock, ask to be scored on those three plus communication. Like every mock in this book, it scores each one from 1 (no hire) to 4 (strong hire), and exercise 8's checklist is the evidence it looks for.</p>
+<p>Expect an AI-assisted round to be graded on those three, because they're the part of the work the assistant can't do for you. They're also the three words this book's AI-assisted format uses, and <a href="../../../index.html#stage-w4">Mock 4</a> in week 4 is where you practice them under time. It scores those three plus communication, each from 1 (no hire) to 4 (strong hire) as every mock in this book does, with exercise 8's checklist as the evidence.</p>
 
 <h3>Accept, push back, or write it yourself</h3>
 <ul>
@@ -859,7 +861,7 @@ def test_photo():
     <tr><td>40 to 45</td><td>review the whole diff against the catalogue; say the complexity</td></tr>
   </tbody>
 </table></div>
-<p>The split is a starting point, not a rule: a harder spec takes longer to pin down, and a task with tricky state needs its sketch first. What doesn't move is the order: right is defined before the code, and nothing is trusted before it's checked. A 60-minute round, such as Mock 4, keeps the same order: give the extra 15 minutes to the steps (15 to 50) and to the final review (50 to 60), where you also plant one deliberate bug (a mutant, section 6) and show a test going red.</p>
+<p>The split can move; the order can't: right is defined before the code, and nothing is trusted before it's checked. A 60-minute round, such as Mock 4, keeps the same order: give the extra 15 minutes to the steps (15 to 50) and to the final review (50 to 60), where you also plant one deliberate bug (a mutant, section 6) and show a test going red. Mock 4 also changes a requirement halfway. Update the context block, change the affected expected values and the oracle yourself, and watch those tests fail on the old code. Only then ask for the change, as one step. The tests are meant to change here, so it's the easiest moment to wave through tests the assistant edited to match its own code.</p>
 
 <h3>When not to use it at all</h3>
 <ul>
@@ -872,14 +874,14 @@ def test_photo():
 <div class="keyidea">Expect to be judged on your decisions, not on the assistant's typing: direction (context, plan, small steps), verification (checks you chose, run before you trust), and judgment (accept, push back with evidence, or do it yourself). Say each decision out loud, with its reason, and accept only code you can explain line by line.</div>
 
 <div class="check" id="check-pushback">
-  <p class="q">The assistant's <code>top</code> fails your tie test. Which reply is best?</p>
+  <p class="q">The assistant's <code>top</code> returns two pairs for k = 1. Which reply is best?</p>
   <div class="opts">
-    <button>"Ties must be alphabetical. Are you sure yours are? Please double-check."</button>
-    <button>"Ties are wrong. Rewrite the whole function from scratch, more carefully."</button>
-    <button data-correct>"<code>top({"b": 1, "a": 1}, 1)</code> gives <code>[("b", 1)]</code>; I expect <code>[("a", 1)]</code>. Fix only that."</button>
+    <button>"It must return exactly k pairs. Please double-check your code."</button>
+    <button>"<code>top({"a": 2, "b": 1}, 1)</code> gives two pairs. Rewrite <code>top</code> from scratch, more carefully."</button>
+    <button data-correct>"<code>top({"a": 2, "b": 1}, 1)</code> gives <code>[("a", 2), ("b", 1)]</code>; I expect <code>[("a", 2)]</code>. Fix only that."</button>
   </div>
-  <div class="fb right"><p>Yes. It gives the assistant exactly what it was missing: a concrete input, the wrong output and the right one, which together carry the rule (ties go to the alphabetically first word) better than any description of it. "Fix only that" limits the change, so the next diff is small and checkable. The interviewer hears the same thing: you found a bug with evidence and kept the fix contained.</p></div>
-  <div class="fb wrong"><p>Picture a mechanic. "Are you sure the car's fine?" gets you a shrug. "It squeals when I brake at low speed" gets you a fix. Restating the rule and asking it to double-check adds nothing it didn't already have: the rule was in the context block all along. The reply may defend the code, or change something else, as easily as fix it. "Rewrite from scratch" throws away the steps that already passed their checks. A failing input with the output you expect is the smallest message that can't be misread.</p></div>
+  <div class="fb right"><p>Yes. It gives the assistant exactly what it was missing: a concrete input, the wrong output and the right one, which together show the bug and give the fix a test it must pass. "Fix only that" limits the change, so the next diff is small and checkable. The interviewer hears the same thing: you found a bug with evidence and kept the fix contained.</p></div>
+  <div class="fb wrong"><p>Picture a mechanic. "Are you sure the car's fine?" gets you a shrug. "It squeals when I brake at low speed" gets you a fix; "so rebuild the brakes" gets you new brakes to test from scratch. Restating the rule and asking it to double-check adds nothing it didn't already have: the rule was in the context block all along, and the reply may defend the code as easily as fix it. A rewrite turns a small fix into a whole new <code>top</code> to check, every line of it a fresh chance to be wrong. A failing input, the output you expect and "fix only that" ask for the smallest change, in a message that can't be misread.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -890,7 +892,7 @@ def test_photo():
   <li><b>Context.</b> "Two questions first: how big is the log, and what counts as a word? … Thanks. Before I prompt, here's the signature, the sizes, the invariant and what the answer must satisfy. The input doesn't fit in memory, so I'm saying that up front."</li>
   <li><b>Plan.</b> "I'll ask for its assumptions and a plan first, then one step at a time, each with a check. … It assumed a file path, but callers pass lines, so I'm correcting that now."</li>
   <li><b>Checks first.</b> "I'm writing the tie case and the empty input myself, plus a slow oracle to compare against."</li>
-  <li><b>Judgment.</b> "The tie test gives <code>[("b", 1)]</code>, so I'm pasting that case back instead of asking it to double-check. … It passes now. Let me flip the tie order on purpose and watch the test go red. Good: committing. This diff also renamed a function I didn't ask about, so I'm undoing that part."</li>
+  <li><b>Judgment.</b> "The tie test gives <code>[("b", 1)]</code>, so I'm pasting that case back instead of asking it to double-check. … It passes now. Let me flip the tie order on purpose and watch the test go red, then flip it back. This diff also renamed a function I didn't ask about, so I'm undoing that part. Now committing."</li>
   <li><b>Debugging.</b> "It fails on one empty line. Checking each arrow of the sketch on that input, the words already come out as <code>[""]</code>, so it's the first box. Three causes inside it, most likely first; the input already rules out the newline one, and one run settles the rest: <code>split(" ")</code> keeps empty strings."</li>
 </ol>
 
@@ -935,7 +937,7 @@ def test_photo():
   <details class="aside another"><summary>Answer</summary>
     <p>(a) 0.9² = 0.81, 0.9⁴ ≈ 0.656, 0.9⁸ ≈ 0.430, so 0.9¹⁰ = 0.9⁸ × 0.9² ≈ 0.35. Then 0.95²⁰ ≈ 0.36 and 0.99⁵⁰ ≈ 0.61: twenty changes at 95% are about as risky as ten at 90%, and fifty at 99% still go wrong two sessions in five.</p>
     <p>(b) 0.97¹² ≈ 0.69 and 0.85¹² ≈ 0.14. A gap of 12 points per step becomes a factor of about five per session.</p>
-    <p>(c) Each step must end right with some q where q²⁰ = 0.9, so q = 0.9<sup>1/20</sup> ≈ 0.99475. A wrong step gets through with 0.1 × (1 − c), so you need 0.1 × (1 − c) ≤ 0.00525, which means c ≥ 0.9475. The checks must catch about 95% of wrong steps.</p>
+    <p>(c) Each step must end right with some q where q²⁰ = 0.9. While they're small, chances add: if each of the twenty steps lets a mistake through with chance s = 1 − q, the session lets one through about 20 × s of the time, so s ≈ 0.1 / 20 = 0.005. A wrong step gets through with 0.1 × (1 − c), so 0.1 × (1 − c) ≤ 0.005 means c ≥ 0.95 (exactly 0.9475).</p>
   </details>
 </div>
 
@@ -1061,14 +1063,15 @@ put of a new key, cache full:
 <div class="exercise">
   <div class="tier stretch">Stretch · your AI tool, timed</div>
   <h4>8. A narrated build (45 minutes)</h4>
-  <p>With your assistant, build a <code>Leaderboard</code> class with <code>add(player, points)</code>, <code>top(k)</code> (ties alphabetical) and <code>reset(player)</code>, narrating every decision out loud. Record yourself. Four stages: (1) context block and plan, 5 minutes; (2) tests and an oracle written by you, 10 minutes (here the oracle is a plain model that gets the same random calls, as in section 5); (3) small steps, each with a check and a commit, 20 minutes; (4) one named refactor behind a photo, 10 minutes.</p>
+  <p>With your assistant, build a <code>Leaderboard</code> class with <code>add(player, points)</code>, <code>top(k)</code> (ties alphabetical) and <code>reset(player)</code>, narrating every decision out loud. Record yourself. Four stages: (1) context block and plan, 5 minutes; (2) tests and an oracle written by you, 10 minutes (here the oracle is a plain model that gets the same random calls, as in section 5); (3) small steps, each with a check and a commit, 20 minutes, changing one rule yourself at minute 25 (say, ties now go to whoever reached the score first); (4) one named refactor behind a photo, 10 minutes.</p>
   <p>Then play the recording back. For each dimension, count how many of its three things you can hear yourself do, from 0 to 3. This is a checklist, not the mock's 1-to-4 hiring scale.</p>
   <ul>
     <li><b>Direction:</b> a context block with the sizes and the hard example, before any code; a read-back and a plan, before any code; every diff small enough to read in about two minutes.</li>
     <li><b>Verification:</b> expected values from the task, written before the code; an oracle you wrote, run on small inputs; at least one deliberate mutant, seen to go red.</li>
     <li><b>Judgment:</b> at least one push-back with a failing input; at least one "I'll type this myself"; every accept, push-back and takeover said with its reason.</li>
+    <li><b>Communication:</b> each phase named out loud before you start it, as in section 11; every assumption said out loud before it goes in the context block (section 3); the complexity said at the end (section 10's plan).</li>
   </ul>
-  <p>When you hear at least two of the three in every dimension, ask for a "mock interview, AI-assisted coding round, 60 minutes". Ask the interviewer to score direction, verification, judgment and communication, each from 1 (no hire) to 4 (strong hire), with this checklist as the evidence to look for.</p>
+  <p>When you hear at least two of the three in every dimension, ask for a "mock interview, AI-assisted coding round, 60 minutes". The interviewer sees only the chat, so as you go, type what you'd say out loud and paste each prompt, each diff and each check's output.</p>
 </div>
 
 <p>Run the coding exercises from the repo root:</p>
@@ -1118,9 +1121,11 @@ python3 -m pytest -k differential</code></pre>
         wrong++; a.push(BAD);
         if (r2[i] < c) { caught++; b.push(CAUGHT); } else { slipped++; b.push(BAD); }
       }
-      const noteA = !wrong ? `This session: all ${n} ${plural(n, "change", "changes")} came out right.`
-        : `This session: ${wrong} wrong ${plural(wrong, "change", "changes")} got in. If the final test catches ${plural(wrong, "it", "them")} at all, it doesn't say which of the ${n} to blame.`;
-      const noteB = !wrong ? `This session: all ${n} ${plural(n, "change", "changes")} came out right.`
+      const allRight = `This session: ${n === 1 ? "the one change" : `all ${n} changes`} came out right.`;
+      const noteA = !wrong ? allRight
+        : `This session: ${wrong} wrong ${plural(wrong, "change", "changes")} got in.` + (n > 1 ? ` If the final test catches ${plural(wrong, "it", "them")} at all, it doesn't say which of the ${n} to blame.` : "");
+      const noteB = !wrong ? allRight
+        : !caught ? `This session: no check caught ${plural(slipped, "the wrong change", `any of the ${slipped} wrong changes`)}.`
         : slipped ? `This session: ${caught} caught and redone, but ${slipped} got past ${plural(slipped, "its check", "their checks")}.`
         : `This session: ${caught} wrong ${plural(caught, "change was", "changes were")} caught right away and redone. Nothing got through.`;
       $("cp-out").replaceChildren(row("No checks between changes", all, a, noteA), row("Check after every change", checked, b, noteB));
@@ -1207,7 +1212,7 @@ python3 -m pytest -k differential</code></pre>
       { lines: [1, 3], name: "Changed interface", why: "It was supposed to take <code>lines</code>; now it takes a file path, and line 3 is where that bites: it opens a file, so every caller breaks, including the ones that read from a network stream. (It also leaves out <code>encoding=</code>, so the code never says how to decode the file; a file that doesn't decode raises an error on line 4, and line 5 swallows it.)" },
       { lines: [4, 8], name: "Everything in memory", why: "<code>f.read()</code> loads the whole log into one string, and <code>split()</code> on line 8 turns it into a list of all 2 billion words: 16 GB of pointers alone. The task said one pass, counts only." },
       { lines: [2, 5, 6], name: "Errors swallowed", why: "A missing file, a permission error, even a typo inside the <code>try</code>: they all return <code>[]</code>, which looks exactly like a log with no words. Let errors reach the caller." },
-      { lines: [12], name: "Hidden loop", why: "<code>ranked</code> is a list, so <code>not in</code> scans it. For D = 100,000 distinct words that's about D²/2 = 5 billion comparisons. <code>in</code> loops in C, about ten times faster than a Python loop, and that's still tens of seconds, against a few milliseconds for the same loop without the check. The check is pointless anyway: dict keys are already unique." },
+      { lines: [12], name: "Hidden loop", why: "<code>ranked</code> is a list, so <code>not in</code> scans it. For D = 100,000 distinct words that's about D²/2 = 5 billion comparisons. <code>in</code> runs in C, but at about 7 ns a comparison (the hash-maps chapter's 70 ms to scan 10 million names), that's still tens of seconds, against a few milliseconds for the same loop without the check. The check is pointless anyway: dict keys are already unique." },
       { lines: [14], name: "Wrong tie order", why: "Python's sort is stable, and <code>reverse=True</code> keeps equal counts in first-seen order, not alphabetical. Sort by <code>(-counts[w], w)</code> instead, without <code>reverse</code>." },
       { lines: [15], name: "Off by one", why: "<code>ranked[:k + 1]</code> returns k + 1 pairs: two of them for k = 1." },
     ];

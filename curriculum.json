@@ -1518,7 +1518,7 @@
           "tag": "P0",
           "text": "Coding with AI: give it context (diagrams, data flow, invariants), split work into checkable steps, write the tests first, verify every change; debug, refactor and review AI-written code; know when not to use it",
           "short": "Coding with AI: write, debug, refactor",
-          "requires": ["02.01", "01.01", "02.02", "01.04", "02.03", "01.08"]
+          "requires": ["02.01", "01.01", "02.02", "01.04", "02.03", "01.08", "10.01"]
         },
         {"id": "13.07", "tag": "P2", "text": "Quantization, distillation, speculative decoding"},
         {

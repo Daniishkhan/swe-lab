@@ -1,7 +1,9 @@
 # Tests for differential.py: find_counterexample(candidate, oracle, alphabet, max_len).
 # The toy problem: the most common value in a list, ties going to the
-# smallest value, None for an empty list. It isn't an exercise anywhere
-# else, so the correct version below gives nothing away.
+# smallest value, None for an empty list. It's the k = 1 case of
+# py_toolkit's top_k_frequent (week 1), and the chapter's top_k_oracle
+# sorts by the same (-count, value) key, so the correct version below
+# gives nothing new away.
 # Expected counterexamples were worked out by hand; the budget comes from
 # where each one sits in the order, by arithmetic.
 import signal

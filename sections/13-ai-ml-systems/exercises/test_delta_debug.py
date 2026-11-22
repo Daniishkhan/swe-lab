@@ -109,6 +109,10 @@ def test_keeps_the_original_order():
 
     result, _ = run(["b", "a", "c", "b"], a_then_b)
     assert result == ["a", "b"]
+    # list.remove(x) and cur.index(x) find the first copy of x, not the item at
+    # that position. Here, once the x is gone, only the second "a" can go.
+    result, _ = run(["a", "x", "b", "a"], a_then_b)
+    assert result == ["a", "b"]
     # Keep the order of positions, not of values: here 12 comes before 3.
     result, _ = run(list(range(16))[::-1], needs(3, 12))
     assert result == [12, 3]
@@ -151,9 +155,15 @@ def test_a_cut_can_free_an_item_you_already_kept():
 def test_freeing_can_chain_across_passes():
     # More a than b, and more b than c. On the full list only the c can go
     # on its own. Cutting it frees a b, and cutting that b frees an a, so two
-    # passes over the single items stop at "aaab", which isn't 1-minimal.
-    result, _ = run(list("aaabbc"), lambda sub: sub.count("a") > sub.count("b") > sub.count("c"))
+    # front-to-back passes stop at "aaab", which isn't 1-minimal. On the
+    # reverse, two back-to-front passes stop at "baaa".
+    def chain(sub):
+        return sub.count("a") > sub.count("b") > sub.count("c")
+
+    result, _ = run(list("aaabbc"), chain)
     assert result == ["a", "a", "b"]
+    result, _ = run(list("cbbaaa"), chain)
+    assert result == ["b", "a", "a"]
 
 
 def test_every_short_bracket_string():

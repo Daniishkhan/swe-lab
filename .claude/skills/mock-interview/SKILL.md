@@ -39,10 +39,11 @@ Per format:
   stages. Add a new requirement each time the current one works (persistence,
   concurrency, a limit, an API change). Judge whether the code survives the
   changes.
-- **AI-assisted coding (15.09):** Danish uses their own AI assistant, out
-  loud, and pastes each prompt and each diff into the chat as they go. Give a
-  small component (60 minutes by default) with one tricky edge case, and change
-  a requirement halfway. Score Danish's decisions, not the assistant's typing:
+- **AI-assisted coding (15.09):** Danish uses their own AI assistant, types
+  into the chat what they'd say out loud, and pastes each prompt, each diff
+  and each check's output as they go. Give a small component (60 minutes by
+  default) with one tricky edge case, and change a requirement halfway. Score
+  Danish's decisions, not the assistant's typing:
   the context and plan before any code, the checks chosen and run before
   trusting a diff, and each accept, push-back or "I'll type this myself", with
   its reason. Point at any accepted line and ask what it does; "the assistant

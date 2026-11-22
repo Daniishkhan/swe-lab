@@ -49,9 +49,10 @@ What the tests measure
   (also on a reversed input), and three bugs that aren't monotone: an odd
   number of quote marks; "an x plus more ( than )", where removing a )
   lets a ( go that couldn't go before (run on all 1,219 failing strings of
-  up to 7 characters over "()x"); and a chain in "aaabbc" with more a than
-  b and more b than c, where cutting the c frees a b, and cutting that b
-  frees an a, so two passes over the single items aren't enough.
+  up to 7 characters over "()x"); and a chain in "aaabbc" and its reverse
+  "cbbaaa", with more a than b and more b than c, where cutting the c
+  frees a b, and cutting that b frees an a, so two passes over the single
+  items aren't enough, front to back or back to front.
 
 Before you code (say it out loud)
 ---------------------------------
