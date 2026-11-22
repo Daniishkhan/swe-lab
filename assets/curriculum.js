@@ -1051,7 +1051,7 @@ window.CURRICULUM = {
     {
      "file": "hash-maps.html",
      "topic": "01.01",
-     "title": "Find anything in one step (Hash maps, arrays and strings)"
+     "title": "Hash maps: why a lookup is O(1)"
     },
     {
      "file": "heaps.html",
@@ -3661,5 +3661,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-22 07:23"
+ "generated": "2026-11-22 22:55"
 };
