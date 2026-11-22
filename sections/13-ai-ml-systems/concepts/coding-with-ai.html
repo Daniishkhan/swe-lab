@@ -204,7 +204,7 @@ assumptions and a plan.</code></pre>
   <li><b>Sizes</b> decide the design. 2 billion words can't sit in a list: on a 64-bit machine the list alone holds an 8-byte pointer per word, 16 GB before counting the words themselves. A dict of 100,000 short words is about 10 MB. So stream the lines and keep only the counts. Sorting 100,000 counts is about 1.7 million comparisons, well under a second, so you don't need the heaps chapter's size-k heap here.</li>
   <li>The input is an <b>iterable</b>: anything a <code>for</code> loop can walk, such as a list, an open file, or lines arriving from the network. So the code gets one walk through it, and can't ask for its length.</li>
   <li>A <b>constraint</b> is a limit the solution must respect: one pass, memory for the counts only, no new libraries.</li>
-  <li>An <b>invariant</b>, as in the <a href="../../02-algorithms/concepts/binary-search.html#s3">binary search chapter</a>, is something the loop never breaks: true after every step, not only at the end. Here: after each line, <code>counts[w]</code> is how often w has appeared so far, and nothing else is kept. You check this one in a test rather than in the real loop, since a recount needs every line so far, which the invariant says not to keep. So on small inputs, after each line, compare <code>counts</code> with a recount of the lines so far.</li>
+  <li>An <b>invariant</b>, as in the <a href="../../02-algorithms/concepts/binary-search.html#s3">binary search chapter</a>, is something the loop never breaks: true after every step, not only at the end. Here: after each line, <code>counts[w]</code> is how often w has appeared so far, and nothing else is kept. You check this one in a test rather than in the real loop, since a recount needs every line so far, which the invariant says not to keep. So run the counting on each prefix of a small input (the first line, the first two, …) and compare each result with a recount.</li>
   <li>A <b>property</b> is a rule the final answer must satisfy: the right number of pairs with no word twice, every count exact, the right order, and no word left out that should have made the list. You check it once, at the end, on the output. Together these pin the answer down: only one list obeys all of them. Properties become your first tests (section 5).</li>
   <li>The <b>examples</b> include the hard case: a tie where first-seen and alphabetical disagree. That one line would have caught section 1's bug.</li>
   <li>The <b>don't</b> line stops helpful extras: a new library (code nobody on your team has vetted, section 9), a changed signature, edits to files you never mentioned.</li>
@@ -367,7 +367,7 @@ Plan: one pass into a dict, then sort.</code></pre>
 <ol>
   <li><b>Examples</b>: inputs with outputs you worked out by hand, including the hard case. <code>["beta alpha", "alpha beta"]</code> with k = 1 gives <code>[("alpha", 2)]</code>.</li>
   <li><b>Edge cases</b>: the smallest and strangest inputs. <code>[]</code>, <code>[""]</code>, a line of only spaces, one word repeated, a k bigger than the number of distinct words.</li>
-  <li><b>Properties</b>: the "answer must satisfy" line of your context block, rules that hold for <em>every</em> input, so you can check them on thousands of random ones. Exactly min(k, distinct words) pairs, no word twice. Every count matches a recount. Most common first, ties alphabetical. Every word left out ranks below every word kept: a lower count, or the same count and a later name. Each rule shuts out a wrong answer that the others let through. Drop the first, and <code>return []</code> passes all the rest. Drop the last, and <code>ranked[1:k + 1]</code>, which skips the most common word, passes on every input with more than k distinct words.</li>
+  <li><b>Properties</b>: the "answer must satisfy" line of your context block, rules that hold for <em>every</em> input, so you can check them on thousands of random ones. Exactly min(k, distinct words) pairs, no word twice. Every count matches a recount. Most common first, ties alphabetical. Every word left out ranks below every word kept: a lower count, or the same count and a later name. Each rule shuts out a wrong answer that the others let through. Drop the first, and <code>return []</code> passes all the rest. Drop the last, and returning places 2 to k + 1 of the ranking, which skips the most common word, passes on every input with more than k distinct words.</li>
 </ol>
 
 <p>The assistant is useful here too, as long as you track where each expected value came from. "List 20 tricky inputs for this function" gets you tabs, empty lines, a k of 0 and accented capitals in seconds, including some you hadn't thought of. Let it propose inputs freely. Take an expected value from it only after you've worked that value out from the task yourself, or checked it with an oracle you wrote. An expected value read off the code proves nothing.</p>
@@ -554,7 +554,7 @@ for _ in range(1000):
 <p>A good doctor doesn't hand out pills until the symptoms stop. They take a history, order tests that split the possible causes into "this one" and "not this one", and treat once they know. Debugging works the same way:</p>
 <ol>
   <li><b>Reproduce</b>: make it fail on demand, with a command you can rerun.</li>
-  <li><b>Shrink</b>: cut the failing input down to the smallest piece that still fails.</li>
+  <li><b>Shrink</b>: cut the failing input down until every piece left matters.</li>
   <li><b>Locate</b>: run the shrunk input through the data-flow sketch, and find the first arrow where the data is wrong. Or locate it in time: if some older version works, bisect the history to the first bad commit, and its diff bounds the hypotheses.</li>
   <li><b>Hypothesize</b>: list possible causes inside that box, most likely first, and for the top two, an experiment whose result differs between them.</li>
   <li><b>Experiment</b>: run one experiment at a time, cheapest first, and write down what each one ruled out.</li>
@@ -579,7 +579,7 @@ for _ in range(1000):
 
 <p>On 16 lines that took 16 runs, barely better than trying one line at a time. The payoff comes with size. For a bug that needs two lines, each halving level tries at most 4 pieces: the 2 pieces that still hold a needed line, each split in two. 1,000 lines take about 10 halvings (2¹⁰ = 1,024), so about 40 runs. 2 million lines take about 21 (2²¹ is about 2.1 million), so about 85. One line at a time would take 1,000 and 2 million runs. At 2 seconds a run, that's about 3 minutes instead of 46 days.</p>
 
-<p>What counts as done? An input is <b>1-minimal</b> when removing any single piece that's left makes the bug vanish: every piece left matters. In the player that's lines 4 and 13. The halving gets there fast, and right, because of two moves: one skips runs it doesn't need, and the other guarantees a 1-minimal result. Each one needs a reason.</p>
+<p>What counts as done? An input is <b>1-minimal</b> when removing any single piece that's left makes the bug vanish: every piece left matters. In the player that's lines 4 and 13. The halving gets there fast, and right, because of two moves: one skips a retry it doesn't need, and the other guarantees a 1-minimal result. Each one needs a reason.</p>
 
 <p><b>It doesn't retry a cut it had to undo.</b> After run 6 it moves on to pairs without trying lines 1 to 4 as a block again. Their one try, run 3, cut them from all 16 lines, and the bug vanished: lines 5 to 16, on their own, pass. The input is now lines 1 to 4 and 13 to 16. Cutting 1 to 4 again would leave 13 to 16, which is a part of that passing input. Skipping the run is safe when the bug is <b>monotone</b>: adding lines to a failing input never makes it pass. Turn that around: if an input passes, every part of it passes too. (If some part failed, adding the other lines back would turn a failing input into a passing one, which monotone rules out.) So 13 to 16 would pass, and the run would be wasted.</p>
 
@@ -740,7 +740,7 @@ def test_photo():
         after = new(lines, k)
         assert after == before, lines</code></pre>
 
-<p>Two questions decide whether a photo is good enough. <b>Does it cover the code you'll change?</b> Run it under a coverage tool (coverage.py, for Python) and check that every line you're about to touch actually ran. Then plant one mutant on each path you'll touch (both sides of an <code>if</code>, the body of a loop), and watch the photo go red. <b>Can old and new even run side by side?</b> Code that reads the clock, a file or random numbers gives different answers on two runs for reasons that have nothing to do with the refactor. So pass those in first, the way the <a href="../../01-data-structures/concepts/lru-lfu-cache.html#s11">LRU chapter's</a> <code>ttl_cache</code> takes a <code>clock</code>, and give both versions the same fake clock, the same seeded random generator and the same lines.</p>
+<p>Two questions decide whether a photo is good enough. <b>Does it cover the code you'll change?</b> Run it under a coverage tool (coverage.py, for Python) and check that every line you're about to touch actually ran. Then plant one mutant on each path you'll touch (both sides of an <code>if</code>, the body of a loop), and watch the photo go red. <b>Can old and new even run side by side?</b> Code that reads the clock, a file or random numbers gives different answers on two runs for reasons that have nothing to do with the refactor. So pass those in first, the way the <a href="../../01-data-structures/concepts/lru-lfu-cache.html#exercises">LRU chapter's</a> <code>ttl_cache</code> takes a <code>clock</code>, and give both versions the same fake clock, the same seeded random generator and the same lines.</p>
 
 <p>Exercise 6's <code>find_counterexample</code> is this camera, made exhaustive: with the old version as the oracle, it hands you the smallest input where old and new disagree.</p>
 
@@ -892,8 +892,10 @@ def test_photo():
   <li><b>Context.</b> "Two questions first: how big is the log, and what counts as a word? … Thanks. Before I prompt, here's the signature, the sizes, the invariant and what the answer must satisfy. The input doesn't fit in memory, so I'm saying that up front."</li>
   <li><b>Plan.</b> "I'll ask for its assumptions and a plan first, then one step at a time, each with a check. … It assumed a file path, but callers pass lines, so I'm correcting that now."</li>
   <li><b>Checks first.</b> "I'm writing the tie case and the empty input myself, plus a slow oracle to compare against."</li>
-  <li><b>Judgment.</b> "The tie test gives <code>[("b", 1)]</code>, so I'm pasting that case back instead of asking it to double-check. … It passes now. Let me flip the tie order on purpose and watch the test go red, then flip it back. This diff also renamed a function I didn't ask about, so I'm undoing that part. Now committing."</li>
+  <li><b>Judgment.</b> "The tie test gives <code>[("b", 1)]</code>, so I'm pasting that case back instead of asking it to double-check. … Its fix sorts by <code>(-count, word)</code>, so ties go a to z. It also renamed a function I didn't ask about, so I'm undoing that part. It passes now. Let me flip the tie order on purpose and watch the test go red, then flip it back. Now committing."</li>
   <li><b>Debugging.</b> "It fails on one empty line. Checking each arrow of the sketch on that input, the words already come out as <code>[""]</code>, so it's the first box. Three causes inside it, most likely first; the input already rules out the newline one, and one run settles the rest: <code>split(" ")</code> keeps empty strings."</li>
+  <li><b>Refactor.</b> "First, a photo: the old copy as the oracle, on random lines, empty ones and tabs included. Coverage says every line I'll change ran, and a mutant on each path turns the photo red. One named change: extract <code>count(lines)</code>. … The diff only moves the loop, and the photo's green. Committing."</li>
+  <li><b>Review.</b> "Last pass: the whole diff against the catalogue, row by row. … Time is O(n) to count the n words, plus O(d log d) to sort the d distinct ones. Memory is the counts only, O(d)."</li>
 </ol>
 
 <details class="aside deeper">
@@ -904,8 +906,7 @@ def test_photo():
     <li><b>"Two versions it wrote disagree. Which do you trust?"</b> Neither, yet. I run both against my checks, and the disagreement itself hands me an input to test.</li>
     <li><b>"Its version is faster than yours, but you can't follow it. Ship it?"</b> Not until it passes my checks and I can explain it. If its walk-through of the trick doesn't get me there, I ship my slower version. Code nobody understands is a cost for the next person who has to change it.</li>
     <li><b>"How would you use it in a big codebase you don't know?"</b> Read-only first: ask it to trace a request and list the files involved, check the trace, and draw the data flow. Then small changes behind characterization tests.</li>
-    <li><b>"How do you know your characterization tests are enough?"</b> I run them under coverage and check that every line I'm changing ran, and I plant a mutant on each path I'm changing to watch them go red.</li>
-    <li><b>"Here's a 1,000-line AI-generated change to review."</b> Ask for it in reviewable pieces. Read the changed files, the signature changes and the tests first, climb the ladder, and read every line where the risk is. (In a 45-minute round the code is small, so there you read all of it.)</li>
+    <li><b>"Here's a 1,000-line AI-generated change to review."</b> Ask for it in reviewable pieces. Read the changed files, the signature changes and the tests first, climb the ladder, and read every line where the risk is. (In an interview round the code is small, so there you read all of it.)</li>
   </ul>
 </details>
 
@@ -933,11 +934,11 @@ def test_photo():
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
   <h4>1. Compounding by hand</h4>
-  <p>(a) Work out 0.9<sup>10</sup>, 0.95<sup>20</sup> and 0.99<sup>50</sup>, using repeated squaring for the first. (b) A 12-step session without checks: one assistant's steps are right 97% of the time, another's 85%. What's the chance of a fully right session with each? (c) A 20-step session whose steps are right 90% of the time. What catch rate c must the check after each step have for the whole session to end right 90% of the time?</p>
+  <p>(a) Work out 0.9<sup>10</sup>, 0.95<sup>20</sup> and 0.99<sup>50</sup>, using repeated squaring for the first. (b) A 12-step session without checks: one assistant's steps are right 97% of the time, another's 85%. What's the chance of a fully right session with each? (c) A 20-step session whose steps are right 90% of the time. What catch rate c must the check after each step have (a caught step is redone right) for the whole session to end right 90% of the time?</p>
   <details class="aside another"><summary>Answer</summary>
     <p>(a) 0.9² = 0.81, 0.9⁴ ≈ 0.656, 0.9⁸ ≈ 0.430, so 0.9¹⁰ = 0.9⁸ × 0.9² ≈ 0.35. Then 0.95²⁰ ≈ 0.36 and 0.99⁵⁰ ≈ 0.61: twenty changes at 95% are about as risky as ten at 90%, and fifty at 99% still go wrong two sessions in five.</p>
     <p>(b) 0.97¹² ≈ 0.69 and 0.85¹² ≈ 0.14. A gap of 12 points per step becomes a factor of about five per session.</p>
-    <p>(c) Each step must end right with some q where q²⁰ = 0.9. While they're small, <a href="../../02-algorithms/concepts/probability-estimation.html#s8">chances add</a>: if each of the twenty steps lets a mistake through with chance s = 1 − q, the session lets one through about 20 × s of the time, so s ≈ 0.1 / 20 = 0.005. A wrong step gets through with 0.1 × (1 − c), so 0.1 × (1 − c) ≤ 0.005 means c ≥ 0.95 (0.9475 if a caught step is redone right).</p>
+    <p>(c) Each step must end right with some q where q²⁰ = 0.9. While they're small, <a href="../../02-algorithms/concepts/probability-estimation.html#s8">chances add</a>: if each of the twenty steps lets a mistake through with chance s = 1 − q, the session lets one through about 20 × s of the time, so s ≈ 0.1 / 20 = 0.005. A wrong step gets through with 0.1 × (1 − c), so 0.1 × (1 − c) ≤ 0.005 means c ≥ 0.95 (exactly 0.9475).</p>
   </details>
 </div>
 
@@ -1068,7 +1069,7 @@ put of a new key, cache full:
   <ul>
     <li><b>Direction:</b> a context block with the sizes and the hard example, before any code; a read-back and a plan, before any code; every diff small enough to read in about two minutes.</li>
     <li><b>Verification:</b> expected values from the task, written before the code; an oracle you wrote, run on small inputs; at least one deliberate mutant, seen to go red.</li>
-    <li><b>Judgment:</b> at least one push-back with a failing input; at least one "I'll type this myself"; every accept, push-back and takeover said with its reason.</li>
+    <li><b>Judgment:</b> at least one push-back with a failing input; at least one "I'll type this myself"; every accept, push-back and takeover said with its reason, and every accept with what its lines do.</li>
     <li><b>Communication:</b> each phase named out loud before you start it, as in section 11; every assumption said out loud before it goes in the context block (section 3); the complexity said at the end (section 10's plan).</li>
   </ul>
   <p>When you count at least two of the three in every dimension, ask for a "mock interview, AI-assisted coding round, 60 minutes". The interviewer sees only the chat, so as you go, type what you'd say out loud and paste each prompt, each diff and each check's output.</p>
