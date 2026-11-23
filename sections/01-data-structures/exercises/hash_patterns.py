@@ -1,5 +1,5 @@
 """
-Hash map patterns: seen-it, group-by, running total
+Hash map patterns: seen before, group by key, prefix sums
 Topic: 01.01  |  Priority: P0
 
 Problem

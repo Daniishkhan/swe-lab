@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- tools/build.py reads this tag to link the page from its chapter. -->
   <meta name="topic" content="01.01">
-  <title>Find anything in one step (Hash maps, arrays and strings)</title>
+  <title>Hash maps: why a lookup is O(1)</title>
   <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
   <link rel="stylesheet" href="../../../assets/style.css">
   <script src="../../../assets/curriculum.js"></script>
@@ -17,375 +18,357 @@
 
 <header class="chapter-head">
   <div class="eyebrow">Chapter 1 · Part 1</div>
-  <h1>Find anything in one step</h1>
-  <div class="meta"><span><span class="badge P0">P0</span> in almost every coding round</span><span>about 55 minutes</span><span>10 quick checks · 8 exercises</span></div>
+  <h1>Hash maps: why a lookup is O(1)</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> in almost every coding round</span><span>about 35 minutes</span><span>7 quick checks · 8 exercises</span></div>
 </header>
 
-<p>Almost every coding interview uses a hash map somewhere: a Python <code>dict</code> or <code>set</code>. Nobody gets credit for using one. The credit goes to knowing <b>why</b> it's fast, <b>when</b> it stops being fast, and what it costs. This chapter builds a hash map from nothing, one fix at a time, so every part of it has a reason you can say out loud.</p>
+<p>A hash map stores keys with their values and finds any key in about one step, however many keys it holds. Python's <code>dict</code> is a hash map, and <code>set</code> is the same structure without the values. Almost every coding interview uses one, and interviewers give credit for explaining why a lookup is O(1), when it stops being O(1), and what it costs in memory. This chapter builds a hash map from a plain array, one fix at a time, so that each part of the design has a reason you can say out loud.</p>
 
 <div class="learn-list">
   <h4>By the end you'll be able to</h4>
   <ol>
-    <li>Explain why reading slot <code>i</code> of an array is one step, and why that's the whole trick.</li>
-    <li>Build a hash map from first principles: hash function, buckets, collisions, load factor, resizing.</li>
-    <li>Compare chaining and open addressing, including why deleting needs "tombstones".</li>
-    <li>Say what makes a valid key, and what breaks when you get it wrong.</li>
-    <li>Explain when "O(1)" turns into O(n), including on purpose, by an attacker.</li>
-    <li>Spot hash map problems in interviews, and know when a hash map is the wrong tool.</li>
+    <li>Build a hash map from an array: hash function, buckets, collisions, load factor and resizing.</li>
+    <li>Compare separate chaining with open addressing, and explain why emptying a deleted key's slot breaks lookups.</li>
+    <li>State what makes a valid key, and what breaks when a key is not one.</li>
+    <li>Explain when O(1) becomes O(n), including when an attacker forces it.</li>
+    <li>Recognize the problems a hash map solves, and the ones where it is the wrong structure.</li>
   </ol>
 </div>
 
-<p class="muted small">How to read this: go top to bottom. Answer each quick check before reading on; a wrong answer gets the idea explained a different way. Grey "Go deeper" boxes are optional on a first read. This chapter leans on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a>: Big-O, the doubling test, and amortized cost.</p>
+<p class="muted small">How to read this: top to bottom. Some sections end with a quick check, and a wrong answer gets the idea explained a second way. "Go deeper" boxes are optional on a first read. This chapter builds on <a href="../../02-algorithms/concepts/complexity.html">Big-O and complexity analysis</a>, in particular amortized cost.</p>
 
 <!-- ============================================================ -->
-<h2 id="s1"><span class="sec-num">1</span>The problem: is this name taken?</h2>
+<h2 id="s1"><span class="sec-num">1</span>The problem: a membership check on a list is O(n)</h2>
 
-<div class="story">
-  <p>You run sign-ups for a service with <b>10 million</b> users. Every time someone picks a username, the server must answer one question: <em>is this name already taken?</em></p>
-  <p>The names sit in a Python list. <code>name in names</code> checks them one by one. When the name is new (the common case), it has to look at all 10 million. Measured on a laptop, that takes about <b>70 milliseconds</b>.</p>
-  <p>That sounds quick, until 1,000 people sign up in the same second. Now the server needs 1,000 × 70 ms = <b>70 seconds of work every second</b>. It falls further behind with every sign-up.</p>
-</div>
+<p>A list cannot answer "is this value already here?" without comparing the value against every item, and at ten million items that is too slow to do on every request.</p>
 
-<p>Put the same 10 million names in a Python <code>set</code> and the same check takes about <b>30 nanoseconds</b>. That's more than two million times faster. And it stays about 30 nanoseconds whether the set holds ten names or ten million.</p>
+<p>Take a sign-up service with 10 million users. Each time someone picks a username, the server must check whether the name is taken. If the names are in a Python list, <code>name in names</code> compares the new name with each stored name in turn. A free name, which is the common case, gets compared with all 10 million. On a laptop that takes about 70 milliseconds.</p>
 
-<p>How can a check not depend on how many names there are? It sounds like magic. It isn't. It's one fact about computer memory, plus about five clever fixes, each one patching the hole left by the one before. By the end of this chapter you'll have built all of them.</p>
+<pre class="plain"><code>one check of a free name     about 70 ms
+1,000 sign-ups a second      1,000 × 70 ms = 70 s of work</code></pre>
+
+<p>The server is handed 70 seconds of work for every second that passes, so it can never catch up.</p>
+
+<p>With the same names in a Python <code>set</code>, the check takes well under a microsecond, which is hundreds of thousands of times faster. It also does the same small amount of work at ten names and at ten million.</p>
 
 <!-- ============================================================ -->
-<h2 id="s2"><span class="sec-num">2</span>Memory is a numbered street</h2>
+<h2 id="s2"><span class="sec-num">2</span>Arrays: reading slot i takes one step</h2>
 
-<p>Start with the one fact everything else rests on.</p>
+<p>An array can read any of its slots in one step, because the slot's position in memory is computed and not searched for.</p>
 
-<p>Picture a very long street of identical mailboxes, numbered 0, 1, 2, 3 and so on, all the same width and all in a row. If someone says "go to box 4,512", you don't walk past the first 4,511 boxes checking numbers. You know each box is, say, 30 cm wide, so box 4,512 is 4,512 × 30 cm from the start. You go straight there.</p>
+<p>An array is a run of equal-sized slots stored side by side in memory. Every byte of memory has a number, called its address, and the hardware can jump straight to any address. Because the slots are all the same size, the address of slot <code>i</code> follows from one multiplication and one addition.</p>
 
-<p>Computer memory (RAM) is that street. Every byte has a number, called its <b>address</b>. The hardware can read any address in about the same time, near or far. (That's a simplification: the CPU keeps recently used memory, and its neighbors, in a small fast cache, so nearby reads can be about 100× cheaper. Section 8 uses this.) An <b>array</b> is a run of equal-sized slots side by side on that street. To find slot <code>i</code>, the computer does one multiply and one add:</p>
+<pre class="diagram"><code>slot          0      1      2      3      4
+value        17     42      8     99      3
+address    1000   1008   1016   1024   1032
 
-<pre class="diagram"><code>address of slot i  =  start  +  i × slot size
+8-byte slots, starting at address 1000
+address of slot i  =  start + i × slot size
+address of slot 3  =  1000 + 3 × 8  =  1024</code></pre>
 
- slot:     0      1      2      3      4
-        ┌──────┬──────┬──────┬──────┬──────┐
-        │  17  │  42  │   8  │  99  │   3  │
-        └──────┴──────┴──────┴──────┴──────┘
- address: 1000   1008   1016   1024   1032      (8-byte slots, start = 1000)
+<p>Reading slot 3 costs the same as reading slot 3 million, which is why <code>nums[i]</code> is O(1) for a list of any length. A Python list is this kind of array, and its slots hold references to the items.</p>
 
- slot 3 → 1000 + 3 × 8 = 1024. One step, whatever the array's length.</code></pre>
-
-<p>That's why <code>nums[3]</code> is O(1): it's arithmetic, not a search. (A Python list stores 8-byte <em>references</em> to its items in such a block, so the rule holds for lists too.)</p>
-
-<p>The catch: arithmetic only helps if you already know the slot number. Our sign-up check knows a <em>name</em>, not a slot. With only an array, here are the two options:</p>
+<p>The limit of this trick is that the slot number must already be known. The sign-up check starts from a name and not from a slot number, and with a plain array that leaves two options.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Approach</th><th>Check one name</th><th>Add one name</th><th>With 10 million names</th></tr></thead>
   <tbody>
-    <tr><td>Unsorted list, scan it</td><td>O(n)</td><td>O(1), append at the end</td><td>10 million comparisons per check</td></tr>
-    <tr><td>Sorted list, binary search</td><td>O(log n)</td><td>O(n), shift everything after it</td><td>24 comparisons per check, but about 5 million items moved per insert</td></tr>
+    <tr><td>Unsorted list, scanned</td><td>O(n)</td><td>O(1) amortized, append at the end</td><td>10 million comparisons per check</td></tr>
+    <tr><td>Sorted list, binary search</td><td>O(log n)</td><td>O(n), shift the items after it</td><td>24 comparisons per check, about 5 million shifts per insert</td></tr>
   </tbody>
 </table></div>
 
-<p>The sorted list is like an alphabetized bookshelf. Finding a book is fast: open to the middle and keep halving. But slotting a new book in under "M" means sliding every book after it one place over. On average that's half the shelf. Arrays have no gaps, so inserting in the middle always shifts.</p>
+<p>Sorting fixes the check and breaks the insert. An array has no gaps, so putting a new name in its sorted position means shifting every name after it, which is half the array on average. A sign-up does both a check and an insert, so both have to be fast.</p>
 
-<h3>Strings are arrays too</h3>
-<p>A string is an array of characters. That's why <code>s[5]</code> is O(1), but comparing two strings of length k takes up to k steps, one character at a time. In Python (and Java, Go, JavaScript) strings are also <b>immutable</b>: they can't change after they're made. <code>s += "x"</code> builds a brand-new string and copies everything over, so doing it in a loop is O(n²); collect the pieces in a list and <code>"".join</code> them once (the <a href="../../02-algorithms/concepts/complexity.html#s5">complexity chapter</a> has the details). Both facts come back when strings become keys: hashing one costs k steps, and immutability is exactly what makes a string a safe key (section 9).</p>
-
-<div class="keyidea"><p>An array reads slot <code>i</code> in one step because the slot's address is arithmetic. The whole game of this chapter is turning a <em>key</em> (like a name) into a slot number, so we get that one-step jump for keys that aren't numbers.</p></div>
-
-<div class="check" id="check-street">
-  <p class="q">You keep the 10 million names in a sorted list and use binary search. Lookups take 24 comparisons. Why isn't that good enough for sign-ups?</p>
-  <div class="opts">
-    <button>24 comparisons is too slow for a lookup</button>
-    <button data-correct>Every new sign-up must be inserted in sorted position, which shifts millions of items</button>
-    <button>Binary search doesn't work on strings</button>
-  </div>
-  <div class="fb right"><p>Right. Lookups are fine; the inserts kill it. Sign-ups are a mix of "check" and "add", so we need both to be fast.</p></div>
-  <div class="fb wrong"><p>Think about what a sign-up does: it checks the name, and if it's free, <em>adds</em> it. Checking takes about log₂(10,000,000) ≈ 24 comparisons, which is quick, and alphabetical order works fine for binary search on strings. Adding is the problem. The new name has to go in its sorted place, and an array has no gaps, so every name after that spot slides over by one. That's about 5 million moves per sign-up.</p></div>
-</div>
+<p>The rest of the chapter turns a key such as a name into a slot number, so that any key gets the one-step read.</p>
 
 <!-- ============================================================ -->
-<h2 id="s3"><span class="sec-num">3</span>Use the key as the address</h2>
+<h2 id="s3"><span class="sec-num">3</span>Direct addressing: the key as the array index</h2>
 
-<p>Here's a bold idea. What if the key itself <em>were</em> the slot number?</p>
+<p>When the keys are small whole numbers, the key itself can serve as the slot number, and a lookup is a single array read. This is called direct addressing.</p>
 
-<p>Say you want to count the letters in a book. There are only 26 lowercase letters. Make an array of 26 counters. For the letter <code>c</code>, use slot <code>ord(c) - ord('a')</code>: 'a' is slot 0, 'b' is slot 1, … 'z' is slot 25. Seeing a letter means one jump and one add. No searching at all, and no two letters ever share a slot.</p>
+<p>Counting letters is the standard example. There are 26 lowercase letters, so an array of 26 counters has one slot for every possible key, and a letter's position in the alphabet is its index.</p>
 
 <pre><code>counts = [0] * 26
 for c in "banana":
-    counts[ord(c) - ord("a")] += 1   # the letter IS the address
-# counts[0] == 3 ('a'), counts[1] == 1 ('b'), counts[13] == 2 ('n')</code></pre>
+    counts[ord(c) - ord("a")] += 1    # its position is its slot
+# counts[0] is 3 ("a"), counts[1] is 1 ("b"), counts[13] is 2 ("n")</code></pre>
 
-<p>This is called <b>direct addressing</b>: the key is used directly as the array index. It's perfect when the keys are small whole numbers packed close together: letters, ages (0 to 150), days of the year, or user ids that run from 0 to 10 million (a <code>bytearray</code> of 10 million true/false flags is about 10 MB, which is fine).</p>
+<p>Each letter costs one array read, one addition and one write. Nothing is searched, and two different letters can never share a slot.</p>
 
-<h3>Where it breaks</h3>
-<p>Now try it for usernames. Turn a name into a number by treating its letters like digits: with 37 possible characters (a–z, 0–9, underscore), a 20-character name is a 20-digit number in base 37. The biggest such number is about 37²⁰ ≈ <b>2 × 10³¹</b>. That's how many slots you'd need.</p>
+<p>Direct addressing fits whenever the possible keys are few and packed close together: letters, ages from 0 to 150, days of the year, or user ids that run from 0 to 10 million. A <code>bytearray</code> with one flag for each of those ids takes about 10 MB.</p>
 
-<p>Picture a hotel with a room for every name anyone could ever pick. It has 2 × 10³¹ rooms. Your 10 million guests fill a fraction of them so tiny it has 24 zeros after the decimal point (about 4 × 10⁻²⁵). Even at one bit per room, the hotel needs more memory than every computer on Earth combined. 64-bit ids have the same problem: 2⁶⁴ ≈ 1.8 × 10¹⁹ slots.</p>
+<p>It fails for usernames, because the array needs a slot for every key that could exist and not only for the keys in use. Suppose a username is 20 characters drawn from 37 symbols: the lowercase letters, the digits and the underscore.</p>
 
-<p>So direct addressing fails for one reason: the number of <em>possible</em> keys is astronomically bigger than the number of keys you actually <em>have</em>.</p>
+<pre class="plain"><code>possible usernames       37²⁰, about 2 × 10³¹
+usernames in use         10,000,000
+share of slots in use    about 4 × 10⁻²⁵</code></pre>
 
-<div class="keyidea"><p>Direct addressing (key = index) gives perfect one-step lookups, but needs one slot per <em>possible</em> key. That only works when the possible keys are few and dense. For names, emails or big ids we need to squash a huge key space into a small array.</p></div>
-
-<div class="check" id="check-direct">
-  <p class="q">Which of these would you sensibly store with plain direct addressing (an array indexed by the key)?</p>
-  <div class="opts">
-    <button>Phone numbers (10 digits) of a company's 2,000 employees</button>
-    <button data-correct>The number of people born on each day of the year</button>
-    <button>Email addresses that have unsubscribed</button>
-  </div>
-  <div class="fb right"><p>Yes. There are only 366 possible days, so an array of 366 counters covers every possible key, with no waste worth mentioning.</p></div>
-  <div class="fb wrong"><p>Ask "how many <em>possible</em> keys are there?", not "how many keys do I have?". There are 10 billion possible 10-digit phone numbers, so an array for 2,000 employees would be 99.99998% empty: with an 8-byte record per slot, that's 80 GB to hold 16 KB of data. Emails are even worse: unlimited length, so the possible keys are endless. Days of the year: only 366 possible keys. That's the one an array can index directly.</p></div>
-</div>
+<p>No computer has memory for that many slots, and nearly every one of them would stay empty. A 64-bit numeric id has the same problem, with about 18 billion billion possible values.</p>
 
 <!-- ============================================================ -->
-<h2 id="s4"><span class="sec-num">4</span>Squash any key into a slot: hashing</h2>
+<h2 id="s4"><span class="sec-num">4</span>Hash functions: from any key to a bucket</h2>
 
-<p>Picture a coat check at a theater. It has 100 hooks. You hand over your coat and get a ticket with a number from 0 to 99. When you come back, the attendant doesn't search the room. Your ticket number <em>is</em> the hook. Millions of different people could visit; the room still has just 100 hooks, because tickets are about hooks, not about people.</p>
-<p class="small muted">Where the analogy breaks: a real attendant hands out a fresh ticket for a free hook, and you must keep it. A hash is a ticket printed <em>from the coat itself</em>: show the same coat again and you get the same number, so you never need to keep the ticket. The price is that two different coats can print the same number. That's section 5.</p>
+<p>A hash function turns a key of any type into a number, and the remainder of that number after division by the array's length picks the slot.</p>
 
-<p>A <b>hash function</b> is the ticket machine. It takes any key (a name, an email, a tuple) and turns it into a number. Then we squash that number into the array's range with the remainder: <code>slot = hash(key) % m</code>, where <code>m</code> is the number of slots. Each slot is called a <b>bucket</b>, and the whole array is the <b>hash table</b>.</p>
+<p>The number is called the key's hash. A hash map is also called a hash table, each slot of its array is a bucket, and m is the number of buckets.</p>
 
-<h3>A hash function you can run by hand</h3>
-<p>Here is a real one (it's what Java uses for strings). Start at 0. For each character, multiply what you have by 31 and add the character's code (<code>ord</code>):</p>
+<pre class="plain"><code>bucket = hash(key) % m</code></pre>
+
+<p>The <code>%</code> operator gives the remainder after division, so in Python the result is always a valid index into an array of m buckets, however large the hash is.</p>
+
+<p>Java's hash function for strings is short enough to run by hand: start at zero, and for each character multiply the running value by 31 and add the character's code.</p>
 
 <pre><code>def toy_hash(s):
     h = 0
     for ch in s:
-        h = h * 31 + ord(ch)   # mix in each character, in order
+        h = h * 31 + ord(ch)    # earlier characters weigh more
     return h</code></pre>
 
-<div class="table-wrap"><table class="steps-table">
-  <thead><tr><th>step</th><th>character</th><th>ord</th><th>h = h × 31 + ord</th></tr></thead>
-  <tbody>
-    <tr><td>1</td><td>c</td><td>99</td><td>0 × 31 + 99 = 99</td></tr>
-    <tr><td>2</td><td>a</td><td>97</td><td>99 × 31 + 97 = 3,166</td></tr>
-    <tr><td>3</td><td>t</td><td>116</td><td>3,166 × 31 + 116 = <b>98,262</b></td></tr>
-  </tbody>
-</table></div>
+<p>Here it is on "cat".</p>
 
-<p>With 8 buckets, "cat" goes to bucket 98,262 % 8 = <b>6</b>. Every time, on every run. "dog" hashes to 99,644, so bucket 4. "act" hashes to 96,402, so bucket 2.</p>
+<pre class="plain"><code>character    code    h
+c              99    0 × 31 + 99 = 99
+a              97    99 × 31 + 97 = 3,166
+t             116    3,166 × 31 + 116 = 98,262
 
-<p>Why multiply by 31 at all? Try the lazy version: just add up the character codes. "cat", "act" and "tac" all add up to 312, so all three land in the same bucket. Adding ignores <em>order</em>. Multiplying before each add makes earlier characters count differently from later ones, so rearranged letters give different numbers.</p>
+toy_hash("cat") = 98,262      98,262 % 8 = 6
+toy_hash("dog") = 99,644      99,644 % 8 = 4
+toy_hash("act") = 96,402      96,402 % 8 = 2</code></pre>
 
-<h3>What a good hash function needs</h3>
+<p>In a table of 8 buckets "cat" goes to bucket 6, on every run and on every machine.</p>
+
+<p>The multiplication makes the order of the characters count. A hash that only added the character codes would give "cat", "act" and "tac" the same value, 312, and all three keys would land in one bucket.</p>
+
+<p>A hash function is usable when it has three properties.</p>
 <ol>
-  <li><b>Same key, same number, for as long as the table exists.</b> If "cat" gave 6 when you stored it and 3 when you looked it up, you'd look on the wrong hook. This is the one rule that can never bend. (Python's string hashes change between runs, as section 10 explains, so never save <code>hash()</code> values to disk or send them to another process. Use a stable hash like <code>hashlib</code> for that.)</li>
-  <li><b>Spread keys evenly.</b> Different keys should look random across the buckets, so no bucket gets crowded. The "add the letters" hash fails this.</li>
-  <li><b>Fast.</b> Hashing a string of length k touches all k characters, so it costs O(k). For short keys that's tiny. For a 1 MB string it's a million steps, which is why Python remembers (caches) a string's hash inside the string after the first time.</li>
+  <li><b>Deterministic.</b> The same key gives the same hash for as long as the table exists. A key stored in bucket 6 and later looked up in bucket 3 would be reported missing.</li>
+  <li><b>Uniform.</b> Different keys spread evenly over the buckets, so that no bucket gets crowded. The hash that only adds character codes fails this test.</li>
+  <li><b>Fast.</b> Hashing a string of length k reads all k characters, so it costs O(k), and comparing two strings for equality costs up to O(k) as well. The O(1) usually quoted for hash maps assumes that keys are short.</li>
 </ol>
 
-<p class="small muted">One trap in other languages: Java's and C's <code>%</code> keeps the sign, so a negative hash gives a negative slot. Even <code>Math.abs(hash) % m</code> fails for one value (<code>Math.abs(Integer.MIN_VALUE)</code> is still negative), which is why Java masks the sign bit off instead. Python's <code>%</code> always returns 0 to m − 1, so this never shows up there.</p>
-<p class="small muted">Notice the "O(1)" of a hash map quietly assumes hashing the key takes constant time. With long keys, a lookup is really O(k). Saying that in an interview is a small senior signal.</p>
-
-<div class="keyidea"><p>A hash function turns any key into a number, the same number every time, spread evenly. <code>hash(key) % m</code> squashes it into one of m buckets. It's a coat-check ticket: it tells you which hook to go to without searching.</p></div>
-
-<div class="check" id="check-hash">
-  <p class="q">A teammate writes a "hash" that returns a random number each time it's called, because "random numbers spread perfectly evenly". What goes wrong?</p>
-  <div class="opts">
-    <button>Nothing; even spread is the main goal</button>
-    <button>It's too slow to generate random numbers</button>
-    <button data-correct>A key stored in one bucket will be looked for in a different bucket later</button>
-  </div>
-  <div class="fb right"><p>Exactly. Insert "cat" and it lands in bucket 6. Look it up and the "hash" now says bucket 3, which is empty: "cat" seems to be missing. Same key, same number is the rule that can't bend. Even spread only matters once that holds.</p></div>
-  <div class="fb wrong"><p>Speed isn't the issue (random numbers are cheap). Act it out at the coat check: you hand over your coat and get ticket 6. When you come back, the machine prints you a new random ticket, 3. The attendant goes to hook 3, finds nothing, and says your coat isn't here. A hash is only useful if the same key gives the same number every time. Spreading evenly is the second rule, not the first.</p></div>
-</div>
+<details class="aside deeper">
+  <summary>Go deeper: what Python does with string hashes</summary>
+  <p>Python computes a string's hash once and stores it in the string object, so hashing the same long string again costs O(1).</p>
+  <p>Python's hash of a string also changes from one run of the program to the next, for a reason section 10 explains. A value from <code>hash()</code> should therefore never be written to disk or sent to another process. A stable function from <code>hashlib</code> is the right tool for that.</p>
+</details>
 
 <!-- ============================================================ -->
-<h2 id="s5"><span class="sec-num">5</span>Collisions happen early: chaining</h2>
+<h2 id="s5"><span class="sec-num">5</span>Collisions and separate chaining</h2>
 
-<p>We squashed a huge number of possible keys into m buckets. So some different keys <em>must</em> share a bucket. That's the <b>pigeonhole principle</b>: put 9 pigeons into 8 holes and at least one hole has two. When two different keys land in the same bucket, it's called a <b>collision</b>.</p>
+<p>Two different keys can land in the same bucket. This is called a collision, and no hash function can prevent it.</p>
 
-<p>Look back at our toy hash: "tac" hashes to 114,582, and 114,582 % 8 = 6. That's the same bucket as "cat". Our very first handful of keys already collided.</p>
+<p>There are far more possible keys than buckets, so some keys have to share. The toy hash already produces a collision among three-letter words.</p>
 
-<h3>Sooner than you'd think</h3>
-<p>You might hope collisions are rare while the table is mostly empty. They're not. Think of birthdays: in a room of just <b>23</b> people, there's a better than 50% chance two share a birthday, even though there are 365 days. That's the <b>birthday paradox</b>. It's not about <em>your</em> birthday matching someone; it's about <em>any</em> pair matching, and 23 people make 253 pairs.</p>
+<pre class="plain"><code>toy_hash("cat") =  98,262       98,262 % 8 = 6
+toy_hash("tac") = 114,582      114,582 % 8 = 6</code></pre>
+
+<p>Their hashes differ, but both keys belong in bucket 6.</p>
+
+<p>Collisions also begin long before a table is full. A collision only needs some pair of keys to match, and the number of pairs grows much faster than the number of keys. With 365 buckets, 23 keys already form 253 pairs, and each pair shares a bucket with a chance of 1 in 365.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Buckets</th><th>Keys until a collision is more likely than not</th></tr></thead>
   <tbody>
-    <tr><td>8</td><td>4 (with 5 keys it's already 79%)</td></tr>
+    <tr><td>8</td><td>4</td></tr>
     <tr><td>365</td><td>23</td></tr>
     <tr><td>1,000</td><td>38</td></tr>
     <tr><td>1,000,000</td><td>1,178</td></tr>
   </tbody>
 </table></div>
 
-<p>The pattern: collisions start after about √m keys (the square root of the number of buckets), long before the table is full. So collisions aren't an edge case to handle someday. They're the normal case, and the design has to plan for them from the start.</p>
+<p>A collision becomes more likely than not after about 1.2 times the square root of m keys. The row for 365 buckets is known as the birthday paradox, because it says that two people in a group of 23 probably share a birthday. Collisions are the normal case, and a hash table has to handle them from the first few inserts.</p>
 
-<h3>The fix: each bucket holds a short list</h3>
-<p>Back to the coat check: when two tickets say hook 6, hang both coats on hook 6. To find yours, go to hook 6 and read the name tag on each coat until it's yours.</p>
+<p>The simplest answer is separate chaining. Each bucket holds a short list of key and value pairs, called a chain, and keys that collide share a chain.</p>
 
-<p>In a hash table, each bucket holds a small list of <code>(key, value)</code> pairs. This is called <b>separate chaining</b>, and each list is a <b>chain</b>.</p>
 <ul>
-  <li><b>Insert:</b> hash the key, go to its bucket, and walk the chain. If the key is there, replace its value. If not, add the pair to the chain.</li>
-  <li><b>Look up:</b> hash the key, go to its bucket, and walk the chain comparing each stored key with <code>==</code>.</li>
+  <li><b>Insert:</b> hash the key, go to its bucket and walk the chain. If the key is already there, replace its value. If not, add the pair to the chain.</li>
+  <li><b>Lookup:</b> hash the key, go to its bucket and compare the key with each stored key in turn, until one is equal or the chain ends.</li>
 </ul>
-<p>That's why the table must store the <b>key</b>, not just the value. "cat" and "tac" share bucket 6; the only way to tell them apart is to compare the keys themselves.</p>
 
-<details class="aside another">
-  <summary>Explain it another way: count the handshakes</summary>
-  <p>A collision isn't one key against the table; it's any <em>pair</em> of keys landing together. Picture every key shaking hands with every other key. 10 keys make 45 handshakes, 40 keys make 780, 100 keys make 4,950. Each handshake is a small, independent chance (1 in m) of a shared bucket.</p>
-  <p>With 1,000 buckets, 38 keys already make 703 handshakes, each with a 1-in-1,000 chance. That's like rolling a 1,000-sided die 703 times and hoping for no 1s. The keys grow slowly, but the pairs grow like the square of the keys, which is why collisions arrive near √m.</p>
-</details>
+<p>This is why a hash table stores each key next to its value. The keys "cat" and "tac" share bucket 6, and comparing the stored keys is the only way to tell the two entries apart. A lookup also never leaves its own bucket, so the cost of a lookup is the length of one chain.</p>
 
 <div class="figure">
   <div id="chain-player"></div>
-  <div class="cap">Six inserts and three lookups in a table of 8 buckets, using the toy hash from section 4. Step through it and count the <code>==</code> comparisons each lookup does. Notice that a lookup only ever looks inside one bucket.</div>
+  <div class="cap">Six inserts and three lookups in a chained table of 8 buckets, using <code>toy_hash</code>. Each lookup compares keys in one bucket only.</div>
 </div>
 
-<div class="keyidea"><p>Collisions are guaranteed and start early (after about √m keys). Chaining handles them: each bucket keeps a short list of (key, value) pairs, and a lookup walks only its own bucket's list, comparing keys with <code>==</code>.</p></div>
-
-<div class="check" id="check-collide">
-  <p class="q">You put 5 keys into an empty table with 8 buckets, using a good hash. What's the chance at least two land in the same bucket?</p>
+<div class="check" id="check-collision-odds">
+  <p class="q">Five keys go into an empty table of 8 buckets, with a good hash function. How likely is it that at least two of them share a bucket?</p>
   <div class="opts">
-    <button>About 5%, the table is mostly empty</button>
+    <button>About 5%, because the table is mostly empty</button>
     <button>About 40%</button>
     <button data-correct>About 80%</button>
   </div>
-  <div class="fb right"><p>Yes, 79%. The first key can go anywhere. The second avoids it with chance 7/8, the third 6/8, the fourth 5/8, the fifth 4/8. Multiply: 7/8 × 6/8 × 5/8 × 4/8 ≈ 0.21 chance of <em>no</em> collision, so 79% chance of at least one.</p></div>
-  <div class="fb wrong"><p>Work it out one key at a time, asking "does it miss all the buckets already used?". Key 2 misses key 1's bucket with chance 7/8. Key 3 must miss two used buckets: 6/8. Key 4: 5/8. Key 5: 4/8. All of that has to happen: 7/8 × 6/8 × 5/8 × 4/8 ≈ 0.21. So there's a 79% chance of at least one collision. Many keys means many <em>pairs</em>, and any pair can collide.</p></div>
-</div>
-
-<details class="aside deeper">
-  <summary>Go deeper: why √m, and why chains stay short</summary>
-  <p>With k keys there are k(k−1)/2 pairs, and each pair collides with chance 1/m. Expect about one collision when k²/2 ≈ m, so k ≈ √(2m). The exact 50% point is about 1.18√m.</p>
-  <p>If you put n keys into n buckets at random, about 37% of buckets end up empty (that's 1/e) and the longest chain is surprisingly short. It grows like log n / log log n. In a quick simulation with a million keys in a million buckets, the longest chain was 8. So "average chain length 1" really does mean almost every lookup touches one or two keys.</p>
-</details>
-
-<!-- ============================================================ -->
-<h2 id="s6"><span class="sec-num">6</span>Load factor: how full is too full</h2>
-
-<p>Chaining keeps working however many keys you add. But it doesn't stay <em>fast</em>.</p>
-
-<p>Picture a supermarket with 10 checkout lanes. If 10 shoppers arrive, most lanes have one person and you walk right up. If 1,000 shoppers arrive, every lane has about 100 people, and you wait behind all of them. The number of lanes didn't change. The <b>ratio</b> of shoppers to lanes did.</p>
-
-<p>Now with real numbers. Put our 10 million names into a table with only 1,000 buckets. Each chain holds about 10,000 names. Checking a new name means walking its whole chain: 10,000 comparisons. That's 1,000 times better than the plain list, but nowhere near one step. We've built a list cut into 1,000 pieces.</p>
-
-<p>The ratio that decides everything is called the <b>load factor</b>, written α (the Greek letter alpha):</p>
-<p style="text-align:center" class="big-number">α = n / m = keys ÷ buckets</p>
-<p>It's the average chain length. With a good hash:</p>
-<ul>
-  <li>looking up a key that <b>isn't</b> there walks a whole chain: about <b>1 + α</b> steps (1 to find the bucket, α keys to compare);</li>
-  <li>looking up a key that <b>is</b> there stops halfway on average: about <b>1 + α/2</b> steps.</li>
-</ul>
-<p>So the speed of a hash table depends only on α, <em>not on n</em>. Keep α below some small constant like 1, and every lookup is O(1) on average, whether there are ten keys or ten million. That's the answer to section 1's puzzle.</p>
-
-<p>One more thing the figure below shows. When m is a power of two, like 16, <code>hash % 16</code> keeps only the last 4 binary digits of the hash, just as <code>123,456 % 100</code> keeps only the last two decimal digits, 56. Tables like power-of-two sizes because that remainder is one fast bit-mask. The catch: the bucket then depends on the last few bits alone, so keys whose last bits are all the same (like multiples of 16) all land together. Some tables use prime sizes instead, which mixes in every digit but costs a slower division.</p>
-
-<div class="figure">
-  <div class="viz-stage">
-    <div class="viz-controls" style="margin-top:0">
-      <span class="small">keys n =</span><input type="range" id="lf-n" min="0" max="160" value="24" style="width:200px"><b id="lf-nval"></b>
-      <label class="small">buckets m = <select id="lf-m"><option>8</option><option selected>16</option><option>32</option><option>64</option></select></label>
-      <label class="small">keys are <select id="lf-keys"><option value="rand">random</option><option value="mult">multiples of 16</option></select></label>
-    </div>
-    <svg class="viz" id="lf-svg" viewBox="0 0 640 200" style="margin-top:8px"></svg>
-    <div class="viz-caption" id="lf-msg"></div>
-  </div>
-  <div class="cap">Each bar is one bucket; its height is the chain length. Slide n up and watch the average and the longest chain grow. Then raise m and watch them fall: only the ratio n/m matters. Last, switch the keys to "multiples of 16" with m = 16 and see what a hash that looks only at the last few bits does with patterned keys.</div>
-</div>
-
-<div class="keyidea"><p>The <b>load factor</b> α = n/m is the average chain length. Lookup cost is about 1 + α, so it depends on how <em>full</em> the table is, not how <em>big</em>. Keep α bounded and lookups stay O(1) on average.</p></div>
-
-<div class="check" id="check-load">
-  <p class="q">A chained table has 1,000,000 keys in 1,000 buckets, with a good hash. About how many key comparisons does looking up a <em>missing</em> key take?</p>
-  <div class="opts">
-    <button>About 1, hash maps are O(1)</button>
-    <button data-correct>About 1,000</button>
-    <button>About 1,000,000</button>
-  </div>
-  <div class="fb right"><p>Right. α = 1,000,000 / 1,000 = 1,000 keys per chain, and a missing key has to be compared against its whole chain. O(1) only holds while α stays small. The next section is how real tables make sure it does.</p></div>
-  <div class="fb wrong"><p>Picture the checkout lanes: 1,000,000 shoppers, 1,000 lanes, so about 1,000 per lane. A missing key goes to <em>one</em> bucket (not all of them, so not a million), but it must compare against every key in that bucket to be sure it's absent. That's about 1,000. "Hash maps are O(1)" is only true when the table keeps the keys-per-bucket ratio small.</p></div>
+  <div class="fb right"><p>Each new key has to miss every bucket already in use.</p>
+<pre class="plain"><code>chance of no collision
+7/8 × 6/8 × 5/8 × 4/8 ≈ 0.21</code></pre>
+<p>That leaves a 79% chance that two of the keys share a bucket.</p></div>
+  <div class="fb wrong"><p>Count pairs of keys instead of keys. Five keys form 10 pairs, and each pair shares a bucket with a chance of 1 in 8. That many chances make a collision far more likely than not, and the exact figure is 79%.</p></div>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="s7"><span class="sec-num">7</span>Resizing: growing without losing O(1)</h2>
+<h2 id="s6"><span class="sec-num">6</span>Load factor: what keeps lookups O(1)</h2>
 
-<p>We don't know in advance how many keys are coming. So the table starts small and grows. The rule is: when adding a key would push α past a limit (Java uses 0.75), make a bigger table, about twice the size, and move everything over.</p>
+<p>The cost of a lookup in a chained hash table depends on how full the table is, and not on how many keys it holds.</p>
 
-<h3>Why every key has to move</h3>
-<p>You can't just copy the buckets across in order. A key's bucket is <code>hash(key) % m</code>, and m just changed. "dog" was in bucket 99,644 % 8 = 4. In a table of 16, it belongs in 99,644 % 16 = <b>12</b>. Copy the old buckets over unchanged and a later lookup for "dog" would go to bucket 12 and find nothing.</p>
-<p>Not every key moves. "cat" (98,262) and "tac" (114,582) both stay in bucket 6, because both numbers leave remainder 6 when divided by 16 as well. When a power-of-two table doubles, each key either stays at slot i or moves to exactly i + m (the old size). Which one depends on a single binary digit of its hash: the one that the new, bigger mask lets through. On average half the keys move. Java's <code>HashMap</code> uses this to split each bucket into a "stay" list and a "move" list without recomputing any remainders.</p>
-<p>So a resize <b>rehashes</b> every key: work out its new bucket and put it there. It's the coat check moving to a room with twice the hooks: every ticket number changes, so every coat gets re-hung.</p>
+<p>Fullness is measured by the load factor, which is the number of keys divided by the number of buckets. It is written α, the Greek letter alpha, and it is also the average length of a chain.</p>
 
-<h3>Doesn't that make inserts slow?</h3>
-<p>One resize touches every key, so that one insert is O(n). But resizes are rare, and they get rarer as the table grows. This is exactly the amortized argument from <a href="../../02-algorithms/concepts/complexity.html#s7">the complexity chapter</a>. Here are the real numbers for 1,000 inserts, starting with 8 buckets and growing at α = 0.75:</p>
+<pre class="plain"><code>α = n / m                      n keys in m buckets
 
-<div class="table-wrap"><table class="steps-table">
-  <thead><tr><th>resize when inserting key #</th><th>table grows</th><th>keys moved</th></tr></thead>
+lookup of an absent key        about α comparisons
+lookup of a present key        about 1 + α/2 comparisons</code></pre>
+
+<p>An absent key costs one step to reach its bucket and then a comparison with every key in the chain, which holds α keys on average. A present key is found partway along its chain, which also holds about α other keys. Keys join a chain in the order they arrive, so on average half of them sit ahead of it, and a lookup compares each of them before the key itself.</p>
+
+<p>Two table sizes show what this means for 10 million names.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Buckets</th><th>Load factor</th><th>Comparisons to check a new name</th></tr></thead>
   <tbody>
-    <tr><td>7</td><td>8 → 16</td><td>6</td></tr>
-    <tr><td>13</td><td>16 → 32</td><td>12</td></tr>
-    <tr><td>25</td><td>32 → 64</td><td>24</td></tr>
-    <tr><td>49, 97, 193, 385</td><td>… → 1,024</td><td>48 + 96 + 192 + 384</td></tr>
-    <tr><td>769</td><td>1,024 → 2,048</td><td>768</td></tr>
-    <tr><td colspan="2"><b>total for 1,000 inserts</b></td><td><b>1,530</b>, about 1.5 moves per insert</td></tr>
+    <tr><td>1,000</td><td>10,000</td><td>about 10,000</td></tr>
+    <tr><td>20,000,000</td><td>0.5</td><td>0.5 on average</td></tr>
   </tbody>
 </table></div>
 
-<p>Each resize moves about as many keys as all the earlier resizes put together, plus a few. So the total stays under 2n, which is O(1) extra per insert, on average over the whole run. If you grew by a fixed amount instead (say, 8 more buckets each time), you'd resize every few inserts and move everything each time: O(n²) total. <b>Growing by a multiple is what keeps it constant.</b></p>
+<p>With 1,000 buckets the table is little more than a list cut into 1,000 pieces. With 20 million buckets most chains hold one name or none. A table that keeps its load factor under a fixed limit therefore answers a lookup in O(1) on average, which is why the set in section 1 did the same work at ten names and at ten million.</p>
 
-<details class="aside another">
-  <summary>Explain it another way: count backwards from the last resize</summary>
-  <p>Look at the table right after its last resize, holding about n keys. That resize moved every key: about n. The one before moved n/2, the one before that n/4, and so on. Add them up: n + n/2 + n/4 + … never reaches 2n. Each resize moves about as many keys as all the earlier ones combined, so the whole history costs less than two trips through the keys. Spread over n inserts, that's under two moves each.</p>
-</details>
+<div class="keyidea"><p>A hash map is fast because its load factor is bounded, not because hashing is fast.</p></div>
 
-<div class="keyidea"><p>When α passes a limit, the table grows by a multiple (usually 2×) and rehashes every key, because each key's bucket depends on m. One insert pays O(n), but the total over n inserts stays under about 2n moves: <b>amortized O(1)</b>.</p></div>
-
-<div class="check" id="check-resize">
-  <p class="q">When the table doubles from 8 to 16 buckets, why can't it copy bucket 0 to bucket 0, bucket 1 to bucket 1, and so on?</p>
+<div class="check" id="check-load-factor">
+  <p class="q">A chained table holds 1,000,000 keys in 1,000 buckets, with a good hash function. About how many key comparisons does a lookup of an absent key take?</p>
   <div class="opts">
-    <button>It could; that's just slower than rehashing</button>
-    <button data-correct>Each key's bucket is hash % m, so with a new m many keys belong in a different bucket</button>
-    <button>The old buckets have to be freed before the new ones exist</button>
+    <button>About 1, because hash maps are O(1)</button>
+    <button data-correct>About 1,000</button>
+    <button>About 1,000,000</button>
   </div>
-  <div class="fb right"><p>Right. Lookups in the new table compute hash % 16. A key sitting where hash % 8 put it may be in the wrong place for that, and would never be found.</p></div>
-  <div class="fb wrong"><p>Try one key: "dog" hashes to 99,644. In 8 buckets: 99,644 % 8 = 4. In 16 buckets: 99,644 % 16 = 12. If we copied bucket 4 to bucket 4, "dog" would sit in 4, but every future lookup would compute 12 and look there. The key would be lost. The bucket number depends on m, so changing m means recomputing every key's bucket.</p></div>
+  <div class="fb right"><p>The load factor is 1,000, so the average chain holds 1,000 keys, and an absent key is compared with its whole chain.</p></div>
+  <div class="fb wrong"><p>Follow the lookup. The hash picks one bucket, so the other buckets are never touched and the answer cannot be a million. About 1,000 keys sit in that bucket, and the lookup must compare with all of them before it can report the key absent. O(1) holds only while the table keeps its chains short.</p></div>
 </div>
 
-<details class="aside deeper">
-  <summary>Go deeper: the latency spike, and how real systems avoid it</summary>
-  <p>Amortized O(1) is a promise about the total. The one unlucky insert that triggers a resize of a 10-million-key table still pays for 10 million moves, maybe a second of work, while that request waits. For a web service, that's a p99 latency spike.</p>
-  <p><b>Redis</b> avoids it with <em>incremental rehashing</em>: it keeps the old and new tables side by side and moves a few buckets on every operation (and some more in the background). Lookups check both tables until the move is done. No single request pays for the whole move.</p>
-  <p>Other common answers: <b>pre-size</b> the table when you know roughly how many keys are coming (Java's <code>new HashMap&lt;&gt;(expected)</code>), and remember that most tables <b>never shrink</b>. Delete 9 million of 10 million keys and the table stays big, which wastes memory and makes iterating slow, since iteration walks every bucket: O(n + m), not O(n).</p>
-</details>
-
 <!-- ============================================================ -->
-<h2 id="s8"><span class="sec-num">8</span>Open addressing and the tombstone problem</h2>
+<h2 id="s7"><span class="sec-num">7</span>Resizing and rehashing: amortized O(1) inserts</h2>
 
-<p>Chaining needs a separate little list per bucket, and each list item lives somewhere else in memory. There's another way that keeps everything in the one array: <b>open addressing</b>. Each slot holds at most one key. Python's <code>dict</code> and <code>set</code> work this way.</p>
+<p>A hash table keeps its load factor bounded by growing. When an insert would push the load factor past a limit, the table allocates a larger array, usually twice the size, and moves every key into it.</p>
 
-<p>Picture a parking lot where your ticket says "spot 6". If spot 6 is taken, you try spot 7, then 8, and park in the first free one. To find your car later, start at spot 6 and walk forward until you see it. If you reach an <em>empty</em> spot first, your car isn't in the lot: if it were, you'd have parked it there or earlier.</p>
+<p>The limit is a design choice and not a law. Java's <code>HashMap</code> uses 0.75. A lower limit gives shorter chains and uses more memory.</p>
 
-<p>That's <b>linear probing</b>. Each slot you look at is a <b>probe</b>. "Next slot" wraps around from the end of the array to the start.</p>
-
-<h3>Why it needs a lower load factor</h3>
-<p>Parked cars clump together. A car that finds its spot taken parks just past the clump, so the clump grows, and a bigger clump catches even more cars. This is called <b>clustering</b>. It means the cost grows much faster than α, and explodes near full. The expected number of probes for linear probing:</p>
+<p>Every key has to be placed again, because a key's bucket depends on m and m has just changed. Working out each key's bucket in the new array is called rehashing.</p>
 
 <div class="table-wrap"><table>
-  <thead><tr><th>load factor α</th><th>find a key that's there</th><th>find a key that isn't</th></tr></thead>
+  <thead><tr><th>Key</th><th>Hash</th><th>Bucket in a table of 8</th><th>Bucket in a table of 16</th></tr></thead>
+  <tbody>
+    <tr><td>"dog"</td><td>99,644</td><td>99,644 % 8 = 4</td><td>99,644 % 16 = 12</td></tr>
+    <tr><td>"cat"</td><td>98,262</td><td>98,262 % 8 = 6</td><td>98,262 % 16 = 6</td></tr>
+  </tbody>
+</table></div>
+
+<p>After the table doubles, a lookup for "dog" searches bucket 12. Had the old buckets been copied across unchanged, "dog" would still be in bucket 4 and no lookup would find it. Some keys, such as "cat", happen to keep their bucket.</p>
+
+<p>A resize moves all n keys, so the one insert that triggers it costs O(n). Taken together, inserts stay cheap because doubling makes resizes rare, which is the <a href="../../02-algorithms/concepts/complexity.html#s7">amortized analysis</a> from the complexity chapter. Here are 1,000 inserts into a table that starts with 8 buckets and grows at a load factor of 0.75.</p>
+
+<div class="table-wrap"><table class="steps-table">
+  <thead><tr><th>Resize at insert number</th><th>Buckets</th><th>Keys moved</th></tr></thead>
+  <tbody>
+    <tr><td>7</td><td>8 to 16</td><td>6</td></tr>
+    <tr><td>13</td><td>16 to 32</td><td>12</td></tr>
+    <tr><td>25</td><td>32 to 64</td><td>24</td></tr>
+    <tr><td>49, 97, 193, 385</td><td>64 to 1,024, in four steps</td><td>48 + 96 + 192 + 384</td></tr>
+    <tr><td>769</td><td>1,024 to 2,048</td><td>768</td></tr>
+    <tr><td colspan="2"><b>Total for 1,000 inserts</b></td><td><b>1,530</b></td></tr>
+  </tbody>
+</table></div>
+
+<p>The 1,000 inserts cause 1,530 moves, about one and a half per insert. Each resize moves about as many keys as all the earlier resizes combined, so the total stays below twice the number of inserts however long the run is. Spread over all the inserts, the extra cost is O(1) each, and that is what "amortized O(1)" means.</p>
+
+<p>Growing by a multiple is what makes this work. Here are the same inserts with a fixed step of 8 buckets.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Growth rule</th><th>Resizes</th><th>Keys moved</th></tr></thead>
+  <tbody>
+    <tr><td>Double the buckets</td><td>8</td><td>1,530</td></tr>
+    <tr><td>Add 8 buckets</td><td>166</td><td>83,166</td></tr>
+  </tbody>
+</table></div>
+
+<p>A fixed step resizes every few inserts and moves every key each time, which is O(n²) in total.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: what a resize costs in real systems</summary>
+  <p>Amortized O(1) is a statement about the total. The single insert that triggers a resize of a 10-million-key table still moves 10 million keys, and the request that issued it waits for a few hundred milliseconds. In a web service that shows up as a spike in tail latency.</p>
+  <p>Redis avoids the spike with incremental rehashing. It keeps the old and new tables side by side and moves one bucket on every operation, and lookups check both tables until the move is finished. Where the number of keys is known in advance, the simpler answer is to create the table at its final size, which Java, Go, Rust and C++ allow and Python does not. Java's constructor takes a bucket count, not a key count, and rounds it up to a power of two, so <code>new HashMap&lt;&gt;(1000)</code> gets 1,024 buckets and still resizes at its 769th key. Since Java 19, <code>HashMap.newHashMap(1000)</code> sizes the table for 1,000 keys.</p>
+  <p>Java and CPython keep each key's hash, so a resize places every key again without calling the hash function, and a lookup runs the equality test only on keys whose stored hash matches.</p>
+  <p>Most tables never shrink. A table that has lost most of its keys keeps all its buckets, and iterating over it still visits every one of them, which costs O(n + m).</p>
+</details>
+
+<div class="check" id="check-rehash">
+  <p class="q">When a table doubles from 8 to 16 buckets, why can it not copy bucket 0 to bucket 0, bucket 1 to bucket 1, and so on?</p>
+  <div class="opts">
+    <button data-correct>A key's bucket is its hash modulo m, so with a new m many keys belong in a different bucket</button>
+    <button>It could, and rehashing is only a speed optimization</button>
+    <button>The hash function changes with the table size, so every key needs a new hash</button>
+  </div>
+  <div class="fb right"><p>Lookups in the new table take the hash modulo 16. A key left where modulo 8 put it may sit in a bucket that no lookup for it will ever visit.</p></div>
+  <div class="fb wrong"><p>Trace one key. In a table of 8 buckets "emu" is in bucket 5, and in a table of 16 its hash points to bucket 13. Copied straight across, "emu" would sit in bucket 5 while every later lookup searched bucket 13. Changing m means working out every key's bucket again, although each key's hash stays the same.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Open addressing: linear probing and tombstones</h2>
+
+<p>Open addressing handles collisions without chains. Every key is stored in the array itself, one key to a slot, so a lookup never walks a chain. A key whose slot is occupied goes to a different slot.</p>
+
+<p>Python's <code>dict</code> and <code>set</code> use open addressing. The simplest form, and the one this section builds, is linear probing. The slot that the hash picks is the key's home slot. If the home slot is occupied, the insert tries the next slot and then the one after it, wrapping around from the end of the array to the start, and it stores the key in the first empty slot it finds. Each slot examined is called a probe.</p>
+
+<p>A lookup follows the same path. It starts at the home slot and walks forward until it finds the key or reaches an empty slot. An empty slot proves that the key is absent, because an insert of that key would have stopped there. In a table of 8 slots the keys "cat", "tac" and "pig" all have home slot 6.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Operation</th><th>What the probes find</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>Insert "cat"</td><td>slot 6 is empty</td><td>stored in slot 6</td></tr>
+    <tr><td>Insert "tac"</td><td>slot 6 holds "cat"</td><td>stored in slot 7</td></tr>
+    <tr><td>Look up "tac"</td><td>slot 6 holds "cat", slot 7 holds "tac"</td><td>found after 2 probes</td></tr>
+    <tr><td>Look up "pig"</td><td>slots 6 and 7 hold other keys, slot 0 is empty</td><td>absent after 3 probes</td></tr>
+  </tbody>
+</table></div>
+
+<p>The lookup of "pig" wraps around to slot 0, finds it empty and stops.</p>
+
+<h3>Clustering</h3>
+
+<p>Linear probing needs a lower load factor than chaining, because runs of occupied slots feed on themselves. Such a run is called a cluster. A new key whose home slot lies anywhere inside a cluster walks to the end of it and makes the cluster one slot longer, and a longer cluster catches more new keys. The number of probes therefore climbs much faster than the load factor does.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Load factor</th><th>Probes to find a present key</th><th>Probes to report a key absent</th></tr></thead>
   <tbody>
     <tr><td>0.50</td><td>1.5</td><td>2.5</td></tr>
-    <tr><td>2/3 (Python's limit)</td><td>2.0</td><td>5.0</td></tr>
+    <tr><td>2/3</td><td>2.0</td><td>5.0</td></tr>
     <tr><td>0.75</td><td>2.5</td><td>8.5</td></tr>
     <tr><td>0.90</td><td>5.5</td><td>50.5</td></tr>
   </tbody>
 </table></div>
-<details class="aside another">
-  <summary>Explain it another way: a traffic jam</summary>
-  <p>A short jam on a highway is easy to pass. But each car that arrives at the back of the jam stops and makes it longer, and a longer jam catches more arriving cars. Two jams that grow into each other become one huge jam. A cluster in linear probing works the same way: any key whose home slot is <em>anywhere</em> in the cluster joins the end of it. So big clusters grow faster than small ones, and the cost rises much faster than the table fills.</p>
-  <p>The textbook fixes spread out the walk: <b>quadratic probing</b> tries slots 1, 4, 9, 16 … away from home, and <b>double hashing</b> uses a second hash to pick the step size, so two keys with the same home take different paths. Python's scrambled probe order (see "Go deeper" below) is in the same spirit.</p>
-</details>
 
-<p>That's why open-addressing tables resize earlier than chaining ones. Python's <code>dict</code> grows at about 2/3 full. (With chaining, α can go past 1 and things just get gradually slower; with open addressing, α can never pass 1, since each slot holds one key.)</p>
+<p>A table that is nine tenths full needs about 50 probes to report a key absent, twenty times as many as a table that is half full. Open-addressing tables therefore grow well before they are full, and Python's <code>dict</code> grows when it is about two thirds full.</p>
 
-<h3>Deleting: the hard part</h3>
-<p>Say "cat" wants slot 6 and gets it. Then "tac" also wants slot 6, finds it taken, and parks in slot 7. Now delete "cat" by emptying slot 6. Look up "tac": start at slot 6, find it <b>empty</b>, and stop. "Empty means not here," so "tac" looks missing, even though it's sitting in slot 7.</p>
+<h3>Deletion and tombstones</h3>
 
-<p>The fix: deleting leaves a marker, called a <b>tombstone</b>, that says "something used to be here, keep walking". Lookups walk past tombstones. A real empty slot is still the only thing that ends a search.</p>
-<p>Inserts may reuse a tombstone's slot, but carefully. Say "cat" is deleted (slot 6 is a tombstone) and you insert "tac" again to change its value. If you drop "tac" into the first tombstone you meet, you now have two copies: the new one in slot 6, the old one still in slot 7. An insert must keep walking until it finds the key or an empty slot, and only then use the first tombstone it passed.</p>
-<p>Tombstones have a cost too: they don't hold keys, but they still make searches walk further. A table that sees lots of inserts and deletes can fill up with them. So tables count tombstones toward the "how full" limit. When that limit is hit, the table is rebuilt: only live keys are re-inserted, and the new size is chosen from the <em>live</em> keys. A table that's mostly tombstones is rebuilt at the same size, clean, rather than doubled for no reason.</p>
+<p>Deletion is the hard part of open addressing, because emptying a slot can cut the path to keys stored beyond it. The fix is a tombstone, a marker left in a deleted key's slot that tells a search to keep walking.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>How "cat" is deleted from slot 6</th><th>The next lookup of "tac", stored in slot 7</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>The slot is emptied</td><td>slot 6 is empty, so the search stops</td><td>reported absent, which is wrong</td></tr>
+    <tr><td>The slot gets a tombstone</td><td>slot 6 is a tombstone, so the search goes on to slot 7</td><td>found after 2 probes</td></tr>
+  </tbody>
+</table></div>
+
+<p>Only a truly empty slot ends a search, so the tombstone in slot 6 keeps the lookup walking to "tac" in slot 7.</p>
+
+<p>Tombstones add two rules. An insert may reuse a tombstone's slot, but only after walking on to an empty slot to confirm that the key is not stored further along, or the table could end up holding the same key twice. Tombstones hold no key but still lengthen the searches that pass them, so they count toward the load factor limit, and when it is reached the table is rebuilt from its live keys.</p>
 
 <div class="figure">
   <div class="viz-stage">
     <div class="viz-controls" style="margin-top:0">
-      <input id="hm-key" type="text" placeholder="key, e.g. cat" maxlength="12" style="width:130px">
+      <input id="hm-key" type="text" aria-label="Key" placeholder="key, e.g. cat" maxlength="12" style="width:130px">
       <button class="btn primary" id="hm-put">Insert</button>
       <button class="btn" id="hm-get">Look up</button>
       <button class="btn" id="hm-del">Delete</button>
@@ -397,56 +380,64 @@ for c in "banana":
       <label class="small">grow when α passes <select id="hm-lf"><option>0.5</option><option selected>0.75</option><option value="99">never</option></select></label>
     </div>
     <div style="margin-top:12px"><div id="hm-table"></div></div>
-    <div class="viz-caption" id="hm-msg"></div>
-    <div class="legend"><span><i style="background:var(--accent)"></i>found / just written</span><span><i style="background:var(--warn)"></i>probed and walked past</span><span><i style="background:var(--bad)"></i>tombstone ✝</span></div>
+    <div class="viz-caption" id="hm-msg" aria-live="polite"></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>just written</span><span><i style="background:var(--ok)"></i>found</span><span><i style="background:var(--warn)"></i>probed</span><span><i style="background:var(--bad)"></i>tombstone (del)</span></div>
   </div>
-  <div class="cap">The same toy hash, in a real table you can poke (kept to 32 bits, as Java does, so long keys show different hash numbers than Python's <code>toy_hash</code>; the buckets come out the same). Try this: insert <b>cat</b>, then <b>tac</b> (it collides and moves to slot 7). Delete <b>cat</b>, then look up <b>tac</b>: the tombstone in slot 6 keeps the search going. Then switch to chaining and repeat; chaining needs no tombstones.</div>
+  <div class="cap">A table of 8 slots that uses <code>toy_hash</code>, kept to 32 bits as in Java. Insert <b>cat</b> and <b>tac</b>, delete <b>cat</b>, then look up <b>tac</b> and insert <b>pig</b>. The tombstone in slot 6 keeps both searches going, and <b>pig</b> reuses it only after reaching an empty slot. Separate chaining runs the same steps without tombstones.</div>
 </div>
+
+<h3>Separate chaining or open addressing</h3>
+
+<p>Chaining tolerates a high load factor and makes deletion easy. Open addressing is usually faster, because the slots next to a probe come into the CPU's cache together with it, while list nodes are scattered across memory.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th></th><th>Separate chaining</th><th>Open addressing</th></tr></thead>
   <tbody>
-    <tr><td>Collision goes</td><td>into the bucket's list</td><td>into the next free slot</td></tr>
-    <tr><td>Load factor</td><td>can pass 1; slows down gradually</td><td>must stay below 1; usually grows at 0.5–0.9</td></tr>
-    <tr><td>Delete</td><td>remove from the list</td><td>needs tombstones</td></tr>
-    <tr><td>Memory</td><td>a small list per bucket, scattered</td><td>one flat array</td></tr>
-    <tr><td>Speed in practice</td><td>each chain step can jump anywhere in memory</td><td>probes are neighbors, so they're often already loaded by the CPU</td></tr>
-    <tr><td>Used by</td><td>Java <code>HashMap</code>, C++ <code>std::unordered_map</code></td><td>Python <code>dict</code>/<code>set</code>, Go maps (since 1.24), Rust <code>HashMap</code></td></tr>
+    <tr><td>A colliding key goes</td><td>into the bucket's chain</td><td>to the next free slot</td></tr>
+    <tr><td>Load factor</td><td>can pass 1, and lookups slow down gradually</td><td>must stay below 1, and tables grow at 0.5 to 0.9</td></tr>
+    <tr><td>Deletion</td><td>removes the pair from the chain</td><td>leaves a tombstone</td></tr>
+    <tr><td>Memory</td><td>a separate list for each bucket</td><td>one flat array</td></tr>
+    <tr><td>Used by</td><td>Java <code>HashMap</code>, C++ <code>std::unordered_map</code></td><td>Python <code>dict</code> and <code>set</code>, Rust <code>HashMap</code>, Go maps since 1.24</td></tr>
   </tbody>
 </table></div>
 
-<div class="keyidea"><p><b>Open addressing</b> keeps one key per slot and walks to the next slot on a collision. An empty slot ends a search, so deleting must leave a <b>tombstone</b> instead of an empty slot, or keys further along the walk get lost.</p></div>
-
-<div class="check" id="check-tomb">
-  <p class="q">With linear probing, "tac" sits in slot 7 because "cat" had slot 6. You delete "cat" by setting slot 6 back to empty. What happens on the next lookup of "tac"?</p>
-  <div class="opts">
-    <button>It's found, since it's still in slot 7</button>
-    <button data-correct>It's reported missing: the search starts at slot 6, sees empty, and stops</button>
-    <button>The table moves "tac" back to slot 6 automatically</button>
-  </div>
-  <div class="fb right"><p>Right. The search rule "empty means it isn't here" is what makes misses fast, and it's exactly what deleting breaks. A tombstone in slot 6 would say "keep walking".</p></div>
-  <div class="fb wrong"><p>Follow the lookup step by step, the way the computer does. "tac" hashes to slot 6. The search looks at slot 6: empty. The rule says that if "tac" were in the table, it would have parked here or at a later slot before any gap, so an empty slot means "not here", and the search stops. It never gets to slot 7. Nothing moves keys around on its own. That's why a delete must leave a tombstone, which tells the search to keep going.</p></div>
-</div>
-
 <details class="aside deeper">
-  <summary>Go deeper: what Python's dict actually does</summary>
-  <p>CPython's <code>dict</code> uses open addressing, but not plain "next slot". It probes in a scrambled order, roughly <code>i = (5·i + 1 + perturb) % m</code>, where <code>perturb</code> starts as the full hash and shifts right by 5 bits each step. (Python's <code>set</code> first checks a few neighboring slots, for the cache, then scrambles.) Every bit of the hash eventually affects where it looks, so keys that only differ in their high bits still spread out.</p>
-  <p>Since Python 3.6, a dict is two arrays: a small sparse array of slot indexes, and a dense array of entries in insertion order. That's why dicts remember insertion order (guaranteed since 3.7) and why they use less memory than before. The table grows when it's about 2/3 full, to roughly 3× the number of live keys rounded up to a power of two.</p>
-  <p>Newer designs push open addressing further. <b>Robin Hood hashing</b> lets a key that's far from home take a slot from one that's close to home, which keeps all walks short. <b>Swiss tables</b> (Google's Abseil, Rust's <code>HashMap</code>, Go 1.24 maps) keep a tiny summary byte per slot and check a group of 8 or 16 slots at once, often with a single CPU instruction.</p>
+  <summary>Go deeper: Python's dict, other designs, and the cache</summary>
+  <p>CPython's <code>dict</code> does not probe the next slot. It visits slots in a scrambled order that comes to depend on every bit of the hash, so keys with the same home slot soon take different paths.</p>
+  <pre class="plain"><code># perturb starts as the full hash
+perturb = perturb >> 5
+i = (5 * i + 1 + perturb) % m</code></pre>
+  <p>Since Python 3.6 a dict is two arrays: a sparse array of indexes, which is the part that gets probed, and a dense array of entries in insertion order. That layout is why a dict preserves insertion order, which the language has guaranteed since 3.7.</p>
+  <p>Quadratic probing and double hashing are the textbook ways to reduce clustering. Swiss tables, used by Abseil, Rust and Go, store one summary byte per slot and test a group of 8 or 16 slots at once.</p>
+  <p>Linear probing can also delete without tombstones. Backward-shift deletion moves later keys of the cluster back into the emptied slot, as long as no key moves before its home slot, so no gap is left on any key's path.</p>
+  <p>The cache also explains why a big table is slower than a small one although each lookup does the same work. With a different name on each check, a lookup in the set of 10 million names took about 150 nanoseconds, against about 20 in a set of ten names, because most of the big table is not in the cache.</p>
 </details>
 
+<div class="check" id="check-tombstone-insert">
+  <p class="q">With linear probing, "tac" is in slot 7 because "cat" held slot 6. Then "cat" is deleted and slot 6 gets a tombstone. Where does an insert of "tac" with a new value go?</p>
+  <div class="opts">
+    <button>Into slot 6, the first slot it can reuse</button>
+    <button data-correct>Into slot 7, replacing the old value</button>
+    <button>Into slot 0, the first empty slot</button>
+  </div>
+  <div class="fb right"><p>The insert walks past the tombstone, finds "tac" in slot 7 and replaces its value there. A tombstone is reused only by a key that the walk has shown is not already stored.</p></div>
+  <div class="fb wrong"><p>Picture the insert stopping at slot 6. The table would then hold "tac" twice, with the new value in slot 6 and the old one in slot 7, and a later delete would remove only the first copy, so the old value would come back. That is why an insert walks on until it finds the key or an empty slot, and reuses a tombstone only when the key is absent.</p></div>
+</div>
+
 <!-- ============================================================ -->
-<h2 id="s9"><span class="sec-num">9</span>The key contract</h2>
+<h2 id="s9"><span class="sec-num">9</span>Hashable keys: the hash and equality contract</h2>
 
-<p>The whole design so far rests on one promise: a key gets the same bucket on the way in and on the way out. Two habits break that promise, and both are classic interview questions.</p>
+<p>A hash map only works if a key reaches the same bucket when it is looked up as when it was stored. That requirement puts two rules on keys, and breaking either one loses entries without raising any error.</p>
 
-<h3>Rule 1: keys that are equal must hash the same</h3>
-<p>A lookup goes to bucket <code>hash(key) % m</code>, then compares with <code>==</code>. Say two keys are equal (<code>a == b</code>) but have different hashes. Store under <code>a</code>, look up with <code>b</code>: you go to a different bucket, and never even get to the <code>==</code> check. The reverse is fine: two <em>unequal</em> keys may share a hash. That's just a collision, and <code>==</code> sorts it out.</p>
-<p>Python enforces part of this. If your class defines <code>__eq__</code> but not <code>__hash__</code>, Python sets <code>__hash__</code> to <code>None</code> and the class can't be a key at all. Java doesn't: override <code>equals</code> without <code>hashCode</code> and lookups quietly fail.</p>
+<h3>Equal keys must have equal hashes</h3>
 
-<h3>Rule 2: a key must not change while it's in the table</h3>
-<p>Back to the coat check. You hand in your coat, get ticket 6, and then scribble the ticket into a 9. The coat is on hook 6, but you'll ask for hook 9. The coat is still in the room, but nobody can find it.</p>
-<p>Here's that in code. The key is an object whose hash depends on a field that can change:</p>
+<p>A lookup hashes the key to choose a bucket and only then compares keys for equality. If two keys are equal but hash differently, a lookup with the second searches a different bucket from the one that holds the first, and the equality test never runs. The opposite case is harmless, since two unequal keys with the same hash are an ordinary collision.</p>
+
+<p>Python enforces part of this rule. A class that defines <code>__eq__</code> without <code>__hash__</code> has its <code>__hash__</code> set to <code>None</code>, so its objects cannot be used as keys at all. Java does not check. Overriding <code>equals</code> without <code>hashCode</code> compiles, and lookups then fail quietly.</p>
+
+<h3>A key must not change while it is stored</h3>
+
+<p>The table hashes a key when it stores it. If the key's hash changes afterward, a lookup with the changed key searches a different bucket from the one that holds the entry.</p>
 
 <pre><code>class Point:
     def __init__(self, x, y): self.x, self.y = x, y
@@ -455,171 +446,205 @@ for c in "banana":
 
 p = Point(1, 2)
 seen = {p}
-p.x = 99                  # the key changes while it's inside the set
-print(p in seen)          # False: we look in the bucket for (99, 2)
-print(Point(1, 2) in seen)  # False: right bucket, but the stored key is now (99, 2)</code></pre>
+p.x = 99                      # the key changes inside the set
+print(p in seen)              # False
+print(Point(1, 2) in seen)    # False</code></pre>
 
-<p>The entry isn't deleted. It's in the set, but neither the old value nor the new one can reach it. That's why Python refuses to hash lists, sets and dicts (they can change) but hashes tuples, strings, numbers and frozensets (they can't). Use a tuple, like <code>(x, y)</code>, when you want a composite key.</p>
+<p>The first lookup hashes <code>(99, 2)</code> and searches a different bucket. The second reaches the right bucket, where the stored key now equals <code>(99, 2)</code>. The entry is still in the set, but neither value can reach it. This is why Python refuses to hash lists, sets and dicts, which can change, and hashes strings, numbers, tuples and frozensets, which cannot. A key made of several fields is written as a tuple, such as <code>(x, y)</code>.</p>
 
-<p class="small muted">A Python gotcha that follows from rule 1: <code>1 == 1.0 == True</code>, so they must hash the same, and they're the <em>same key</em>. <code>{1: "a", True: "b", 1.0: "c"}</code> is <code>{1: "c"}</code>. Related: adding or removing keys while looping over a dict raises <code>RuntimeError</code>, because a resize could reshuffle what you're walking over. Loop over <code>list(d)</code> instead.</p>
-<p class="small muted">One odd case to know: <code>float("nan") != float("nan")</code>, so NaN is never equal to itself. Python's dict checks "is it the very same object?" before <code>==</code>, so the same NaN object can be found, but a freshly made NaN never can.</p>
+<details class="aside deeper">
+  <summary>Go deeper: four consequences in Python</summary>
+  <p>The values <code>1</code>, <code>1.0</code> and <code>True</code> are equal, so they must hash alike, and they are one key. The dict <code>{1: "a", True: "b", 1.0: "c"}</code> ends up holding a single entry.</p>
+  <p>A NaN is not equal to itself. Python's dict checks whether two keys are the same object before it calls <code>==</code>, so the same NaN object can be found again, but a newly created NaN never matches.</p>
+  <p>Changing the number of keys while looping over a dict raises <code>RuntimeError</code>. The loop checks the size on every step, because an insert could resize the table under it. Looping over <code>list(d)</code> avoids it.</p>
+  <p>An object whose class defines neither <code>__eq__</code> nor <code>__hash__</code> hashes by identity, so changing its fields does not move it, and only that same object finds it again.</p>
+</details>
 
-<div class="keyidea"><p>A key must keep one promise: <b>equal keys have equal hashes, and the key never changes while stored</b>. Break either and entries become unfindable, without any error. That's why dict keys must be immutable: strings, numbers, tuples, frozensets.</p></div>
-
-<div class="check" id="check-key">
-  <p class="q">You use a list as a key in a language that allows it, and later append to the list. What's the most likely result?</p>
+<div class="check" id="check-mutable-key">
+  <p class="q">In Java a list hashes by its contents. A list is used as a <code>HashMap</code> key, and an item is appended to it afterward. What happens?</p>
   <div class="opts">
-    <button>The table moves the entry to the list's new bucket</button>
-    <button>The lookup still works, because it's the same list object</button>
-    <button data-correct>The entry becomes unfindable: lookups go to the bucket for the new contents</button>
+    <button>The table moves the entry to the bucket for the new contents</button>
+    <button>Lookups still work, because it is the same list object</button>
+    <button data-correct>The entry becomes unreachable, because lookups go to the bucket for the new contents</button>
   </div>
-  <div class="fb right"><p>Right. Nobody tells the table the key changed, so the entry stays in its old bucket while every lookup computes the new hash. This is exactly why Python makes lists unhashable.</p></div>
-  <div class="fb wrong"><p>The table only computed the bucket once, when you inserted. It has no idea you appended later, so it can't move anything. Now a lookup hashes the list's <em>current</em> contents and lands in a different bucket. Being the "same object" doesn't help, because the table never gets far enough to compare objects: it looks in the wrong place first. It's the scribbled coat-check ticket: the coat is in the room, on a hook nobody will visit.</p></div>
+  <div class="fb right"><p>Nothing tells the table that the key changed, so the entry stays where its old hash put it while a lookup with the list hashes its new contents. This is the reason Python makes lists unhashable.</p></div>
+  <div class="fb wrong"><p>Follow the numbers. Java hashes the list <code>[1, 2]</code> to 994, so in a table of 16 buckets the entry goes to bucket 2. Appending 3 makes the hash 30,817, and every lookup then searches bucket 1. Nothing moves the entry, and being the same object does not help, because the lookup never reaches bucket 2.</p></div>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="s10"><span class="sec-num">10</span>When O(1) becomes O(n)</h2>
+<h2 id="s10"><span class="sec-num">10</span>Worst case O(n): weak hash functions and hash flooding</h2>
 
-<p>Every "O(1)" in this chapter came with a quiet condition: <em>with a good hash, keys spread evenly</em>. What if they don't?</p>
+<p>Every O(1) in this chapter assumed that the hash function spreads keys evenly. When it does not, a hash map degrades into a list.</p>
 
-<p>Worst case, every key lands in the same bucket. Then the table is one long chain (or, with open addressing, one long cluster). Each lookup is O(n), and inserting n keys is 1 + 2 + … + n = <b>O(n²)</b>. The table is a list again, with extra steps.</p>
+<p>In the worst case every key lands in the same bucket. The table is then a single chain, or a single cluster under open addressing. Each lookup is O(n), and inserting n keys costs O(n²) in total, because each insert first walks past the keys already stored.</p>
 
-<h3>By accident</h3>
-<p>Bad hashes happen. The "add up the letters" hash puts every anagram together. A table of 16 buckets keeps only the last 4 bits of the hash, so keys that are all multiples of 16 (try it in the section 6 figure) all land in bucket 0. Real libraries defend against this by scrambling the hash before using it: Java mixes the high bits into the low bits, and Python's probe order uses every bit.</p>
+<p>A weak hash function can cause this by accident. The hash that only adds character codes puts every anagram of a word into one bucket.</p>
 
-<h3>On purpose: hash flooding</h3>
-<p>Now imagine an attacker who knows your hash function. Web servers often parse a request's form fields into a hash map. The idea was published in 2003 (Crosby and Wallach). In 2011, researchers showed that for most popular web languages (PHP, Java, Python, Ruby, ASP.NET and more), you could compute thousands of field names that all collide. A request with about 100,000 such fields makes the server do around 100,000²/2 = 5 billion key comparisons. One few-megabyte request could tie up a CPU core for close to a minute. That attack is called <b>hash flooding</b>.</p>
+<h3>Hash flooding</h3>
 
-<p>The fix was to make the hash <b>unpredictable</b>. Python picks a random secret at startup and mixes it into every string hash (using a function called SipHash), so <code>hash("cat")</code> changes from one run of Python to the next, and an attacker can't precompute collisions. Java took a different route: when a bucket's chain gets long (8 entries), it turns that chain into a balanced tree, so the worst case per lookup becomes O(log n) instead of O(n). A third, blunt fix ships everywhere too: cap the input, such as limiting how many form fields one request may have (PHP's <code>max_input_vars</code>, Tomcat's <code>maxParameterCount</code>).</p>
+<p>An attacker can also force the worst case on purpose, which is called hash flooding. Web servers commonly parse the fields of a request into a hash map. If the hash function is fixed and public, an attacker can compute thousands of field names that all collide and send them in a single request.</p>
+
+<pre class="plain"><code>100,000 colliding field names
+about 100,000² / 2 = 5 billion key comparisons
+at about 10 ns each, about 50 seconds of CPU</code></pre>
+
+<p>One request of a few megabytes can keep a CPU core busy for close to a minute. The attack was described in 2003, and in 2011 researchers showed that it worked against PHP, Java, Python, Ruby and ASP.NET.</p>
+
+<p>Three defenses followed. Python made its hash unpredictable. It picks a random secret when the process starts and mixes the secret into every string hash, using a function called SipHash, so an attacker cannot compute collisions in advance. Java kept its hash function and limited the damage: a bucket that grows past 8 entries is converted into a <a href="trees.html#s8">balanced tree</a>, which keeps its keys sorted and makes the worst lookup O(log n). Web frameworks also cap the number of fields in one request.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Operation</th><th>Average</th><th>Worst</th><th>Why the worst case happens</th></tr></thead>
   <tbody>
-    <tr><td>look up, insert, delete</td><td>O(1)</td><td>O(n)</td><td>all keys in one bucket (bad hash, or an attacker)</td></tr>
-    <tr><td>one insert that triggers a resize</td><td>O(1) amortized</td><td>O(n)</td><td>it rehashes every key</td></tr>
-    <tr><td>iterate over all keys</td><td>O(n + m)</td><td>O(n + m)</td><td>it visits every bucket, empty or not</td></tr>
-    <tr><td>smallest key, keys in a range</td><td colspan="2">O(n)</td><td>hashing scrambles order on purpose</td></tr>
-    <tr><td>hash one key of length k</td><td>O(k)</td><td>O(k)</td><td>it reads every character (Python caches a string's hash after the first time)</td></tr>
-    <tr><td>space</td><td>O(n)</td><td>O(n)</td><td>plus empty slots: about n/α slots, so a lower load factor means more memory</td></tr>
+    <tr><td>Look up, insert, delete</td><td>O(1)</td><td>O(n)</td><td>every key lands in one bucket</td></tr>
+    <tr><td>Insert, with resizes counted</td><td>O(1) amortized</td><td>O(n)</td><td>the insert that triggers a resize rehashes every key</td></tr>
+    <tr><td>Iterate over all keys</td><td>O(n + m)</td><td>O(n + m)</td><td>it visits every bucket, empty or not</td></tr>
+    <tr><td>Smallest key, or keys in a range</td><td>O(n)</td><td>O(n)</td><td>keys are not sorted</td></tr>
+    <tr><td>Find a value</td><td>O(n)</td><td>O(n)</td><td>only keys are hashed</td></tr>
+    <tr><td>Space</td><td>O(n)</td><td>O(n)</td><td>plus the empty slots, so a lower load factor costs more memory</td></tr>
   </tbody>
 </table></div>
 
-<div class="keyidea"><p>Hash map operations are O(1) <b>on average</b> (because of hashing) and <b>amortized</b> (because of resizing). The worst case is O(n), when keys pile into one bucket. Randomized hashing keeps attackers from forcing that.</p></div>
+<p>An accurate answer keeps three cases apart: O(1) on average, amortized O(1) for inserts, and O(n) in the worst case.</p>
 
-<div class="check" id="check-worst">
-  <p class="q">Python changes <code>hash("cat")</code> every time the program starts. What problem does that solve?</p>
+<details class="aside deeper">
+  <summary>Go deeper: SipHash, patterned keys, integer keys and tree bins</summary>
+  <p>Python's first fix, in 2012, mixed a random seed into its old string hash, and researchers soon showed how to recover the seed. Python 3.4 switched to SipHash, which is designed so that its output does not reveal its key.</p>
+  <p>Java, Python, Go and Rust keep the number of buckets a power of two, because the remainder is then just the low bits of the hash, and reading bits is cheaper than dividing. The catch is that where an integer hashes to itself, as in Python and Java, keys that are all multiples of 16 share bucket 0 of a 16-bucket table. Libraries defend against such patterns by mixing the high bits of the hash into the choice of slot.</p>
+  <p>Python randomizes the hashes of strings and bytes, but not of numbers. An integer hashes to itself, reduced modulo 2⁶¹ − 1, so every number of the form below has hash 1.</p>
+  <pre class="plain"><code>k × (2⁶¹ − 1) + 1        for k = 0, 1, 2, …</code></pre>
+  <p>Building a dict from n such keys takes O(n²) time. If untrusted input becomes integer keys, cap its size or convert the keys to strings.</p>
+  <p>Java's <code>String.hashCode</code> is the toy hash from section 4 and is not randomized, so colliding keys are cheap to make. The strings "Aa" and "BB" both hash to 2,112, so every string made of 17 such two-letter blocks shares one hash: 131,072 field names of 34 characters, about 4.5 MB. That is why Java added tree bins. A bucket becomes a tree only in a table of at least 64 buckets, and when many keys share one hash, the O(log n) bound holds only if they are <code>Comparable</code>.</p>
+</details>
+
+<div class="check" id="check-randomized-hash">
+  <p class="q">Python gives the same string a different hash each time the program starts. What problem does that solve?</p>
   <div class="opts">
     <button>It spreads keys more evenly within one run</button>
-    <button data-correct>An attacker can't work out ahead of time which keys will collide</button>
-    <button>It stops two equal strings from colliding</button>
+    <button data-correct>An attacker cannot work out in advance which keys will collide</button>
+    <button>It shuffles the order of sets, so that code cannot depend on it</button>
   </div>
-  <div class="fb right"><p>Right. Within one run, the hash is still fixed (same key, same number), so the table works normally. Across runs it's a secret, so nobody can precompute a pile of colliding keys and flood your server.</p></div>
-  <div class="fb wrong"><p>Think about who it's hiding from. Inside one run, "cat" hashes the same every time, as it must, and a random secret doesn't make the spread any more even than a good fixed hash would. Equal strings <em>always</em> hash the same; that's the key contract. What changes is that the hash is different on <em>every run</em>, so someone outside can't compute in advance 100,000 field names that land in one bucket. It's a defence against hash flooding.</p></div>
+  <div class="fb right"><p>Within one run the hash is fixed, so the table works as usual. Across runs it depends on a secret, so nobody outside the process can prepare a set of colliding keys.</p></div>
+  <div class="fb wrong"><p>Ask who the secret is kept from. Inside one run a string hashes the same way every time, as the table requires, and a secret spreads keys no better than a good fixed hash does. A set of strings does print in a different order on each run, but only as a side effect. The point is that someone outside the process can no longer compute 100,000 field names that share a bucket.</p></div>
 </div>
 
-<details class="aside deeper">
-  <summary>Go deeper: integers are still predictable</summary>
-  <p>Python only randomizes the hashes of strings and bytes. Integers hash to themselves, reduced modulo 2⁶¹ − 1, so <code>hash(2**61) == hash(1)</code>. Every number of the form k·(2⁶¹ − 1) + 1 has hash 1. Building a dict from a few thousand such keys is hundreds of times slower than from the same number of ordinary ints, and the gap doubles every time n doubles: O(n²) against O(n). If untrusted input becomes integer keys, cap the input size or convert the keys to strings.</p>
-  <p>Java's version of the story: <code>String.hashCode</code> (our toy hash) is not randomized at all, which is why Java added tree bins. A bucket only becomes a tree once it holds 8 entries <em>and</em> the table has at least 64 buckets (below that, Java just resizes), and the O(log n) guarantee only holds if the keys are <code>Comparable</code>.</p>
-  <p>Also: <code>hash(-1) == hash(-2) == -2</code>, because CPython uses −1 internally to mean "error".</p>
-</details>
-
 <!-- ============================================================ -->
-<h2 id="s11"><span class="sec-num">11</span>Hash maps as a tool, and when not to use one</h2>
+<h2 id="s11"><span class="sec-num">11</span>Hash map patterns, and when to use another structure</h2>
 
-<p>In interviews, the hash map is usually the trick that turns O(n²) into O(n). The move is always the same: <b>spend memory to remember something, so you never have to search for it again</b>. It shows up in four shapes:</p>
+<p>In an interview a hash map is most often the step that turns an O(n²) solution into an O(n) one. It does so by remembering what has already been seen, so that nothing has to be searched for twice.</p>
+
+<p>The signal in a problem is a brute-force solution with two nested loops, where the inner loop only searches for one thing. A lookup replaces that search. Four patterns cover most of these problems.</p>
 
 <div class="table-wrap"><table>
-  <thead><tr><th>Pattern</th><th>The question you ask the map</th><th>Classic problem</th></tr></thead>
+  <thead><tr><th>Pattern</th><th>What the map remembers</th><th>Classic problem</th></tr></thead>
   <tbody>
-    <tr><td><b>Seen it?</b></td><td>"Have I met the partner of this item before?"</td><td>Two Sum: for each x, look for target − x among the items already passed</td></tr>
-    <tr><td><b>Group by a label</b></td><td>"Which group does this item belong to?" The label is a key that's equal for things that belong together.</td><td>Group Anagrams: the label is the word's letters, sorted ("eat" → "aet")</td></tr>
-    <tr><td><b>Count</b></td><td>"How many times so far?"</td><td>First unique character, top-k frequent words (<code>collections.Counter</code>)</td></tr>
-    <tr><td><b>Running total</b></td><td>"How many earlier prefixes had exactly this sum?"</td><td>Count subarrays that sum to k, even with negative numbers</td></tr>
+    <tr><td><b>Seen before</b></td><td>each item already passed</td><td>Two Sum: for each x, look up target − x</td></tr>
+    <tr><td><b>Group by key</b></td><td>the items that share each label</td><td>Group Anagrams: the label is the word's letters in sorted order</td></tr>
+    <tr><td><b>Count</b></td><td>how many times each item has appeared</td><td>Top-k frequent words, with <code>collections.Counter</code></td></tr>
+    <tr><td><b>Prefix sums</b></td><td>for each prefix sum, which is the total of the items up to a position, how many earlier positions had it</td><td>Count the subarrays that sum to k: a subarray sums to k when the prefix sums at its two ends differ by k</td></tr>
   </tbody>
 </table></div>
 
-<p>The tell in a problem statement: a brute force that loops over pairs, where the inner loop is really just <em>searching</em> for something specific. Replace that search with a lookup.</p>
+<p>Each pattern spends O(n) extra memory to remove the inner loop.</p>
 
-<h3>When it's the wrong tool</h3>
+<p>A hash map is the wrong structure in four situations.</p>
+
 <ul>
-  <li><b>You need order.</b> "Smallest key", "next key after x", "all keys between a and f": hashing scrambles order on purpose, so these are O(n). Use a sorted structure (a balanced tree, a sorted list with binary search, a skip list).</li>
-  <li><b>The keys are small and dense.</b> Letters, ages, ids from 0 to n: a plain array (direct addressing from section 3) is faster and smaller.</li>
-  <li><b>Memory is tight.</b> Hash tables keep empty slots on purpose. A Python set of our 10 million names has a 268 MB table, three times the list's 89 MB array of pointers. The strings themselves (about 530 MB) are shared, so the whole set costs about 30% more memory than the list. At a billion keys, consider a sorted file, a database index, or a Bloom filter (an approximate set, coming later in chapter 1).</li>
-  <li><b>You need a guaranteed worst case.</b> A hard real-time system can't accept a rare O(n) resize. A balanced tree is O(log n) every time.</li>
+  <li><b>The order of the keys matters.</b> Finding the smallest key, the next key after a given one, or every key in a range costs O(n), because a hash map does not sort its keys. A balanced tree or a sorted array keeps keys in order.</li>
+  <li><b>The keys are small and dense.</b> Letters, ages and ids from 0 to n fit an array with direct addressing, which is faster and smaller.</li>
+  <li><b>Memory is tight.</b> A hash table keeps empty slots on purpose. If the 10 million names rarely change, a sorted list of references to them needs 80 MB against the 268 MB table of a Python set, and still answers a check in 24 comparisons.</li>
+  <li><b>A worst-case bound is required.</b> A hard real-time system cannot accept an occasional O(n) resize, while a balanced tree takes O(log n) on every operation.</li>
 </ul>
 
-<div class="keyidea"><p>Reach for a hash map when a brute force keeps <em>searching</em> for something: remember it instead. Skip it when you need order or ranges, when keys are small dense integers, or when memory or worst-case time is what matters.</p></div>
-
-<div class="check" id="check-tool">
-  <p class="q">You need to support "add an event with a timestamp" and "list all events between 9:00 and 9:05". Which structure fits best?</p>
-  <div class="opts">
-    <button>A hash map from timestamp to event</button>
-    <button data-correct>A structure that keeps timestamps sorted, like a balanced tree</button>
-    <button>A hash map, plus scanning all keys for the range</button>
-  </div>
-  <div class="fb right"><p>Right. A sorted structure finds 9:00 in O(log n) and walks forward until 9:05, touching only the events in the range. That's what hash maps can't do.</p></div>
-  <div class="fb wrong"><p>A hash map can answer "is there an event at exactly 9:03:17?" in O(1). But "between 9:00 and 9:05" needs the keys in <em>order</em>, and a hash map scatters 9:00:01 and 9:00:02 into unrelated buckets on purpose. Scanning all keys works but is O(n) per query, the thing we're trying to avoid. A sorted structure keeps neighbors together, so a range is "find the start, walk forward".</p></div>
-</div>
-
 <details class="aside deeper">
-  <summary>Go deeper: when the map doesn't fit on one machine</summary>
-  <p>A natural way to spread keys over N servers is <code>server = hash(key) % N</code>. It's the same squash as a bucket. And it has the same problem as resizing: change N from 10 to 11 and almost every key's server changes, so almost all the data has to move. <b>Consistent hashing</b> (<a href="../../02-algorithms/concepts/consistent-hashing.html">topic 02.15</a>) fixes that, so adding a server moves only about 1/N of the keys.</p>
-  <p>Shared maps inside one program need care too: two threads inserting at once can corrupt a chain or lose a resize. Java's <code>ConcurrentHashMap</code> locks per bucket and lets reads skip locks. That's in the concurrent structures chapter.</p>
+  <summary>Go deeper: hash maps across threads, machines and files</summary>
+  <p>A hash map that several threads write to needs a lock. A <a href="concurrent-structures.html#s9">concurrent hash map</a>, such as Java's <code>ConcurrentHashMap</code>, locks one part of the table at a time, so writers to different parts do not wait.</p>
+  <p>The natural way to spread keys over N servers is to take the hash modulo N. It has the same flaw as resizing: changing N from 10 to 11 changes the server of almost every key, so almost all the data has to move. <a href="../../02-algorithms/concepts/consistent-hashing.html">Consistent hashing</a> moves only about one key in N.</p>
+  <p>The same split works for a map too big for memory. Write each key to one of k files chosen by its hash, so every copy of a key lands in the same file, and then process each file with an ordinary hash map.</p>
 </details>
+
+<div class="check" id="check-range-query">
+  <p class="q">A service must support two operations: add an event with a timestamp, and list all events between 9:00 and 9:05. Which structure fits best?</p>
+  <div class="opts">
+    <button data-correct>A structure that keeps timestamps sorted, such as a balanced tree</button>
+    <button>A hash map from timestamp to event</button>
+    <button>A hash map, with a scan of all its keys for each range</button>
+  </div>
+  <div class="fb right"><p>A sorted structure finds 9:00 in O(log n) steps and then walks forward to 9:05, touching only the events in the range.</p></div>
+  <div class="fb wrong"><p>A hash map can say in O(1) whether an event exists at exactly 9:03:17. A range needs the keys in order, and a hash map does not sort them. Scanning every key does work, but it costs O(n) per query, which is the cost the structure was meant to avoid.</p></div>
+</div>
 
 <!-- ============================================================ -->
 <h2 id="s12"><span class="sec-num">12</span>What to say in the interview</h2>
 
-<p>When an interviewer asks "why is a dict lookup O(1)?" or "how would you build a hash map?", walk through it in this order. Each step is one or two sentences:</p>
-<ol>
-  <li><b>The trick:</b> "An array reads any slot in one step, because the address is arithmetic. A hash function turns any key into a slot number: <code>hash(key) % m</code>."</li>
-  <li><b>Collisions:</b> "Many keys share a slot, and it starts early, after about √m keys. I'd chain: each bucket holds a short list of key-value pairs, and I compare keys with equality. Or use open addressing, with tombstones for deletes."</li>
-  <li><b>Load factor:</b> "Cost is about 1 + α, where α = n/m. So I keep α below a limit, like 0.75, by doubling the table and rehashing. That's O(n) for one insert but amortized O(1)."</li>
-  <li><b>The fine print:</b> "That's O(1) average, O(n) worst case if keys pile up, which an attacker can force without randomized hashing. And hashing a key of length k costs O(k)."</li>
-  <li><b>The trade-off:</b> "It costs extra memory and throws away order. If I need ranges or a guaranteed worst case, I'd use a balanced tree."</li>
-</ol>
+<p>When asked why a dict lookup is O(1), or how to build a hash map, answer in this order.</p>
 
-<div class="story">
-  <p>"For the sign-up check, I'd keep the names in a hash set. Each check is O(1) on average, about 30 nanoseconds in Python, versus scanning 10 million names. The cost is memory: the table is about three times the list's array of pointers, roughly 30% more overall once you count the names themselves. Python randomizes string hashes, so users can't pick names that collide on purpose. If we outgrow one machine, I'd shard by hash of the name, using consistent hashing so adding a shard doesn't move everything."</p>
-</div>
+<ol>
+  <li><b>Array indexing.</b> "An array reads any slot in one step, because the slot's address is computed. A hash function turns any key into a number, and that number modulo the table size picks the slot."</li>
+  <li><b>Collisions.</b> "Different keys can share a bucket, and that starts early. I would chain, so each bucket holds a short list of key and value pairs and I compare keys for equality. The alternative is open addressing, which usually marks deletes with tombstones."</li>
+  <li><b>Load factor and resizing.</b> "A lookup costs about one step plus the load factor, which is keys divided by buckets. I keep it under a limit such as 0.75 by doubling the table and rehashing. An occasional insert costs O(n), and the amortized cost is O(1)."</li>
+  <li><b>Worst case.</b> "That is O(1) on average. The worst case is O(n) if the keys pile into one bucket, which an attacker can force unless the hash is randomized."</li>
+  <li><b>Trade-off.</b> "A hash map spends extra memory and gives up order. For range queries or a guaranteed worst case I would use a balanced tree."</li>
+</ol>
 
 <!-- ============================================================ -->
 <h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
 <ol>
-  <li>Arrays read slot i in one step: the address is start + i × size. Hash maps exist to get that jump for any key.</li>
-  <li>Direct addressing (key = index) needs a slot per <em>possible</em> key, so it only works for small, dense keys.</li>
-  <li>A hash function turns a key into a number: same key, same number, spread evenly. <code>hash % m</code> picks the bucket.</li>
-  <li>Collisions start after about √m keys (the birthday paradox). Chaining keeps a list per bucket and compares keys with <code>==</code>.</li>
-  <li>Load factor α = n/m is the average chain length; lookup costs about 1 + α. Bounded α means O(1).</li>
-  <li>Resize by doubling and rehash every key (the bucket depends on m). One insert is O(n); n inserts total under 2n moves: amortized O(1).</li>
-  <li>Open addressing walks to the next free slot. An empty slot ends a search, so deletes leave tombstones.</li>
-  <li>Keys: equal keys must hash equal, and keys must not change while stored. Hence immutable keys.</li>
-  <li>O(1) is average; worst case is O(n) when keys pile up. Randomized hashing stops attackers forcing it.</li>
-  <li>Use one when a brute force keeps searching. Not for order or ranges, small dense keys, tight memory, or hard worst-case limits.</li>
+  <li>An array reads slot i in one step because the address is computed. A hash map gives that one-step read to keys of any type.</li>
+  <li>Direct addressing needs a slot for every possible key, so it only suits small, dense keys.</li>
+  <li>A hash function must be deterministic and uniform. The hash modulo the table size picks the bucket.</li>
+  <li>A collision becomes likely after about the square root of m keys. Separate chaining keeps the colliding entries in a list and compares keys for equality.</li>
+  <li>A lookup costs about one step plus the load factor, so a bounded load factor is what makes lookups O(1).</li>
+  <li>Resizing doubles the table and rehashes every key. Doubling keeps the total under two moves per insert, so inserts are amortized O(1) although one insert costs O(n).</li>
+  <li>Linear probing walks forward on a collision. An empty slot ends a search, so deletes leave tombstones.</li>
+  <li>Equal keys must hash alike, and a key must not change while it is stored.</li>
+  <li>The worst case is O(n), when keys pile into one bucket. Randomized hashing stops an attacker from forcing it.</li>
+  <li>A hash map is the wrong structure for ordered or range queries, small dense keys, tight memory or a hard worst-case bound.</li>
 </ol>
 
 <div class="review" id="review"></div>
 
 <!-- ============================================================ -->
 <h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
-<p>Do them in order. Warm-ups are pen and paper: commit to an answer before you open it. Core exercises are code in <code>exercises/</code>, and their tests <b>count how much work your code does</b> (key comparisons, hashes, probes, reads), so a correct but slow answer fails.</p>
+<p>Do them in order. Commit to an answer on paper before opening a warm-up's answer. The core exercises are code in <code>exercises/</code>, and their tests count how much work the code does, so a correct but slow answer fails.</p>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>1. Run a probing table by hand</h4>
-  <p>A table has 8 slots and uses linear probing. The keys' hashes are: A = 3, B = 11, C = 4, D = 19, E = 5. Insert A, B, C, D, E in that order (slot = hash % 8). Then delete B and look up D. Write down the table after each step and every slot the lookup visits.</p>
+  <h4>1. Trace linear probing by hand</h4>
+  <p>A table has 8 slots and uses linear probing. The keys have these hashes: A is 3, B is 11, C is 4, D is 19 and E is 5. Insert A, B, C, D and E in that order, then delete B and look up D. Write down the table after each step and every slot the lookup visits.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>A → 3. B: 11 % 8 = 3, taken, so 4. C: 4 is taken, so 5. D: 19 % 8 = 3, then 4, 5 taken, so 6. E: 5 and 6 taken, so 7. Table: [_, _, _, A, B, C, D, E]. Delete B: slot 4 becomes a tombstone. Look up D: slot 3 (A, no), slot 4 (tombstone, keep going), slot 5 (C, no), slot 6 (D, found). Four probes. If B's slot had been emptied instead, the lookup would stop at slot 4 and wrongly report D missing. Notice C: its home slot 4 was taken by B, a key that didn't even belong there. Keys spill into each other's homes and the run grows: that's clustering.</p>
+    <pre class="plain"><code>insert A    3 % 8 = 3     slot 3
+insert B   11 % 8 = 3     3 is taken, so slot 4
+insert C    4 % 8 = 4     4 is taken, so slot 5
+insert D   19 % 8 = 3     3, 4 and 5 are taken, so slot 6
+insert E    5 % 8 = 5     5 and 6 are taken, so slot 7
+
+table       [ _  _  _  A  B  C  D  E ]
+
+delete B    slot 4 becomes a tombstone
+look up D   slot 3 holds A, slot 4 is a tombstone,
+            slot 5 holds C, slot 6 holds D
+            found after 4 probes</code></pre>
+    <p>Had slot 4 been emptied, the lookup would have stopped there and reported D absent. Key C also shows clustering: its home slot was taken by B, a key that did not belong in that slot either.</p>
   </details>
 </div>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
   <h4>2. Pick the structure</h4>
-  <p>For each, choose an array, a hash map/set, or a sorted structure, and say why in one sentence: (a) count how often each byte value (0–255) appears in a file; (b) check whether a URL has been crawled before, for 50 million URLs; (c) a leaderboard that shows the 10 players just above and below you; (d) cache the result of an expensive function of two integer arguments.</p>
+  <p>For each task, choose an array, a hash map or hash set, or a sorted structure, and give the reason in one sentence.</p>
+  <ol type="a">
+    <li>Count how often each byte value from 0 to 255 appears in a file.</li>
+    <li>Check whether a URL has been crawled before, among 50 million URLs.</li>
+    <li>Show a leaderboard with the 10 players just above and just below a given player.</li>
+    <li>Cache the result of an expensive function of two integer arguments.</li>
+  </ol>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) An array of 256 counters: the keys are small and dense, so direct addressing beats hashing. (b) A hash set: pure membership, no order needed. At this size, mention memory (several GB in Python) and a Bloom filter if "probably crawled" is acceptable. (c) A sorted structure: "just above and below" is an order question. (d) A hash map keyed by the tuple <code>(a, b)</code>: tuples are immutable and hash by their contents (this is what <code>functools.cache</code> does).</p>
+    <ol type="a">
+      <li>An array of 256 counters. The keys are small and dense, so direct addressing beats hashing.</li>
+      <li>A hash set, since the task is pure membership with no order. At this size the memory runs to several gigabytes in Python, and <a href="probabilistic-structures.html#s3">a Bloom filter</a> is worth mentioning if "probably crawled" is acceptable.</li>
+      <li>A sorted structure, because "just above and just below" is a question about order.</li>
+      <li>A hash map keyed by the tuple <code>(a, b)</code>. Tuples are immutable and hash by their contents, which is how <code>functools.cache</code> works.</li>
+    </ol>
   </details>
 </div>
 
@@ -628,79 +653,80 @@ print(Point(1, 2) in seen)  # False: right bucket, but the stored key is now (99
   <h4>3. Find the bug</h4>
 <pre><code>class User:
     def __init__(self, email): self.email = email
-    def __eq__(self, other): return self.email.lower() == other.email.lower()
+    def __eq__(self, other):
+        return self.email.lower() == other.email.lower()
     def __hash__(self): return hash(self.email)</code></pre>
-  <p>Which part of the key contract does this break? Give two <code>User</code> objects that show it, and fix it.</p>
+  <p>Which rule of the key contract does this class break? Give two <code>User</code> objects that show the bug, and fix it.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>Equal keys must have equal hashes. <code>User("A@x.com") == User("a@x.com")</code> is true, but their hashes are computed from different strings, so they (almost always) land in different buckets: put one in a set and the other isn't found. Fix: hash the same thing equality compares, <code>hash(self.email.lower())</code>. Even better, normalize once in <code>__init__</code> and use a frozen dataclass so the email can't change after the user goes into a set.</p>
+    <p>Equal keys must have equal hashes. The objects <code>User("A@x.com")</code> and <code>User("a@x.com")</code> compare equal, but their hashes come from different strings, so they almost always land in different buckets. Put one in a set and the other is not found. The fix is to hash the value that equality compares, which is <code>self.email.lower()</code>. Better still, make <code>User</code> a frozen dataclass and lower-case the email before creating it, so the email cannot change after the user goes into a set.</p>
   </details>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>4. <code>HashMap</code> with separate chaining</h4>
-  <p>Build sections 4 to 7 yourself in <code>exercises/hash_map.py</code>: buckets of (key, value) pairs, <code>put</code>, <code>get</code>, <code>remove</code>, <code>in</code>, <code>len</code>, and doubling when α would pass the limit. No <code>dict</code> or <code>set</code> inside. The tests hand you keys that count every <code>==</code> and every <code>hash()</code> call. Looking up 5,000 keys must take only a few comparisons each, and the table must grow by a multiple, not by a fixed step. It also reports its chain lengths through <code>bucket_sizes()</code>, so the tests can see how long your chains really are.</p>
+  <p>Build sections 4 to 7 in <code>exercises/hash_map.py</code>: buckets of key and value pairs, <code>put</code>, <code>get</code>, <code>remove</code>, <code>in</code>, <code>len</code>, and growth by a multiple when the load factor would pass the limit. No <code>dict</code> or <code>set</code> inside. The tests pass in keys that count every <code>==</code> and every <code>hash()</code> call. Looking up 5,000 keys must take only a few comparisons each, keys spread far apart must all survive the resizes, and the table must grow by a multiple and not by a fixed step. The map also reports its bucket count through <code>capacity</code> and its chain lengths through <code>bucket_sizes()</code>, which the tests read.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>5. <code>ProbingMap</code> with linear probing and tombstones</h4>
-  <p>Build section 8 in <code>exercises/probing_map.py</code>. Count every slot you look at in <code>self.probes</code>. The tests check that deletes don't hide later keys, that 10,000 rounds of insert-then-delete don't leave the table clogged with tombstones or bloated in size, and that lookups average only a few probes.</p>
+  <p>Build section 8 in <code>exercises/probing_map.py</code>, and count every slot examined in <code>self.probes</code>. The tests check that a delete does not hide keys stored further along, that 10,000 rounds of insert and delete leave the table neither clogged with tombstones nor bloated, that inserts stay cheap with every rebuild counted, and that lookups average only a few probes.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>6. Hash map patterns in O(n)</h4>
-  <p>In <code>exercises/hash_patterns.py</code>: <code>two_sum</code>, <code>group_anagrams</code> and <code>subarray_sum_count</code>, one for each of the first, second and fourth patterns in section 11. The tests pass you a list that counts how many times you read from it, and fail if you read it more than a couple of times per item. Comparing every pair reads it about n²/2 times.</p>
+  <p>In <code>exercises/hash_patterns.py</code>, write <code>two_sum</code>, <code>group_anagrams</code> and <code>subarray_sum_count</code>, which use the first, second and fourth patterns from section 11. The tests pass in a list that counts how often it is read, and they fail when a function reads it more than a few times per item. Comparing every pair reads it about half of n² times. The track saves <code>subarray_sum_count</code> for week 2, because it needs <a href="../../02-algorithms/concepts/two-pointers-sliding-window.html#s8">prefix sums</a>, which a later chapter builds.</p>
 </div>
 
 <div class="exercise">
   <div class="tier stretch">Stretch · measure</div>
   <h4>7. Flood a dict</h4>
-  <p>Using the fact from section 10's "Go deeper", build a Python dict from n keys that all have hash 1 (k·(2⁶¹ − 1) + 1 for k = 0 … n−1), for n = 1,000, 2,000, 4,000 and 8,000. Time each with <code>time.perf_counter</code> and compare with the same number of ordinary ints. Print the ratio each time n doubles. Do you see about ×4 for the colliding keys and about ×2 for the normal ones? Explain why, using section 10.</p>
+  <p>The "Go deeper" box in section 10 gives a family of integers that all have hash 1. Build a Python dict from n of them, for n of 1,000, 2,000, 4,000 and 8,000, and time each build with <code>time.perf_counter</code>, keeping the fastest of five runs. Do the same with ordinary integers at 25 times those sizes, because 8,000 of them build too fast to time reliably. For both, print how the time changes each time n doubles. Explain the two ratios using sections 7 and 10.</p>
 </div>
 
 <div class="exercise">
   <div class="tier stretch">Stretch · explain</div>
   <h4>8. Say it out loud</h4>
-  <p>Set a 2-minute timer and answer, as if to an interviewer: "Why is a dict lookup O(1), and when isn't it?" Record yourself if you can. Then check: did you mention array indexing, the hash function, collisions, the load factor, resizing and amortized cost, the average-vs-worst distinction, and one trade-off?</p>
+  <p>Set a 2-minute timer and answer as if to an interviewer: "Why is a dict lookup O(1), and when is it not?" Record yourself if you can. Then check whether you covered array indexing, the hash function, collisions, the load factor, resizing and amortized cost, the difference between average and worst case, and one trade-off.</p>
 </div>
 
 <p>Run the coding exercises from the repo root:</p>
-<pre class="plain"><code>python3 -m pytest -k "hash_map or probing_map or hash_patterns"</code></pre>
+<pre class="plain"><code>python3 -m pytest -k "test_hash_map or probing_map or hash_patterns"</code></pre>
 
 <nav class="chapter-nav">
   <a href="../index.html"><small>← Back to</small>Chapter 1 overview</a>
-  <a class="next" href="linear-structures.html"><small>Next →</small>Linked lists, stacks, queues and monotonic stacks</a>
+  <a class="next" href="linear-structures.html"><small>Next →</small>Linked lists, stacks, queues, deques and monotonic stacks</a>
 </nav>
 
 </main>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  // The toy hash from section 4 (Java's string hash), kept to 32 bits so it's exact in JS.
+  // toy_hash from section 4 (Java's string hash), kept to 32 bits so it is exact in JS.
   const toyHash = (s) => { let h = 0; for (const c of s) h = (Math.imul(h, 31) + c.codePointAt(0)) >>> 0; return h; };
 
-  // ---- Chaining stepper (section 5) ----
+  // ---- Separate chaining stepper (section 5) ----
   (function () {
     const M = 8, frames = [], buckets = Array.from({ length: M }, () => []);
     const snap = (extra) => frames.push({ b: buckets.map((c) => c.slice()), ...extra });
-    snap({ msg: "An empty table: 8 buckets, each an empty list." });
+    snap({ msg: "An empty table: 8 buckets, each with an empty chain." });
     for (const k of ["cat", "dog", "act", "tac", "emu", "owl"]) {
       const h = toyHash(k), i = h % M, before = buckets[i].length;
       buckets[i].push(k);
-      snap({ bucket: i, hl: [i, before], msg: `insert <b>${k}</b>: hash = ${h.toLocaleString()}, ${h.toLocaleString()} % 8 = <b>${i}</b>. ` +
-        (before ? `Bucket ${i} already holds ${buckets[i].slice(0, before).join(", ")}: a collision, so ${k} joins the chain.` : "Bucket was empty.") });
+      snap({ bucket: i, hl: [i, before], msg: `Insert <b>${k}</b>: the hash is ${h.toLocaleString()}, and ${h.toLocaleString()} % 8 = <b>${i}</b>. ` +
+        (before ? `Bucket ${i} already holds ${buckets[i].slice(0, before).join(" and ")}. That is a collision, so ${k} joins the chain.` : "The bucket was empty.") });
     }
     for (const k of ["tac", "yak", "eel"]) {
       const h = toyHash(k), i = h % M, chain = buckets[i];
       let cmps = 0;
-      snap({ bucket: i, msg: `look up <b>${k}</b>: hash % 8 = <b>${i}</b>. Only bucket ${i} is searched.` + (chain.length ? "" : ` It's empty, so ${k} isn't here: 0 comparisons.`) });
+      snap({ bucket: i, msg: `Look up <b>${k}</b>: its hash % 8 = <b>${i}</b>, so only bucket ${i} is searched.` + (chain.length ? "" : ` The bucket is empty, so ${k} is absent after 0 comparisons.`) });
       for (let j = 0; j < chain.length; j++) {
         cmps++;
         const hit = chain[j] === k;
-        snap({ bucket: i, cmp: [i, j], hit, msg: `compare ${k} == ${chain[j]}? <b>${hit ? "yes" : "no"}</b>. ` +
-          (hit ? `Found after ${cmps} comparison${cmps > 1 ? "s" : ""}.` : j === chain.length - 1 ? `End of chain: ${k} isn't in the table. ${cmps} comparisons, not 6.` : "Keep walking the chain.") });
+        snap({ bucket: i, cmp: [i, j], hit, msg: `Is ${k} equal to ${chain[j]}? <b>${hit ? "Yes" : "No"}</b>. ` +
+          (hit ? `Found after ${cmps} comparison${cmps > 1 ? "s" : ""}.` : j === chain.length - 1 ? `The chain has ended, so ${k} is absent after ${cmps} comparison${cmps > 1 ? "s" : ""}. The other ${6 - cmps} keys were never touched.` : "Keep walking the chain.") });
         if (hit) break;
       }
     }
@@ -717,46 +743,16 @@ print(Point(1, 2) in seen)  # False: right bucket, but the stored key is now (99
     });
   })();
 
-  // ---- Load factor slider (section 6) ----
+  // ---- Linear probing and chaining playground (section 8) ----
   (function () {
-    // A fixed pool of well-mixed 32-bit hashes (murmur3's finalizer), so the picture
-    // is stable as you slide. A plain LCG would be wrong here: its low bits cycle,
-    // so "% m" for a power-of-two m would spread keys unrealistically evenly.
-    const mix = (h) => { h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return h >>> 0; };
-    const pool = Array.from({ length: 160 }, (_, k) => mix(k + 0x9e3779b9));
-    function draw() {
-      const n = Number($("lf-n").value), m = Number($("lf-m").value), mode = $("lf-keys").value;
-      $("lf-nval").textContent = n;
-      const counts = new Array(m).fill(0);
-      for (let k = 0; k < n; k++) {
-        const h = mode === "mult" ? 16 * (k + 1) : pool[k];
-        counts[h % m]++;
-      }
-      const svg = $("lf-svg"); svg.replaceChildren();
-      const W = 640, base = 170, maxC = Math.max(8, ...counts), bw = (W - 40) / m;
-      counts.forEach((c, i) => {
-        const hgt = (c / maxC) * 150;
-        svg.append(V.s("rect", { x: 20 + i * bw + 1, y: base - hgt, width: Math.max(1, bw - 2), height: hgt, rx: 2, fill: c > 2 * Math.max(1, n / m) && c > 2 ? "var(--warn)" : "var(--accent)" }));
-        if (m <= 32 && c) svg.append(V.s("text", { class: "label", x: 20 + i * bw + bw / 2, y: base - hgt - 4, "text-anchor": "middle", text: c }));
-      });
-      svg.append(V.s("line", { class: "axis", x1: 20, x2: W - 20, y1: base, y2: base }),
-        V.s("text", { class: "label", x: 20, y: 192, text: `bucket 0 … ${m - 1}` }));
-      const a = n / m, longest = Math.max(0, ...counts), empty = counts.filter((c) => c === 0).length;
-      $("lf-msg").innerHTML = `α = ${n} / ${m} = <b>${a.toFixed(2)}</b>. Average chain ${a.toFixed(2)}, longest <b>${longest}</b>, ${empty} of ${m} buckets empty. ` +
-        (mode === "mult" && n ? `A missing key that also lands in bucket 0 compares all <b>${longest}</b>: α = ${a.toFixed(2)} is only an average, and averages assume an even spread.` : `A lookup for a missing key compares about <b>${a.toFixed(1)}</b> keys.`) +
-        (mode === "mult" && n ? (m <= 16 ? " Every key is a multiple of 16, so every key % m is 0: one giant chain. The hash spreads nothing." : ` Every key is a multiple of 16, so only buckets ${[0, 16, 32, 48].filter((b) => b < m).join(", ")} can be used: ${m / 16} of ${m}.`) : "");
-    }
-    for (const id of ["lf-n", "lf-m", "lf-keys"]) $(id).addEventListener("input", draw);
-    draw();
-  })();
-
-  // ---- Probing / chaining playground (section 8) ----
-  (function () {
-    const TOMB = "✝";
-    let m, mode = "probe", maxLf = 0.75, slots, live, tombs, mark;
+    const TOMB = "del";   // the tombstone marker; keys typed by the reader are never stored as "del"
+    let m, mode = "probe", maxLf = 0.75, slots, live, tombs, mark, grewNote = "";
     const reset = () => { m = 8; live = 0; tombs = 0; mark = {}; slots = Array.from({ length: m }, () => (mode === "chain" ? [] : null)); };
     const occupied = (v) => v !== null && v !== TOMB;
-    // Linear probing search: returns {at, path, free} (at = slot of key or -1, free = first reusable slot).
+    // Typed keys go into HTML messages, so escape them.
+    const b = (k) => "<b>" + String(k).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]) + "</b>";
+    const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    // Linear probing search. Returns {at, path, free}: at is the key's slot or -1, free is the first reusable slot.
     function search(key) {
       const path = []; let i = toyHash(key) % m, free = -1;
       for (let k = 0; k < m; k++) {
@@ -774,73 +770,107 @@ print(Point(1, 2) in seen)  # False: right bucket, but the stored key is now (99
       for (const k of keys) { if (mode === "chain") slots[toyHash(k) % m].push(k); else slots[search(k).free] = k; }
       return keys.length;
     }
-    function put(key) {
-      mark = {};
-      if (!key) return "Type a key first.";
-      const h = toyHash(key), home = h % m;
-      if (mode === "chain" ? slots[home].includes(key) : search(key).at >= 0) return `<b>${key}</b> is already in the table (a real map would overwrite its value).`;
-      let note = "";
-      const grew = (was, moved) => ` Load would pass the limit, so the table grew ${was} → ${m} and rehashed ${moved} key${moved === 1 ? "" : "s"}: this one insert cost O(n).`;
+    // Grows or rebuilds the table when the next insert needs it, and says why in grewNote.
+    function makeRoom() {
+      grewNote = "";
+      const was = m;
       if (mode === "chain") {
-        if ((live + 1) / m > maxLf) { const was = m; note = grew(was, rebuild(m * 2)); }
-      } else if ((live + tombs + 1) / m > maxLf || live + tombs + 1 >= m) {
-        // Tombstones count toward "full". Size the new table from live keys only, so a
-        // table clogged with tombstones is rebuilt at the same size instead of doubling.
-        const lim = Math.min(maxLf, 0.9), was = m;
-        let newM = m; while ((live + 1) / newM > lim) newM *= 2;
+        if ((live + 1) / m <= maxLf) return;
+        let newM = m * 2; while ((live + 1) / newM > maxLf) newM *= 2;
         const moved = rebuild(newM);
-        note = newM === was ? ` Live keys plus tombstones passed the limit, so the table was rebuilt at the same size: ${moved} live key${moved === 1 ? "" : "s"} re-inserted, tombstones gone.` : grew(was, moved);
+        grewNote = `The load factor would pass the limit, so the table grew from ${was} to ${m} buckets and rehashed ${plural(moved, "key")}. This one insert cost O(n). `;
+        return;
       }
-      const h2 = toyHash(key), i0 = h2 % m;
-      let msg = `hash("<b>${key}</b>") = ${h2.toLocaleString()} → % ${m} = <b>${i0}</b>.`;
+      // Tombstones count toward the load factor, and a search needs an empty slot to stop.
+      // The new size comes from the live keys only, so a table clogged with tombstones is
+      // rebuilt at the same size instead of doubling.
+      const overLimit = (live + tombs + 1) / m > maxLf, noEmpty = live + tombs + 1 >= m;
+      if (!overLimit && !noEmpty) return;
+      const lim = Math.min(maxLf, 0.9);
+      let newM = m; while ((live + 1) / newM > lim) newM *= 2;
+      const why = !overLimit ? "No empty slot would be left to end a search" : tombs ? "Live keys plus tombstones would pass the limit" : "The load factor would pass the limit";
+      const moved = rebuild(newM);
+      grewNote = newM === was
+        ? `${why}, so the table was rebuilt at the same size: ${plural(moved, "live key")} re-inserted, and the tombstones are gone. `
+        : `${why}, so the table grew from ${was} to ${newM} slots and rehashed ${plural(moved, "key")}. This one insert cost O(n). `;
+    }
+    function put(key) {
+      mark = {}; grewNote = "";
+      if (!key) return "Type a key first.";
+      if (key === TOMB) return `"${TOMB}" is how this figure draws a tombstone. Pick another key.`;
+      // A key that is already stored: show where, marking the path a lookup takes to it.
+      const at = toyHash(key) % m;
       if (mode === "chain") {
-        slots[i0].push(key); mark[i0 + ":" + (slots[i0].length - 1)] = "hl";
-        msg += slots[i0].length > 1 ? ` Collision: bucket ${i0}'s chain is now ${slots[i0].length} long.` : " Empty bucket.";
+        const j = slots[at].indexOf(key);
+        if (j >= 0) {
+          for (let q = 0; q < j; q++) mark[at + ":" + q] = "warn";
+          mark[at + ":" + j] = "done";
+          return `${b(key)} is already in bucket ${at}. A real map would overwrite its value there.`;
+        }
       } else {
         const r = search(key);
+        if (r.at >= 0) {
+          r.path.forEach((p) => (mark[p] = slots[p] === TOMB ? "bad" : "warn"));
+          mark[r.at] = "done";
+          return `${b(key)} is already in slot ${r.at}` + (r.path.some((p) => slots[p] === TOMB) ? ", past a tombstone" : "") + ". A real map would overwrite its value there.";
+        }
+      }
+      makeRoom();
+      const h = toyHash(key), home = h % m;
+      let msg = `The hash of ${b(key)} is ${h.toLocaleString()}, and ${h.toLocaleString()} % ${m} = <b>${home}</b>.`;
+      if (mode === "chain") {
+        slots[home].push(key); mark[home + ":" + (slots[home].length - 1)] = "hl";
+        msg += slots[home].length > 1 ? ` A collision: the chain in bucket ${home} now holds ${slots[home].length} keys.` : " The bucket was empty.";
+      } else {
+        // The search always ends on an empty slot here, because makeRoom keeps one free.
+        const r = search(key), reused = slots[r.free] === TOMB;
         r.path.forEach((p) => { if (p !== r.free) mark[p] = slots[p] === TOMB ? "bad" : "warn"; });
-        if (slots[r.free] === TOMB) tombs--;
+        if (reused) tombs--;
         slots[r.free] = key; mark[r.free] = "hl";
-        msg += r.free === i0 ? " Slot was free." : ` Slot ${i0} was taken, so it walked to slot <b>${r.free}</b> (${r.path.length} probes).`;
+        msg += reused
+          ? ` The search walked ${plural(r.path.length, "slot")}, as far as the empty slot ${r.path[r.path.length - 1]}, to confirm that the key is not stored further along. Then it reused the tombstone in slot <b>${r.free}</b>.`
+          : r.free === home ? " The home slot was free." : ` Slot ${home} was taken, so the key went to slot <b>${r.free}</b> after ${plural(r.path.length, "probe")}.`;
       }
       live++;
-      return msg + note;
+      return grewNote + msg;
     }
     function get(key) {
       mark = {};
       if (!key) return "Type a key first.";
-      const i0 = toyHash(key) % m;
+      const home = toyHash(key) % m;
       if (mode === "chain") {
-        const j = slots[i0].indexOf(key);
-        slots[i0].forEach((_, q) => { if (q < (j < 0 ? slots[i0].length : j)) mark[i0 + ":" + q] = "warn"; });
-        if (j >= 0) { mark[i0 + ":" + j] = "hl"; return `<b>${key}</b> → bucket ${i0}, found after ${j + 1} comparison${j ? "s" : ""}.`; }
-        return slots[i0].length ? `<b>${key}</b> → bucket ${i0}: compared all ${slots[i0].length}, not there.` : `<b>${key}</b> → bucket ${i0}, which is empty: not there, 0 comparisons.`;
+        const chain = slots[home], j = chain.indexOf(key);
+        chain.forEach((_, q) => { if (q < (j < 0 ? chain.length : j)) mark[home + ":" + q] = "warn"; });
+        if (j >= 0) { mark[home + ":" + j] = "done"; return `${b(key)} belongs in bucket ${home} and was found after ${plural(j + 1, "comparison")}.`; }
+        if (!chain.length) return `${b(key)} belongs in bucket ${home}, which is empty, so it is absent after 0 comparisons.`;
+        return `${b(key)} belongs in bucket ${home}. ` + (chain.length === 1 ? "The one key there was compared" : chain.length === 2 ? "Both keys there were compared" : `All ${chain.length} keys there were compared`) + ", and it is absent.";
       }
       const r = search(key);
       r.path.forEach((p) => (mark[p] = slots[p] === TOMB ? "bad" : "warn"));
-      if (r.at >= 0) { mark[r.at] = "hl"; return `<b>${key}</b> starts at slot ${i0} and is found in slot ${r.at} after ${r.path.length} probe${r.path.length > 1 ? "s" : ""}` + (r.path.some((p) => slots[p] === TOMB) ? ", walking past a tombstone." : "."); }
+      if (r.at >= 0) { mark[r.at] = "done"; return `${b(key)} has home slot ${home} and was found in slot ${r.at} after ${plural(r.path.length, "probe")}` + (r.path.some((p) => slots[p] === TOMB) ? ", walking past a tombstone." : "."); }
       const last = r.path[r.path.length - 1];
-      return `<b>${key}</b> starts at slot ${i0}; ` + (slots[last] === null ? `slot ${last} is empty, so it isn't here (${r.path.length} probe${r.path.length > 1 ? "s" : ""}).` : `walked the whole table without finding it.`);
+      return `${b(key)} has home slot ${home}. ` + (slots[last] === null ? `Slot ${last} is empty, so the key is absent after ${plural(r.path.length, "probe")}.` : "The search walked the whole table without finding it.");
     }
     function del(key) {
       mark = {};
-      const i0 = toyHash(key || "") % m;
+      if (!key) return "Type a key first.";
+      const home = toyHash(key) % m;
       if (mode === "chain") {
-        const j = key ? slots[i0].indexOf(key) : -1;
-        if (j < 0) return `<b>${key || "?"}</b> isn't in the table.`;
-        slots[i0].splice(j, 1); live--; return `Removed <b>${key}</b> from bucket ${i0}'s chain. No tombstone needed.`;
+        const j = slots[home].indexOf(key);
+        if (j < 0) return `${b(key)} is not in the table.`;
+        slots[home].splice(j, 1); live--; return `Removed ${b(key)} from the chain in bucket ${home}. Chaining needs no tombstone.`;
       }
-      const r = key ? search(key) : { at: -1 };
-      if (r.at < 0) return `<b>${key || "?"}</b> isn't in the table.`;
+      const r = key !== TOMB ? search(key) : { at: -1 };
+      if (r.at < 0) return `${b(key)} is not in the table.`;
       slots[r.at] = TOMB; live--; tombs++; mark[r.at] = "bad";
-      return `Slot ${r.at} becomes a <b>tombstone</b>, not empty, so keys that walked past it can still be found. Live keys ${live}, tombstones ${tombs}.`;
+      return `Slot ${r.at} becomes a <b>tombstone</b> and not an empty slot, so keys stored beyond it can still be found. Live keys: ${live}. Tombstones: ${tombs}.`;
     }
     function render() {
       const host = $("hm-table");
       const a = live / m;
       const meter = V.el("div", { class: "small", style: "margin-bottom:10px" },
-        `${live} live key${live === 1 ? "" : "s"}` + (mode === "probe" ? `, ${tombs} tombstone${tombs === 1 ? "" : "s"}` : "") + `, ${m} ${mode === "chain" ? "buckets" : "slots"}. α = `, V.el("b", {}, a.toFixed(2)),
-        mode === "probe" && tombs ? V.el("span", { class: "muted" }, ` (counting tombstones: ${((live + tombs) / m).toFixed(2)})`) : null);
+        `${plural(live, "live key")}` + (mode === "probe" ? `, ${plural(tombs, "tombstone")}` : "") + `, ${m} ${mode === "chain" ? "buckets" : "slots"}. α = `, V.el("b", {}, a.toFixed(2)),
+        mode === "probe" && tombs ? V.el("span", { class: "muted" }, ` (${((live + tombs) / m).toFixed(2)} with tombstones counted)`) : null);
       let body;
       if (mode === "chain") {
         body = V.el("div", { style: "display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 16px" },
@@ -860,18 +890,29 @@ print(Point(1, 2) in seen)  # False: right bucket, but the stored key is now (99
     $("hm-get").onclick = () => say(get(key()));
     $("hm-del").onclick = () => say(del(key()));
     $("hm-rand").onclick = () => {
-      let msg = "";
+      const added = []; let notes = "", last = "";
       for (let k = 0; k < 3; k++) {
         const pool = words.filter((w) => (mode === "chain" ? !slots[toyHash(w) % m].includes(w) : search(w).at < 0));
         if (!pool.length) break;
-        msg = put(pool[Math.floor(Math.random() * pool.length)]);
+        const w = pool[Math.floor(Math.random() * pool.length)];
+        const out = put(w);
+        added.push(b(w));
+        notes += grewNote.replace("This one insert", `Inserting ${b(w)}`);
+        last = out.slice(grewNote.length);
       }
-      say("Last insert: " + msg);
+      if (!added.length) { say("Every sample word is already in the table. Type your own key, or press Reset."); return; }
+      const list = added.length > 1 ? added.slice(0, -1).join(", ") + " and " + added[added.length - 1] : added[0];
+      say(added.length === 1 ? notes + last : `Inserted ${list}. ${notes}Last insert: ${last}`);
     };
-    $("hm-reset").onclick = () => { reset(); say("Empty table with 8 slots."); };
-    $("hm-mode").onchange = (e) => { mode = e.target.value; reset(); say(mode === "chain" ? "Separate chaining: colliding keys share a bucket's list." : "Linear probing: one key per slot; on a collision, try the next slot."); };
-    $("hm-lf").onchange = (e) => { maxLf = Number(e.target.value); say(maxLf === 99 ? "Never grow (except when the table is completely full). Add keys and watch the walks get longer." : `The table now grows when α would pass ${maxLf}.`); };
-    reset(); say("Try: insert <b>cat</b>, then <b>tac</b>. Both start at slot 6.");
+    $("hm-reset").onclick = () => { reset(); say(`An empty table with 8 ${mode === "chain" ? "buckets" : "slots"}.`); };
+    $("hm-mode").onchange = (e) => { mode = e.target.value; reset(); say(mode === "chain" ? "Separate chaining: keys that collide share a bucket's chain." : "Linear probing: one key per slot, and a colliding key goes to the next free slot."); };
+    $("hm-lf").onchange = (e) => {
+      maxLf = Number(e.target.value);
+      say(maxLf !== 99 ? `The table now grows when the load factor would pass ${maxLf}.`
+        : mode === "chain" ? "The table now never grows. Add keys and watch the chains get longer."
+        : "The table now grows only when no empty slot would be left, because a search needs one to stop. Add keys and watch the searches get longer.");
+    };
+    reset(); say("Insert <b>cat</b>, then <b>tac</b>. Both have home slot 6.");
   })();
 })();
 </script>

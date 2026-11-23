@@ -111,6 +111,17 @@ def test_resizes_under_load():
     assert all(m.get(i) == i * i for i in range(1000))
 
 
+def test_resizes_rehash_every_key():
+    # Small consecutive integers keep their bucket when the table doubles, so
+    # use keys far apart. A resize that copies bucket i to bucket i loses most.
+    keys = [i * 7919 for i in range(1000)]
+    m = HashMap(initial_capacity=8)
+    for k in keys:
+        m.put(k, k)
+    lost = [k for k in keys if k not in m]
+    assert not lost, f"{len(lost):,} of {len(keys):,} keys lost: does a resize rehash every key into the new buckets?"
+
+
 def test_no_dict_or_set_inside():
     m = HashMap()
     for i in range(50):

@@ -1051,7 +1051,7 @@ window.CURRICULUM = {
     {
      "file": "hash-maps.html",
      "topic": "01.01",
-     "title": "Find anything in one step (Hash maps, arrays and strings)"
+     "title": "Hash maps: why a lookup is O(1)"
     },
     {
      "file": "heaps.html",
@@ -1185,7 +1185,7 @@ window.CURRICULUM = {
     {
      "file": "hash_patterns.py",
      "module": "hash_patterns",
-     "title": "Hash map patterns: seen-it, group-by, running total",
+     "title": "Hash map patterns: seen before, group by key, prefix sums",
      "topics": [
       "01.01"
      ],
@@ -3661,5 +3661,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-22 07:23"
+ "generated": "2026-11-23 02:45"
 };
