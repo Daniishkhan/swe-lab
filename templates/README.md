@@ -6,8 +6,8 @@ the style guide that keeps new pages consistent.
 
 ## Book chapters (the new format, use this for rewrites)
 
-`sections/02-algorithms/concepts/complexity.html` and `sorting.html` are the
-reference. A book chapter reads top to bottom instead of being a stack of boxes:
+`sections/01-data-structures/concepts/hash-maps.html` is the reference chapter.
+A book chapter reads top to bottom instead of being a stack of boxes:
 
 - `<main class="content book">`, load `assets/book.js` after `shell.js`.
 - `header.chapter-head` (eyebrow, plain-English h1, meta), intro, and a

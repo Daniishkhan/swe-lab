@@ -17,7 +17,7 @@ Do not open an HTML file until you have written a short blueprint covering all
 five items below:
 
 1. **Context:** Read `templates/README.md` (the format spec) and the reference
-   chapter `sections/02-algorithms/concepts/sorting.html`. Look up the topic in
+   chapter `sections/01-data-structures/concepts/hash-maps.html`. Look up the topic in
    `curriculum.json`: its id, tag, `requires` (what the reader already knows),
    and its place in the `track`. Teach nothing that leans on a topic later in
    the track; if the chapter truly needs one, move it or the topic in the track

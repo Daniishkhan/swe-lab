@@ -52,8 +52,7 @@ ideas. The full method is the `teach` skill. Chapters apply it through
    scratch folder outside the repo, run `tools/check_exercise.py`, then delete
    them. Pen-and-paper warm-up answers in a collapsed aside are fine.
 2. **Every chapter is a book chapter.** Spec: `templates/README.md`. Reference:
-   `sections/02-algorithms/concepts/sorting.html` and `complexity.html`. The
-   other chapter 1 and 2 pages are older "box" pages waiting to be rewritten.
+   `sections/01-data-structures/concepts/hash-maps.html`.
 3. **No external dependencies in pages.** No CDNs, frameworks or `fetch()`;
    everything works offline from `file://`. Use `assets/viz.js`.
 4. **No hard-coded colors.** Use the theme tokens from the top of

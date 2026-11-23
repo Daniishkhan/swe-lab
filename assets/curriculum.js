@@ -1039,74 +1039,9 @@ window.CURRICULUM = {
    ],
    "concepts": [
     {
-     "file": "concurrent-structures.html",
-     "topic": "01.14",
-     "title": "Many threads, one structure (Concurrent structures)"
-    },
-    {
-     "file": "graphs.html",
-     "topic": "01.05",
-     "title": "Dots and lines (Graphs and how to store them)"
-    },
-    {
      "file": "hash-maps.html",
      "topic": "01.01",
      "title": "Find anything in one step (Hash maps)"
-    },
-    {
-     "file": "heaps.html",
-     "topic": "01.04",
-     "title": "The most urgent thing first (Heaps and priority queues)"
-    },
-    {
-     "file": "intervals.html",
-     "topic": "01.09",
-     "title": "Where things overlap (Intervals: merge, sweep line, interval trees)"
-    },
-    {
-     "file": "linear-structures.html",
-     "topic": "01.02",
-     "title": "Who goes next? (Linked lists, stacks, queues, deques and monotonic stacks)"
-    },
-    {
-     "file": "lru-lfu-cache.html",
-     "topic": "01.08",
-     "title": "What to forget first (LRU and LFU caches)"
-    },
-    {
-     "file": "probabilistic-structures.html",
-     "topic": "01.12",
-     "title": "Almost right, in almost no memory (Bloom filters, Count-Min Sketch, HyperLogLog)"
-    },
-    {
-     "file": "segment-fenwick-trees.html",
-     "topic": "01.10",
-     "title": "Totals over any range (Segment trees and Fenwick trees)"
-    },
-    {
-     "file": "skip-lists.html",
-     "topic": "01.11",
-     "title": "Express lanes for a linked list (Skip lists)"
-    },
-    {
-     "file": "storage-structures.html",
-     "topic": "01.13",
-     "title": "Built for the disk (B-trees, LSM trees and the write-ahead log)"
-    },
-    {
-     "file": "trees.html",
-     "topic": "01.03",
-     "title": "Sorted and fast (Trees, binary search trees, balancing and traversals)"
-    },
-    {
-     "file": "tries.html",
-     "topic": "01.06",
-     "title": "Words that share a path (Tries and radix trees)"
-    },
-    {
-     "file": "union-find.html",
-     "topic": "01.07",
-     "title": "Same group or not? (Union-find)"
     }
    ],
    "exercises": [
@@ -1846,88 +1781,7 @@ window.CURRICULUM = {
      ]
     }
    ],
-   "concepts": [
-    {
-     "file": "backtracking.html",
-     "topic": "02.06",
-     "title": "Recursion and backtracking"
-    },
-    {
-     "file": "bfs-dfs.html",
-     "topic": "02.05",
-     "title": "Exploring graphs: BFS, DFS, topological sort"
-    },
-    {
-     "file": "binary-search.html",
-     "topic": "02.03",
-     "title": "Binary search and \"search on the answer\""
-    },
-    {
-     "file": "bit-manipulation.html",
-     "topic": "02.11",
-     "title": "Bit manipulation"
-    },
-    {
-     "file": "complexity.html",
-     "topic": "02.01",
-     "title": "How fast is your code? (Complexity analysis)"
-    },
-    {
-     "file": "consistent-hashing.html",
-     "topic": "02.15",
-     "title": "Which server holds this key? (Consistent hashing)"
-    },
-    {
-     "file": "dynamic-programming.html",
-     "topic": "02.07",
-     "title": "Dynamic programming"
-    },
-    {
-     "file": "greedy.html",
-     "topic": "02.10",
-     "title": "Greedy algorithms and how to argue correctness"
-    },
-    {
-     "file": "minimum-spanning-tree.html",
-     "topic": "02.09",
-     "title": "Connect everything, cheaply (Minimum spanning trees)"
-    },
-    {
-     "file": "probability-estimation.html",
-     "topic": "02.16",
-     "title": "Numbers on the back of an envelope (estimation and probability)"
-    },
-    {
-     "file": "rate-limiting.html",
-     "topic": "02.14",
-     "title": "Rate limiting: buckets and windows"
-    },
-    {
-     "file": "shortest-paths.html",
-     "topic": "02.08",
-     "title": "Shortest paths: Dijkstra, Bellman-Ford, A*"
-    },
-    {
-     "file": "sorting.html",
-     "topic": "02.02",
-     "title": "Putting things in order (Sorting)"
-    },
-    {
-     "file": "streaming-external.html",
-     "topic": "02.13",
-     "title": "Data bigger than memory (Streaming and external algorithms)"
-    },
-    {
-     "file": "string-algorithms.html",
-     "topic": "02.12",
-     "title": "Finding a needle fast (String search)"
-    },
-    {
-     "file": "two-pointers-sliding-window.html",
-     "topic": "02.04",
-     "title": "Two pointers, sliding window, prefix sums"
-    }
-   ],
+   "concepts": [],
    "exercises": [
     {
      "file": "astar_grid.py",
@@ -3220,13 +3074,7 @@ window.CURRICULUM = {
      "text": "Dependency management, build systems, monorepo trade-offs"
     }
    ],
-   "concepts": [
-    {
-     "file": "python-toolkit.html",
-     "topic": "10.01",
-     "title": "Python for interviews: the toolkit"
-    }
-   ],
+   "concepts": [],
    "exercises": [
     {
      "file": "py_toolkit.py",
@@ -3436,13 +3284,7 @@ window.CURRICULUM = {
      "text": "Training infrastructure basics: data loaders, checkpointing, distributed training"
     }
    ],
-   "concepts": [
-    {
-     "file": "coding-with-ai.html",
-     "topic": "13.06",
-     "title": "Code you didn't write (Coding with AI: write, debug, refactor)"
-    }
-   ],
+   "concepts": [],
    "exercises": [
     {
      "file": "bisect_skip.py",
@@ -3539,18 +3381,7 @@ window.CURRICULUM = {
      "text": "Product sense: why are we building this, how would we measure it?"
     }
    ],
-   "concepts": [
-    {
-     "file": "project-deep-dive.html",
-     "topic": "14.01",
-     "title": "Your project deep dive"
-    },
-    {
-     "file": "why-this-company.html",
-     "topic": "14.09",
-     "title": "Why this company: Netflix and Anthropic"
-    }
-   ],
+   "concepts": [],
    "exercises": []
   },
   {
@@ -3648,18 +3479,12 @@ window.CURRICULUM = {
      ]
     }
    ],
-   "concepts": [
-    {
-     "file": "algorithmic-round.html",
-     "topic": "15.01",
-     "title": "The algorithmic coding round"
-    }
-   ],
+   "concepts": [],
    "exercises": []
   }
  ],
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 13:39"
+ "generated": "2026-11-23 13:51"
 };
