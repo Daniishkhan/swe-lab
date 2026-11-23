@@ -58,7 +58,7 @@ swe-prep/
 |---|---|---|
 | §01 Data structures | `hash-maps.html` (`01.01`) written; other high-ROI core chapters authored as needed (see `CLAUDE.md`) | 37 exercises, from `hash_map` and `lru_cache` to `bloom_filter`, `lsm_store` and `mpmc_queue` |
 | §02 Algorithms | Learned via targeted chapters + `teach` sessions | 36 exercises, from `sorts` and `graphs` to `dijkstra`, `kruskal_mst`, `kmp_search`, `external_sort`, `token_bucket`, `consistent_hash` and `capacity_estimate` |
-| §10 Code quality & §13 AI/ML | Learned via `teach` sessions + worksheets | 4 exercises (`py_toolkit`, `differential`, `delta_debug`, `bisect_skip`) |
+| §10 Code quality & §13 AI/ML | Learned via `teach` sessions + worksheets | 6 exercises (`py_idioms`, `py_internals`, `py_toolkit`, `differential`, `delta_debug`, `bisect_skip`) |
 | §03–§09, §11–§12, §14–§15 | Learned via `teach` sessions, worksheets & mocks | Scaffolded with chapter dashboards and templates |
 
 ## Priority key
@@ -69,26 +69,42 @@ swe-prep/
 
 ## The track
 
-The home page shows one ordered 10-week track (~5 hours/day, designed to run in
-**8 to 12 weeks** including onsite & company packs). Because resumes go out on
-day 1 and screens typically land 4 to 6 weeks later, **Weeks 1 to 4 make you
-technical-screen ready** across Google (bare-editor DSA), Anthropic (4-level
-practical + concurrency), and general senior loops, while **Weeks 5 to 10**
-build Google L5 system design, AI-infra depth, and senior behavioral leveling.
+The home page separates concerns cleanly into four lanes so setup, technical
+study, behavioral prep, and company-specific onsite prep never mix—with plain
+sequential numbering (`1, 2, 3…`) instead of jumping chapter IDs:
+
+1. **Phase 0 (4 days, before Week 1):** Deep Python warm-up (comprehensions,
+   lambdas, closures, lazy generators, data model, gotchas, decorators, context
+   managers, and stdlib via `py_idioms`, `py_internals`, and `py_toolkit`), the
+   Google bare-editor coding playbook, and your 60-second intro + flagship
+   project baseline so early recruiter calls never interrupt technical study.
+2. **Weeks 1 to 10 (pure technical spine, ~5h/day):** Zero behavioral or setup
+   steps mixed in. **Weeks 1 to 4 make you technical-screen ready** across
+   Google (bare-editor DSA), Anthropic (4-level practical + concurrency), and
+   general senior loops; **Weeks 5 to 10** build Google L5 system design,
+   AI-infra depth, and advanced scale follow-ups.
+3. **Parallel Behavioral Track (~1h/week on Sundays):** Runs alongside technical
+   weeks (STAR stories, Google G&L, Anthropic Values, Past-Project Deep Dive,
+   Hiring Manager, and Senior Behavioral mock) without breaking coding or
+   system design flow.
+4. **Onsite & Company Packs:** Triggered when an onsite is booked (or Weeks 11
+   to 12).
 
 | Stage | Focus | Milestone |
 |---|---|---|
-| Week 1 | Complexity, bare-editor protocol, Python stdlib, hash maps, linear/monotonic, trees, heaps, sorting; flagship project deep dive (`14.01`) | Mock 1: Google coding #1 (bare editor, 1 medium + follow-up) |
-| Week 2 | Binary search on answer, sliding window, graphs, BFS/DFS/topo, **Union-Find**, **tries**, **intervals**, **Dijkstra**; ownership stories | Mock 2: Google coding #2 (Medium-Hard graph/interval/trie + 2 follow-ups) |
-| Week 3 | Backtracking, DP, **greedy**, LRU/TTL cache, rate limiters; testing, designing for change, 4-level builds (`10.04`); past-project deep dive (`15.10`) | Mock 3: Practical 4-level screen (Anthropic CodeSignal style, 90m) |
-| Week 4 | **Concurrency** (processes, threads, GIL/`asyncio`, races, locks, deadlock, thread pools, async I/O, bounded buffer, single-flight); debugging, code reading, AI verification (`13.06`) | Mock 4: Concurrency coding (crawler / single-flight cache) — **technical-screen ready** |
-| Week 5 | System design foundations: scoping, capacity/p99 math, TCP/HTTP/TLS/DNS, stateless services, load balancing, APIs, caching, **CDNs/object storage**, SLOs; conflict stories | Mock 5: Google coding #3 (Medium-Hard + scale follow-up) |
-| Week 6 | Probabilistic DS, storage engines (B-tree/LSM/WAL), SQL/EXPLAIN, modeling, indexes, ACID, **MVCC**, choosing a DB, **AuthN/AuthZ & multi-tenancy**; URL shortener; failure stories | Mock 6: System Design #1 (storage & foundations) |
+| Phase 0 | **Python warm-up & setup (4 days)**: idioms, comprehensions, lambdas, generators, gotchas (`py_idioms`, `py_internals`), stdlib toolkit (`py_toolkit`), bare-editor coding playbook, 60-sec intro + flagship project baseline | *(4-day pre-flight warm-up)* |
+| Week 1 | Complexity & amortized cost, hash maps, linear/monotonic structures, trees, heaps, sorting & quickselect | Mock 1: Google coding #1 (bare editor, 1 medium + follow-up) |
+| Week 2 | Binary search on answer, sliding window, graphs, BFS/DFS/topo, **Union-Find**, **tries**, **intervals**, **Dijkstra** | Mock 2: Google coding #2 (Medium-Hard graph/interval/trie + 2 follow-ups) |
+| Week 3 | Backtracking, DP, **greedy**, LRU/TTL cache, rate limiters; testing, designing for change, 4-level progressive builds | Mock 3: Practical 4-level screen (Anthropic CodeSignal style, 90m) |
+| Week 4 | **Concurrency** (processes, threads, GIL/`asyncio`, races, locks, deadlock, thread pools, async I/O, bounded buffer, single-flight); debugging, code reading, AI verification | Mock 4: Concurrency coding (crawler / single-flight cache) — **technical-screen ready** |
+| Week 5 | System design foundations: scoping, capacity/p99 math, TCP/HTTP/TLS/DNS, stateless services, load balancing, APIs, caching, **CDNs/object storage**, SLOs | Mock 5: Google coding #3 (Medium-Hard + scale follow-up) |
+| Week 6 | Probabilistic DS, storage engines (B-tree/LSM/WAL), SQL/EXPLAIN, modeling, indexes, ACID, **MVCC**, choosing a DB, **AuthN/AuthZ & multi-tenancy**; URL shortener | Mock 6: System Design #1 (storage & foundations) |
 | Week 7 | **Google L5 distributed systems deep dive**: consistent hashing, replication/sharding, **hot keys & cross-shard indexes**, consistency/CAP/PACELC, **Raft/Paxos consensus**, clocks, quorums, **distributed locks/leases**, queues/idempotency, **sagas/outbox/2PC**, failure modes & overload protection; rate limiter & distributed KV store | Mock 7: System Design #2 (Google L5 hard distributed system + black-box grilling) |
-| Week 8 | **Multi-region**, **deployment safety & zero-downtime migrations**, real-time (WS/SSE/pub-sub), **search & inverted index**, **batch & stream processing**; job scheduler, payment ledger, chat, typeahead, web crawler; influence stories | Mock 8: System Design #3 (real-time, search or streaming + minute-25 shift) |
-| Week 9 | **Core AI systems (Anthropic & 2026 Google)**: transformers at systems level, **LLM inference serving** (continuous batching, KV cache, TTFT vs throughput), LLM APIs, **evals**, **LLM security**; inference API & token rate limiter; mentoring & prioritization stories | Mock 9: System Design #4 (Anthropic AI-infra: inference gateway + token quotas) |
-| Week 10 | **Google L5 follow-up finishers**: **streaming & external algorithms**, Fenwick/BIT, bits, rolling hash; **Google G&L + Anthropic Values (`14.09`)**; hiring manager round (`15.12`) | Mock 10: Senior Behavioral (Google G&L hypotheticals + Anthropic Values) |
-| Onsite | Triggered the day *any* onsite is booked: stack traces, optional debugging / code review / LLD / AI-assisted coding (`15.09`) per recruiter round list | Mock 11: Full-loop rehearsal (back-to-back) |
+| Week 8 | **Multi-region**, **deployment safety & zero-downtime migrations**, real-time (WS/SSE/pub-sub), **search & inverted index**, **batch & stream processing**; job scheduler, payment ledger, chat, typeahead, web crawler | Mock 8: System Design #3 (real-time, search or streaming + minute-25 shift) |
+| Week 9 | **Core AI systems (Anthropic & 2026 Google)**: transformers at systems level, **LLM inference serving** (continuous batching, KV cache, TTFT vs throughput), LLM APIs, **evals**, **LLM security**; inference API & token rate limiter | Mock 9: System Design #4 (Anthropic AI-infra: inference gateway + token quotas) |
+| Week 10 | **Advanced DSA & Google L5 follow-ups**: **streaming & external algorithms**, Fenwick/BIT, bits, rolling hash | Mock 10: Google L5 Hard + streaming/100TB follow-up |
+| Parallel | **Behavioral & Leadership (~1h/week on Sundays)**: STAR stories, **Google G&L + Anthropic Values**, past-project deep dive mock, hiring manager mock | Mock: Senior Behavioral (Google G&L hypotheticals + Anthropic Values) |
+| Onsite | Triggered the day *any* onsite is booked: stack traces, optional debugging / code review / LLD / AI-assisted coding per recruiter round list | Mock 11: Full-loop rehearsal (back-to-back) |
 | Packs | Pickable company packs: **Google** (Drive, Docs/CRDT, Geo/S2, landmark papers), **Anthropic** (RAG, Agents/Sandboxing, Containers, Evals, Safety, GPUs), **Consumer** (Meta/Netflix/Uber: Feed, Notifications, Flash-Sale, Video, Chaos, Recs, A/B) | |
 
 Everything else (the P2s and the deeper P1s) is listed as **Deferred** at the

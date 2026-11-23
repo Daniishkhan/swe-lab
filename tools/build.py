@@ -101,12 +101,13 @@ def check_track(data: dict) -> list[str]:
             if fmt and fmt not in topics:
                 errors.append(f"milestone {mid} names unknown format {fmt}")
     final = {step["topic"]: st["id"] for st in stages for step in st["steps"]}
-    picking = False
+    phase = 0  # 0 = main, 1 = parallel, 2 = pick
     for st in stages:
-        if picking and not st.get("pick"):
-            errors.append(f"stage {st['id']} comes after a pick stage; pick stages go last")
-        picking = picking or bool(st.get("pick"))
-        local = {}  # what this pick stage has placed so far
+        st_phase = 2 if st.get("pick") else (1 if st.get("parallel") else 0)
+        if st_phase < phase:
+            errors.append(f"stage {st['id']} is out of order; main stages come first, then parallel, then pick stages")
+        phase = st_phase
+        local = {}  # what this parallel or pick stage has placed so far
         for step in st["steps"]:
             tid = step["topic"]
             if tid not in topics:
@@ -124,7 +125,7 @@ def check_track(data: dict) -> list[str]:
                     errors.append(f"{tid} ({st['id']}) is required but builds on optional step {r}")
             kind = "optional" if step.get("optional") else "required"
             placed[tid] = st["id"]
-            (local if st.get("pick") else main)[tid] = kind
+            (local if (st.get("pick") or st.get("parallel")) else main)[tid] = kind
     return errors
 
 

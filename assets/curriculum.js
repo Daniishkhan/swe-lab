@@ -4,22 +4,115 @@ window.CURRICULUM = {
   "rule": "Every step builds only on steps before it. tools/build.py fails the build if one doesn't.",
   "stages": [
    {
-    "id": "w1",
-    "label": "Week 1",
-    "title": "Core data structures, complexity and bare-editor habits",
-    "goal": "Hash maps, stacks, queues, trees and heaps feel routine, you hand-trace every solution in a plain editor before running it, and your 60-second intro and flagship project map are ready for early recruiter calls.",
-    "daily": "Two timed problems a day from the chapters you have read, 25 to 30 minutes each, in a plain editor without running code until after you hand-trace it (the Google bare-editor method in 15.01). Log each one.",
+    "id": "p0",
+    "label": "Phase 0",
+    "title": "Python fluency warm-up, coding playbook & recruiter baseline",
+    "goal": "Build effortless Python muscle memory (comprehensions, lambdas, generators, data model, gotchas and stdlib), learn the bare-editor coding protocol, and lock down your 60-second intro and flagship project map before Week 1 begins.",
     "steps": [
      {
-      "topic": "02.01"
-     },
-     {
-      "topic": "15.01",
-      "do": "Read it on day 1, before your first timed drill: clarify, state brute force and cost, optimize, hand-trace edge cases in a bare editor with no execution, then handle follow-ups."
+      "topic": "10.10",
+      "do": "Spend real time here so Python never slows you down in mocks. Ask Claude: “teach me Python interview fluency in depth” — cover list/dict/set comprehensions, multi-key lambdas, closures and late binding, lazy generators (yield/yield from), itertools, dataclasses, decorators, context managers, and classic pitfalls (2D grid aliasing, mutable defaults, slicing costs). Then solve py_idioms and py_internals."
      },
      {
       "topic": "10.01",
-      "do": "Learn Python's interview stdlib (collections, heapq, bisect, itertools, functools), write a one-page cheat sheet, then do py_toolkit."
+      "do": "Master the interview standard library (Counter, defaultdict, deque, heapq, bisect, itertools, functools.cache / cmp_to_key), write your one-page cheat sheet, and complete py_toolkit."
+     },
+     {
+      "topic": "15.01",
+      "do": "Learn the Google bare-editor protocol once and keep it as a reference card for every drill and mock: clarify, brute force + cost, optimize, hand-trace edge cases without running code, handle follow-ups."
+     },
+     {
+      "topic": "14.01",
+      "do": "Draft your 60-second 'tell me about yourself' and your flagship project deep-dive worksheet (python3 tools/new.py deepdive \"Project\") so early recruiter and hiring manager calls don't disrupt technical weeks."
+     }
+    ],
+    "dayNote": "About 17 hours across 4 days (~4 to 4.5 hours/day) before Week 1. Investing time in Python fluency upfront pays off on every coding mock and drill.",
+    "days": [
+     {
+      "label": "Day 1 · Comprehensions, lambdas, closures & generators",
+      "plan": [
+       {
+        "t": "2h",
+        "topic": "10.10",
+        "do": "Deep dive with Claude: list/dict/set comprehensions, lambda sort keys, late-binding closures, zip/enumerate/itertools, yield and yield from"
+       },
+       {
+        "t": "2h 15m",
+        "topic": "10.10",
+        "do": "Complete py_idioms (all 5 functions) and explain the 'say it out loud' questions"
+       }
+      ],
+      "drills": []
+     },
+     {
+      "label": "Day 2 · Python data model, gotchas, decorators & context managers",
+      "plan": [
+       {
+        "t": "2h",
+        "topic": "10.10",
+        "do": "Deep dive with Claude: object references, shallow vs deep copy, 2D grid aliasing, mutable defaults, slicing costs, @dataclass(frozen=True, order=True), @wraps/@cache decorators and @contextmanager"
+       },
+       {
+        "t": "2h 15m",
+        "topic": "10.10",
+        "do": "Complete py_internals (all 5 drills) and review every trap you hit"
+       }
+      ],
+      "drills": []
+     },
+     {
+      "label": "Day 3 · Standard library toolkit & bare-editor playbook",
+      "plan": [
+       {
+        "t": "1h 15m",
+        "topic": "10.01",
+        "do": "Build your one-page Python stdlib cheat sheet (Counter, defaultdict, deque, heapq, bisect, itertools, functools)"
+       },
+       {
+        "t": "2h",
+        "topic": "10.01",
+        "do": "Complete py_toolkit (work-capped O(n)/O(n log n) tests)"
+       },
+       {
+        "t": "1h",
+        "topic": "15.01",
+        "do": "Learn the Google bare-editor coding playbook and save your dry-run checklist"
+       }
+      ],
+      "drills": []
+     },
+     {
+      "label": "Day 4 · Flagship project baseline & Python speed check",
+      "plan": [
+       {
+        "t": "2h 30m",
+        "topic": "14.01",
+        "do": "Score 3 past projects, draft your 60-sec intro, and finish the flagship deep-dive map, metrics and rejected alternatives"
+       },
+       {
+        "t": "1h",
+        "topic": "14.01",
+        "do": "Rehearse your 60-sec intro and 5-minute project map out loud with a timer"
+       },
+       {
+        "t": "45m",
+        "topic": "10.10",
+        "do": "Redo any shaky idiom from py_idioms / py_internals / py_toolkit from a blank editor"
+       }
+      ],
+      "drills": []
+     }
+    ]
+   },
+   {
+    "id": "w1",
+    "label": "Week 1",
+    "title": "Complexity and core data structures",
+    "goal": "Complexity reasoning, hash maps, stacks, queues, trees, heaps and sorting feel routine, and you dry-run every solution by hand in a plain editor before running it.",
+    "daily": "Two timed problems a day from the chapters you have read, 25 to 30 minutes each, in a plain editor using Phase 0's bare-editor protocol (hand-trace before executing). Log each one.",
+    "steps": [
+     {
+      "topic": "02.01"
      },
      {
       "topic": "01.01",
@@ -40,36 +133,27 @@ window.CURRICULUM = {
      {
       "topic": "02.02",
       "do": "Focus on stability, custom sort keys, merge/quickselect and when O(n) bucket/counting sort beats O(n log n). Code merge_sort and quickselect in sorts; the rest is a stretch."
-     },
-     {
-      "topic": "14.01",
-      "do": "Draft your 60-second 'tell me about yourself' and your flagship project deep-dive worksheet (python3 tools/new.py deepdive \"Project\") so early recruiter and hiring manager calls don't catch you cold."
      }
     ],
-    "dayNote": "About 29 hours (~4.5 to 5 hours/day for 6 days, plus a lighter mock + review day on Sunday). Stretch exercises are optional. Never skip hand-tracing before running code.",
+    "dayNote": "About 27.5 hours of pure technical prep (~4 to 4.5 hours/day Mon–Sat + light Sunday mock, leaving ~1 hour on Sunday for your Parallel Behavioral track). Stretch exercises are optional.",
     "days": [
      {
       "label": "Day 1 · Monday",
       "plan": [
        {
-        "t": "1h 15m",
+        "t": "1h 30m",
         "topic": "02.01",
-        "do": "Learn complexity & amortized analysis (ask Claude 'teach me complexity and amortized analysis')"
+        "do": "Learn complexity, amortized analysis and when constants/memory matter"
        },
        {
-        "t": "1h 15m",
+        "t": "1h 30m",
         "topic": "02.01",
         "do": "complexity_drills"
        },
        {
-        "t": "45m",
-        "topic": "15.01",
-        "do": "Learn the Google bare-editor coding loop (clarify, brute force, optimize, hand-trace, follow-ups)"
-       },
-       {
         "t": "1h 15m",
-        "topic": "10.01",
-        "do": "Make your Python stdlib one-page cheat sheet and start py_toolkit"
+        "topic": "01.01",
+        "do": "Read hash-maps.html and answer every quick check"
        }
       ],
       "drills": []
@@ -78,19 +162,14 @@ window.CURRICULUM = {
       "label": "Day 2 · Tuesday",
       "plan": [
        {
-        "t": "45m",
-        "topic": "10.01",
-        "do": "Finish py_toolkit"
+        "t": "2h",
+        "topic": "01.01",
+        "do": "Warm-ups, then hash_map and hash_patterns (probing_map is stretch)"
        },
        {
         "t": "1h 15m",
-        "topic": "01.01",
-        "do": "Read hash-maps.html and answer every quick check"
-       },
-       {
-        "t": "1h 45m",
-        "topic": "01.01",
-        "do": "Warm-ups, then hash_map and hash_patterns (probing_map is stretch)"
+        "topic": "01.02",
+        "do": "Learn linked lists, stacks, queues, deques and monotonic stack/queue"
        }
       ],
       "drills": [
@@ -102,19 +181,14 @@ window.CURRICULUM = {
       "label": "Day 3 · Wednesday",
       "plan": [
        {
-        "t": "1h 15m",
-        "topic": "01.02",
-        "do": "Learn linked lists, stacks, queues, deques and monotonic stack/queue"
-       },
-       {
         "t": "2h",
         "topic": "01.02",
         "do": "linked_lists and monotonic (ring_deque is stretch)"
        },
        {
-        "t": "45m",
-        "topic": "14.01",
-        "do": "Score three past projects, pick your flagship, and draft your 60-second intro"
+        "t": "1h 15m",
+        "topic": "01.03",
+        "do": "Learn BSTs, balanced trees (conceptual), traversals and LCA"
        }
       ],
       "drills": [
@@ -126,19 +200,14 @@ window.CURRICULUM = {
       "label": "Day 4 · Thursday",
       "plan": [
        {
+        "t": "2h",
+        "topic": "01.03",
+        "do": "tree_traversals and LCA practice (bst delete is stretch)"
+       },
+       {
         "t": "1h 15m",
-        "topic": "01.03",
-        "do": "Learn BSTs, balanced trees (conceptual), traversals and LCA"
-       },
-       {
-        "t": "1h 45m",
-        "topic": "01.03",
-        "do": "tree_traversals (bst delete is stretch)"
-       },
-       {
-        "t": "1h",
-        "topic": "14.01",
-        "do": "Draft your flagship deep-dive map, scale numbers and rejected alternatives"
+        "topic": "01.04",
+        "do": "Learn binary heaps, top-k, k-way merge and two-heap medians"
        }
       ],
       "drills": [
@@ -150,17 +219,12 @@ window.CURRICULUM = {
       "label": "Day 5 · Friday",
       "plan": [
        {
-        "t": "1h 15m",
-        "topic": "01.04",
-        "do": "Learn binary heaps, top-k, k-way merge and two-heap medians"
-       },
-       {
-        "t": "1h 45m",
+        "t": "2h",
         "topic": "01.04",
         "do": "min_heap and heap_patterns"
        },
        {
-        "t": "1h",
+        "t": "1h 15m",
         "topic": "02.02",
         "do": "Learn sorting trade-offs, stability, Timsort and quickselect"
        }
@@ -179,14 +243,9 @@ window.CURRICULUM = {
         "do": "sorts (merge sort and quickselect; remaining sorts are stretch)"
        },
        {
-        "t": "1h 15m",
-        "topic": "14.01",
-        "do": "Finish your deep-dive worksheet and practice the 5-minute map out loud"
-       },
-       {
-        "t": "1h",
+        "t": "1h 30m",
         "topic": "01.02",
-        "do": "Redo the hardest drill from Days 2 to 5 from a blank editor"
+        "do": "Redo the two hardest drills from Days 2 to 5 from a blank editor"
        }
       ],
       "drills": [
@@ -198,11 +257,6 @@ window.CURRICULUM = {
       "label": "Day 7 · Sunday",
       "plan": [
        {
-        "t": "20m",
-        "topic": "15.01",
-        "do": "Review your bare-editor checklist and common edge cases"
-       },
-       {
         "t": "1h",
         "topic": "m1",
         "do": "45-minute bare-editor mock plus feedback and logging"
@@ -210,7 +264,7 @@ window.CURRICULUM = {
        {
         "t": "1h",
         "topic": "01.01",
-        "do": "Light review of weakest topic from Week 1"
+        "do": "Targeted review of weakest topic from Week 1 (plus ~1h on your Parallel Behavioral track)"
        }
       ],
       "drills": []
@@ -262,9 +316,6 @@ window.CURRICULUM = {
      {
       "topic": "02.08",
       "do": "Google staple: learn Dijkstra and 0-1 BFS, then do dijkstra and timed drills. Bellman-Ford and A* are stretch."
-     },
-     {
-      "topic": "14.02"
      }
     ],
     "milestone": {
@@ -279,7 +330,7 @@ window.CURRICULUM = {
     "id": "w3",
     "label": "Week 3",
     "title": "DP, greedy and practical 4-level builds (Anthropic OA ready)",
-    "goal": "Dynamic programming and greedy proofs stop feeling like guesswork, you can architect a component across 4 escalating requirements with tests first, and your past-project deep dive holds up under grilling.",
+    "goal": "Dynamic programming and greedy proofs stop feeling like guesswork, and you can architect a clean, extensible component across 4 escalating requirements with tests first.",
     "daily": "One timed bare-editor algorithmic problem (mixing Weeks 1 to 3) plus one practical build slice or timed DP/greedy drill.",
     "steps": [
      {
@@ -313,10 +364,6 @@ window.CURRICULUM = {
      {
       "topic": "10.04",
       "do": "Anthropic CodeSignal prep — two 90-minute 4-level builds, tests first: (1) an in-memory key-value store with TTL, prefix scan and transactions; (2) an in-memory file system with quotas (or banking ledger). Skip parking lot and elevator."
-     },
-     {
-      "topic": "15.10",
-      "do": "Ask Claude: “mock interview, past-project deep dive, 45 minutes” with your worksheet closed. Expect follow-ups on every trade-off, failure and metric."
      }
     ],
     "milestone": {
@@ -417,19 +464,19 @@ window.CURRICULUM = {
      },
      {
       "topic": "09.04",
-      "do": "Ask Claude: “teach me TCP, UDP, HTTP, TLS and DNS” (60 minutes for this step and 09.03): handshakes, RTT cost, keep-alive, connection pooling, HTTP/2 multiplexing, HTTP/3/QUIC, TLS termination."
+      "do": "Ask Claude: “teach me TCP, UDP, HTTP, TLS and DNS” (60 minutes covering TCP/UDP, HTTP, TLS and DNS): handshakes, RTT cost, keep-alive, connection pooling, HTTP/2 multiplexing, HTTP/3/QUIC, TLS termination."
      },
      {
       "topic": "09.03",
-      "do": "Covered with 09.04. Explain back, hop by hop, what happens when a client calls an HTTPS API and where latency hides."
+      "do": "Covered in the same networking session as TCP vs UDP. Explain back, hop by hop, what happens when a client calls an HTTPS API and where latency hides."
      },
      {
       "topic": "04.11",
-      "do": "Ask Claude: “teach me stateless services and load balancing” (45 minutes for this step and 04.04): session externalization, horizontal scaling, L4 vs L7, health checks and why sticky sessions hurt."
+      "do": "Ask Claude: “teach me stateless services and load balancing” (45 minutes covering stateless services and load balancing): session externalization, horizontal scaling, L4 vs L7, health checks and why sticky sessions hurt."
      },
      {
       "topic": "04.04",
-      "do": "Covered with 04.11. Explain back when you pick L4 vs L7 and how draining works during deploys."
+      "do": "Covered in the same session as stateless services. Explain back when you pick L4 vs L7 and how draining works during deploys."
      },
      {
       "topic": "04.09"
@@ -443,9 +490,6 @@ window.CURRICULUM = {
      {
       "topic": "11.01",
       "do": "Ask Claude: “teach me SLIs, SLOs and error budgets” (45 minutes). From now on, end every system design with two concrete SLOs and the one symptom alert you'd page on."
-     },
-     {
-      "topic": "14.03"
      }
     ],
     "milestone": {
@@ -477,11 +521,11 @@ window.CURRICULUM = {
      },
      {
       "topic": "06.04",
-      "do": "Ask Claude: “teach me data modeling and indexing” (60 minutes for this step and 06.01): normalize first, denormalize only for a named query, composite index column order, covering indexes and write overhead."
+      "do": "Ask Claude: “teach me data modeling and indexing” (60 minutes covering data modeling and indexing): normalize first, denormalize only for a named query, composite index column order, covering indexes and write overhead."
      },
      {
       "topic": "06.01",
-      "do": "Covered with 06.04. Explain back left-prefix rules for composite indexes and when an index hurts write throughput."
+      "do": "Covered in the same session as data modeling. Explain back left-prefix rules for composite indexes and when an index hurts write throughput."
      },
      {
       "topic": "06.02"
@@ -496,18 +540,15 @@ window.CURRICULUM = {
      },
      {
       "topic": "12.01",
-      "do": "Ask Claude: “teach me AuthN/AuthZ and multi-tenant isolation for system design” (45 minutes for this step and 12.05): OAuth 2.0/OIDC, JWT vs opaque sessions, RBAC/ABAC, tenant boundaries and noisy-neighbor isolation."
+      "do": "Ask Claude: “teach me AuthN/AuthZ and multi-tenant isolation for system design” (45 minutes covering AuthN/AuthZ and multi-tenant isolation): OAuth 2.0/OIDC, JWT vs opaque sessions, RBAC/ABAC, tenant boundaries and noisy-neighbor isolation."
      },
      {
       "topic": "12.05",
-      "do": "Covered with 12.01. Explain back how you prevent cross-tenant data leaks and noisy-neighbor exhaustion in a shared service."
+      "do": "Covered in the same session as AuthN/AuthZ. Explain back how you prevent cross-tenant data leaks and noisy-neighbor exhaustion in a shared service."
      },
      {
       "topic": "07.01",
       "do": "Warm-up design (30 to 45 min, timed, out loud): URL shortener / pastebin, including custom aliases, analytics, cache stampede and key generation."
-     },
-     {
-      "topic": "14.04"
      }
     ],
     "milestone": {
@@ -538,11 +579,11 @@ window.CURRICULUM = {
      },
      {
       "topic": "05.02",
-      "do": "Ask Claude: “teach me consistency models and CAP/PACELC” (60 minutes for this step and 05.01): linearizable, sequential, causal, read-your-writes and eventual consistency with real examples."
+      "do": "Ask Claude: “teach me consistency models and CAP/PACELC” (60 minutes covering consistency models and CAP/PACELC): linearizable, sequential, causal, read-your-writes and eventual consistency with real examples."
      },
      {
       "topic": "05.01",
-      "do": "Covered with 05.02. Explain back what PACELC adds to CAP and place Spanner, DynamoDB, Cassandra and Postgres on it."
+      "do": "Covered in the same session as consistency models. Explain back what PACELC adds to CAP and place Spanner, DynamoDB, Cassandra and Postgres on it."
      },
      {
       "topic": "05.04",
@@ -560,11 +601,11 @@ window.CURRICULUM = {
      },
      {
       "topic": "04.08",
-      "do": "Ask Claude: “teach me message queues, event logs and delivery guarantees” (60 minutes for this step and 05.03): Kafka partitions/consumer groups vs SQS, ordering, DLQs and idempotency keys."
+      "do": "Ask Claude: “teach me message queues, event logs and delivery guarantees” (60 minutes covering queues, event streams and delivery guarantees): Kafka partitions/consumer groups vs SQS, ordering, DLQs and idempotency keys."
      },
      {
       "topic": "05.03",
-      "do": "Covered with 04.08. Explain back how an idempotency key turns at-least-once delivery into effectively-once."
+      "do": "Covered in the same session as message queues. Explain back how an idempotency key turns at-least-once delivery into effectively-once."
      },
      {
       "topic": "05.07",
@@ -572,11 +613,11 @@ window.CURRICULUM = {
      },
      {
       "topic": "05.08",
-      "do": "Ask Claude: “teach me distributed failure modes and overload protection” (60 minutes for this step and 04.12): split brain, gray failure, thundering herd, retry storms, timeouts, jitter, circuit breakers, load shedding and bulkheads."
+      "do": "Ask Claude: “teach me distributed failure modes and overload protection” (60 minutes covering failure modes and overload protection): split brain, gray failure, thundering herd, retry storms, timeouts, jitter, circuit breakers, load shedding and bulkheads."
      },
      {
       "topic": "04.12",
-      "do": "Covered with 05.08. Explain back how retries amplify outages and how token buckets + jitter + load shedding stop a cascade."
+      "do": "Covered in the same session as failure modes. Explain back how retries amplify outages and how token buckets + jitter + load shedding stop a cascade."
      },
      {
       "topic": "07.02"
@@ -606,11 +647,11 @@ window.CURRICULUM = {
      },
      {
       "topic": "11.02",
-      "do": "Ask Claude: “teach me deployment safety and zero-downtime migrations” (45 minutes for this step and 04.17): canary rollouts, feature flags, automated rollback, expand-contract, dual writes, backfills and shadow traffic."
+      "do": "Ask Claude: “teach me deployment safety and zero-downtime migrations” (45 minutes covering deployment safety and zero-downtime migrations): canary rollouts, feature flags, automated rollback, expand-contract, dual writes, backfills and shadow traffic."
      },
      {
       "topic": "04.17",
-      "do": "Covered with 11.02. Explain back how to migrate a live high-QPS table to a new schema or database with zero downtime."
+      "do": "Covered in the same session as deployment safety. Explain back how to migrate a live high-QPS table to a new schema or database with zero downtime."
      },
      {
       "topic": "04.14"
@@ -621,11 +662,11 @@ window.CURRICULUM = {
      },
      {
       "topic": "06.07",
-      "do": "Ask Claude: “teach me batch and stream processing” (60 minutes for this step and 06.08): event time vs processing time, tumbling/sliding windows, watermarks, late data and checkpointing."
+      "do": "Ask Claude: “teach me batch and stream processing” (60 minutes covering batch and stream processing): event time vs processing time, tumbling/sliding windows, watermarks, late data and checkpointing."
      },
      {
       "topic": "06.08",
-      "do": "Covered with 06.07. Explain back why event time differs from processing time and how watermarks bound state."
+      "do": "Covered in the same session as batch vs stream processing. Explain back why event time differs from processing time and how watermarks bound state."
      },
      {
       "topic": "07.10"
@@ -650,9 +691,6 @@ window.CURRICULUM = {
      {
       "topic": "07.19",
       "optional": true
-     },
-     {
-      "topic": "14.05"
      }
     ],
     "milestone": {
@@ -699,12 +737,6 @@ window.CURRICULUM = {
      {
       "topic": "07.27",
       "optional": true
-     },
-     {
-      "topic": "14.06"
-     },
-     {
-      "topic": "14.07"
      }
     ],
     "milestone": {
@@ -718,9 +750,9 @@ window.CURRICULUM = {
    {
     "id": "w10",
     "label": "Week 10",
-    "title": "Google L5 follow-up finishers and senior behavioral leveling",
-    "goal": "You handle Google's signature scale follow-ups (streaming, 100TB external data, range queries, rolling hashes), your 8 to 10 STAR stories map cleanly to L5 scope, and you can ace both Google G&L and Anthropic Values rounds.",
-    "daily": "Two timed bare-editor Google Medium-Hard problems a day (explicitly rehearsing streaming/memory follow-ups) plus 30 minutes of timed spoken story rehearsal.",
+    "title": "Advanced DSA and Google L5 scale follow-ups",
+    "goal": "Close the remaining high-ceiling algorithmic follow-up patterns—streaming and 100TB external data, dynamic prefix sums, bit tricks and rolling hashes—so Google L5 constraint shifts never rattle you.",
+    "daily": "Two timed bare-editor Google Medium-Hard problems a day, explicitly practicing streaming, bounded-RAM and dynamic-update follow-ups.",
     "steps": [
      {
       "topic": "02.13",
@@ -737,20 +769,59 @@ window.CURRICULUM = {
      {
       "topic": "02.12",
       "do": "Learn rolling hash (Rabin-Karp) and conceptual KMP: do rabin_karp. kmp_search and longest_dup_substring are stretch."
-     },
-     {
-      "topic": "14.09",
-      "do": "Calibrate for your top targets: (1) Google G&L — prepare 8 to 10 L5-scope STAR stories PLUS practice 4 hypothetical leadership scenarios ('PM pushes to ship with tech debt', 'two senior engineers deadlocked'); (2) Anthropic Values — study Anthropic's mission, Core Views on AI Safety and Responsible Scaling Policy, and prepare honest stories on epistemic humility and safety trade-offs. For any other company, run a 30-minute values & round-format check before recruiter screens."
-     },
-     {
-      "topic": "15.12",
-      "do": "Ask Claude: “mock interview, hiring manager round, 45 minutes”. Bring your flagship project deep dive, an ownership-under-ambiguity story, and three sharp questions about the team's hardest technical problems."
      }
     ],
     "milestone": {
      "id": "m10",
+     "format": "15.01",
+     "title": "Mock 10: Google L5 Hard + streaming/100TB follow-up",
+     "bar": "One unseen Hard or multi-part Medium-Hard in 45 minutes in a bare editor, with clean hand-tracing and a strong follow-up pivot to streaming or external-memory constraints. Score 3+ on all four coding signals.",
+     "ask": "mock interview, coding (Google L5 bare-editor Hard + streaming/external-memory follow-up), 45 minutes"
+    }
+   },
+   {
+    "id": "behavioral",
+    "label": "Behavioral",
+    "title": "Behavioral, leadership and career narrative",
+    "parallel": true,
+    "goal": "Run ~1 hour every Sunday in parallel with Weeks 1 to 10. Build 8 to 10 L5-scope STAR stories, rehearse Google G&L hypotheticals and Anthropic Values, and clear your project deep dive and hiring manager mocks without breaking technical focus.",
+    "daily": "One Sunday hour: write or refine one STAR story, map it to multiple prompts in story-bank.md, and say the 2-minute version out loud with a timer.",
+    "steps": [
+     {
+      "topic": "14.02"
+     },
+     {
+      "topic": "14.03"
+     },
+     {
+      "topic": "15.10",
+      "do": "Run around Week 3 (before HM calls land): ask Claude “mock interview, past-project deep dive, 45 minutes” with your Phase 0 worksheet closed. Expect follow-ups on every trade-off, failure and metric."
+     },
+     {
+      "topic": "14.04"
+     },
+     {
+      "topic": "14.05"
+     },
+     {
+      "topic": "14.06"
+     },
+     {
+      "topic": "14.07"
+     },
+     {
+      "topic": "14.09",
+      "do": "Calibrate for your top targets: (1) Google G&L — map your 8 to 10 STAR stories to L5 scope PLUS practice 4 hypothetical leadership scenarios ('PM pushes to ship with tech debt', 'two senior engineers deadlocked'); (2) Anthropic Values — study Anthropic's mission, Core Views on AI Safety and Responsible Scaling Policy, and prepare honest stories on epistemic humility and safety trade-offs. For any other company, run a 30-minute values & round-format check before screens."
+     },
+     {
+      "topic": "15.12",
+      "do": "Run before your first HM call (or around Week 6 to 8): ask Claude “mock interview, hiring manager round, 45 minutes”. Bring your flagship project deep dive, an ownership-under-ambiguity story, and three sharp questions about the team's hardest technical problems."
+     }
+    ],
+    "milestone": {
+     "id": "mb",
      "format": "15.11",
-     "title": "Mock 10: Senior behavioral (Google G&L + Anthropic Values)",
+     "title": "Mock: Senior behavioral (Google G&L + Anthropic Values)",
      "bar": "45 minutes: three L5-scope STAR stories (ambiguity/ownership, cross-team influence/conflict, owned failure), two Google-style leadership hypotheticals, and an Anthropic mission/epistemic-humility probe. Score 3+ on all four behavioral signals.",
      "ask": "mock interview, behavioral (Google L5 G&L with hypotheticals + Anthropic values), 45 minutes"
     }
@@ -951,7 +1022,8 @@ window.CURRICULUM = {
        "Insert Delete GetRandom O(1)",
        "M"
       ]
-     ]
+     ],
+     "short": "Hash maps & sets"
     },
     {
      "id": "01.02",
@@ -990,7 +1062,8 @@ window.CURRICULUM = {
        "Largest Rectangle in Histogram",
        "H"
       ]
-     ]
+     ],
+     "short": "Linked lists, stacks, queues & monotonic stacks"
     },
     {
      "id": "01.03",
@@ -1034,7 +1107,8 @@ window.CURRICULUM = {
        "Binary Tree Maximum Path Sum",
        "H"
       ]
-     ]
+     ],
+     "short": "Trees, BSTs & traversals"
     },
     {
      "id": "01.04",
@@ -1065,7 +1139,8 @@ window.CURRICULUM = {
        "Find Median from Data Stream",
        "H"
       ]
-     ]
+     ],
+     "short": "Heaps & priority queues"
     },
     {
      "id": "01.05",
@@ -1084,7 +1159,8 @@ window.CURRICULUM = {
        "Clone Graph",
        "M"
       ]
-     ]
+     ],
+     "short": "Graph representations"
     },
     {
      "id": "01.06",
@@ -1112,7 +1188,8 @@ window.CURRICULUM = {
        "Word Search II",
        "H"
       ]
-     ]
+     ],
+     "short": "Tries & prefix trees"
     },
     {
      "id": "01.07",
@@ -1145,7 +1222,8 @@ window.CURRICULUM = {
        "Number of Islands II",
        "H"
       ]
-     ]
+     ],
+     "short": "Union-Find (disjoint sets)"
     },
     {
      "id": "01.08",
@@ -1165,7 +1243,8 @@ window.CURRICULUM = {
        "LFU Cache",
        "H"
       ]
-     ]
+     ],
+     "short": "LRU, TTL & LFU caches"
     },
     {
      "id": "01.09",
@@ -1211,7 +1290,8 @@ window.CURRICULUM = {
        "Range Module",
        "H"
       ]
-     ]
+     ],
+     "short": "Intervals & sweep line"
     },
     {
      "id": "01.10",
@@ -1230,7 +1310,8 @@ window.CURRICULUM = {
        "Count of Smaller Numbers After Self",
        "H"
       ]
-     ]
+     ],
+     "short": "Fenwick (BIT) & segment trees"
     },
     {
      "id": "01.11",
@@ -1248,7 +1329,8 @@ window.CURRICULUM = {
      "requires": [
       "01.01",
       "01.04"
-     ]
+     ],
+     "short": "Bloom filters & probabilistic structures"
     },
     {
      "id": "01.13",
@@ -1258,7 +1340,8 @@ window.CURRICULUM = {
       "01.03",
       "01.04",
       "01.12"
-     ]
+     ],
+     "short": "Storage engines: B-trees, LSM trees & WAL"
     },
     {
      "id": "01.14",
@@ -1268,7 +1351,8 @@ window.CURRICULUM = {
       "01.02",
       "01.01",
       "03.03"
-     ]
+     ],
+     "short": "Concurrent data structures"
     }
    ],
    "concepts": [
@@ -1627,7 +1711,8 @@ window.CURRICULUM = {
      "id": "02.01",
      "tag": "P0",
      "text": "Complexity analysis: time, space, amortized; knowing when constants matter",
-     "requires": []
+     "requires": [],
+     "short": "Complexity & amortized cost"
     },
     {
      "id": "02.02",
@@ -1654,7 +1739,8 @@ window.CURRICULUM = {
        "Largest Number",
        "M"
       ]
-     ]
+     ],
+     "short": "Sorting & quickselect"
     },
     {
      "id": "02.03",
@@ -1694,7 +1780,8 @@ window.CURRICULUM = {
        "Median of Two Sorted Arrays",
        "H"
       ]
-     ]
+     ],
+     "short": "Binary search & search on the answer"
     },
     {
      "id": "02.04",
@@ -1734,7 +1821,8 @@ window.CURRICULUM = {
        "Minimum Window Substring",
        "H"
       ]
-     ]
+     ],
+     "short": "Two pointers, sliding window & prefix sums"
     },
     {
      "id": "02.05",
@@ -1775,7 +1863,8 @@ window.CURRICULUM = {
        "Word Ladder",
        "H"
       ]
-     ]
+     ],
+     "short": "Graph traversals & topological sort"
     },
     {
      "id": "02.06",
@@ -1810,7 +1899,8 @@ window.CURRICULUM = {
        "N-Queens",
        "H"
       ]
-     ]
+     ],
+     "short": "Recursion & backtracking"
     },
     {
      "id": "02.07",
@@ -1858,7 +1948,8 @@ window.CURRICULUM = {
        "Burst Balloons",
        "H"
       ]
-     ]
+     ],
+     "short": "Dynamic programming"
     },
     {
      "id": "02.08",
@@ -1889,7 +1980,8 @@ window.CURRICULUM = {
        "Shortest Path in a Grid with Obstacles Elimination",
        "H"
       ]
-     ]
+     ],
+     "short": "Shortest paths (Dijkstra & 0-1 BFS)"
     },
     {
      "id": "02.09",
@@ -1905,7 +1997,8 @@ window.CURRICULUM = {
        "Min Cost to Connect All Points",
        "M"
       ]
-     ]
+     ],
+     "short": "Minimum spanning trees"
     },
     {
      "id": "02.10",
@@ -1937,7 +2030,8 @@ window.CURRICULUM = {
        "Hand of Straights",
        "M"
       ]
-     ]
+     ],
+     "short": "Greedy & exchange arguments"
     },
     {
      "id": "02.11",
@@ -1968,7 +2062,8 @@ window.CURRICULUM = {
        "Sum of Two Integers",
        "M"
       ]
-     ]
+     ],
+     "short": "Bit manipulation"
     },
     {
      "id": "02.12",
@@ -1992,7 +2087,8 @@ window.CURRICULUM = {
        "Longest Duplicate Substring",
        "H"
       ]
-     ]
+     ],
+     "short": "Rolling hash & string matching"
     },
     {
      "id": "02.13",
@@ -2001,7 +2097,8 @@ window.CURRICULUM = {
      "requires": [
       "02.02",
       "01.04"
-     ]
+     ],
+     "short": "Streaming & external-memory algorithms"
     },
     {
      "id": "02.14",
@@ -2011,7 +2108,8 @@ window.CURRICULUM = {
       "02.04",
       "01.01",
       "01.02"
-     ]
+     ],
+     "short": "Rate limiting algorithms"
     },
     {
      "id": "02.15",
@@ -2020,7 +2118,8 @@ window.CURRICULUM = {
      "requires": [
       "01.01",
       "02.03"
-     ]
+     ],
+     "short": "Consistent & rendezvous hashing"
     },
     {
      "id": "02.16",
@@ -2029,7 +2128,8 @@ window.CURRICULUM = {
      "requires": [
       "02.01",
       "01.01"
-     ]
+     ],
+     "short": "Probability & capacity math"
     }
    ],
    "concepts": [],
@@ -2375,13 +2475,14 @@ window.CURRICULUM = {
      "text": "Threads vs processes vs coroutines; when each is the right tool",
      "requires": [
       "09.01"
-     ]
+     ],
+     "short": "Threads, processes & asyncio (Python GIL)"
     },
     {
      "id": "03.02",
      "tag": "P0",
      "text": "Race conditions, critical sections, atomicity, visibility",
-     "short": "Race conditions and atomicity",
+     "short": "Race conditions & atomicity",
      "requires": [
       "03.01"
      ]
@@ -2390,7 +2491,7 @@ window.CURRICULUM = {
      "id": "03.03",
      "tag": "P0",
      "text": "Mutexes, read-write locks, semaphores, condition variables",
-     "short": "Locks, semaphores and condition variables",
+     "short": "Locks, semaphores & condition variables",
      "requires": [
       "03.02"
      ]
@@ -2401,7 +2502,8 @@ window.CURRICULUM = {
      "text": "Deadlock, livelock, starvation: the four deadlock conditions and how to break them",
      "requires": [
       "03.03"
-     ]
+     ],
+     "short": "Deadlock, livelock & starvation"
     },
     {
      "id": "03.05",
@@ -2410,13 +2512,14 @@ window.CURRICULUM = {
      "requires": [
       "03.03",
       "01.02"
-     ]
+     ],
+     "short": "Thread pools, queues & backpressure"
     },
     {
      "id": "03.06",
      "tag": "P0",
      "text": "Async I/O and event loops (epoll/kqueue model, async/await semantics, cancellation)",
-     "short": "Async I/O and event loops",
+     "short": "Async I/O & event loops",
      "requires": [
       "03.01"
      ]
@@ -2425,7 +2528,7 @@ window.CURRICULUM = {
      "id": "03.07",
      "tag": "P0",
      "text": "Classic concurrency patterns: producer-consumer, bounded buffer, thread-safe LRU, single-flight coalescing",
-     "short": "Bounded buffer, thread-safe LRU and single-flight",
+     "short": "Bounded buffer, thread-safe LRU & single-flight",
      "requires": [
       "03.03",
       "03.05",
@@ -2484,7 +2587,8 @@ window.CURRICULUM = {
      "id": "04.01",
      "tag": "P0",
      "text": "Requirements gathering: functional vs non-functional, scoping, stating assumptions",
-     "requires": []
+     "requires": [],
+     "short": "Requirements gathering & scoping"
     },
     {
      "id": "04.02",
@@ -2494,7 +2598,8 @@ window.CURRICULUM = {
       "04.01",
       "04.03",
       "02.16"
-     ]
+     ],
+     "short": "Back-of-envelope estimation"
     },
     {
      "id": "04.03",
@@ -2503,7 +2608,8 @@ window.CURRICULUM = {
      "requires": [
       "02.01",
       "02.16"
-     ]
+     ],
+     "short": "Latency numbers & p99 fan-out"
     },
     {
      "id": "04.04",
@@ -2514,7 +2620,8 @@ window.CURRICULUM = {
       "09.03",
       "01.01",
       "04.11"
-     ]
+     ],
+     "short": "Load balancing (L4 vs L7)"
     },
     {
      "id": "04.05",
@@ -2524,7 +2631,8 @@ window.CURRICULUM = {
       "01.08",
       "04.03",
       "04.02"
-     ]
+     ],
+     "short": "Caching strategies & stampedes"
     },
     {
      "id": "04.06",
@@ -2534,13 +2642,14 @@ window.CURRICULUM = {
       "06.04",
       "06.01",
       "06.02"
-     ]
+     ],
+     "short": "Choosing a database"
     },
     {
      "id": "04.07",
      "tag": "P0",
      "text": "Replication (leader-follower, multi-leader, leaderless) and sharding/partitioning strategies",
-     "short": "Replication and sharding",
+     "short": "Replication & sharding",
      "requires": [
       "04.06",
       "02.15"
@@ -2550,7 +2659,7 @@ window.CURRICULUM = {
      "id": "04.08",
      "tag": "P0",
      "text": "Message queues and event streams (Kafka, SQS, RabbitMQ): ordering, delivery guarantees",
-     "short": "Message queues and event streams",
+     "short": "Message queues & event streams",
      "requires": [
       "01.02",
       "04.07"
@@ -2563,13 +2672,14 @@ window.CURRICULUM = {
      "requires": [
       "04.01",
       "09.03"
-     ]
+     ],
+     "short": "API design (REST, gRPC, idempotency)"
     },
     {
      "id": "04.10",
      "tag": "P0",
      "text": "CDNs, edge caching, object storage",
-     "short": "CDNs and object storage",
+     "short": "CDNs & object storage",
      "requires": [
       "04.05",
       "09.03"
@@ -2579,7 +2689,7 @@ window.CURRICULUM = {
      "id": "04.11",
      "tag": "P1",
      "text": "Stateless services, session handling, horizontal scaling",
-     "short": "Stateless services",
+     "short": "Stateless services & horizontal scaling",
      "requires": [
       "09.03"
      ]
@@ -2588,7 +2698,7 @@ window.CURRICULUM = {
      "id": "04.12",
      "tag": "P0",
      "text": "Rate limiting, load shedding, circuit breakers, retries with jitter, timeouts, bulkheads",
-     "short": "Timeouts, retries, circuit breakers, load shedding",
+     "short": "Timeouts, retries, circuit breakers & load shedding",
      "requires": [
       "02.14",
       "04.04",
@@ -2607,13 +2717,14 @@ window.CURRICULUM = {
       "05.01",
       "04.04",
       "05.08"
-     ]
+     ],
+     "short": "Multi-region architecture"
     },
     {
      "id": "04.14",
      "tag": "P1",
      "text": "Real-time delivery: WebSockets, SSE, long polling, pub/sub fan-out",
-     "short": "Real-time delivery: WebSockets, SSE, pub/sub",
+     "short": "Real-time delivery (WebSockets, SSE, pub/sub)",
      "requires": [
       "09.03",
       "09.04",
@@ -2625,7 +2736,7 @@ window.CURRICULUM = {
      "id": "04.15",
      "tag": "P1",
      "text": "Search and indexing: inverted index, scatter-gather, ranking basics",
-     "short": "Search and inverted indexes",
+     "short": "Search & inverted indexes",
      "requires": [
       "01.01",
       "04.07",
@@ -2662,7 +2773,7 @@ window.CURRICULUM = {
      "id": "05.01",
      "tag": "P0",
      "text": "CAP and PACELC, and what they do and do not say",
-     "short": "CAP and PACELC",
+     "short": "CAP & PACELC",
      "requires": [
       "04.07",
       "05.02"
@@ -2674,7 +2785,8 @@ window.CURRICULUM = {
      "text": "Consistency models: linearizable, sequential, causal, eventual, read-your-writes",
      "requires": [
       "04.07"
-     ]
+     ],
+     "short": "Consistency models"
     },
     {
      "id": "05.03",
@@ -2683,13 +2795,14 @@ window.CURRICULUM = {
      "requires": [
       "04.08",
       "04.09"
-     ]
+     ],
+     "short": "Delivery guarantees & idempotency"
     },
     {
      "id": "05.04",
      "tag": "P0",
      "text": "Consensus: Raft in detail, Paxos at a conceptual level; leader election",
-     "short": "Consensus: Raft, Paxos and leader election",
+     "short": "Consensus: Raft, Paxos & leader election",
      "requires": [
       "05.02",
       "05.01"
@@ -2699,7 +2812,7 @@ window.CURRICULUM = {
      "id": "05.05",
      "tag": "P1",
      "text": "Quorums, sloppy quorums, hinted handoff, read repair, anti-entropy (Merkle trees)",
-     "short": "Quorums, hinted handoff and read repair",
+     "short": "Quorums, hinted handoff & read repair",
      "requires": [
       "04.07",
       "05.02",
@@ -2710,7 +2823,7 @@ window.CURRICULUM = {
      "id": "05.06",
      "tag": "P1",
      "text": "Time and ordering: clock skew, Lamport clocks, vector clocks, hybrid logical clocks, TrueTime intuition",
-     "short": "Time, clocks and ordering",
+     "short": "Time, clocks & ordering",
      "requires": [
       "05.02"
      ]
@@ -2719,7 +2832,7 @@ window.CURRICULUM = {
      "id": "05.07",
      "tag": "P1",
      "text": "Distributed transactions: 2PC, sagas, outbox pattern, change data capture",
-     "short": "Distributed transactions: 2PC, sagas and outbox",
+     "short": "Distributed transactions: 2PC, sagas & outbox",
      "requires": [
       "06.02",
       "04.08",
@@ -2733,13 +2846,14 @@ window.CURRICULUM = {
      "requires": [
       "04.04",
       "04.07"
-     ]
+     ],
+     "short": "Distributed failure modes"
     },
     {
      "id": "05.09",
      "tag": "P1",
      "text": "Distributed locks, fencing tokens, leases",
-     "short": "Distributed locks, leases and fencing tokens",
+     "short": "Distributed locks, leases & fencing tokens",
      "requires": [
       "05.04",
       "05.06"
@@ -2752,7 +2866,8 @@ window.CURRICULUM = {
      "requires": [
       "05.02",
       "05.06"
-     ]
+     ],
+     "short": "CRDTs & conflict resolution"
     },
     {
      "id": "05.11",
@@ -2791,7 +2906,8 @@ window.CURRICULUM = {
       "01.13",
       "06.04",
       "06.03"
-     ]
+     ],
+     "short": "Database indexing (B-tree, composite, covering)"
     },
     {
      "id": "06.02",
@@ -2801,7 +2917,8 @@ window.CURRICULUM = {
       "06.04",
       "01.13",
       "06.01"
-     ]
+     ],
+     "short": "Transactions, ACID & isolation anomalies"
     },
     {
      "id": "06.03",
@@ -2810,7 +2927,8 @@ window.CURRICULUM = {
      "requires": [
       "01.01",
       "02.02"
-     ]
+     ],
+     "short": "SQL fluency & EXPLAIN plans"
     },
     {
      "id": "06.04",
@@ -2819,7 +2937,8 @@ window.CURRICULUM = {
      "requires": [
       "04.01",
       "06.03"
-     ]
+     ],
+     "short": "Data modeling & access patterns"
     },
     {
      "id": "06.05",
@@ -2827,13 +2946,14 @@ window.CURRICULUM = {
      "text": "MVCC, optimistic vs pessimistic locking",
      "requires": [
       "06.02"
-     ]
+     ],
+     "short": "MVCC & optimistic vs pessimistic locking"
     },
     {
      "id": "06.06",
      "tag": "P0",
      "text": "Partitioning: hash vs range, hot keys, rebalancing, secondary indexes across shards",
-     "short": "Partitioning, hot keys and cross-shard indexes",
+     "short": "Partitioning, hot keys & cross-shard indexes",
      "requires": [
       "04.07",
       "06.01"
@@ -2852,7 +2972,7 @@ window.CURRICULUM = {
      "id": "06.08",
      "tag": "P1",
      "text": "Stream concepts: windowing, watermarks, late data, exactly-once processing",
-     "short": "Streaming: windowing, watermarks and late data",
+     "short": "Streaming: windows, watermarks & late data",
      "requires": [
       "06.07",
       "05.03"
@@ -2900,7 +3020,7 @@ window.CURRICULUM = {
      "id": "07.01",
      "tag": "Classic",
      "text": "URL shortener; pastebin",
-     "short": "URL shortener",
+     "short": "URL shortener & pastebin",
      "requires": [
       "04.01",
       "04.02",
@@ -2918,13 +3038,14 @@ window.CURRICULUM = {
       "02.14",
       "04.05",
       "04.12"
-     ]
+     ],
+     "short": "Distributed rate limiter"
     },
     {
      "id": "07.03",
      "tag": "Consumer",
      "text": "News feed / timeline (fan-out on write vs read)",
-     "short": "News feed",
+     "short": "News feed / timeline",
      "requires": [
       "04.05",
       "04.07",
@@ -2940,7 +3061,8 @@ window.CURRICULUM = {
       "04.14",
       "04.07",
       "05.03"
-     ]
+     ],
+     "short": "Chat & messaging"
     },
     {
      "id": "07.05",
@@ -2950,13 +3072,14 @@ window.CURRICULUM = {
       "04.08",
       "05.03",
       "04.12"
-     ]
+     ],
+     "short": "Notification system"
     },
     {
      "id": "07.06",
      "tag": "Classic",
      "text": "Typeahead / autocomplete",
-     "short": "Typeahead",
+     "short": "Typeahead / autocomplete",
      "requires": [
       "01.06",
       "04.05",
@@ -2973,7 +3096,8 @@ window.CURRICULUM = {
       "02.14",
       "04.08",
       "03.05"
-     ]
+     ],
+     "short": "Distributed web crawler"
     },
     {
      "id": "07.08",
@@ -2987,7 +3111,8 @@ window.CURRICULUM = {
       "02.15",
       "01.13",
       "05.06"
-     ]
+     ],
+     "short": "Distributed key-value store"
     },
     {
      "id": "07.09",
@@ -2998,7 +3123,7 @@ window.CURRICULUM = {
      "id": "07.10",
      "tag": "Classic",
      "text": "Job scheduler / distributed cron / task queue",
-     "short": "Job scheduler and task queue",
+     "short": "Distributed job scheduler & task queue",
      "requires": [
       "04.08",
       "05.03",
@@ -3017,7 +3142,7 @@ window.CURRICULUM = {
      "id": "07.12",
      "tag": "Google",
      "text": "File sync and storage (Google Drive / Dropbox-style)",
-     "short": "File sync and storage (Drive)",
+     "short": "File sync & storage (Google Drive)",
      "requires": [
       "04.10",
       "04.07",
@@ -3039,7 +3164,7 @@ window.CURRICULUM = {
      "id": "07.14",
      "tag": "Classic",
      "text": "Payment system and ledger (idempotency, reconciliation, double-entry)",
-     "short": "Payment system and ledger",
+     "short": "Payment system & ledger",
      "requires": [
       "06.02",
       "05.03",
@@ -3061,7 +3186,7 @@ window.CURRICULUM = {
      "id": "07.16",
      "tag": "Google",
      "text": "Collaborative editor (Google Docs — OT vs CRDT)",
-     "short": "Collaborative editor (Docs)",
+     "short": "Collaborative editor (Google Docs)",
      "requires": [
       "04.14",
       "05.06",
@@ -3072,7 +3197,7 @@ window.CURRICULUM = {
      "id": "07.17",
      "tag": "Classic",
      "text": "Metrics, monitoring, and alerting pipeline",
-     "short": "Metrics and alerting pipeline",
+     "short": "Metrics & alerting pipeline",
      "requires": [
       "04.08",
       "06.07",
@@ -3084,7 +3209,7 @@ window.CURRICULUM = {
      "id": "07.18",
      "tag": "Google",
      "text": "Log aggregation and distributed search",
-     "short": "Log aggregation and search",
+     "short": "Log aggregation & search",
      "requires": [
       "04.08",
       "04.15",
@@ -3095,7 +3220,7 @@ window.CURRICULUM = {
      "id": "07.19",
      "tag": "Classic",
      "text": "Ad click aggregation; real-time top-k / leaderboard",
-     "short": "Ad click aggregation and top-k",
+     "short": "Ad click aggregation & top-k",
      "requires": [
       "04.08",
       "06.08",
@@ -3109,7 +3234,8 @@ window.CURRICULUM = {
      "requires": [
       "04.10",
       "04.08"
-     ]
+     ],
+     "short": "Video streaming & CDN"
     },
     {
      "id": "07.21",
@@ -3145,7 +3271,8 @@ window.CURRICULUM = {
       "04.12",
       "04.13",
       "05.08"
-     ]
+     ],
+     "short": "Resilience & regional evacuation"
     },
     {
      "id": "07.25",
@@ -3156,13 +3283,14 @@ window.CURRICULUM = {
       "04.04",
       "04.12",
       "04.14"
-     ]
+     ],
+     "short": "LLM inference API & batching"
     },
     {
      "id": "07.26",
      "tag": "Anthropic",
      "text": "Multi-tenant rate limiting and quota by tokens rather than requests",
-     "short": "Rate limiting by tokens",
+     "short": "Multi-tenant token rate limiter",
      "requires": [
       "02.14",
       "07.02",
@@ -3174,7 +3302,7 @@ window.CURRICULUM = {
      "id": "07.27",
      "tag": "Anthropic",
      "text": "Prompt/response caching (prefix caching, KV cache reuse)",
-     "short": "Prompt and KV caching",
+     "short": "Prompt & KV cache reuse",
      "requires": [
       "13.02",
       "04.05"
@@ -3201,7 +3329,8 @@ window.CURRICULUM = {
       "07.10",
       "09.08",
       "12.08"
-     ]
+     ],
+     "short": "Agent execution & sandboxing platform"
     },
     {
      "id": "07.30",
@@ -3228,7 +3357,7 @@ window.CURRICULUM = {
      "id": "07.32",
      "tag": "Anthropic",
      "text": "Abuse detection and safety filtering in the request path",
-     "short": "Abuse detection and safety filtering",
+     "short": "Abuse detection & safety filtering",
      "requires": [
       "13.02",
       "12.08",
@@ -3250,7 +3379,8 @@ window.CURRICULUM = {
      "id": "08.01",
      "tag": "P0",
      "text": "Systematic debugging: reproduce, isolate, hypothesize, bisect, verify the fix",
-     "requires": []
+     "requires": [],
+     "short": "Systematic debugging"
     },
     {
      "id": "08.02",
@@ -3258,13 +3388,15 @@ window.CURRICULUM = {
      "text": "Reading stack traces across languages; following a failure through async boundaries",
      "requires": [
       "08.01"
-     ]
+     ],
+     "short": "Stack traces & async failures"
     },
     {
      "id": "08.03",
      "tag": "P0",
      "text": "Reading unfamiliar code quickly: entry points, data flow, invariants",
-     "requires": []
+     "requires": [],
+     "short": "Reading unfamiliar code quickly"
     },
     {
      "id": "08.04",
@@ -3325,7 +3457,8 @@ window.CURRICULUM = {
       "08.03",
       "08.04",
       "10.03"
-     ]
+     ],
+     "short": "Reviewing a pull request live"
     }
    ],
    "concepts": [],
@@ -3342,7 +3475,7 @@ window.CURRICULUM = {
      "id": "09.01",
      "tag": "P0",
      "text": "Processes, threads, context switches, scheduling",
-     "short": "Processes and threads"
+     "short": "Processes, threads & scheduling"
     },
     {
      "id": "09.02",
@@ -3353,7 +3486,7 @@ window.CURRICULUM = {
      "id": "09.03",
      "tag": "P0",
      "text": "HTTP/1.1 vs HTTP/2 vs HTTP/3; TLS handshake; DNS resolution",
-     "short": "HTTP versions, TLS and DNS",
+     "short": "HTTP versions, TLS & DNS",
      "requires": [
       "09.04"
      ]
@@ -3386,7 +3519,7 @@ window.CURRICULUM = {
      "id": "09.08",
      "tag": "P1",
      "text": "Containers: namespaces, cgroups, images; Kubernetes scheduling basics",
-     "short": "Containers, sandboxing and K8s basics",
+     "short": "Containers, sandboxing & Kubernetes basics",
      "requires": [
       "09.01"
      ]
@@ -3418,29 +3551,38 @@ window.CURRICULUM = {
    "notes": [],
    "topics": [
     {
+     "id": "10.10",
+     "tag": "P0",
+     "short": "Python idioms, lambdas, generators & gotchas",
+     "text": "Python fluency in depth: list/dict/set comprehensions, lambdas and closures, generators (yield/yield from), itertools, dataclasses, decorators, context managers, and classic pitfalls",
+     "requires": []
+    },
+    {
      "id": "10.01",
      "tag": "P0",
      "text": "Clean, idiomatic code in your primary language; deep knowledge of its standard library",
-     "short": "Idiomatic code and the standard library",
+     "short": "Python standard library toolkit",
      "requires": [
-      "02.01"
+      "10.10"
      ]
     },
     {
      "id": "10.02",
      "tag": "P0",
-     "text": "Object-oriented and functional design; composition over inheritance; SOLID as trade-offs, not rules"
+     "text": "Object-oriented and functional design; composition over inheritance; SOLID as trade-offs, not rules",
+     "short": "Designing for change"
     },
     {
      "id": "10.03",
      "tag": "P0",
-     "text": "Testing strategy: unit, integration, end-to-end, contract; what to mock and what not to"
+     "text": "Testing strategy: unit, integration, end-to-end, contract; what to mock and what not to",
+     "short": "Testing for interviews"
     },
     {
      "id": "10.04",
      "tag": "P1",
      "text": "Low-level design exercises: in-memory KV store with transactions, in-memory file system, banking ledger, LRU cache, spreadsheet engine",
-     "short": "Progressive 4-level builds and LLD",
+     "short": "4-level progressive builds",
      "requires": [
       "01.01",
       "01.04",
@@ -3477,6 +3619,24 @@ window.CURRICULUM = {
    "concepts": [],
    "exercises": [
     {
+     "file": "py_idioms.py",
+     "module": "py_idioms",
+     "title": "Python idioms: comprehensions, lambdas, closures, generators and itertools",
+     "topics": [
+      "10.10"
+     ],
+     "result": null
+    },
+    {
+     "file": "py_internals.py",
+     "module": "py_internals",
+     "title": "Python in-depth: data model, classic gotchas, decorators and context managers",
+     "topics": [
+      "10.10"
+     ],
+     "result": null
+    },
+    {
      "file": "py_toolkit.py",
      "module": "py_toolkit",
      "title": "Python toolkit drills: the standard library tools that turn O(n²) into O(n)",
@@ -3500,7 +3660,8 @@ window.CURRICULUM = {
      "text": "SLIs, SLOs, error budgets",
      "requires": [
       "04.03"
-     ]
+     ],
+     "short": "SLIs, SLOs & error budgets"
     },
     {
      "id": "11.02",
@@ -3508,7 +3669,8 @@ window.CURRICULUM = {
      "text": "Deployment safety: canary, blue-green, feature flags, automated rollback",
      "requires": [
       "11.01"
-     ]
+     ],
+     "short": "Deployment safety & rollbacks"
     },
     {
      "id": "11.03",
@@ -3555,7 +3717,7 @@ window.CURRICULUM = {
      "id": "12.01",
      "tag": "P0",
      "text": "Authentication vs authorization; sessions, JWT, OAuth 2.0, OIDC",
-     "short": "AuthN, AuthZ, OAuth 2.0 and JWT",
+     "short": "AuthN, AuthZ, OAuth 2.0 & JWT",
      "requires": [
       "09.03"
      ]
@@ -3582,7 +3744,8 @@ window.CURRICULUM = {
      "requires": [
       "12.01",
       "04.06"
-     ]
+     ],
+     "short": "Multi-tenant isolation"
     },
     {
      "id": "12.06",
@@ -3598,7 +3761,7 @@ window.CURRICULUM = {
      "id": "12.08",
      "tag": "P1",
      "text": "LLM-specific risks: prompt injection, data exfiltration through tools, sandbox escape",
-     "short": "LLM security and tool sandboxing",
+     "short": "LLM security & tool sandboxing",
      "requires": [
       "13.03",
       "12.05"
@@ -3628,7 +3791,7 @@ window.CURRICULUM = {
      "id": "13.02",
      "tag": "P0",
      "text": "Inference serving: batching (static, dynamic, continuous), KV cache, streaming, time-to-first-token vs throughput",
-     "short": "Inference serving: batching and the KV cache",
+     "short": "LLM inference serving & KV cache",
      "requires": [
       "13.01",
       "04.14",
@@ -3643,7 +3806,8 @@ window.CURRICULUM = {
      "requires": [
       "13.01",
       "04.12"
-     ]
+     ],
+     "short": "Building reliably on LLM APIs"
     },
     {
      "id": "13.04",
@@ -3653,7 +3817,8 @@ window.CURRICULUM = {
       "13.01",
       "13.03",
       "04.15"
-     ]
+     ],
+     "short": "RAG design & failure modes"
     },
     {
      "id": "13.05",
@@ -3661,13 +3826,14 @@ window.CURRICULUM = {
      "text": "Evaluation: building eval sets, graders, regression detection, offline vs online metrics",
      "requires": [
       "13.03"
-     ]
+     ],
+     "short": "LLM evaluation & graders"
     },
     {
      "id": "13.06",
      "tag": "P1",
      "text": "Coding with AI and verification: give invariants/context, split into checkable steps, write tests first, review diffs and verify with differential testing; know when not to use it",
-     "short": "Coding with AI: verify, debug, review",
+     "short": "Coding with AI: verify, debug & review",
      "requires": [
       "08.01",
       "08.03",
@@ -3686,7 +3852,8 @@ window.CURRICULUM = {
      "text": "GPU fundamentals: memory hierarchy, utilization, multi-GPU and multi-node serving",
      "requires": [
       "13.02"
-     ]
+     ],
+     "short": "GPU fundamentals & multi-GPU serving"
     },
     {
      "id": "13.09",
@@ -3696,7 +3863,8 @@ window.CURRICULUM = {
       "13.03",
       "09.08",
       "12.08"
-     ]
+     ],
+     "short": "Agent architecture & tool sandboxing"
     },
     {
      "id": "13.10",
@@ -3752,39 +3920,44 @@ window.CURRICULUM = {
     {
      "id": "14.01",
      "tag": "P0",
-     "text": "Project deep dive: explain a system you built, the alternatives you rejected, what you would change"
+     "text": "Project deep dive: explain a system you built, the alternatives you rejected, what you would change",
+     "short": "Flagship project & 60-sec intro"
     },
     {
      "id": "14.02",
      "tag": "P0",
-     "text": "Ownership stories: driving ambiguous work from problem to shipped result"
+     "text": "Ownership stories: driving ambiguous work from problem to shipped result",
+     "short": "Ownership & ambiguity stories"
     },
     {
      "id": "14.03",
      "tag": "P0",
-     "text": "Conflict and disagreement: disagree-and-commit, pushing back with data"
+     "text": "Conflict and disagreement: disagree-and-commit, pushing back with data",
+     "short": "Conflict & disagreement stories"
     },
     {
      "id": "14.04",
      "tag": "P0",
-     "text": "Failure stories: a real mistake, its impact, what changed afterward"
+     "text": "Failure stories: a real mistake, its impact, what changed afterward",
+     "short": "Failure & learning stories"
     },
     {
      "id": "14.05",
      "tag": "P0",
      "text": "Technical influence without authority; aligning multiple teams",
-     "short": "Influence without authority"
+     "short": "Influence without authority stories"
     },
     {
      "id": "14.06",
      "tag": "P1",
      "text": "Mentoring and raising the bar for others",
-     "short": "Mentoring and raising the bar"
+     "short": "Mentoring & raising the bar stories"
     },
     {
      "id": "14.07",
      "tag": "P1",
-     "text": "Prioritization and saying no; trading scope, quality, and time"
+     "text": "Prioritization and saying no; trading scope, quality, and time",
+     "short": "Prioritization & saying no stories"
     },
     {
      "id": "14.08",
@@ -3795,7 +3968,7 @@ window.CURRICULUM = {
      "id": "14.09",
      "tag": "P0",
      "text": "Company calibration: Google Googleyness & Leadership (ambiguity, leadership without authority, hypotheticals); Anthropic mission, AI safety, RSP and epistemic humility",
-     "short": "Company calibration: Google G&L and Anthropic Values",
+     "short": "Google G&L & Anthropic Values calibration",
      "requires": [
       "14.01"
      ]
@@ -3820,9 +3993,8 @@ window.CURRICULUM = {
      "id": "15.01",
      "tag": "Format",
      "text": "Algorithmic coding (45 min, bare editor, no execution, 1 problem + escalating follow-ups)",
-     "requires": [
-      "02.01"
-     ]
+     "requires": [],
+     "short": "Bare-editor coding playbook"
     },
     {
      "id": "15.02",
@@ -3837,7 +4009,8 @@ window.CURRICULUM = {
       "08.01",
       "08.02",
       "08.03"
-     ]
+     ],
+     "short": "Debugging round mock"
     },
     {
      "id": "15.04",
@@ -3847,7 +4020,8 @@ window.CURRICULUM = {
       "08.03",
       "08.04",
       "08.13"
-     ]
+     ],
+     "short": "Code review round mock"
     },
     {
      "id": "15.05",
@@ -3860,7 +4034,8 @@ window.CURRICULUM = {
      "text": "Low-level / object-oriented design",
      "requires": [
       "10.04"
-     ]
+     ],
+     "short": "Object-oriented design mock"
     },
     {
      "id": "15.07",
@@ -3878,13 +4053,14 @@ window.CURRICULUM = {
      "text": "AI-assisted coding round (where permitted): graded on direction, verification, and judgment",
      "requires": [
       "13.06"
-     ]
+     ],
+     "short": "AI-assisted coding mock"
     },
     {
      "id": "15.10",
      "tag": "Format",
      "text": "Project retrospective / past work deep dive",
-     "short": "Past-project deep dive",
+     "short": "Past-project deep dive mock",
      "requires": [
       "14.01"
      ]
@@ -3901,7 +4077,8 @@ window.CURRICULUM = {
      "requires": [
       "14.01",
       "14.02"
-     ]
+     ],
+     "short": "Hiring manager round mock"
     }
    ],
    "concepts": [],
@@ -3911,5 +4088,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 14:39"
+ "generated": "2026-11-23 17:09"
 };

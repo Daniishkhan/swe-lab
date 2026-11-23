@@ -3,20 +3,115 @@
     "rule": "Every step builds only on steps before it. tools/build.py fails the build if one doesn't.",
     "stages": [
       {
-        "id": "w1",
-        "label": "Week 1",
-        "title": "Core data structures, complexity and bare-editor habits",
-        "goal": "Hash maps, stacks, queues, trees and heaps feel routine, you hand-trace every solution in a plain editor before running it, and your 60-second intro and flagship project map are ready for early recruiter calls.",
-        "daily": "Two timed problems a day from the chapters you have read, 25 to 30 minutes each, in a plain editor without running code until after you hand-trace it (the Google bare-editor method in 15.01). Log each one.",
+        "id": "p0",
+        "label": "Phase 0",
+        "title": "Python fluency warm-up, coding playbook & recruiter baseline",
+        "goal": "Build effortless Python muscle memory (comprehensions, lambdas, generators, data model, gotchas and stdlib), learn the bare-editor coding protocol, and lock down your 60-second intro and flagship project map before Week 1 begins.",
         "steps": [
-          {"topic": "02.01"},
           {
-            "topic": "15.01",
-            "do": "Read it on day 1, before your first timed drill: clarify, state brute force and cost, optimize, hand-trace edge cases in a bare editor with no execution, then handle follow-ups."
+            "topic": "10.10",
+            "do": "Spend real time here so Python never slows you down in mocks. Ask Claude: “teach me Python interview fluency in depth” — cover list/dict/set comprehensions, multi-key lambdas, closures and late binding, lazy generators (yield/yield from), itertools, dataclasses, decorators, context managers, and classic pitfalls (2D grid aliasing, mutable defaults, slicing costs). Then solve py_idioms and py_internals."
           },
           {
             "topic": "10.01",
-            "do": "Learn Python's interview stdlib (collections, heapq, bisect, itertools, functools), write a one-page cheat sheet, then do py_toolkit."
+            "do": "Master the interview standard library (Counter, defaultdict, deque, heapq, bisect, itertools, functools.cache / cmp_to_key), write your one-page cheat sheet, and complete py_toolkit."
+          },
+          {
+            "topic": "15.01",
+            "do": "Learn the Google bare-editor protocol once and keep it as a reference card for every drill and mock: clarify, brute force + cost, optimize, hand-trace edge cases without running code, handle follow-ups."
+          },
+          {
+            "topic": "14.01",
+            "do": "Draft your 60-second 'tell me about yourself' and your flagship project deep-dive worksheet (python3 tools/new.py deepdive \"Project\") so early recruiter and hiring manager calls don't disrupt technical weeks."
+          }
+        ],
+        "dayNote": "About 17 hours across 4 days (~4 to 4.5 hours/day) before Week 1. Investing time in Python fluency upfront pays off on every coding mock and drill.",
+        "days": [
+          {
+            "label": "Day 1 · Comprehensions, lambdas, closures & generators",
+            "plan": [
+              {
+                "t": "2h",
+                "topic": "10.10",
+                "do": "Deep dive with Claude: list/dict/set comprehensions, lambda sort keys, late-binding closures, zip/enumerate/itertools, yield and yield from"
+              },
+              {
+                "t": "2h 15m",
+                "topic": "10.10",
+                "do": "Complete py_idioms (all 5 functions) and explain the 'say it out loud' questions"
+              }
+            ],
+            "drills": []
+          },
+          {
+            "label": "Day 2 · Python data model, gotchas, decorators & context managers",
+            "plan": [
+              {
+                "t": "2h",
+                "topic": "10.10",
+                "do": "Deep dive with Claude: object references, shallow vs deep copy, 2D grid aliasing, mutable defaults, slicing costs, @dataclass(frozen=True, order=True), @wraps/@cache decorators and @contextmanager"
+              },
+              {
+                "t": "2h 15m",
+                "topic": "10.10",
+                "do": "Complete py_internals (all 5 drills) and review every trap you hit"
+              }
+            ],
+            "drills": []
+          },
+          {
+            "label": "Day 3 · Standard library toolkit & bare-editor playbook",
+            "plan": [
+              {
+                "t": "1h 15m",
+                "topic": "10.01",
+                "do": "Build your one-page Python stdlib cheat sheet (Counter, defaultdict, deque, heapq, bisect, itertools, functools)"
+              },
+              {
+                "t": "2h",
+                "topic": "10.01",
+                "do": "Complete py_toolkit (work-capped O(n)/O(n log n) tests)"
+              },
+              {
+                "t": "1h",
+                "topic": "15.01",
+                "do": "Learn the Google bare-editor coding playbook and save your dry-run checklist"
+              }
+            ],
+            "drills": []
+          },
+          {
+            "label": "Day 4 · Flagship project baseline & Python speed check",
+            "plan": [
+              {
+                "t": "2h 30m",
+                "topic": "14.01",
+                "do": "Score 3 past projects, draft your 60-sec intro, and finish the flagship deep-dive map, metrics and rejected alternatives"
+              },
+              {
+                "t": "1h",
+                "topic": "14.01",
+                "do": "Rehearse your 60-sec intro and 5-minute project map out loud with a timer"
+              },
+              {
+                "t": "45m",
+                "topic": "10.10",
+                "do": "Redo any shaky idiom from py_idioms / py_internals / py_toolkit from a blank editor"
+              }
+            ],
+            "drills": []
+          }
+        ]
+      },
+      {
+        "id": "w1",
+        "label": "Week 1",
+        "title": "Complexity and core data structures",
+        "goal": "Complexity reasoning, hash maps, stacks, queues, trees, heaps and sorting feel routine, and you dry-run every solution by hand in a plain editor before running it.",
+        "daily": "Two timed problems a day from the chapters you have read, 25 to 30 minutes each, in a plain editor using Phase 0's bare-editor protocol (hand-trace before executing). Log each one.",
+        "steps": [
+          {
+            "topic": "02.01"
           },
           {
             "topic": "01.01",
@@ -37,75 +132,139 @@
           {
             "topic": "02.02",
             "do": "Focus on stability, custom sort keys, merge/quickselect and when O(n) bucket/counting sort beats O(n log n). Code merge_sort and quickselect in sorts; the rest is a stretch."
-          },
-          {
-            "topic": "14.01",
-            "do": "Draft your 60-second 'tell me about yourself' and your flagship project deep-dive worksheet (python3 tools/new.py deepdive \"Project\") so early recruiter and hiring manager calls don't catch you cold."
           }
         ],
-        "dayNote": "About 29 hours (~4.5 to 5 hours/day for 6 days, plus a lighter mock + review day on Sunday). Stretch exercises are optional. Never skip hand-tracing before running code.",
+        "dayNote": "About 27.5 hours of pure technical prep (~4 to 4.5 hours/day Mon–Sat + light Sunday mock, leaving ~1 hour on Sunday for your Parallel Behavioral track). Stretch exercises are optional.",
         "days": [
           {
             "label": "Day 1 · Monday",
             "plan": [
-              {"t": "1h 15m", "topic": "02.01", "do": "Learn complexity & amortized analysis (ask Claude 'teach me complexity and amortized analysis')"},
-              {"t": "1h 15m", "topic": "02.01", "do": "complexity_drills"},
-              {"t": "45m", "topic": "15.01", "do": "Learn the Google bare-editor coding loop (clarify, brute force, optimize, hand-trace, follow-ups)"},
-              {"t": "1h 15m", "topic": "10.01", "do": "Make your Python stdlib one-page cheat sheet and start py_toolkit"}
+              {
+                "t": "1h 30m",
+                "topic": "02.01",
+                "do": "Learn complexity, amortized analysis and when constants/memory matter"
+              },
+              {
+                "t": "1h 30m",
+                "topic": "02.01",
+                "do": "complexity_drills"
+              },
+              {
+                "t": "1h 15m",
+                "topic": "01.01",
+                "do": "Read hash-maps.html and answer every quick check"
+              }
             ],
             "drills": []
           },
           {
             "label": "Day 2 · Tuesday",
             "plan": [
-              {"t": "45m", "topic": "10.01", "do": "Finish py_toolkit"},
-              {"t": "1h 15m", "topic": "01.01", "do": "Read hash-maps.html and answer every quick check"},
-              {"t": "1h 45m", "topic": "01.01", "do": "Warm-ups, then hash_map and hash_patterns (probing_map is stretch)"}
+              {
+                "t": "2h",
+                "topic": "01.01",
+                "do": "Warm-ups, then hash_map and hash_patterns (probing_map is stretch)"
+              },
+              {
+                "t": "1h 15m",
+                "topic": "01.02",
+                "do": "Learn linked lists, stacks, queues, deques and monotonic stack/queue"
+              }
             ],
-            "drills": ["Group Anagrams", "Longest Consecutive Sequence"]
+            "drills": [
+              "Group Anagrams",
+              "Longest Consecutive Sequence"
+            ]
           },
           {
             "label": "Day 3 · Wednesday",
             "plan": [
-              {"t": "1h 15m", "topic": "01.02", "do": "Learn linked lists, stacks, queues, deques and monotonic stack/queue"},
-              {"t": "2h", "topic": "01.02", "do": "linked_lists and monotonic (ring_deque is stretch)"},
-              {"t": "45m", "topic": "14.01", "do": "Score three past projects, pick your flagship, and draft your 60-second intro"}
+              {
+                "t": "2h",
+                "topic": "01.02",
+                "do": "linked_lists and monotonic (ring_deque is stretch)"
+              },
+              {
+                "t": "1h 15m",
+                "topic": "01.03",
+                "do": "Learn BSTs, balanced trees (conceptual), traversals and LCA"
+              }
             ],
-            "drills": ["Daily Temperatures", "Min Stack"]
+            "drills": [
+              "Daily Temperatures",
+              "Min Stack"
+            ]
           },
           {
             "label": "Day 4 · Thursday",
             "plan": [
-              {"t": "1h 15m", "topic": "01.03", "do": "Learn BSTs, balanced trees (conceptual), traversals and LCA"},
-              {"t": "1h 45m", "topic": "01.03", "do": "tree_traversals (bst delete is stretch)"},
-              {"t": "1h", "topic": "14.01", "do": "Draft your flagship deep-dive map, scale numbers and rejected alternatives"}
+              {
+                "t": "2h",
+                "topic": "01.03",
+                "do": "tree_traversals and LCA practice (bst delete is stretch)"
+              },
+              {
+                "t": "1h 15m",
+                "topic": "01.04",
+                "do": "Learn binary heaps, top-k, k-way merge and two-heap medians"
+              }
             ],
-            "drills": ["Validate Binary Search Tree", "Lowest Common Ancestor of a Binary Tree"]
+            "drills": [
+              "Validate Binary Search Tree",
+              "Lowest Common Ancestor of a Binary Tree"
+            ]
           },
           {
             "label": "Day 5 · Friday",
             "plan": [
-              {"t": "1h 15m", "topic": "01.04", "do": "Learn binary heaps, top-k, k-way merge and two-heap medians"},
-              {"t": "1h 45m", "topic": "01.04", "do": "min_heap and heap_patterns"},
-              {"t": "1h", "topic": "02.02", "do": "Learn sorting trade-offs, stability, Timsort and quickselect"}
+              {
+                "t": "2h",
+                "topic": "01.04",
+                "do": "min_heap and heap_patterns"
+              },
+              {
+                "t": "1h 15m",
+                "topic": "02.02",
+                "do": "Learn sorting trade-offs, stability, Timsort and quickselect"
+              }
             ],
-            "drills": ["Kth Largest Element in an Array", "Find Median from Data Stream"]
+            "drills": [
+              "Kth Largest Element in an Array",
+              "Find Median from Data Stream"
+            ]
           },
           {
             "label": "Day 6 · Saturday",
             "plan": [
-              {"t": "1h 30m", "topic": "02.02", "do": "sorts (merge sort and quickselect; remaining sorts are stretch)"},
-              {"t": "1h 15m", "topic": "14.01", "do": "Finish your deep-dive worksheet and practice the 5-minute map out loud"},
-              {"t": "1h", "topic": "01.02", "do": "Redo the hardest drill from Days 2 to 5 from a blank editor"}
+              {
+                "t": "1h 30m",
+                "topic": "02.02",
+                "do": "sorts (merge sort and quickselect; remaining sorts are stretch)"
+              },
+              {
+                "t": "1h 30m",
+                "topic": "01.02",
+                "do": "Redo the two hardest drills from Days 2 to 5 from a blank editor"
+              }
             ],
-            "drills": ["Merge k Sorted Lists", "Sliding Window Maximum"]
+            "drills": [
+              "Merge k Sorted Lists",
+              "Sliding Window Maximum"
+            ]
           },
           {
             "label": "Day 7 · Sunday",
             "plan": [
-              {"t": "20m", "topic": "15.01", "do": "Review your bare-editor checklist and common edge cases"},
-              {"t": "1h", "topic": "m1", "do": "45-minute bare-editor mock plus feedback and logging"},
-              {"t": "1h", "topic": "01.01", "do": "Light review of weakest topic from Week 1"}
+              {
+                "t": "1h",
+                "topic": "m1",
+                "do": "45-minute bare-editor mock plus feedback and logging"
+              },
+              {
+                "t": "1h",
+                "topic": "01.01",
+                "do": "Targeted review of weakest topic from Week 1 (plus ~1h on your Parallel Behavioral track)"
+              }
             ],
             "drills": []
           }
@@ -156,8 +315,7 @@
           {
             "topic": "02.08",
             "do": "Google staple: learn Dijkstra and 0-1 BFS, then do dijkstra and timed drills. Bellman-Ford and A* are stretch."
-          },
-          {"topic": "14.02"}
+          }
         ],
         "milestone": {
           "id": "m2",
@@ -171,7 +329,7 @@
         "id": "w3",
         "label": "Week 3",
         "title": "DP, greedy and practical 4-level builds (Anthropic OA ready)",
-        "goal": "Dynamic programming and greedy proofs stop feeling like guesswork, you can architect a component across 4 escalating requirements with tests first, and your past-project deep dive holds up under grilling.",
+        "goal": "Dynamic programming and greedy proofs stop feeling like guesswork, and you can architect a clean, extensible component across 4 escalating requirements with tests first.",
         "daily": "One timed bare-editor algorithmic problem (mixing Weeks 1 to 3) plus one practical build slice or timed DP/greedy drill.",
         "steps": [
           {
@@ -205,10 +363,6 @@
           {
             "topic": "10.04",
             "do": "Anthropic CodeSignal prep — two 90-minute 4-level builds, tests first: (1) an in-memory key-value store with TTL, prefix scan and transactions; (2) an in-memory file system with quotas (or banking ledger). Skip parking lot and elevator."
-          },
-          {
-            "topic": "15.10",
-            "do": "Ask Claude: “mock interview, past-project deep dive, 45 minutes” with your worksheet closed. Expect follow-ups on every trade-off, failure and metric."
           }
         ],
         "milestone": {
@@ -234,10 +388,18 @@
             "topic": "03.01",
             "do": "Ask Claude: “teach me threads, processes and asyncio in Python” (60 minutes): the GIL, I/O vs CPU-bound work, event loop, asyncio.gather and Semaphore."
           },
-          {"topic": "03.02"},
-          {"topic": "03.03"},
-          {"topic": "03.04"},
-          {"topic": "03.05"},
+          {
+            "topic": "03.02"
+          },
+          {
+            "topic": "03.03"
+          },
+          {
+            "topic": "03.04"
+          },
+          {
+            "topic": "03.05"
+          },
           {
             "topic": "03.06",
             "do": "Ask Claude: “teach me async I/O, event loops and cancellation” (45 minutes): epoll/kqueue intuition, non-blocking sockets, structured concurrency, timeouts and avoiding blocking the loop."
@@ -301,28 +463,33 @@
           },
           {
             "topic": "09.04",
-            "do": "Ask Claude: “teach me TCP, UDP, HTTP, TLS and DNS” (60 minutes for this step and 09.03): handshakes, RTT cost, keep-alive, connection pooling, HTTP/2 multiplexing, HTTP/3/QUIC, TLS termination."
+            "do": "Ask Claude: “teach me TCP, UDP, HTTP, TLS and DNS” (60 minutes covering TCP/UDP, HTTP, TLS and DNS): handshakes, RTT cost, keep-alive, connection pooling, HTTP/2 multiplexing, HTTP/3/QUIC, TLS termination."
           },
           {
             "topic": "09.03",
-            "do": "Covered with 09.04. Explain back, hop by hop, what happens when a client calls an HTTPS API and where latency hides."
+            "do": "Covered in the same networking session as TCP vs UDP. Explain back, hop by hop, what happens when a client calls an HTTPS API and where latency hides."
           },
           {
             "topic": "04.11",
-            "do": "Ask Claude: “teach me stateless services and load balancing” (45 minutes for this step and 04.04): session externalization, horizontal scaling, L4 vs L7, health checks and why sticky sessions hurt."
+            "do": "Ask Claude: “teach me stateless services and load balancing” (45 minutes covering stateless services and load balancing): session externalization, horizontal scaling, L4 vs L7, health checks and why sticky sessions hurt."
           },
           {
             "topic": "04.04",
-            "do": "Covered with 04.11. Explain back when you pick L4 vs L7 and how draining works during deploys."
+            "do": "Covered in the same session as stateless services. Explain back when you pick L4 vs L7 and how draining works during deploys."
           },
-          {"topic": "04.09"},
-          {"topic": "04.05"},
-          {"topic": "04.10"},
+          {
+            "topic": "04.09"
+          },
+          {
+            "topic": "04.05"
+          },
+          {
+            "topic": "04.10"
+          },
           {
             "topic": "11.01",
             "do": "Ask Claude: “teach me SLIs, SLOs and error budgets” (45 minutes). From now on, end every system design with two concrete SLOs and the one symptom alert you'd page on."
-          },
-          {"topic": "14.03"}
+          }
         ],
         "milestone": {
           "id": "m5",
@@ -353,13 +520,15 @@
           },
           {
             "topic": "06.04",
-            "do": "Ask Claude: “teach me data modeling and indexing” (60 minutes for this step and 06.01): normalize first, denormalize only for a named query, composite index column order, covering indexes and write overhead."
+            "do": "Ask Claude: “teach me data modeling and indexing” (60 minutes covering data modeling and indexing): normalize first, denormalize only for a named query, composite index column order, covering indexes and write overhead."
           },
           {
             "topic": "06.01",
-            "do": "Covered with 06.04. Explain back left-prefix rules for composite indexes and when an index hurts write throughput."
+            "do": "Covered in the same session as data modeling. Explain back left-prefix rules for composite indexes and when an index hurts write throughput."
           },
-          {"topic": "06.02"},
+          {
+            "topic": "06.02"
+          },
           {
             "topic": "06.05",
             "do": "Ask Claude: “teach me MVCC, optimistic and pessimistic locking” (45 minutes): snapshot reads, SELECT FOR UPDATE, version columns/CAS and hot-row contention."
@@ -370,17 +539,16 @@
           },
           {
             "topic": "12.01",
-            "do": "Ask Claude: “teach me AuthN/AuthZ and multi-tenant isolation for system design” (45 minutes for this step and 12.05): OAuth 2.0/OIDC, JWT vs opaque sessions, RBAC/ABAC, tenant boundaries and noisy-neighbor isolation."
+            "do": "Ask Claude: “teach me AuthN/AuthZ and multi-tenant isolation for system design” (45 minutes covering AuthN/AuthZ and multi-tenant isolation): OAuth 2.0/OIDC, JWT vs opaque sessions, RBAC/ABAC, tenant boundaries and noisy-neighbor isolation."
           },
           {
             "topic": "12.05",
-            "do": "Covered with 12.01. Explain back how you prevent cross-tenant data leaks and noisy-neighbor exhaustion in a shared service."
+            "do": "Covered in the same session as AuthN/AuthZ. Explain back how you prevent cross-tenant data leaks and noisy-neighbor exhaustion in a shared service."
           },
           {
             "topic": "07.01",
             "do": "Warm-up design (30 to 45 min, timed, out loud): URL shortener / pastebin, including custom aliases, analytics, cache stampede and key generation."
-          },
-          {"topic": "14.04"}
+          }
         ],
         "milestone": {
           "id": "m6",
@@ -401,36 +569,42 @@
             "topic": "02.15",
             "do": "Learn consistent and rendezvous hashing, then do consistent_hash (virtual nodes and replicas). Jump and rendezvous hashing are a stretch."
           },
-          {"topic": "04.07"},
+          {
+            "topic": "04.07"
+          },
           {
             "topic": "06.06",
             "do": "Google L5 essential — ask Claude: “teach me partitioning, hot keys and secondary indexes across shards” (45 minutes): hash vs range sharding, key salting, local vs global secondary indexes and scatter-gather cost."
           },
           {
             "topic": "05.02",
-            "do": "Ask Claude: “teach me consistency models and CAP/PACELC” (60 minutes for this step and 05.01): linearizable, sequential, causal, read-your-writes and eventual consistency with real examples."
+            "do": "Ask Claude: “teach me consistency models and CAP/PACELC” (60 minutes covering consistency models and CAP/PACELC): linearizable, sequential, causal, read-your-writes and eventual consistency with real examples."
           },
           {
             "topic": "05.01",
-            "do": "Covered with 05.02. Explain back what PACELC adds to CAP and place Spanner, DynamoDB, Cassandra and Postgres on it."
+            "do": "Covered in the same session as consistency models. Explain back what PACELC adds to CAP and place Spanner, DynamoDB, Cassandra and Postgres on it."
           },
           {
             "topic": "05.04",
             "do": "Google L5 essential — ask Claude: “teach me Raft consensus and leader election” (60 minutes): terms, quorum votes, log replication, safety under partitions, and how Paxos relates conceptually."
           },
-          {"topic": "05.06"},
-          {"topic": "05.05"},
+          {
+            "topic": "05.06"
+          },
+          {
+            "topic": "05.05"
+          },
           {
             "topic": "05.09",
             "do": "Ask Claude: “teach me distributed locks, leases and fencing tokens” (45 minutes): why TTL locks alone fail under GC pauses, and how monotonic fencing tokens protect storage."
           },
           {
             "topic": "04.08",
-            "do": "Ask Claude: “teach me message queues, event logs and delivery guarantees” (60 minutes for this step and 05.03): Kafka partitions/consumer groups vs SQS, ordering, DLQs and idempotency keys."
+            "do": "Ask Claude: “teach me message queues, event logs and delivery guarantees” (60 minutes covering queues, event streams and delivery guarantees): Kafka partitions/consumer groups vs SQS, ordering, DLQs and idempotency keys."
           },
           {
             "topic": "05.03",
-            "do": "Covered with 04.08. Explain back how an idempotency key turns at-least-once delivery into effectively-once."
+            "do": "Covered in the same session as message queues. Explain back how an idempotency key turns at-least-once delivery into effectively-once."
           },
           {
             "topic": "05.07",
@@ -438,14 +612,18 @@
           },
           {
             "topic": "05.08",
-            "do": "Ask Claude: “teach me distributed failure modes and overload protection” (60 minutes for this step and 04.12): split brain, gray failure, thundering herd, retry storms, timeouts, jitter, circuit breakers, load shedding and bulkheads."
+            "do": "Ask Claude: “teach me distributed failure modes and overload protection” (60 minutes covering failure modes and overload protection): split brain, gray failure, thundering herd, retry storms, timeouts, jitter, circuit breakers, load shedding and bulkheads."
           },
           {
             "topic": "04.12",
-            "do": "Covered with 05.08. Explain back how retries amplify outages and how token buckets + jitter + load shedding stop a cascade."
+            "do": "Covered in the same session as failure modes. Explain back how retries amplify outages and how token buckets + jitter + load shedding stop a cascade."
           },
-          {"topic": "07.02"},
-          {"topic": "07.08"}
+          {
+            "topic": "07.02"
+          },
+          {
+            "topic": "07.08"
+          }
         ],
         "milestone": {
           "id": "m7",
@@ -468,36 +646,51 @@
           },
           {
             "topic": "11.02",
-            "do": "Ask Claude: “teach me deployment safety and zero-downtime migrations” (45 minutes for this step and 04.17): canary rollouts, feature flags, automated rollback, expand-contract, dual writes, backfills and shadow traffic."
+            "do": "Ask Claude: “teach me deployment safety and zero-downtime migrations” (45 minutes covering deployment safety and zero-downtime migrations): canary rollouts, feature flags, automated rollback, expand-contract, dual writes, backfills and shadow traffic."
           },
           {
             "topic": "04.17",
-            "do": "Covered with 11.02. Explain back how to migrate a live high-QPS table to a new schema or database with zero downtime."
+            "do": "Covered in the same session as deployment safety. Explain back how to migrate a live high-QPS table to a new schema or database with zero downtime."
           },
-          {"topic": "04.14"},
+          {
+            "topic": "04.14"
+          },
           {
             "topic": "04.15",
             "do": "Google essential — ask Claude: “teach me search engines and inverted indexes” (45 minutes): tokenization, posting lists, document vs term sharding, scatter-gather and ranking basics."
           },
           {
             "topic": "06.07",
-            "do": "Ask Claude: “teach me batch and stream processing” (60 minutes for this step and 06.08): event time vs processing time, tumbling/sliding windows, watermarks, late data and checkpointing."
+            "do": "Ask Claude: “teach me batch and stream processing” (60 minutes covering batch and stream processing): event time vs processing time, tumbling/sliding windows, watermarks, late data and checkpointing."
           },
           {
             "topic": "06.08",
-            "do": "Covered with 06.07. Explain back why event time differs from processing time and how watermarks bound state."
+            "do": "Covered in the same session as batch vs stream processing. Explain back why event time differs from processing time and how watermarks bound state."
           },
-          {"topic": "07.10"},
-          {"topic": "07.14"},
-          {"topic": "07.04"},
-          {"topic": "07.06"},
+          {
+            "topic": "07.10"
+          },
+          {
+            "topic": "07.14"
+          },
+          {
+            "topic": "07.04"
+          },
+          {
+            "topic": "07.06"
+          },
           {
             "topic": "07.07",
             "do": "Design the distributed web crawler on a worksheet (45 min), connecting frontier sharding, politeness, Bloom dedup and failure recovery back to your Week 4 concurrent crawler."
           },
-          {"topic": "07.17", "optional": true},
-          {"topic": "07.19", "optional": true},
-          {"topic": "14.05"}
+          {
+            "topic": "07.17",
+            "optional": true
+          },
+          {
+            "topic": "07.19",
+            "optional": true
+          }
         ],
         "milestone": {
           "id": "m8",
@@ -534,11 +727,16 @@
             "topic": "12.08",
             "do": "Ask Claude: “teach me LLM security” (30 minutes): prompt injection, indirect injection via tool outputs, data exfiltration, least-privilege tools and execution sandboxing."
           },
-          {"topic": "07.25"},
-          {"topic": "07.26"},
-          {"topic": "07.27", "optional": true},
-          {"topic": "14.06"},
-          {"topic": "14.07"}
+          {
+            "topic": "07.25"
+          },
+          {
+            "topic": "07.26"
+          },
+          {
+            "topic": "07.27",
+            "optional": true
+          }
         ],
         "milestone": {
           "id": "m9",
@@ -551,9 +749,9 @@
       {
         "id": "w10",
         "label": "Week 10",
-        "title": "Google L5 follow-up finishers and senior behavioral leveling",
-        "goal": "You handle Google's signature scale follow-ups (streaming, 100TB external data, range queries, rolling hashes), your 8 to 10 STAR stories map cleanly to L5 scope, and you can ace both Google G&L and Anthropic Values rounds.",
-        "daily": "Two timed bare-editor Google Medium-Hard problems a day (explicitly rehearsing streaming/memory follow-ups) plus 30 minutes of timed spoken story rehearsal.",
+        "title": "Advanced DSA and Google L5 scale follow-ups",
+        "goal": "Close the remaining high-ceiling algorithmic follow-up patterns—streaming and 100TB external data, dynamic prefix sums, bit tricks and rolling hashes—so Google L5 constraint shifts never rattle you.",
+        "daily": "Two timed bare-editor Google Medium-Hard problems a day, explicitly practicing streaming, bounded-RAM and dynamic-update follow-ups.",
         "steps": [
           {
             "topic": "02.13",
@@ -570,20 +768,59 @@
           {
             "topic": "02.12",
             "do": "Learn rolling hash (Rabin-Karp) and conceptual KMP: do rabin_karp. kmp_search and longest_dup_substring are stretch."
-          },
-          {
-            "topic": "14.09",
-            "do": "Calibrate for your top targets: (1) Google G&L — prepare 8 to 10 L5-scope STAR stories PLUS practice 4 hypothetical leadership scenarios ('PM pushes to ship with tech debt', 'two senior engineers deadlocked'); (2) Anthropic Values — study Anthropic's mission, Core Views on AI Safety and Responsible Scaling Policy, and prepare honest stories on epistemic humility and safety trade-offs. For any other company, run a 30-minute values & round-format check before recruiter screens."
-          },
-          {
-            "topic": "15.12",
-            "do": "Ask Claude: “mock interview, hiring manager round, 45 minutes”. Bring your flagship project deep dive, an ownership-under-ambiguity story, and three sharp questions about the team's hardest technical problems."
           }
         ],
         "milestone": {
           "id": "m10",
+          "format": "15.01",
+          "title": "Mock 10: Google L5 Hard + streaming/100TB follow-up",
+          "bar": "One unseen Hard or multi-part Medium-Hard in 45 minutes in a bare editor, with clean hand-tracing and a strong follow-up pivot to streaming or external-memory constraints. Score 3+ on all four coding signals.",
+          "ask": "mock interview, coding (Google L5 bare-editor Hard + streaming/external-memory follow-up), 45 minutes"
+        }
+      },
+      {
+        "id": "behavioral",
+        "label": "Behavioral",
+        "title": "Behavioral, leadership and career narrative",
+        "parallel": true,
+        "goal": "Run ~1 hour every Sunday in parallel with Weeks 1 to 10. Build 8 to 10 L5-scope STAR stories, rehearse Google G&L hypotheticals and Anthropic Values, and clear your project deep dive and hiring manager mocks without breaking technical focus.",
+        "daily": "One Sunday hour: write or refine one STAR story, map it to multiple prompts in story-bank.md, and say the 2-minute version out loud with a timer.",
+        "steps": [
+          {
+            "topic": "14.02"
+          },
+          {
+            "topic": "14.03"
+          },
+          {
+            "topic": "15.10",
+            "do": "Run around Week 3 (before HM calls land): ask Claude “mock interview, past-project deep dive, 45 minutes” with your Phase 0 worksheet closed. Expect follow-ups on every trade-off, failure and metric."
+          },
+          {
+            "topic": "14.04"
+          },
+          {
+            "topic": "14.05"
+          },
+          {
+            "topic": "14.06"
+          },
+          {
+            "topic": "14.07"
+          },
+          {
+            "topic": "14.09",
+            "do": "Calibrate for your top targets: (1) Google G&L — map your 8 to 10 STAR stories to L5 scope PLUS practice 4 hypothetical leadership scenarios ('PM pushes to ship with tech debt', 'two senior engineers deadlocked'); (2) Anthropic Values — study Anthropic's mission, Core Views on AI Safety and Responsible Scaling Policy, and prepare honest stories on epistemic humility and safety trade-offs. For any other company, run a 30-minute values & round-format check before screens."
+          },
+          {
+            "topic": "15.12",
+            "do": "Run before your first HM call (or around Week 6 to 8): ask Claude “mock interview, hiring manager round, 45 minutes”. Bring your flagship project deep dive, an ownership-under-ambiguity story, and three sharp questions about the team's hardest technical problems."
+          }
+        ],
+        "milestone": {
+          "id": "mb",
           "format": "15.11",
-          "title": "Mock 10: Senior behavioral (Google G&L + Anthropic Values)",
+          "title": "Mock: Senior behavioral (Google G&L + Anthropic Values)",
           "bar": "45 minutes: three L5-scope STAR stories (ambiguity/ownership, cross-team influence/conflict, owned failure), two Google-style leadership hypotheticals, and an Anthropic mission/epistemic-humility probe. Score 3+ on all four behavioral signals.",
           "ask": "mock interview, behavioral (Google L5 G&L with hypotheticals + Anthropic values), 45 minutes"
         }
@@ -596,7 +833,9 @@
         "goal": "Start the day ANY onsite is booked, wherever you are on the track. Ask the recruiter for the exact round list, rehearse only the extra formats on your list, and run a full back-to-back loop 3 to 4 days before.",
         "daily": "One timed coding problem a day matching your target company's format, and one mock every other day in your weakest round.",
         "steps": [
-          {"topic": "08.02"},
+          {
+            "topic": "08.02"
+          },
           {
             "topic": "08.09",
             "optional": true,
@@ -627,7 +866,10 @@
             "optional": true,
             "do": "Only if your recruiter confirms an AI-assisted coding round (e.g., Google Gemini-assisted pilot or Meta/Stripe AI round). Ask Claude: “mock interview, AI-assisted coding round, 60 minutes”."
           },
-          {"topic": "02.09", "optional": true}
+          {
+            "topic": "02.09",
+            "optional": true
+          }
         ],
         "milestone": {
           "id": "m11",
@@ -644,14 +886,23 @@
         "pick": true,
         "goal": "Start once a Google onsite is booked (or in Weeks 11 to 12 as your gold-standard stretch): planetary-scale storage, real-time collaboration, geospatial indexing and landmark distributed systems papers.",
         "steps": [
-          {"topic": "07.12"},
+          {
+            "topic": "07.12"
+          },
           {
             "topic": "05.10",
             "do": "Ask Claude: “teach me OT vs CRDTs for collaborative editing” (45 minutes): state-based vs op-based CRDTs, convergence and trade-offs vs central OT."
           },
-          {"topic": "07.16"},
-          {"topic": "07.13"},
-          {"topic": "07.18", "optional": true},
+          {
+            "topic": "07.16"
+          },
+          {
+            "topic": "07.13"
+          },
+          {
+            "topic": "07.18",
+            "optional": true
+          },
           {
             "topic": "05.12",
             "optional": true,
@@ -666,18 +917,38 @@
         "pick": true,
         "goal": "Start once an Anthropic onsite is booked (core LLM serving, token rate limiting, evals and LLM security are already in Week 9). Covers RAG, sandboxed agent execution, containers, safety filtering and training infrastructure.",
         "steps": [
-          {"topic": "13.04"},
-          {"topic": "07.28"},
+          {
+            "topic": "13.04"
+          },
+          {
+            "topic": "07.28"
+          },
           {
             "topic": "09.08",
             "do": "Ask Claude: “teach me Linux containers, namespaces, cgroups and microVM sandboxing” (45 minutes): how untrusted code/tool execution is isolated safely."
           },
-          {"topic": "13.09"},
-          {"topic": "07.29"},
-          {"topic": "07.30", "optional": true},
-          {"topic": "07.32", "optional": true},
-          {"topic": "13.08", "optional": true},
-          {"topic": "07.31", "optional": true}
+          {
+            "topic": "13.09"
+          },
+          {
+            "topic": "07.29"
+          },
+          {
+            "topic": "07.30",
+            "optional": true
+          },
+          {
+            "topic": "07.32",
+            "optional": true
+          },
+          {
+            "topic": "13.08",
+            "optional": true
+          },
+          {
+            "topic": "07.31",
+            "optional": true
+          }
         ]
       },
       {
@@ -687,13 +958,29 @@
         "pick": true,
         "goal": "Start if you book an onsite at a high-scale consumer, social, streaming or commerce company (Meta, Netflix, Uber, Airbnb, DoorDash). Builds directly on Weeks 5 to 8.",
         "steps": [
-          {"topic": "07.03"},
-          {"topic": "07.05"},
-          {"topic": "07.15"},
-          {"topic": "07.20"},
-          {"topic": "07.24"},
-          {"topic": "07.21", "optional": true},
-          {"topic": "07.22", "optional": true}
+          {
+            "topic": "07.03"
+          },
+          {
+            "topic": "07.05"
+          },
+          {
+            "topic": "07.15"
+          },
+          {
+            "topic": "07.20"
+          },
+          {
+            "topic": "07.24"
+          },
+          {
+            "topic": "07.21",
+            "optional": true
+          },
+          {
+            "topic": "07.22",
+            "optional": true
+          }
         ]
       }
     ]
@@ -710,147 +997,361 @@
           "id": "01.01",
           "tag": "P0",
           "text": "Arrays, strings, hash maps/sets: collision handling, load factor, resizing cost",
-          "requires": ["02.01"],
+          "requires": [
+            "02.01"
+          ],
           "drills": [
-            ["Two Sum", "E"],
-            ["Contains Duplicate", "E"],
-            ["Group Anagrams", "M"],
-            ["Longest Consecutive Sequence", "M"],
-            ["Insert Delete GetRandom O(1)", "M"]
-          ]
+            [
+              "Two Sum",
+              "E"
+            ],
+            [
+              "Contains Duplicate",
+              "E"
+            ],
+            [
+              "Group Anagrams",
+              "M"
+            ],
+            [
+              "Longest Consecutive Sequence",
+              "M"
+            ],
+            [
+              "Insert Delete GetRandom O(1)",
+              "M"
+            ]
+          ],
+          "short": "Hash maps & sets"
         },
         {
           "id": "01.02",
           "tag": "P0",
           "text": "Linked lists, stacks, queues, deques, monotonic stack/queue",
-          "requires": ["01.01", "02.01"],
+          "requires": [
+            "01.01",
+            "02.01"
+          ],
           "drills": [
-            ["Valid Parentheses", "E"],
-            ["Reverse Linked List", "E"],
-            ["Linked List Cycle", "E"],
-            ["Min Stack", "M"],
-            ["Daily Temperatures", "M"],
-            ["Sliding Window Maximum", "H"],
-            ["Largest Rectangle in Histogram", "H"]
-          ]
+            [
+              "Valid Parentheses",
+              "E"
+            ],
+            [
+              "Reverse Linked List",
+              "E"
+            ],
+            [
+              "Linked List Cycle",
+              "E"
+            ],
+            [
+              "Min Stack",
+              "M"
+            ],
+            [
+              "Daily Temperatures",
+              "M"
+            ],
+            [
+              "Sliding Window Maximum",
+              "H"
+            ],
+            [
+              "Largest Rectangle in Histogram",
+              "H"
+            ]
+          ],
+          "short": "Linked lists, stacks, queues & monotonic stacks"
         },
         {
           "id": "01.03",
           "tag": "P0",
           "text": "Trees: BST, balanced trees (red-black, AVL at a conceptual level), traversal orders",
-          "requires": ["02.01", "01.01", "01.02"],
+          "requires": [
+            "02.01",
+            "01.01",
+            "01.02"
+          ],
           "drills": [
-            ["Maximum Depth of Binary Tree", "E"],
-            ["Invert Binary Tree", "E"],
-            ["Validate Binary Search Tree", "M"],
-            ["Binary Tree Level Order Traversal", "M"],
-            ["Lowest Common Ancestor of a Binary Tree", "M"],
-            ["Kth Smallest Element in a BST", "M"],
-            ["Serialize and Deserialize Binary Tree", "H"],
-            ["Binary Tree Maximum Path Sum", "H"]
-          ]
+            [
+              "Maximum Depth of Binary Tree",
+              "E"
+            ],
+            [
+              "Invert Binary Tree",
+              "E"
+            ],
+            [
+              "Validate Binary Search Tree",
+              "M"
+            ],
+            [
+              "Binary Tree Level Order Traversal",
+              "M"
+            ],
+            [
+              "Lowest Common Ancestor of a Binary Tree",
+              "M"
+            ],
+            [
+              "Kth Smallest Element in a BST",
+              "M"
+            ],
+            [
+              "Serialize and Deserialize Binary Tree",
+              "H"
+            ],
+            [
+              "Binary Tree Maximum Path Sum",
+              "H"
+            ]
+          ],
+          "short": "Trees, BSTs & traversals"
         },
         {
           "id": "01.04",
           "tag": "P0",
           "text": "Heaps and priority queues: top-k, k-way merge, scheduling",
-          "requires": ["01.03", "01.02"],
+          "requires": [
+            "01.03",
+            "01.02"
+          ],
           "drills": [
-            ["Kth Largest Element in an Array", "M"],
-            ["K Closest Points to Origin", "M"],
-            ["Task Scheduler", "M"],
-            ["Merge k Sorted Lists", "H"],
-            ["Find Median from Data Stream", "H"]
-          ]
+            [
+              "Kth Largest Element in an Array",
+              "M"
+            ],
+            [
+              "K Closest Points to Origin",
+              "M"
+            ],
+            [
+              "Task Scheduler",
+              "M"
+            ],
+            [
+              "Merge k Sorted Lists",
+              "H"
+            ],
+            [
+              "Find Median from Data Stream",
+              "H"
+            ]
+          ],
+          "short": "Heaps & priority queues"
         },
         {
           "id": "01.05",
           "tag": "P0",
           "text": "Graphs: adjacency list vs matrix, directed/undirected, weighted",
-          "requires": ["01.01", "01.03"],
-          "drills": [["Find the Town Judge", "E"], ["Clone Graph", "M"]]
+          "requires": [
+            "01.01",
+            "01.03"
+          ],
+          "drills": [
+            [
+              "Find the Town Judge",
+              "E"
+            ],
+            [
+              "Clone Graph",
+              "M"
+            ]
+          ],
+          "short": "Graph representations"
         },
         {
           "id": "01.06",
           "tag": "P0",
           "text": "Tries, prefix/radix trees (autocomplete, routing tables)",
-          "requires": ["01.01", "01.03", "02.05"],
+          "requires": [
+            "01.01",
+            "01.03",
+            "02.05"
+          ],
           "drills": [
-            ["Implement Trie (Prefix Tree)", "M"],
-            ["Design Add and Search Words Data Structure", "M"],
-            ["Search Suggestions System", "M"],
-            ["Word Search II", "H"]
-          ]
+            [
+              "Implement Trie (Prefix Tree)",
+              "M"
+            ],
+            [
+              "Design Add and Search Words Data Structure",
+              "M"
+            ],
+            [
+              "Search Suggestions System",
+              "M"
+            ],
+            [
+              "Word Search II",
+              "H"
+            ]
+          ],
+          "short": "Tries & prefix trees"
         },
         {
           "id": "01.07",
           "tag": "P0",
           "text": "Union-find (disjoint sets) with path compression",
-          "requires": ["01.05", "02.05", "01.03", "02.01"],
+          "requires": [
+            "01.05",
+            "02.05",
+            "01.03",
+            "02.01"
+          ],
           "drills": [
-            ["Number of Provinces", "M"],
-            ["Redundant Connection", "M"],
-            ["Accounts Merge", "M"],
-            ["Satisfiability of Equality Equations", "M"],
-            ["Number of Islands II", "H"]
-          ]
+            [
+              "Number of Provinces",
+              "M"
+            ],
+            [
+              "Redundant Connection",
+              "M"
+            ],
+            [
+              "Accounts Merge",
+              "M"
+            ],
+            [
+              "Satisfiability of Equality Equations",
+              "M"
+            ],
+            [
+              "Number of Islands II",
+              "H"
+            ]
+          ],
+          "short": "Union-Find (disjoint sets)"
         },
         {
           "id": "01.08",
           "tag": "P1",
           "text": "LRU/LFU cache construction (hash map + doubly linked list)",
-          "requires": ["01.01", "01.02", "01.04"],
-          "drills": [["LRU Cache", "M"], ["LFU Cache", "H"]]
+          "requires": [
+            "01.01",
+            "01.02",
+            "01.04"
+          ],
+          "drills": [
+            [
+              "LRU Cache",
+              "M"
+            ],
+            [
+              "LFU Cache",
+              "H"
+            ]
+          ],
+          "short": "LRU, TTL & LFU caches"
         },
         {
           "id": "01.09",
           "tag": "P0",
           "text": "Interval structures: merge, sweep line, interval tree basics",
-          "requires": ["02.02", "02.03", "02.04", "01.04", "01.03"],
+          "requires": [
+            "02.02",
+            "02.03",
+            "02.04",
+            "01.04",
+            "01.03"
+          ],
           "drills": [
-            ["Merge Intervals", "M"],
-            ["Insert Interval", "M"],
-            ["Non-overlapping Intervals", "M"],
-            ["Minimum Number of Arrows to Burst Balloons", "M"],
-            ["Car Pooling", "M"],
-            ["My Calendar I", "M"],
-            ["Employee Free Time", "H"],
-            ["Range Module", "H"]
-          ]
+            [
+              "Merge Intervals",
+              "M"
+            ],
+            [
+              "Insert Interval",
+              "M"
+            ],
+            [
+              "Non-overlapping Intervals",
+              "M"
+            ],
+            [
+              "Minimum Number of Arrows to Burst Balloons",
+              "M"
+            ],
+            [
+              "Car Pooling",
+              "M"
+            ],
+            [
+              "My Calendar I",
+              "M"
+            ],
+            [
+              "Employee Free Time",
+              "H"
+            ],
+            [
+              "Range Module",
+              "H"
+            ]
+          ],
+          "short": "Intervals & sweep line"
         },
         {
           "id": "01.10",
           "tag": "P1",
           "text": "Segment trees, Fenwick trees (BIT)",
-          "requires": ["01.03", "01.04"],
+          "requires": [
+            "01.03",
+            "01.04"
+          ],
           "drills": [
-            ["Range Sum Query - Mutable", "M"],
-            ["Count of Smaller Numbers After Self", "H"]
-          ]
+            [
+              "Range Sum Query - Mutable",
+              "M"
+            ],
+            [
+              "Count of Smaller Numbers After Self",
+              "H"
+            ]
+          ],
+          "short": "Fenwick (BIT) & segment trees"
         },
         {
           "id": "01.11",
           "tag": "P2",
           "text": "Skip lists (and why Redis uses them)",
-          "requires": ["01.02", "01.03"]
+          "requires": [
+            "01.02",
+            "01.03"
+          ]
         },
         {
           "id": "01.12",
           "tag": "P1",
           "text": "Probabilistic structures: Bloom filter, Count-Min Sketch, HyperLogLog",
-          "requires": ["01.01", "01.04"]
+          "requires": [
+            "01.01",
+            "01.04"
+          ],
+          "short": "Bloom filters & probabilistic structures"
         },
         {
           "id": "01.13",
           "tag": "P1",
           "text": "Storage structures: B-tree, B+tree, LSM tree, SSTable, write-ahead log",
-          "requires": ["01.03", "01.04", "01.12"]
+          "requires": [
+            "01.03",
+            "01.04",
+            "01.12"
+          ],
+          "short": "Storage engines: B-trees, LSM trees & WAL"
         },
         {
           "id": "01.14",
           "tag": "P2",
           "text": "Concurrent structures: lock-free queue, ring buffer, concurrent hash map",
-          "requires": ["01.02", "01.01", "03.03"]
+          "requires": [
+            "01.02",
+            "01.01",
+            "03.03"
+          ],
+          "short": "Concurrent data structures"
         }
       ]
     },
@@ -867,171 +1368,425 @@
           "id": "02.01",
           "tag": "P0",
           "text": "Complexity analysis: time, space, amortized; knowing when constants matter",
-          "requires": []
+          "requires": [],
+          "short": "Complexity & amortized cost"
         },
         {
           "id": "02.02",
           "tag": "P0",
           "text": "Sorting and its trade-offs (quicksort, mergesort, heapsort, counting/radix); stability",
-          "requires": ["02.01", "01.04"],
-          "drills": [["Merge Sorted Array", "E"], ["Sort Colors", "M"], ["Sort an Array", "M"], ["Largest Number", "M"]]
+          "requires": [
+            "02.01",
+            "01.04"
+          ],
+          "drills": [
+            [
+              "Merge Sorted Array",
+              "E"
+            ],
+            [
+              "Sort Colors",
+              "M"
+            ],
+            [
+              "Sort an Array",
+              "M"
+            ],
+            [
+              "Largest Number",
+              "M"
+            ]
+          ],
+          "short": "Sorting & quickselect"
         },
         {
           "id": "02.03",
           "tag": "P0",
           "text": "Binary search, including \"search on the answer\" variants",
-          "requires": ["02.01", "02.02", "01.02"],
+          "requires": [
+            "02.01",
+            "02.02",
+            "01.02"
+          ],
           "drills": [
-            ["Binary Search", "E"],
-            ["Search in Rotated Sorted Array", "M"],
-            ["Find Minimum in Rotated Sorted Array", "M"],
-            ["Koko Eating Bananas", "M"],
-            ["Capacity To Ship Packages Within D Days", "M"],
-            ["Split Array Largest Sum", "H"],
-            ["Median of Two Sorted Arrays", "H"]
-          ]
+            [
+              "Binary Search",
+              "E"
+            ],
+            [
+              "Search in Rotated Sorted Array",
+              "M"
+            ],
+            [
+              "Find Minimum in Rotated Sorted Array",
+              "M"
+            ],
+            [
+              "Koko Eating Bananas",
+              "M"
+            ],
+            [
+              "Capacity To Ship Packages Within D Days",
+              "M"
+            ],
+            [
+              "Split Array Largest Sum",
+              "H"
+            ],
+            [
+              "Median of Two Sorted Arrays",
+              "H"
+            ]
+          ],
+          "short": "Binary search & search on the answer"
         },
         {
           "id": "02.04",
           "tag": "P0",
           "text": "Two pointers, sliding window, prefix sums",
-          "requires": ["02.01", "02.02", "01.01"],
+          "requires": [
+            "02.01",
+            "02.02",
+            "01.01"
+          ],
           "drills": [
-            ["Valid Palindrome", "E"],
-            ["3Sum", "M"],
-            ["Container With Most Water", "M"],
-            ["Longest Substring Without Repeating Characters", "M"],
-            ["Product of Array Except Self", "M"],
-            ["Subarray Sum Equals K", "M"],
-            ["Minimum Window Substring", "H"]
-          ]
+            [
+              "Valid Palindrome",
+              "E"
+            ],
+            [
+              "3Sum",
+              "M"
+            ],
+            [
+              "Container With Most Water",
+              "M"
+            ],
+            [
+              "Longest Substring Without Repeating Characters",
+              "M"
+            ],
+            [
+              "Product of Array Except Self",
+              "M"
+            ],
+            [
+              "Subarray Sum Equals K",
+              "M"
+            ],
+            [
+              "Minimum Window Substring",
+              "H"
+            ]
+          ],
+          "short": "Two pointers, sliding window & prefix sums"
         },
         {
           "id": "02.05",
           "tag": "P0",
           "text": "BFS/DFS, topological sort, cycle detection, connected components",
-          "requires": ["02.01", "01.01", "01.02", "01.05"],
+          "requires": [
+            "02.01",
+            "01.01",
+            "01.02",
+            "01.05"
+          ],
           "drills": [
-            ["Number of Islands", "M"],
-            ["Rotting Oranges", "M"],
-            ["Course Schedule", "M"],
-            ["Course Schedule II", "M"],
-            ["Pacific Atlantic Water Flow", "M"],
-            ["Alien Dictionary", "H"],
-            ["Word Ladder", "H"]
-          ]
+            [
+              "Number of Islands",
+              "M"
+            ],
+            [
+              "Rotting Oranges",
+              "M"
+            ],
+            [
+              "Course Schedule",
+              "M"
+            ],
+            [
+              "Course Schedule II",
+              "M"
+            ],
+            [
+              "Pacific Atlantic Water Flow",
+              "M"
+            ],
+            [
+              "Alien Dictionary",
+              "H"
+            ],
+            [
+              "Word Ladder",
+              "H"
+            ]
+          ],
+          "short": "Graph traversals & topological sort"
         },
         {
           "id": "02.06",
           "tag": "P0",
           "text": "Recursion and backtracking (permutations, subsets, constraint search)",
-          "requires": ["02.01", "02.05"],
+          "requires": [
+            "02.01",
+            "02.05"
+          ],
           "drills": [
-            ["Subsets", "M"],
-            ["Permutations", "M"],
-            ["Combination Sum", "M"],
-            ["Generate Parentheses", "M"],
-            ["Word Search", "M"],
-            ["N-Queens", "H"]
-          ]
+            [
+              "Subsets",
+              "M"
+            ],
+            [
+              "Permutations",
+              "M"
+            ],
+            [
+              "Combination Sum",
+              "M"
+            ],
+            [
+              "Generate Parentheses",
+              "M"
+            ],
+            [
+              "Word Search",
+              "M"
+            ],
+            [
+              "N-Queens",
+              "H"
+            ]
+          ],
+          "short": "Recursion & backtracking"
         },
         {
           "id": "02.07",
           "tag": "P0",
           "text": "Dynamic programming: 1D/2D, knapsack family, LIS, edit distance, interval and DAG DP",
-          "requires": ["02.01", "02.03", "02.06"],
+          "requires": [
+            "02.01",
+            "02.03",
+            "02.06"
+          ],
           "drills": [
-            ["Climbing Stairs", "E"],
-            ["House Robber", "M"],
-            ["Coin Change", "M"],
-            ["Longest Increasing Subsequence", "M"],
-            ["Longest Common Subsequence", "M"],
-            ["Word Break", "M"],
-            ["Edit Distance", "M"],
-            ["Longest Increasing Path in a Matrix", "H"],
-            ["Burst Balloons", "H"]
-          ]
+            [
+              "Climbing Stairs",
+              "E"
+            ],
+            [
+              "House Robber",
+              "M"
+            ],
+            [
+              "Coin Change",
+              "M"
+            ],
+            [
+              "Longest Increasing Subsequence",
+              "M"
+            ],
+            [
+              "Longest Common Subsequence",
+              "M"
+            ],
+            [
+              "Word Break",
+              "M"
+            ],
+            [
+              "Edit Distance",
+              "M"
+            ],
+            [
+              "Longest Increasing Path in a Matrix",
+              "H"
+            ],
+            [
+              "Burst Balloons",
+              "H"
+            ]
+          ],
+          "short": "Dynamic programming"
         },
         {
           "id": "02.08",
           "tag": "P0",
           "text": "Shortest paths: Dijkstra, 0-1 BFS, Bellman-Ford, A* basics",
-          "requires": ["02.05", "01.04"],
+          "requires": [
+            "02.05",
+            "01.04"
+          ],
           "drills": [
-            ["Network Delay Time", "M"],
-            ["Path With Minimum Effort", "M"],
-            ["Cheapest Flights Within K Stops", "M"],
-            ["Swim in Rising Water", "H"],
-            ["Shortest Path in a Grid with Obstacles Elimination", "H"]
-          ]
+            [
+              "Network Delay Time",
+              "M"
+            ],
+            [
+              "Path With Minimum Effort",
+              "M"
+            ],
+            [
+              "Cheapest Flights Within K Stops",
+              "M"
+            ],
+            [
+              "Swim in Rising Water",
+              "H"
+            ],
+            [
+              "Shortest Path in a Grid with Obstacles Elimination",
+              "H"
+            ]
+          ],
+          "short": "Shortest paths (Dijkstra & 0-1 BFS)"
         },
         {
           "id": "02.09",
           "tag": "P1",
           "text": "Minimum spanning tree (Kruskal, Prim)",
-          "requires": ["01.07", "01.04", "02.08"],
-          "drills": [["Min Cost to Connect All Points", "M"]]
+          "requires": [
+            "01.07",
+            "01.04",
+            "02.08"
+          ],
+          "drills": [
+            [
+              "Min Cost to Connect All Points",
+              "M"
+            ]
+          ],
+          "short": "Minimum spanning trees"
         },
         {
           "id": "02.10",
           "tag": "P1",
           "text": "Greedy algorithms and how to argue correctness",
-          "requires": ["02.02", "01.09", "02.07"],
+          "requires": [
+            "02.02",
+            "01.09",
+            "02.07"
+          ],
           "drills": [
-            ["Jump Game", "M"],
-            ["Jump Game II", "M"],
-            ["Gas Station", "M"],
-            ["Partition Labels", "M"],
-            ["Hand of Straights", "M"]
-          ]
+            [
+              "Jump Game",
+              "M"
+            ],
+            [
+              "Jump Game II",
+              "M"
+            ],
+            [
+              "Gas Station",
+              "M"
+            ],
+            [
+              "Partition Labels",
+              "M"
+            ],
+            [
+              "Hand of Straights",
+              "M"
+            ]
+          ],
+          "short": "Greedy & exchange arguments"
         },
         {
           "id": "02.11",
           "tag": "P1",
           "text": "Bit manipulation",
-          "requires": ["02.01", "02.06"],
+          "requires": [
+            "02.01",
+            "02.06"
+          ],
           "drills": [
-            ["Single Number", "E"],
-            ["Number of 1 Bits", "E"],
-            ["Counting Bits", "E"],
-            ["Missing Number", "E"],
-            ["Sum of Two Integers", "M"]
-          ]
+            [
+              "Single Number",
+              "E"
+            ],
+            [
+              "Number of 1 Bits",
+              "E"
+            ],
+            [
+              "Counting Bits",
+              "E"
+            ],
+            [
+              "Missing Number",
+              "E"
+            ],
+            [
+              "Sum of Two Integers",
+              "M"
+            ]
+          ],
+          "short": "Bit manipulation"
         },
         {
           "id": "02.12",
           "tag": "P1",
           "text": "String algorithms: rolling hash, KMP at a conceptual level",
-          "requires": ["02.01", "01.01", "02.03"],
+          "requires": [
+            "02.01",
+            "01.01",
+            "02.03"
+          ],
           "drills": [
-            ["Find the Index of the First Occurrence in a String", "E"],
-            ["Repeated DNA Sequences", "M"],
-            ["Longest Duplicate Substring", "H"]
-          ]
+            [
+              "Find the Index of the First Occurrence in a String",
+              "E"
+            ],
+            [
+              "Repeated DNA Sequences",
+              "M"
+            ],
+            [
+              "Longest Duplicate Substring",
+              "H"
+            ]
+          ],
+          "short": "Rolling hash & string matching"
         },
         {
           "id": "02.13",
           "tag": "P1",
           "text": "Streaming and external algorithms: reservoir sampling, external merge sort, heavy hitters",
-          "requires": ["02.02", "01.04"]
+          "requires": [
+            "02.02",
+            "01.04"
+          ],
+          "short": "Streaming & external-memory algorithms"
         },
         {
           "id": "02.14",
           "tag": "P1",
           "text": "Rate limiting algorithms: token bucket, leaky bucket, sliding window log/counter",
-          "requires": ["02.04", "01.01", "01.02"]
+          "requires": [
+            "02.04",
+            "01.01",
+            "01.02"
+          ],
+          "short": "Rate limiting algorithms"
         },
         {
           "id": "02.15",
           "tag": "P1",
           "text": "Consistent hashing, rendezvous hashing",
-          "requires": ["01.01", "02.03"]
+          "requires": [
+            "01.01",
+            "02.03"
+          ],
+          "short": "Consistent & rendezvous hashing"
         },
         {
           "id": "02.16",
           "tag": "P1",
           "text": "Basic probability and estimation for capacity reasoning",
-          "requires": ["02.01", "01.01"]
+          "requires": [
+            "02.01",
+            "01.01"
+          ],
+          "short": "Probability & capacity math"
         }
       ]
     },
@@ -1048,54 +1803,78 @@
           "id": "03.01",
           "tag": "P0",
           "text": "Threads vs processes vs coroutines; when each is the right tool",
-          "requires": ["09.01"]
+          "requires": [
+            "09.01"
+          ],
+          "short": "Threads, processes & asyncio (Python GIL)"
         },
         {
           "id": "03.02",
           "tag": "P0",
           "text": "Race conditions, critical sections, atomicity, visibility",
-          "short": "Race conditions and atomicity",
-          "requires": ["03.01"]
+          "short": "Race conditions & atomicity",
+          "requires": [
+            "03.01"
+          ]
         },
         {
           "id": "03.03",
           "tag": "P0",
           "text": "Mutexes, read-write locks, semaphores, condition variables",
-          "short": "Locks, semaphores and condition variables",
-          "requires": ["03.02"]
+          "short": "Locks, semaphores & condition variables",
+          "requires": [
+            "03.02"
+          ]
         },
         {
           "id": "03.04",
           "tag": "P0",
           "text": "Deadlock, livelock, starvation: the four deadlock conditions and how to break them",
-          "requires": ["03.03"]
+          "requires": [
+            "03.03"
+          ],
+          "short": "Deadlock, livelock & starvation"
         },
         {
           "id": "03.05",
           "tag": "P0",
           "text": "Thread pools, work queues, backpressure",
-          "requires": ["03.03", "01.02"]
+          "requires": [
+            "03.03",
+            "01.02"
+          ],
+          "short": "Thread pools, queues & backpressure"
         },
         {
           "id": "03.06",
           "tag": "P0",
           "text": "Async I/O and event loops (epoll/kqueue model, async/await semantics, cancellation)",
-          "short": "Async I/O and event loops",
-          "requires": ["03.01"]
+          "short": "Async I/O & event loops",
+          "requires": [
+            "03.01"
+          ]
         },
         {
           "id": "03.07",
           "tag": "P0",
           "text": "Classic concurrency patterns: producer-consumer, bounded buffer, thread-safe LRU, single-flight coalescing",
-          "short": "Bounded buffer, thread-safe LRU and single-flight",
-          "requires": ["03.03", "03.05", "01.08"]
+          "short": "Bounded buffer, thread-safe LRU & single-flight",
+          "requires": [
+            "03.03",
+            "03.05",
+            "01.08"
+          ]
         },
         {
           "id": "03.08",
           "tag": "P1",
           "text": "Memory model basics: happens-before, volatile/atomic, false sharing"
         },
-        {"id": "03.09", "tag": "P1", "text": "Compare-and-swap, lock-free vs wait-free, the ABA problem"},
+        {
+          "id": "03.09",
+          "tag": "P1",
+          "text": "Compare-and-swap, lock-free vs wait-free, the ABA problem"
+        },
         {
           "id": "03.10",
           "tag": "P1",
@@ -1106,8 +1885,16 @@
           "tag": "P1",
           "text": "Language specifics: Python GIL and multiprocessing, Go channels, C++ std::thread/std::atomic, Swift actors"
         },
-        {"id": "03.12", "tag": "P2", "text": "Actor model and CSP"},
-        {"id": "03.13", "tag": "P2", "text": "Parallelism limits: Amdahl's law, contention, cache effects"},
+        {
+          "id": "03.12",
+          "tag": "P2",
+          "text": "Actor model and CSP"
+        },
+        {
+          "id": "03.13",
+          "tag": "P2",
+          "text": "Parallelism limits: Amdahl's law, contention, cache effects"
+        },
         {
           "id": "03.14",
           "tag": "P2",
@@ -1128,106 +1915,176 @@
           "id": "04.01",
           "tag": "P0",
           "text": "Requirements gathering: functional vs non-functional, scoping, stating assumptions",
-          "requires": []
+          "requires": [],
+          "short": "Requirements gathering & scoping"
         },
         {
           "id": "04.02",
           "tag": "P0",
           "text": "Back-of-envelope estimation: QPS, storage, bandwidth, memory",
-          "requires": ["04.01", "04.03", "02.16"]
+          "requires": [
+            "04.01",
+            "04.03",
+            "02.16"
+          ],
+          "short": "Back-of-envelope estimation"
         },
         {
           "id": "04.03",
           "tag": "P0",
           "text": "Latency numbers every engineer should know; p50/p95/p99 thinking",
-          "requires": ["02.01", "02.16"]
+          "requires": [
+            "02.01",
+            "02.16"
+          ],
+          "short": "Latency numbers & p99 fan-out"
         },
         {
           "id": "04.04",
           "tag": "P0",
           "text": "Load balancing: L4 vs L7, algorithms, health checks",
-          "requires": ["09.04", "09.03", "01.01", "04.11"]
+          "requires": [
+            "09.04",
+            "09.03",
+            "01.01",
+            "04.11"
+          ],
+          "short": "Load balancing (L4 vs L7)"
         },
         {
           "id": "04.05",
           "tag": "P0",
           "text": "Caching: cache-aside, write-through, write-behind, TTLs, invalidation, stampede protection",
-          "requires": ["01.08", "04.03", "04.02"]
+          "requires": [
+            "01.08",
+            "04.03",
+            "04.02"
+          ],
+          "short": "Caching strategies & stampedes"
         },
         {
           "id": "04.06",
           "tag": "P0",
           "text": "Database choice: relational vs document vs key-value vs wide-column vs graph vs search",
-          "requires": ["06.04", "06.01", "06.02"]
+          "requires": [
+            "06.04",
+            "06.01",
+            "06.02"
+          ],
+          "short": "Choosing a database"
         },
         {
           "id": "04.07",
           "tag": "P0",
           "text": "Replication (leader-follower, multi-leader, leaderless) and sharding/partitioning strategies",
-          "short": "Replication and sharding",
-          "requires": ["04.06", "02.15"]
+          "short": "Replication & sharding",
+          "requires": [
+            "04.06",
+            "02.15"
+          ]
         },
         {
           "id": "04.08",
           "tag": "P0",
           "text": "Message queues and event streams (Kafka, SQS, RabbitMQ): ordering, delivery guarantees",
-          "short": "Message queues and event streams",
-          "requires": ["01.02", "04.07"]
+          "short": "Message queues & event streams",
+          "requires": [
+            "01.02",
+            "04.07"
+          ]
         },
         {
           "id": "04.09",
           "tag": "P0",
           "text": "API design: REST, gRPC, GraphQL; pagination, versioning, idempotency keys",
-          "requires": ["04.01", "09.03"]
+          "requires": [
+            "04.01",
+            "09.03"
+          ],
+          "short": "API design (REST, gRPC, idempotency)"
         },
         {
           "id": "04.10",
           "tag": "P0",
           "text": "CDNs, edge caching, object storage",
-          "short": "CDNs and object storage",
-          "requires": ["04.05", "09.03"]
+          "short": "CDNs & object storage",
+          "requires": [
+            "04.05",
+            "09.03"
+          ]
         },
         {
           "id": "04.11",
           "tag": "P1",
           "text": "Stateless services, session handling, horizontal scaling",
-          "short": "Stateless services",
-          "requires": ["09.03"]
+          "short": "Stateless services & horizontal scaling",
+          "requires": [
+            "09.03"
+          ]
         },
         {
           "id": "04.12",
           "tag": "P0",
           "text": "Rate limiting, load shedding, circuit breakers, retries with jitter, timeouts, bulkheads",
-          "short": "Timeouts, retries, circuit breakers, load shedding",
-          "requires": ["02.14", "04.04", "04.03", "02.16", "03.05", "05.08"]
+          "short": "Timeouts, retries, circuit breakers & load shedding",
+          "requires": [
+            "02.14",
+            "04.04",
+            "04.03",
+            "02.16",
+            "03.05",
+            "05.08"
+          ]
         },
         {
           "id": "04.13",
           "tag": "P1",
           "text": "Multi-region design: active-active vs active-passive, failover, data residency",
-          "requires": ["04.07", "05.01", "04.04", "05.08"]
+          "requires": [
+            "04.07",
+            "05.01",
+            "04.04",
+            "05.08"
+          ],
+          "short": "Multi-region architecture"
         },
         {
           "id": "04.14",
           "tag": "P1",
           "text": "Real-time delivery: WebSockets, SSE, long polling, pub/sub fan-out",
-          "short": "Real-time delivery: WebSockets, SSE, pub/sub",
-          "requires": ["09.03", "09.04", "04.04", "04.08"]
+          "short": "Real-time delivery (WebSockets, SSE, pub/sub)",
+          "requires": [
+            "09.03",
+            "09.04",
+            "04.04",
+            "04.08"
+          ]
         },
         {
           "id": "04.15",
           "tag": "P1",
           "text": "Search and indexing: inverted index, scatter-gather, ranking basics",
-          "short": "Search and inverted indexes",
-          "requires": ["01.01", "04.07", "06.06"]
+          "short": "Search & inverted indexes",
+          "requires": [
+            "01.01",
+            "04.07",
+            "06.06"
+          ]
         },
-        {"id": "04.16", "tag": "P2", "text": "Cost as a design constraint; build vs buy"},
+        {
+          "id": "04.16",
+          "tag": "P2",
+          "text": "Cost as a design constraint; build vs buy"
+        },
         {
           "id": "04.17",
           "tag": "P1",
           "text": "Migration strategy: dual writes, backfills, shadow traffic, strangler pattern",
           "short": "Zero-downtime migrations",
-          "requires": ["04.07", "11.02"]
+          "requires": [
+            "04.07",
+            "11.02"
+          ]
         }
       ]
     },
@@ -1242,75 +2099,117 @@
           "id": "05.01",
           "tag": "P0",
           "text": "CAP and PACELC, and what they do and do not say",
-          "short": "CAP and PACELC",
-          "requires": ["04.07", "05.02"]
+          "short": "CAP & PACELC",
+          "requires": [
+            "04.07",
+            "05.02"
+          ]
         },
         {
           "id": "05.02",
           "tag": "P0",
           "text": "Consistency models: linearizable, sequential, causal, eventual, read-your-writes",
-          "requires": ["04.07"]
+          "requires": [
+            "04.07"
+          ],
+          "short": "Consistency models"
         },
         {
           "id": "05.03",
           "tag": "P0",
           "text": "Delivery semantics: at-most-once, at-least-once, effectively-once via idempotency",
-          "requires": ["04.08", "04.09"]
+          "requires": [
+            "04.08",
+            "04.09"
+          ],
+          "short": "Delivery guarantees & idempotency"
         },
         {
           "id": "05.04",
           "tag": "P0",
           "text": "Consensus: Raft in detail, Paxos at a conceptual level; leader election",
-          "short": "Consensus: Raft, Paxos and leader election",
-          "requires": ["05.02", "05.01"]
+          "short": "Consensus: Raft, Paxos & leader election",
+          "requires": [
+            "05.02",
+            "05.01"
+          ]
         },
         {
           "id": "05.05",
           "tag": "P1",
           "text": "Quorums, sloppy quorums, hinted handoff, read repair, anti-entropy (Merkle trees)",
-          "short": "Quorums, hinted handoff and read repair",
-          "requires": ["04.07", "05.02", "05.06"]
+          "short": "Quorums, hinted handoff & read repair",
+          "requires": [
+            "04.07",
+            "05.02",
+            "05.06"
+          ]
         },
         {
           "id": "05.06",
           "tag": "P1",
           "text": "Time and ordering: clock skew, Lamport clocks, vector clocks, hybrid logical clocks, TrueTime intuition",
-          "short": "Time, clocks and ordering",
-          "requires": ["05.02"]
+          "short": "Time, clocks & ordering",
+          "requires": [
+            "05.02"
+          ]
         },
         {
           "id": "05.07",
           "tag": "P1",
           "text": "Distributed transactions: 2PC, sagas, outbox pattern, change data capture",
-          "short": "Distributed transactions: 2PC, sagas and outbox",
-          "requires": ["06.02", "04.08", "05.03"]
+          "short": "Distributed transactions: 2PC, sagas & outbox",
+          "requires": [
+            "06.02",
+            "04.08",
+            "05.03"
+          ]
         },
         {
           "id": "05.08",
           "tag": "P1",
           "text": "Failure modes: partitions, split brain, gray failure, thundering herd, cascading failure, retry storms",
-          "requires": ["04.04", "04.07"]
+          "requires": [
+            "04.04",
+            "04.07"
+          ],
+          "short": "Distributed failure modes"
         },
         {
           "id": "05.09",
           "tag": "P1",
           "text": "Distributed locks, fencing tokens, leases",
-          "short": "Distributed locks, leases and fencing tokens",
-          "requires": ["05.04", "05.06"]
+          "short": "Distributed locks, leases & fencing tokens",
+          "requires": [
+            "05.04",
+            "05.06"
+          ]
         },
         {
           "id": "05.10",
           "tag": "P2",
           "text": "CRDTs and conflict resolution",
-          "requires": ["05.02", "05.06"]
+          "requires": [
+            "05.02",
+            "05.06"
+          ],
+          "short": "CRDTs & conflict resolution"
         },
-        {"id": "05.11", "tag": "P2", "text": "Gossip protocols, membership, failure detection"},
+        {
+          "id": "05.11",
+          "tag": "P2",
+          "text": "Gossip protocols, membership, failure detection"
+        },
         {
           "id": "05.12",
           "tag": "P2",
           "text": "Landmark papers: Bigtable, Spanner, GFS, MapReduce, Dynamo, Kafka, Raft",
           "short": "Landmark distributed systems papers",
-          "requires": ["01.13", "05.04", "05.05"]
+          "requires": [
+            "01.13",
+            "05.04",
+            "05.05"
+          ]
         }
       ]
     },
@@ -1319,58 +2218,89 @@
       "id": "06",
       "slug": "06-data-intensive-design",
       "title": "Data-Intensive Design",
-      "notes": ["Core text: Designing Data-Intensive Applications (Kleppmann). Check for the second edition."],
+      "notes": [
+        "Core text: Designing Data-Intensive Applications (Kleppmann). Check for the second edition."
+      ],
       "topics": [
         {
           "id": "06.01",
           "tag": "P0",
           "text": "Indexing: B-tree vs LSM, composite and covering indexes, when an index hurts",
-          "requires": ["01.13", "06.04", "06.03"]
+          "requires": [
+            "01.13",
+            "06.04",
+            "06.03"
+          ],
+          "short": "Database indexing (B-tree, composite, covering)"
         },
         {
           "id": "06.02",
           "tag": "P0",
           "text": "Transactions and ACID; isolation levels and their anomalies (dirty read, non-repeatable read, phantom, write skew)",
-          "requires": ["06.04", "01.13", "06.01"]
+          "requires": [
+            "06.04",
+            "01.13",
+            "06.01"
+          ],
+          "short": "Transactions, ACID & isolation anomalies"
         },
         {
           "id": "06.03",
           "tag": "P0",
           "text": "SQL fluency: joins, aggregation, window functions, reading an EXPLAIN plan",
-          "requires": ["01.01", "02.02"]
+          "requires": [
+            "01.01",
+            "02.02"
+          ],
+          "short": "SQL fluency & EXPLAIN plans"
         },
         {
           "id": "06.04",
           "tag": "P0",
           "text": "Data modeling: normalization vs denormalization, access-pattern-driven design",
-          "requires": ["04.01", "06.03"]
+          "requires": [
+            "04.01",
+            "06.03"
+          ],
+          "short": "Data modeling & access patterns"
         },
         {
           "id": "06.05",
           "tag": "P1",
           "text": "MVCC, optimistic vs pessimistic locking",
-          "requires": ["06.02"]
+          "requires": [
+            "06.02"
+          ],
+          "short": "MVCC & optimistic vs pessimistic locking"
         },
         {
           "id": "06.06",
           "tag": "P0",
           "text": "Partitioning: hash vs range, hot keys, rebalancing, secondary indexes across shards",
-          "short": "Partitioning, hot keys and cross-shard indexes",
-          "requires": ["04.07", "06.01"]
+          "short": "Partitioning, hot keys & cross-shard indexes",
+          "requires": [
+            "04.07",
+            "06.01"
+          ]
         },
         {
           "id": "06.07",
           "tag": "P1",
           "text": "Batch vs stream processing; Lambda vs Kappa architecture",
           "short": "Batch vs stream processing",
-          "requires": ["04.08"]
+          "requires": [
+            "04.08"
+          ]
         },
         {
           "id": "06.08",
           "tag": "P1",
           "text": "Stream concepts: windowing, watermarks, late data, exactly-once processing",
-          "short": "Streaming: windowing, watermarks and late data",
-          "requires": ["06.07", "05.03"]
+          "short": "Streaming: windows, watermarks & late data",
+          "requires": [
+            "06.07",
+            "05.03"
+          ]
         },
         {
           "id": "06.09",
@@ -1382,8 +2312,16 @@
           "tag": "P1",
           "text": "OLTP vs OLAP, columnar storage, Parquet, data warehouse vs lakehouse"
         },
-        {"id": "06.11", "tag": "P2", "text": "Online schema migrations and zero-downtime changes"},
-        {"id": "06.12", "tag": "P2", "text": "Data quality, lineage, backfills, reprocessing"},
+        {
+          "id": "06.11",
+          "tag": "P2",
+          "text": "Online schema migrations and zero-downtime changes"
+        },
+        {
+          "id": "06.12",
+          "tag": "P2",
+          "text": "Data quality, lineage, backfills, reprocessing"
+        },
         {
           "id": "06.13",
           "tag": "P2",
@@ -1404,198 +2342,349 @@
           "id": "07.01",
           "tag": "Classic",
           "text": "URL shortener; pastebin",
-          "short": "URL shortener",
-          "requires": ["04.01", "04.02", "04.05", "04.06", "04.09", "02.16"]
+          "short": "URL shortener & pastebin",
+          "requires": [
+            "04.01",
+            "04.02",
+            "04.05",
+            "04.06",
+            "04.09",
+            "02.16"
+          ]
         },
         {
           "id": "07.02",
           "tag": "Classic",
           "text": "Rate limiter (single node, then distributed)",
-          "requires": ["02.14", "04.05", "04.12"]
+          "requires": [
+            "02.14",
+            "04.05",
+            "04.12"
+          ],
+          "short": "Distributed rate limiter"
         },
         {
           "id": "07.03",
           "tag": "Consumer",
           "text": "News feed / timeline (fan-out on write vs read)",
-          "short": "News feed",
-          "requires": ["04.05", "04.07", "04.08", "01.04"]
+          "short": "News feed / timeline",
+          "requires": [
+            "04.05",
+            "04.07",
+            "04.08",
+            "01.04"
+          ]
         },
         {
           "id": "07.04",
           "tag": "Classic",
           "text": "Chat and messaging (1:1, group, presence, delivery receipts)",
-          "requires": ["04.14", "04.07", "05.03"]
+          "requires": [
+            "04.14",
+            "04.07",
+            "05.03"
+          ],
+          "short": "Chat & messaging"
         },
         {
           "id": "07.05",
           "tag": "Consumer",
           "text": "Notification system (multi-channel, dedup, preferences)",
-          "requires": ["04.08", "05.03", "04.12"]
+          "requires": [
+            "04.08",
+            "05.03",
+            "04.12"
+          ],
+          "short": "Notification system"
         },
         {
           "id": "07.06",
           "tag": "Classic",
           "text": "Typeahead / autocomplete",
-          "short": "Typeahead",
-          "requires": ["01.06", "04.05", "01.04"]
+          "short": "Typeahead / autocomplete",
+          "requires": [
+            "01.06",
+            "04.05",
+            "01.04"
+          ]
         },
         {
           "id": "07.07",
           "tag": "Classic",
           "text": "Web crawler",
-          "requires": ["02.05", "01.12", "02.14", "04.08", "03.05"]
+          "requires": [
+            "02.05",
+            "01.12",
+            "02.14",
+            "04.08",
+            "03.05"
+          ],
+          "short": "Distributed web crawler"
         },
         {
           "id": "07.08",
           "tag": "Classic",
           "text": "Distributed key-value store",
-          "requires": ["04.07", "05.01", "05.02", "05.05", "02.15", "01.13", "05.06"]
+          "requires": [
+            "04.07",
+            "05.01",
+            "05.02",
+            "05.05",
+            "02.15",
+            "01.13",
+            "05.06"
+          ],
+          "short": "Distributed key-value store"
         },
-        {"id": "07.09", "tag": "Classic", "text": "Distributed cache"},
+        {
+          "id": "07.09",
+          "tag": "Classic",
+          "text": "Distributed cache"
+        },
         {
           "id": "07.10",
           "tag": "Classic",
           "text": "Job scheduler / distributed cron / task queue",
-          "short": "Job scheduler and task queue",
-          "requires": ["04.08", "05.03", "01.04", "06.02", "03.05", "05.09"]
+          "short": "Distributed job scheduler & task queue",
+          "requires": [
+            "04.08",
+            "05.03",
+            "01.04",
+            "06.02",
+            "03.05",
+            "05.09"
+          ]
         },
-        {"id": "07.11", "tag": "Classic", "text": "Unique ID generator (Snowflake-style)"},
+        {
+          "id": "07.11",
+          "tag": "Classic",
+          "text": "Unique ID generator (Snowflake-style)"
+        },
         {
           "id": "07.12",
           "tag": "Google",
           "text": "File sync and storage (Google Drive / Dropbox-style)",
-          "short": "File sync and storage (Drive)",
-          "requires": ["04.10", "04.07", "05.03"]
+          "short": "File sync & storage (Google Drive)",
+          "requires": [
+            "04.10",
+            "04.07",
+            "05.03"
+          ]
         },
         {
           "id": "07.13",
           "tag": "Google",
           "text": "Geospatial proximity and ride matching (S2, quadtree, geohash)",
           "short": "Geospatial proximity (S2 / quadtree)",
-          "requires": ["04.07", "04.14", "06.06"]
+          "requires": [
+            "04.07",
+            "04.14",
+            "06.06"
+          ]
         },
         {
           "id": "07.14",
           "tag": "Classic",
           "text": "Payment system and ledger (idempotency, reconciliation, double-entry)",
-          "short": "Payment system and ledger",
-          "requires": ["06.02", "05.03", "05.07"]
+          "short": "Payment system & ledger",
+          "requires": [
+            "06.02",
+            "05.03",
+            "05.07"
+          ]
         },
         {
           "id": "07.15",
           "tag": "Consumer",
           "text": "Ticketing / inventory with contention (flash sale)",
           "short": "Flash-sale inventory with contention",
-          "requires": ["06.05", "05.09", "04.05"]
+          "requires": [
+            "06.05",
+            "05.09",
+            "04.05"
+          ]
         },
         {
           "id": "07.16",
           "tag": "Google",
           "text": "Collaborative editor (Google Docs — OT vs CRDT)",
-          "short": "Collaborative editor (Docs)",
-          "requires": ["04.14", "05.06", "05.10"]
+          "short": "Collaborative editor (Google Docs)",
+          "requires": [
+            "04.14",
+            "05.06",
+            "05.10"
+          ]
         },
         {
           "id": "07.17",
           "tag": "Classic",
           "text": "Metrics, monitoring, and alerting pipeline",
-          "short": "Metrics and alerting pipeline",
-          "requires": ["04.08", "06.07", "06.08", "11.01"]
+          "short": "Metrics & alerting pipeline",
+          "requires": [
+            "04.08",
+            "06.07",
+            "06.08",
+            "11.01"
+          ]
         },
         {
           "id": "07.18",
           "tag": "Google",
           "text": "Log aggregation and distributed search",
-          "short": "Log aggregation and search",
-          "requires": ["04.08", "04.15", "06.07"]
+          "short": "Log aggregation & search",
+          "requires": [
+            "04.08",
+            "04.15",
+            "06.07"
+          ]
         },
         {
           "id": "07.19",
           "tag": "Classic",
           "text": "Ad click aggregation; real-time top-k / leaderboard",
-          "short": "Ad click aggregation and top-k",
-          "requires": ["04.08", "06.08", "01.12"]
+          "short": "Ad click aggregation & top-k",
+          "requires": [
+            "04.08",
+            "06.08",
+            "01.12"
+          ]
         },
         {
           "id": "07.20",
           "tag": "Consumer",
           "text": "Video streaming: ingest, transcoding pipeline, adaptive bitrate, CDN placement",
-          "requires": ["04.10", "04.08"]
+          "requires": [
+            "04.10",
+            "04.08"
+          ],
+          "short": "Video streaming & CDN"
         },
         {
           "id": "07.21",
           "tag": "Consumer",
           "text": "Recommendation system serving and feature pipelines",
           "short": "Recommendation serving",
-          "requires": ["04.08", "04.05"]
+          "requires": [
+            "04.08",
+            "04.05"
+          ]
         },
         {
           "id": "07.22",
           "tag": "Consumer",
           "text": "A/B testing and experimentation platform",
           "short": "A/B testing platform",
-          "requires": ["04.08", "02.16", "01.01"]
+          "requires": [
+            "04.08",
+            "02.16",
+            "01.01"
+          ]
         },
-        {"id": "07.23", "tag": "Consumer", "text": "Playback and client telemetry at scale"},
+        {
+          "id": "07.23",
+          "tag": "Consumer",
+          "text": "Playback and client telemetry at scale"
+        },
         {
           "id": "07.24",
           "tag": "Consumer",
           "text": "Resilience design: chaos engineering, regional evacuation, graceful degradation",
-          "requires": ["04.12", "04.13", "05.08"]
+          "requires": [
+            "04.12",
+            "04.13",
+            "05.08"
+          ],
+          "short": "Resilience & regional evacuation"
         },
         {
           "id": "07.25",
           "tag": "Anthropic",
           "text": "LLM inference API: request routing, continuous batching, streaming tokens, GPU scheduling",
-          "requires": ["13.02", "04.04", "04.12", "04.14"]
+          "requires": [
+            "13.02",
+            "04.04",
+            "04.12",
+            "04.14"
+          ],
+          "short": "LLM inference API & batching"
         },
         {
           "id": "07.26",
           "tag": "Anthropic",
           "text": "Multi-tenant rate limiting and quota by tokens rather than requests",
-          "short": "Rate limiting by tokens",
-          "requires": ["02.14", "07.02", "13.01", "13.02"]
+          "short": "Multi-tenant token rate limiter",
+          "requires": [
+            "02.14",
+            "07.02",
+            "13.01",
+            "13.02"
+          ]
         },
         {
           "id": "07.27",
           "tag": "Anthropic",
           "text": "Prompt/response caching (prefix caching, KV cache reuse)",
-          "short": "Prompt and KV caching",
-          "requires": ["13.02", "04.05"]
+          "short": "Prompt & KV cache reuse",
+          "requires": [
+            "13.02",
+            "04.05"
+          ]
         },
         {
           "id": "07.28",
           "tag": "Anthropic",
           "text": "RAG system: ingestion, chunking, embedding, retrieval, reranking, freshness",
           "short": "RAG system end-to-end",
-          "requires": ["13.04", "04.08"]
+          "requires": [
+            "13.04",
+            "04.08"
+          ]
         },
         {
           "id": "07.29",
           "tag": "Anthropic",
           "text": "Agent execution platform: sandboxing, tool calls, long-running tasks, checkpointing",
-          "requires": ["13.03", "13.09", "04.08", "07.10", "09.08", "12.08"]
+          "requires": [
+            "13.03",
+            "13.09",
+            "04.08",
+            "07.10",
+            "09.08",
+            "12.08"
+          ],
+          "short": "Agent execution & sandboxing platform"
         },
         {
           "id": "07.30",
           "tag": "Anthropic",
           "text": "Evaluation platform: datasets, graders, regression tracking",
           "short": "LLM evaluation platform",
-          "requires": ["13.05", "04.08"]
+          "requires": [
+            "13.05",
+            "04.08"
+          ]
         },
         {
           "id": "07.31",
           "tag": "Anthropic",
           "text": "Training data pipeline and distributed job orchestration",
           "short": "Training data & job orchestration",
-          "requires": ["06.07", "07.10", "13.08"]
+          "requires": [
+            "06.07",
+            "07.10",
+            "13.08"
+          ]
         },
         {
           "id": "07.32",
           "tag": "Anthropic",
           "text": "Abuse detection and safety filtering in the request path",
-          "short": "Abuse detection and safety filtering",
-          "requires": ["13.02", "12.08", "04.12"]
+          "short": "Abuse detection & safety filtering",
+          "requires": [
+            "13.02",
+            "12.08",
+            "04.12"
+          ]
         }
       ]
     },
@@ -1610,26 +2699,33 @@
           "id": "08.01",
           "tag": "P0",
           "text": "Systematic debugging: reproduce, isolate, hypothesize, bisect, verify the fix",
-          "requires": []
+          "requires": [],
+          "short": "Systematic debugging"
         },
         {
           "id": "08.02",
           "tag": "P0",
           "text": "Reading stack traces across languages; following a failure through async boundaries",
-          "requires": ["08.01"]
+          "requires": [
+            "08.01"
+          ],
+          "short": "Stack traces & async failures"
         },
         {
           "id": "08.03",
           "tag": "P0",
           "text": "Reading unfamiliar code quickly: entry points, data flow, invariants",
-          "requires": []
+          "requires": [],
+          "short": "Reading unfamiliar code quickly"
         },
         {
           "id": "08.04",
           "tag": "P0",
           "text": "Finding bugs in provided code: off-by-one, null handling, races, resource leaks, wrong boundary conditions",
           "short": "Finding bugs in given code",
-          "requires": ["03.02"]
+          "requires": [
+            "03.02"
+          ]
         },
         {
           "id": "08.05",
@@ -1663,7 +2759,11 @@
           "tag": "P1",
           "text": "Linux tooling: top/htop, strace, lsof, ss/netstat, tcpdump, perf, dmesg, /proc"
         },
-        {"id": "08.11", "tag": "P2", "text": "Core dumps and debuggers (gdb, lldb)"},
+        {
+          "id": "08.11",
+          "tag": "P2",
+          "text": "Core dumps and debuggers (gdb, lldb)"
+        },
         {
           "id": "08.12",
           "tag": "P2",
@@ -1673,7 +2773,12 @@
           "id": "08.13",
           "tag": "P2",
           "text": "Reviewing a pull request live: correctness, readability, tests, failure modes",
-          "requires": ["08.03", "08.04", "10.03"]
+          "requires": [
+            "08.03",
+            "08.04",
+            "10.03"
+          ],
+          "short": "Reviewing a pull request live"
         }
       ]
     },
@@ -1688,29 +2793,41 @@
           "id": "09.01",
           "tag": "P0",
           "text": "Processes, threads, context switches, scheduling",
-          "short": "Processes and threads"
+          "short": "Processes, threads & scheduling"
         },
-        {"id": "09.02", "tag": "P0", "text": "Virtual memory, paging, stack vs heap, page cache"},
+        {
+          "id": "09.02",
+          "tag": "P0",
+          "text": "Virtual memory, paging, stack vs heap, page cache"
+        },
         {
           "id": "09.03",
           "tag": "P0",
           "text": "HTTP/1.1 vs HTTP/2 vs HTTP/3; TLS handshake; DNS resolution",
-          "short": "HTTP versions, TLS and DNS",
-          "requires": ["09.04"]
+          "short": "HTTP versions, TLS & DNS",
+          "requires": [
+            "09.04"
+          ]
         },
         {
           "id": "09.04",
           "tag": "P0",
           "text": "TCP vs UDP: handshake, flow control, congestion control, connection reuse",
           "short": "TCP vs UDP",
-          "requires": ["04.03"]
+          "requires": [
+            "04.03"
+          ]
         },
         {
           "id": "09.05",
           "tag": "P1",
           "text": "File systems, file descriptors, blocking vs non-blocking I/O, fsync and durability"
         },
-        {"id": "09.06", "tag": "P1", "text": "What happens when you type a URL and press enter, at depth"},
+        {
+          "id": "09.06",
+          "tag": "P1",
+          "text": "What happens when you type a URL and press enter, at depth"
+        },
         {
           "id": "09.07",
           "tag": "P1",
@@ -1720,12 +2837,26 @@
           "id": "09.08",
           "tag": "P1",
           "text": "Containers: namespaces, cgroups, images; Kubernetes scheduling basics",
-          "short": "Containers, sandboxing and K8s basics",
-          "requires": ["09.01"]
+          "short": "Containers, sandboxing & Kubernetes basics",
+          "requires": [
+            "09.01"
+          ]
         },
-        {"id": "09.09", "tag": "P2", "text": "CPU caches, cache locality, branch prediction, SIMD awareness"},
-        {"id": "09.10", "tag": "P2", "text": "NUMA, zero-copy I/O, mmap, io_uring"},
-        {"id": "09.11", "tag": "P2", "text": "Proxies, service mesh, NAT, connection pooling pitfalls"}
+        {
+          "id": "09.09",
+          "tag": "P2",
+          "text": "CPU caches, cache locality, branch prediction, SIMD awareness"
+        },
+        {
+          "id": "09.10",
+          "tag": "P2",
+          "text": "NUMA, zero-copy I/O, mmap, io_uring"
+        },
+        {
+          "id": "09.11",
+          "tag": "P2",
+          "text": "Proxies, service mesh, NAT, connection pooling pitfalls"
+        }
       ]
     },
     {
@@ -1736,38 +2867,70 @@
       "notes": [],
       "topics": [
         {
+          "id": "10.10",
+          "tag": "P0",
+          "short": "Python idioms, lambdas, generators & gotchas",
+          "text": "Python fluency in depth: list/dict/set comprehensions, lambdas and closures, generators (yield/yield from), itertools, dataclasses, decorators, context managers, and classic pitfalls",
+          "requires": []
+        },
+        {
           "id": "10.01",
           "tag": "P0",
           "text": "Clean, idiomatic code in your primary language; deep knowledge of its standard library",
-          "short": "Idiomatic code and the standard library",
-          "requires": ["02.01"]
+          "short": "Python standard library toolkit",
+          "requires": [
+            "10.10"
+          ]
         },
         {
           "id": "10.02",
           "tag": "P0",
-          "text": "Object-oriented and functional design; composition over inheritance; SOLID as trade-offs, not rules"
+          "text": "Object-oriented and functional design; composition over inheritance; SOLID as trade-offs, not rules",
+          "short": "Designing for change"
         },
         {
           "id": "10.03",
           "tag": "P0",
-          "text": "Testing strategy: unit, integration, end-to-end, contract; what to mock and what not to"
+          "text": "Testing strategy: unit, integration, end-to-end, contract; what to mock and what not to",
+          "short": "Testing for interviews"
         },
         {
           "id": "10.04",
           "tag": "P1",
           "text": "Low-level design exercises: in-memory KV store with transactions, in-memory file system, banking ledger, LRU cache, spreadsheet engine",
-          "short": "Progressive 4-level builds and LLD",
-          "requires": ["01.01", "01.04", "10.02", "10.03"]
+          "short": "4-level progressive builds",
+          "requires": [
+            "01.01",
+            "01.04",
+            "10.02",
+            "10.03"
+          ]
         },
         {
           "id": "10.05",
           "tag": "P1",
           "text": "API and interface design: naming, error handling, extensibility, backward compatibility"
         },
-        {"id": "10.06", "tag": "P1", "text": "Common design patterns and when they are overkill"},
-        {"id": "10.07", "tag": "P1", "text": "Refactoring legacy code safely; characterization tests"},
-        {"id": "10.08", "tag": "P2", "text": "Property-based testing, fuzzing, load testing, chaos testing"},
-        {"id": "10.09", "tag": "P2", "text": "Dependency management, build systems, monorepo trade-offs"}
+        {
+          "id": "10.06",
+          "tag": "P1",
+          "text": "Common design patterns and when they are overkill"
+        },
+        {
+          "id": "10.07",
+          "tag": "P1",
+          "text": "Refactoring legacy code safely; characterization tests"
+        },
+        {
+          "id": "10.08",
+          "tag": "P2",
+          "text": "Property-based testing, fuzzing, load testing, chaos testing"
+        },
+        {
+          "id": "10.09",
+          "tag": "P2",
+          "text": "Dependency management, build systems, monorepo trade-offs"
+        }
       ]
     },
     {
@@ -1777,22 +2940,49 @@
       "title": "Reliability, Observability, and Operations",
       "notes": [],
       "topics": [
-        {"id": "11.01", "tag": "P0", "text": "SLIs, SLOs, error budgets", "requires": ["04.03"]},
+        {
+          "id": "11.01",
+          "tag": "P0",
+          "text": "SLIs, SLOs, error budgets",
+          "requires": [
+            "04.03"
+          ],
+          "short": "SLIs, SLOs & error budgets"
+        },
         {
           "id": "11.02",
           "tag": "P0",
           "text": "Deployment safety: canary, blue-green, feature flags, automated rollback",
-          "requires": ["11.01"]
+          "requires": [
+            "11.01"
+          ],
+          "short": "Deployment safety & rollbacks"
         },
         {
           "id": "11.03",
           "tag": "P1",
           "text": "Incident response: mitigation before root cause, communication, blameless postmortems"
         },
-        {"id": "11.04", "tag": "P1", "text": "Capacity planning, autoscaling, load testing"},
-        {"id": "11.05", "tag": "P1", "text": "Alert design: symptom-based alerts, avoiding alert fatigue"},
-        {"id": "11.06", "tag": "P1", "text": "CI/CD pipelines and infrastructure as code"},
-        {"id": "11.07", "tag": "P2", "text": "Disaster recovery: RPO/RTO, backups, restore drills"},
+        {
+          "id": "11.04",
+          "tag": "P1",
+          "text": "Capacity planning, autoscaling, load testing"
+        },
+        {
+          "id": "11.05",
+          "tag": "P1",
+          "text": "Alert design: symptom-based alerts, avoiding alert fatigue"
+        },
+        {
+          "id": "11.06",
+          "tag": "P1",
+          "text": "CI/CD pipelines and infrastructure as code"
+        },
+        {
+          "id": "11.07",
+          "tag": "P2",
+          "text": "Disaster recovery: RPO/RTO, backups, restore drills"
+        },
         {
           "id": "11.08",
           "tag": "P2",
@@ -1811,8 +3001,10 @@
           "id": "12.01",
           "tag": "P0",
           "text": "Authentication vs authorization; sessions, JWT, OAuth 2.0, OIDC",
-          "short": "AuthN, AuthZ, OAuth 2.0 and JWT",
-          "requires": ["09.03"]
+          "short": "AuthN, AuthZ, OAuth 2.0 & JWT",
+          "requires": [
+            "09.03"
+          ]
         },
         {
           "id": "12.02",
@@ -1824,21 +3016,40 @@
           "tag": "P1",
           "text": "Encryption in transit and at rest; hashing vs encryption; password storage"
         },
-        {"id": "12.04", "tag": "P1", "text": "Secrets management, least privilege, key rotation"},
+        {
+          "id": "12.04",
+          "tag": "P1",
+          "text": "Secrets management, least privilege, key rotation"
+        },
         {
           "id": "12.05",
           "tag": "P1",
           "text": "Multi-tenant isolation and data access boundaries",
-          "requires": ["12.01", "04.06"]
+          "requires": [
+            "12.01",
+            "04.06"
+          ],
+          "short": "Multi-tenant isolation"
         },
-        {"id": "12.06", "tag": "P2", "text": "Threat modeling a design"},
-        {"id": "12.07", "tag": "P2", "text": "Supply chain security and dependency risk"},
+        {
+          "id": "12.06",
+          "tag": "P2",
+          "text": "Threat modeling a design"
+        },
+        {
+          "id": "12.07",
+          "tag": "P2",
+          "text": "Supply chain security and dependency risk"
+        },
         {
           "id": "12.08",
           "tag": "P1",
           "text": "LLM-specific risks: prompt injection, data exfiltration through tools, sandbox escape",
-          "short": "LLM security and tool sandboxing",
-          "requires": ["13.03", "12.05"]
+          "short": "LLM security & tool sandboxing",
+          "requires": [
+            "13.03",
+            "12.05"
+          ]
         }
       ]
     },
@@ -1847,7 +3058,9 @@
       "id": "13",
       "slug": "13-ai-ml-systems",
       "title": "AI and ML Systems",
-      "notes": ["Core for Anthropic and increasingly expected in 2026 Google and senior SWE loops."],
+      "notes": [
+        "Core for Anthropic and increasingly expected in 2026 Google and senior SWE loops."
+      ],
       "topics": [
         {
           "id": "13.01",
@@ -1860,48 +3073,86 @@
           "id": "13.02",
           "tag": "P0",
           "text": "Inference serving: batching (static, dynamic, continuous), KV cache, streaming, time-to-first-token vs throughput",
-          "short": "Inference serving: batching and the KV cache",
-          "requires": ["13.01", "04.14", "04.03", "02.16"]
+          "short": "LLM inference serving & KV cache",
+          "requires": [
+            "13.01",
+            "04.14",
+            "04.03",
+            "02.16"
+          ]
         },
         {
           "id": "13.03",
           "tag": "P1",
           "text": "Building on LLM APIs: tool use, structured output, retries, cost and latency budgets",
-          "requires": ["13.01", "04.12"]
+          "requires": [
+            "13.01",
+            "04.12"
+          ],
+          "short": "Building reliably on LLM APIs"
         },
         {
           "id": "13.04",
           "tag": "P1",
           "text": "RAG design and its failure modes",
-          "requires": ["13.01", "13.03", "04.15"]
+          "requires": [
+            "13.01",
+            "13.03",
+            "04.15"
+          ],
+          "short": "RAG design & failure modes"
         },
         {
           "id": "13.05",
           "tag": "P1",
           "text": "Evaluation: building eval sets, graders, regression detection, offline vs online metrics",
-          "requires": ["13.03"]
+          "requires": [
+            "13.03"
+          ],
+          "short": "LLM evaluation & graders"
         },
         {
           "id": "13.06",
           "tag": "P1",
           "text": "Coding with AI and verification: give invariants/context, split into checkable steps, write tests first, review diffs and verify with differential testing; know when not to use it",
-          "short": "Coding with AI: verify, debug, review",
-          "requires": ["08.01", "08.03", "08.04", "10.03"]
+          "short": "Coding with AI: verify, debug & review",
+          "requires": [
+            "08.01",
+            "08.03",
+            "08.04",
+            "10.03"
+          ]
         },
-        {"id": "13.07", "tag": "P2", "text": "Quantization, distillation, speculative decoding"},
+        {
+          "id": "13.07",
+          "tag": "P2",
+          "text": "Quantization, distillation, speculative decoding"
+        },
         {
           "id": "13.08",
           "tag": "P2",
           "text": "GPU fundamentals: memory hierarchy, utilization, multi-GPU and multi-node serving",
-          "requires": ["13.02"]
+          "requires": [
+            "13.02"
+          ],
+          "short": "GPU fundamentals & multi-GPU serving"
         },
         {
           "id": "13.09",
           "tag": "P1",
           "text": "Agent architecture: planning loops, memory, tool permissions, sandboxing",
-          "requires": ["13.03", "09.08", "12.08"]
+          "requires": [
+            "13.03",
+            "09.08",
+            "12.08"
+          ],
+          "short": "Agent architecture & tool sandboxing"
         },
-        {"id": "13.10", "tag": "P2", "text": "Fine-tuning approaches (full, LoRA) and when not to fine-tune"},
+        {
+          "id": "13.10",
+          "tag": "P2",
+          "text": "Fine-tuning approaches (full, LoRA) and when not to fine-tune"
+        },
         {
           "id": "13.11",
           "tag": "P2",
@@ -1921,43 +3172,58 @@
         {
           "id": "14.01",
           "tag": "P0",
-          "text": "Project deep dive: explain a system you built, the alternatives you rejected, what you would change"
+          "text": "Project deep dive: explain a system you built, the alternatives you rejected, what you would change",
+          "short": "Flagship project & 60-sec intro"
         },
         {
           "id": "14.02",
           "tag": "P0",
-          "text": "Ownership stories: driving ambiguous work from problem to shipped result"
+          "text": "Ownership stories: driving ambiguous work from problem to shipped result",
+          "short": "Ownership & ambiguity stories"
         },
         {
           "id": "14.03",
           "tag": "P0",
-          "text": "Conflict and disagreement: disagree-and-commit, pushing back with data"
+          "text": "Conflict and disagreement: disagree-and-commit, pushing back with data",
+          "short": "Conflict & disagreement stories"
         },
         {
           "id": "14.04",
           "tag": "P0",
-          "text": "Failure stories: a real mistake, its impact, what changed afterward"
+          "text": "Failure stories: a real mistake, its impact, what changed afterward",
+          "short": "Failure & learning stories"
         },
         {
           "id": "14.05",
           "tag": "P0",
           "text": "Technical influence without authority; aligning multiple teams",
-          "short": "Influence without authority"
+          "short": "Influence without authority stories"
         },
         {
           "id": "14.06",
           "tag": "P1",
           "text": "Mentoring and raising the bar for others",
-          "short": "Mentoring and raising the bar"
+          "short": "Mentoring & raising the bar stories"
         },
-        {"id": "14.07", "tag": "P1", "text": "Prioritization and saying no; trading scope, quality, and time"},
-        {"id": "14.08", "tag": "P1", "text": "Writing: design docs, RFCs, postmortems"},
+        {
+          "id": "14.07",
+          "tag": "P1",
+          "text": "Prioritization and saying no; trading scope, quality, and time",
+          "short": "Prioritization & saying no stories"
+        },
+        {
+          "id": "14.08",
+          "tag": "P1",
+          "text": "Writing: design docs, RFCs, postmortems"
+        },
         {
           "id": "14.09",
           "tag": "P0",
           "text": "Company calibration: Google Googleyness & Leadership (ambiguity, leadership without authority, hypotheticals); Anthropic mission, AI safety, RSP and epistemic humility",
-          "short": "Company calibration: Google G&L and Anthropic Values",
-          "requires": ["14.01"]
+          "short": "Google G&L & Anthropic Values calibration",
+          "requires": [
+            "14.01"
+          ]
         },
         {
           "id": "14.10",
@@ -1977,7 +3243,8 @@
           "id": "15.01",
           "tag": "Format",
           "text": "Algorithmic coding (45 min, bare editor, no execution, 1 problem + escalating follow-ups)",
-          "requires": ["02.01"]
+          "requires": [],
+          "short": "Bare-editor coding playbook"
         },
         {
           "id": "15.02",
@@ -1988,35 +3255,85 @@
           "id": "15.03",
           "tag": "Format",
           "text": "Debugging round: broken code or failing tests in an unfamiliar repo",
-          "requires": ["08.01", "08.02", "08.03"]
+          "requires": [
+            "08.01",
+            "08.02",
+            "08.03"
+          ],
+          "short": "Debugging round mock"
         },
         {
           "id": "15.04",
           "tag": "Format",
           "text": "Code review round: critique a pull request",
-          "requires": ["08.03", "08.04", "08.13"]
+          "requires": [
+            "08.03",
+            "08.04",
+            "08.13"
+          ],
+          "short": "Code review round mock"
         },
-        {"id": "15.05", "tag": "Format", "text": "System design (high-level architecture + black-box deep dives)"},
-        {"id": "15.06", "tag": "Format", "text": "Low-level / object-oriented design", "requires": ["10.04"]},
-        {"id": "15.07", "tag": "Format", "text": "Concurrency-focused coding"},
-        {"id": "15.08", "tag": "Format", "text": "Take-home or pair-programming project"},
+        {
+          "id": "15.05",
+          "tag": "Format",
+          "text": "System design (high-level architecture + black-box deep dives)"
+        },
+        {
+          "id": "15.06",
+          "tag": "Format",
+          "text": "Low-level / object-oriented design",
+          "requires": [
+            "10.04"
+          ],
+          "short": "Object-oriented design mock"
+        },
+        {
+          "id": "15.07",
+          "tag": "Format",
+          "text": "Concurrency-focused coding"
+        },
+        {
+          "id": "15.08",
+          "tag": "Format",
+          "text": "Take-home or pair-programming project"
+        },
         {
           "id": "15.09",
           "tag": "Format",
           "text": "AI-assisted coding round (where permitted): graded on direction, verification, and judgment",
-          "requires": ["13.06"]
+          "requires": [
+            "13.06"
+          ],
+          "short": "AI-assisted coding mock"
         },
         {
           "id": "15.10",
           "tag": "Format",
           "text": "Project retrospective / past work deep dive",
-          "short": "Past-project deep dive",
-          "requires": ["14.01"]
+          "short": "Past-project deep dive mock",
+          "requires": [
+            "14.01"
+          ]
         },
-        {"id": "15.11", "tag": "Format", "text": "Behavioral, Googleyness & Leadership, and values round"},
-        {"id": "15.12", "tag": "Format", "text": "Hiring manager round", "requires": ["14.01", "14.02"]}
+        {
+          "id": "15.11",
+          "tag": "Format",
+          "text": "Behavioral, Googleyness & Leadership, and values round"
+        },
+        {
+          "id": "15.12",
+          "tag": "Format",
+          "text": "Hiring manager round",
+          "requires": [
+            "14.01",
+            "14.02"
+          ],
+          "short": "Hiring manager round mock"
+        }
       ]
     }
   ],
-  "reference": ["15"]
+  "reference": [
+    "15"
+  ]
 }

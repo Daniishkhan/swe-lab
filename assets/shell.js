@@ -59,13 +59,15 @@
         });
       });
       o.milestone = st.milestone ? Object.assign({}, st.milestone, { key: st.milestone.id, stage: o, isMilestone: true, kind: "milestone" }) : null;
-      o.code = /^Week (\d+)/.test(st.label) ? "W" + st.label.match(/^Week (\d+)/)[1] : st.label[0];
+      o.code = /^Week (\d+)/.test(st.label) ? "W" + st.label.match(/^Week (\d+)/)[1]
+        : /^Phase (\d+)/.test(st.label) ? st.label.match(/^Phase (\d+)/)[1]
+        : st.label[0];
       return o;
     });
     const items = (st) => st.steps.concat(st.milestone ? [st.milestone] : []);
     const all = stages.flatMap((st) => st.steps);
     const byTopic = Object.fromEntries(all.map((x) => [x.id, x]));
-    const main = stages.filter((st) => !st.pick).flatMap(items);
+    const main = stages.filter((st) => !st.pick && !st.parallel).flatMap(items);
     const status = () => store.get("status", {});
     const read = () => store.get("read", {});
     const pagePath = (x, c) => `sections/${x.s.slug}/concepts/${c.file}`;
@@ -101,8 +103,8 @@
       next(s = status()) {
         return main.find((x) => !x.optional && !T.isDone(x, s)) || null;
       },
-      // The ordered list a step belongs to: all main stages, or its own pick stage
-      flow: (x) => (x.stage.pick ? items(x.stage) : main),
+      // The ordered list a step belongs to: all main stages, or its own parallel/pick stage
+      flow: (x) => (x.stage.pick || x.stage.parallel ? items(x.stage) : main),
       // The track step whose chapter page is relPath
       forPage: (relPath) => all.find((x) => x.pages.some((c) => pagePath(x, c) === relPath)) || null,
       // Topics left off the track: deferred until onsites are booked
@@ -305,8 +307,9 @@
     const cur = relPath ? T.forPage(relPath) : null;
     const nextUp = T.next(status);
     const focus = cur ? cur.stage : nextUp ? nextUp.stage : null;
-    let picked = false;
+    let paralleled = false, picked = false;
     for (const st of T.stages) {
+      if (st.parallel && !paralleled) { paralleled = true; box.append(h("div", { class: "nav-label" }, "Parallel track")); }
       if (st.pick && !picked) { picked = true; box.append(h("div", { class: "nav-label" }, "When an onsite is booked")); }
       const { done, total } = T.progress(st, status);
       const link = h("a", { href: `${ROOT}/index.html#stage-${st.id}`, title: `${st.label}: ${st.title}` },

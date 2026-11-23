@@ -4,6 +4,7 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 
 ## Topics
 
+- [ ] `10.10` **[P0]** Python fluency in depth: list/dict/set comprehensions, lambdas and closures, generators (yield/yield from), itertools, dataclasses, decorators, context managers, and classic pitfalls
 - [ ] `10.01` **[P0]** Clean, idiomatic code in your primary language; deep knowledge of its standard library
 - [ ] `10.02` **[P0]** Object-oriented and functional design; composition over inheritance; SOLID as trade-offs, not rules
 - [ ] `10.03` **[P0]** Testing strategy: unit, integration, end-to-end, contract; what to mock and what not to

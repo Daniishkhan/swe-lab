@@ -72,7 +72,8 @@
     const exercises = C.sections.reduce((n, s) => n + s.exercises.length, 0);
     const confident = allTopics.filter((t) => status[t.id] === "confident").length;
     const pagesRead = allPages.filter((p) => (read[p.path] || 0) >= 90).length;
-    const mainStages = T.stages.filter((st) => !st.pick);
+    const mainStages = T.stages.filter((st) => !st.pick && !st.parallel);
+    const weekCount = mainStages.filter((st) => /^Week \d+/.test(st.label)).length;
     const trackCount = () => mainStages.reduce((a, st) => { const p = T.progress(st, status); return [a[0] + p.done, a[1] + p.total]; }, [0, 0]);
 
     // The next unfinished step on the track
@@ -90,7 +91,7 @@
       const pct = T.readPct(x, read);
       const hasPage = !x.isMilestone && x.pages.length > 0;
       nextCard.replaceChildren(h("a", { class: "continue", href: T.href(x, ROOT) },
-        h("div", {}, h("div", { class: "k" }, `Next on your track · ${x.stage.label} · ${T.kindLabel(x)}`),
+        h("div", {}, h("div", { class: "k" }, `Next up · ${x.stage.label}`),
           h("div", { class: "t" }, T.title(x)),
           h("div", { class: "s" }, T.todo(x))),
         h("div", { class: "go" }, hasPage ? [bar(pct), h("span", {}, `${pct}%`)] : h("span", { class: "spacer" }),
@@ -124,8 +125,12 @@
     const focus = (T.next(status) || {}).stage;
     const openSet = new Set(store.get("openStages", []));
     const list = h("div", { class: "track" });
-    let picked = false;
+    let paralleled = false, picked = false;
     for (const st of T.stages) {
+      if (st.parallel && !paralleled) {
+        paralleled = true;
+        list.append(h("div", { class: "track-sub" }, h("h3", {}, "Parallel track (1 hour/week)"), h("span", { class: "aside-note" }, "Run alongside the technical weeks on Sundays so stories and non-technical mocks build steadily without breaking technical flow.")));
+      }
       if (st.pick && !picked) {
         picked = true;
         list.append(h("div", { class: "track-sub" }, h("h3", {}, "When an onsite is booked"), h("span", { class: "aside-note" }, "Start the onsite stage and that company's pack the day it's booked, wherever you are on the track.")));
@@ -136,20 +141,24 @@
       stageHeads.push(paintHead);
       paintHead();
       const steps = h("ol", { class: "steps" });
-      for (const x of st.steps) {
-        const pages = x.pages.map((c) => h("a", { href: `${ROOT}/${T.pagePath(x, c)}` }, c.title));
+      st.steps.forEach((x, idx) => {
+        const tagPill = x.pages.length ? h("span", { class: "kind k-learn" }, "Chapter")
+          : x.kind === "design" ? h("span", { class: "kind k-design" }, "Case")
+          : x.kind === "mock" ? h("span", { class: "kind k-mock" }, "Mock")
+          : null;
         steps.append(h("li", { class: "step" + (x.optional ? " optional" : ""), id: "step-" + x.id },
           statusButton(x.key, refresh),
           h("div", { class: "body" },
-            h("div", { class: "line" }, h("span", { class: "kind k-" + x.kind }, T.kindLabel(x)),
+            h("div", { class: "line" },
+              h("span", { class: "step-num" }, `${idx + 1}.`),
               h("a", { class: "name", href: T.href(x, ROOT) }, T.title(x)),
-              x.optional ? h("span", { class: "opt" }, "optional") : null,
-              badge(x.t.tag), h("span", { class: "id" }, x.id)),
+              tagPill,
+              x.optional ? h("span", { class: "opt" }, "optional") : null),
             h("div", { class: "todo" }, T.todo(x, ROOT)),
             drillList(x.t))));
-      }
+      });
       const m = st.milestone;
-      const box = h("details", { class: "stage" + (st.pick ? " pick" : ""), id: "stage-" + st.id },
+      const box = h("details", { class: "stage" + (st.pick ? " pick" : "") + (st.parallel ? " parallel" : ""), id: "stage-" + st.id },
         h("summary", {},
           h("span", { class: "code" }, st.code),
           h("span", { class: "head" }, h("span", { class: "label" }, st.label), h("span", { class: "title" }, st.title), h("span", { class: "goal" }, st.goal)),
@@ -168,7 +177,7 @@
       list.append(box);
     }
     root.append(h("div", { class: "section-head" }, h("h2", { id: "track" }, "Your track"),
-      h("span", { class: "aside-note" }, `${mainStages.length} weeks (~5h/day, Google L5 gold standard + Anthropic & broad transferability), plus onsite and company packs. Each step builds only on the steps before it.`)), list);
+      h("span", { class: "aside-note" }, `Phase 0 warm-up + ${weekCount} pure technical weeks (~5h/day, Google L5 gold standard), a parallel behavioral track, plus onsite and company packs.`)), list);
 
     // Everything left off the track
     const groups = T.deferred();
