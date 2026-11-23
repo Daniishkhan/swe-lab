@@ -2052,6 +2052,11 @@ window.CURRICULUM = {
      "file": "complexity.html",
      "topic": "02.01",
      "title": "How fast is your code? (Complexity analysis)"
+    },
+    {
+     "file": "sorting.html",
+     "topic": "02.02",
+     "title": "Put chaos in order — and pick the right tool (Sorting & quickselect)"
     }
    ],
    "exercises": [
@@ -3950,5 +3955,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 11:11"
+ "generated": "2026-11-23 12:15"
 };

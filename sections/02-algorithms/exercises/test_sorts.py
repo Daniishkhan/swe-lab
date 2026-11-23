@@ -1,8 +1,11 @@
+import ast
+import inspect
 import math
 import random
 
 import pytest
 
+import sorts as sorts_module
 from sorts import count_inversions, counting_sort, kth_smallest, merge_intervals, merge_sort, quicksort
 
 
@@ -120,7 +123,7 @@ def test_quicksort_examples(vals):
     assert values(items) == sorted(vals)
 
 
-def _qs_limit(n): return 4 * n * math.log2(n)
+def _qs_limit(n): return 3.0 * n * math.log2(n)
 
 
 @pytest.mark.parametrize("shape", ["random", "sorted", "reversed", "all_equal", "few_unique"])
@@ -184,10 +187,13 @@ def test_counting_sort_is_linear():
     ([(8, 10), (1, 3), (2, 6)], [(1, 6), (8, 10)]),
     ([(1, 4), (4, 5)], [(1, 5)]),
     ([(1, 10), (2, 3), (4, 5)], [(1, 10)]),
+    ([(-5, -1), (-3, 2), (5, 7)], [(-5, 2), (5, 7)]),
     ([(5, 5)], [(5, 5)]),
 ])
 def test_merge_intervals(given, expected):
+    before = list(given)
     assert [tuple(x) for x in merge_intervals(given)] == expected
+    assert given == before, "leave the input list alone"
 
 
 class CountedInt(int):
@@ -205,6 +211,7 @@ class CountedInt(int):
     def __gt__(self, o): self._tick(); return int.__gt__(self, o)
     def __ge__(self, o): self._tick(); return int.__ge__(self, o)
     def __eq__(self, o): self._tick(); return int.__eq__(self, o)
+    def __ne__(self, o): self._tick(); return int.__ne__(self, o)
     __hash__ = int.__hash__
 
 
@@ -239,6 +246,7 @@ def test_kth_smallest_examples():
     assert kth_smallest([3, 1, 2], 1) == 1
     assert kth_smallest([3, 1, 2], 3) == 3
     assert kth_smallest([5, 5, 1, 5], 2) == 5
+    assert kth_smallest([-4, 0, -9, 3, -1], 2) == -4
     assert kth_smallest([7], 1) == 7
 
 
@@ -266,11 +274,34 @@ def test_kth_smallest_linear(k_frac):
     assert best <= 10 * n, f"{best} comparisons for n={n}: about {n * math.log2(n):.0f} means you sorted everything"
 
 
-@pytest.mark.parametrize("shape", ["all_equal", "few_unique"])
-def test_kth_smallest_many_equal(shape):
+@pytest.mark.parametrize("shape", ["all_equal", "few_unique", "sorted", "reversed"])
+def test_kth_smallest_adversarial_shapes(shape):
     random.seed(12)
     n = 20_000
     rnd = random.Random(13)
-    vals = [7] * n if shape == "all_equal" else [rnd.randint(0, 3) for _ in range(n)]
+    vals = {
+        "all_equal": [7] * n,
+        "few_unique": [rnd.randint(0, 3) for _ in range(n)],
+        "sorted": list(range(n)),
+        "reversed": list(range(n, 0, -1)),
+    }[shape]
     best = _best_of_3(vals, n // 2)
-    assert best <= 10 * n, f"{best} comparisons on {shape} input: equal items need a three-way partition"
+    assert best <= 10 * n, f"{best} comparisons on {shape} input: use a random pivot and three-way partition"
+
+
+def test_no_builtin_sort_shortcuts():
+    """Enforce sorts.py's rule: don't call sorted(), list.sort(), heapq or bisect."""
+    tree = ast.parse(inspect.getsource(sorts_module))
+    banned_mods = {"heapq", "bisect"}
+    banned_attrs = {"sort", "sorted", "heappush", "heappop", "heapify", "nlargest", "nsmallest", "bisect_left", "bisect_right", "insort"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                assert alias.name.split(".")[0] not in banned_mods, f"sorts.py imports {alias.name!r}: build the sorts yourself"
+        elif isinstance(node, ast.ImportFrom):
+            assert (node.module or "").split(".")[0] not in banned_mods, f"sorts.py imports from {node.module!r}: build the sorts yourself"
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                assert node.func.id != "sorted", "sorts.py calls sorted(): build the sorts yourself"
+            elif isinstance(node.func, ast.Attribute):
+                assert node.func.attr not in banned_attrs, f"sorts.py calls .{node.func.attr}(): build the sorts yourself"
