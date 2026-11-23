@@ -1185,7 +1185,7 @@ window.CURRICULUM = {
     {
      "file": "hash_patterns.py",
      "module": "hash_patterns",
-     "title": "Hash map patterns: seen-it, group-by, running total",
+     "title": "Hash map patterns: seen before, group by key, prefix sums",
      "topics": [
       "01.01"
      ],
@@ -3661,5 +3661,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-22 22:55"
+ "generated": "2026-11-23 02:45"
 };

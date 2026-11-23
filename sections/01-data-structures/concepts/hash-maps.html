@@ -42,7 +42,7 @@
 
 <p>A list cannot answer "is this value already here?" without comparing the value against every item, and at ten million items that is too slow to do on every request.</p>
 
-<p>Take a sign-up service with 10 million users. Each time someone picks a username, the server must check whether the name is taken. If the names are in a Python list, <code>name in names</code> compares the new name with each stored name in turn. A name that is free, which is the common case, gets compared with all 10 million. On a laptop that takes about 70 milliseconds.</p>
+<p>Take a sign-up service with 10 million users. Each time someone picks a username, the server must check whether the name is taken. If the names are in a Python list, <code>name in names</code> compares the new name with each stored name in turn. A free name, which is the common case, gets compared with all 10 million. On a laptop that takes about 70 milliseconds.</p>
 
 <pre class="plain"><code>one check of a free name     about 70 ms
 1,000 sign-ups a second      1,000 × 70 ms = 70 s of work</code></pre>
@@ -87,7 +87,7 @@ address of slot 3  =  1000 + 3 × 8  =  1024</code></pre>
 
 <p>When the keys are small whole numbers, the key itself can serve as the slot number, and a lookup is a single array read. This is called direct addressing.</p>
 
-<p>Counting the letters of a text is the standard example. There are 26 lowercase letters, so an array of 26 counters has one slot for every possible key, and a letter's position in the alphabet is its index.</p>
+<p>Counting letters is the standard example. There are 26 lowercase letters, so an array of 26 counters has one slot for every possible key, and a letter's position in the alphabet is its index.</p>
 
 <pre><code>counts = [0] * 26
 for c in "banana":
@@ -115,7 +115,7 @@ share of slots in use    about 4 × 10⁻²⁵</code></pre>
 
 <pre class="plain"><code>bucket = hash(key) % m</code></pre>
 
-<p>The <code>%</code> operator gives the remainder after division, so the result is always a valid index into an array of m buckets, however large the hash is.</p>
+<p>The <code>%</code> operator gives the remainder after division, so in Python the result is always a valid index into an array of m buckets, however large the hash is.</p>
 
 <p>Java's hash function for strings is short enough to run by hand: start at zero, and for each character multiply the running value by 31 and add the character's code.</p>
 
@@ -177,9 +177,9 @@ toy_hash("tac") = 114,582      114,582 % 8 = 6</code></pre>
   </tbody>
 </table></div>
 
-<p>A collision becomes more likely than not after roughly the square root of m keys. The row for 365 buckets is known as the birthday paradox, because it says that two people in a group of 23 probably share a birthday. Collisions are the normal case, and a hash table has to handle them from the first few inserts.</p>
+<p>A collision becomes more likely than not after about 1.2 times the square root of m keys. The row for 365 buckets is known as the birthday paradox, because it says that two people in a group of 23 probably share a birthday. Collisions are the normal case, and a hash table has to handle them from the first few inserts.</p>
 
-<p>The most direct way to handle them is separate chaining. Each bucket holds a short list of key and value pairs, called a chain, and keys that collide share a chain.</p>
+<p>The simplest answer is separate chaining. Each bucket holds a short list of key and value pairs, called a chain, and keys that collide share a chain.</p>
 
 <ul>
   <li><b>Insert:</b> hash the key, go to its bucket and walk the chain. If the key is already there, replace its value. If not, add the pair to the chain.</li>
@@ -219,7 +219,7 @@ toy_hash("tac") = 114,582      114,582 % 8 = 6</code></pre>
 lookup of an absent key        about α comparisons
 lookup of a present key        about 1 + α/2 comparisons</code></pre>
 
-<p>An absent key costs one step to reach its bucket and then a comparison with every key in the chain, which holds α keys on average. A present key is found partway along its chain. Keys join a chain in the order they arrive, so on average half of the other keys there sit ahead of it, and a lookup compares each of them before the key itself.</p>
+<p>An absent key costs one step to reach its bucket and then a comparison with every key in the chain, which holds α keys on average. A present key is found partway along its chain, which also holds about α other keys. Keys join a chain in the order they arrive, so on average half of them sit ahead of it, and a lookup compares each of them before the key itself.</p>
 
 <p>Two table sizes show what this means for 10 million names.</p>
 
@@ -468,7 +468,7 @@ print(Point(1, 2) in seen)    # False</code></pre>
     <button data-correct>The entry becomes unreachable, because lookups go to the bucket for the new contents</button>
   </div>
   <div class="fb right"><p>Nothing tells the table that the key changed, so the entry stays where its old hash put it while a lookup with the list hashes its new contents. This is the reason Python makes lists unhashable.</p></div>
-  <div class="fb wrong"><p>The table computed the key's hash once, at insert time, and it is never told about the append, so it cannot move anything. A later lookup hashes the list as it is now and searches a different bucket. Being the same object does not help, because the lookup goes to the wrong bucket before any keys are compared.</p></div>
+  <div class="fb wrong"><p>Follow the numbers. Java hashes the list <code>[1, 2]</code> to 994, so in a table of 16 buckets the entry goes to bucket 2. Appending 3 makes the hash 30,817, and every lookup then searches bucket 1. Nothing moves the entry, and being the same object does not help, because the lookup never reaches bucket 2.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -540,7 +540,7 @@ at about 10 ns each, about 50 seconds of CPU</code></pre>
     <tr><td><b>Seen before</b></td><td>each item already passed</td><td>Two Sum: for each x, look up target − x</td></tr>
     <tr><td><b>Group by key</b></td><td>the items that share each label</td><td>Group Anagrams: the label is the word's letters in sorted order</td></tr>
     <tr><td><b>Count</b></td><td>how many times each item has appeared</td><td>Top-k frequent words, with <code>collections.Counter</code></td></tr>
-    <tr><td><b>Prefix sums</b></td><td>how many earlier positions had each prefix sum, the total of the items up to that position</td><td>Count the subarrays that sum to k: a subarray sums to k when the prefix sums at its two ends differ by k</td></tr>
+    <tr><td><b>Prefix sums</b></td><td>for each prefix sum, which is the total of the items up to a position, how many earlier positions had it</td><td>Count the subarrays that sum to k: a subarray sums to k when the prefix sums at its two ends differ by k</td></tr>
   </tbody>
 </table></div>
 
@@ -580,7 +580,7 @@ at about 10 ns each, about 50 seconds of CPU</code></pre>
 
 <ol>
   <li><b>Array indexing.</b> "An array reads any slot in one step, because the slot's address is computed. A hash function turns any key into a number, and that number modulo the table size picks the slot."</li>
-  <li><b>Collisions.</b> "Different keys can share a bucket, and that starts early. I would chain, so each bucket holds a short list of key and value pairs and I compare keys for equality. The alternative is open addressing, which needs tombstones for deletes."</li>
+  <li><b>Collisions.</b> "Different keys can share a bucket, and that starts early. I would chain, so each bucket holds a short list of key and value pairs and I compare keys for equality. The alternative is open addressing, which usually marks deletes with tombstones."</li>
   <li><b>Load factor and resizing.</b> "A lookup costs about one step plus the load factor, which is keys divided by buckets. I keep it under a limit such as 0.75 by doubling the table and rehashing. An occasional insert costs O(n), and the amortized cost is O(1)."</li>
   <li><b>Worst case.</b> "That is O(1) on average. The worst case is O(n) if the keys pile into one bucket, which an attacker can force unless the hash is randomized."</li>
   <li><b>Trade-off.</b> "A hash map spends extra memory and gives up order. For range queries or a guaranteed worst case I would use a balanced tree."</li>
@@ -665,7 +665,7 @@ look up D   slot 3 holds A, slot 4 is a tombstone,
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>4. <code>HashMap</code> with separate chaining</h4>
-  <p>Build sections 4 to 7 in <code>exercises/hash_map.py</code>: buckets of key and value pairs, <code>put</code>, <code>get</code>, <code>remove</code>, <code>in</code>, <code>len</code>, and growth by a multiple when the load factor would pass the limit. No <code>dict</code> or <code>set</code> inside. The tests pass in keys that count every <code>==</code> and every <code>hash()</code> call. Looking up 5,000 keys must take only a few comparisons each, and the table must grow by a multiple and not by a fixed step. The map also reports its bucket count through <code>capacity</code> and its chain lengths through <code>bucket_sizes()</code>, which the tests read.</p>
+  <p>Build sections 4 to 7 in <code>exercises/hash_map.py</code>: buckets of key and value pairs, <code>put</code>, <code>get</code>, <code>remove</code>, <code>in</code>, <code>len</code>, and growth by a multiple when the load factor would pass the limit. No <code>dict</code> or <code>set</code> inside. The tests pass in keys that count every <code>==</code> and every <code>hash()</code> call. Looking up 5,000 keys must take only a few comparisons each, keys spread far apart must all survive the resizes, and the table must grow by a multiple and not by a fixed step. The map also reports its bucket count through <code>capacity</code> and its chain lengths through <code>bucket_sizes()</code>, which the tests read.</p>
 </div>
 
 <div class="exercise">
@@ -683,7 +683,7 @@ look up D   slot 3 holds A, slot 4 is a tombstone,
 <div class="exercise">
   <div class="tier stretch">Stretch · measure</div>
   <h4>7. Flood a dict</h4>
-  <p>The "Go deeper" box in section 10 gives a family of integers that all have hash 1. Build a Python dict from n of them, for n of 1,000, 2,000, 4,000 and 8,000, and time each build with <code>time.perf_counter</code>, keeping the fastest of five runs. Do the same with ordinary integers at 100 times those sizes, because 8,000 of them build too fast to time reliably. For both, print how the time changes each time n doubles. Explain the two ratios using sections 7 and 10.</p>
+  <p>The "Go deeper" box in section 10 gives a family of integers that all have hash 1. Build a Python dict from n of them, for n of 1,000, 2,000, 4,000 and 8,000, and time each build with <code>time.perf_counter</code>, keeping the fastest of five runs. Do the same with ordinary integers at 25 times those sizes, because 8,000 of them build too fast to time reliably. For both, print how the time changes each time n doubles. Explain the two ratios using sections 7 and 10.</p>
 </div>
 
 <div class="exercise">
