@@ -73,7 +73,7 @@ address of slot 3  =  1000 + 3 × 8  =  1024</code></pre>
 <div class="table-wrap"><table>
   <thead><tr><th>Approach</th><th>Check one name</th><th>Add one name</th><th>With 10 million names</th></tr></thead>
   <tbody>
-    <tr><td>Unsorted list, scanned</td><td>O(n)</td><td>O(1), append at the end</td><td>10 million comparisons per check</td></tr>
+    <tr><td>Unsorted list, scanned</td><td>O(n)</td><td>O(1) amortized, append at the end</td><td>10 million comparisons per check</td></tr>
     <tr><td>Sorted list, binary search</td><td>O(log n)</td><td>O(n), shift the items after it</td><td>24 comparisons per check, about 5 million items shifted per insert</td></tr>
   </tbody>
 </table></div>
@@ -111,7 +111,7 @@ share of slots in use    about 4 × 10⁻²⁵</code></pre>
 
 <p>A hash function turns a key of any type into a number, and the remainder of that number after division by the array's length picks the slot.</p>
 
-<p>The number is called the key's hash. A hash map built this way is also called a hash table, each slot of its array is a bucket, and m is the number of buckets.</p>
+<p>The number is called the key's hash. A hash map is also called a hash table, each slot of its array is a bucket, and m is the number of buckets.</p>
 
 <pre class="plain"><code>bucket = hash(key) % m</code></pre>
 
@@ -219,7 +219,7 @@ toy_hash("tac") = 114,582      114,582 % 8 = 6</code></pre>
 lookup of an absent key        about α comparisons
 lookup of a present key        about 1 + α/2 comparisons</code></pre>
 
-<p>An absent key costs one step to reach its bucket and then a comparison with every key in the chain, which holds α keys on average. A present key shares its chain with about α other keys, and on average it is compared with half of them and then with itself.</p>
+<p>An absent key costs one step to reach its bucket and then a comparison with every key in the chain, which holds α keys on average. The other keys land in buckets independently of a present key, so its chain also holds about α of them, and on average it is compared with half of those and then with itself.</p>
 
 <p>Two table sizes show what this means for 10 million names.</p>
 
@@ -233,7 +233,7 @@ lookup of a present key        about 1 + α/2 comparisons</code></pre>
 
 <p>With 1,000 buckets each chain holds about 10,000 names, and the table is little more than a list cut into 1,000 pieces. With 20 million buckets most chains hold one name or none. A table that keeps its load factor under a fixed limit therefore answers a lookup in O(1) on average, which is why the set in section 1 did the same work at ten names and at ten million.</p>
 
-<div class="keyidea"><p>A hash map is fast because its load factor is bounded, not because hashing is fast. A lookup costs about one step plus the average chain length, so it stays O(1) only while the table keeps that average small.</p></div>
+<div class="keyidea"><p>A hash map is fast because its load factor is bounded, not because hashing is fast.</p></div>
 
 <div class="check" id="check-load-factor">
   <p class="q">A chained table holds 1,000,000 keys in 1,000 buckets, with a good hash function. About how many key comparisons does a lookup of an absent key take?</p>
@@ -296,7 +296,7 @@ lookup of a present key        about 1 + α/2 comparisons</code></pre>
 <details class="aside deeper">
   <summary>Go deeper: what a resize costs in real systems</summary>
   <p>Amortized O(1) is a statement about the total. The single insert that triggers a resize of a 10-million-key table still moves 10 million keys, and the request that issued it waits for about half a second. In a web service that shows up as a spike in tail latency.</p>
-  <p>Redis avoids the spike with incremental rehashing. It keeps the old and new tables side by side and moves one bucket on every operation, and lookups check both tables until the move is finished. Where the number of keys is known in advance, the simpler answer is to create the table at its final size, which Java, Go, Rust and C++ allow and Python does not.</p>
+  <p>Redis avoids the spike with incremental rehashing. It keeps the old and new tables side by side and moves one bucket on every operation, and lookups check both tables until the move is finished. Where the number of keys is known in advance, the simpler answer is to create the table at its final size, which Java, Go, Rust and C++ allow and Python does not. Java's constructor takes a bucket count, not a key count, so <code>new HashMap&lt;&gt;(1000)</code> still resizes at its 769th key. Since Java 19, <code>HashMap.newHashMap(1000)</code> sizes the table for 1,000 keys.</p>
   <p>Java and CPython keep each key's hash, so a resize places every key again without calling the hash function.</p>
   <p>Most tables never shrink. A table that has lost most of its keys keeps all its buckets, and iterating over it still visits every one of them, which costs O(n + m).</p>
 </details>
@@ -341,7 +341,7 @@ lookup of a present key        about 1 + α/2 comparisons</code></pre>
   <thead><tr><th>Load factor</th><th>Probes to find a present key</th><th>Probes to report a key absent</th></tr></thead>
   <tbody>
     <tr><td>0.50</td><td>1.5</td><td>2.5</td></tr>
-    <tr><td>0.67</td><td>2.0</td><td>5.0</td></tr>
+    <tr><td>2/3</td><td>2.0</td><td>5.0</td></tr>
     <tr><td>0.75</td><td>2.5</td><td>8.5</td></tr>
     <tr><td>0.90</td><td>5.5</td><td>50.5</td></tr>
   </tbody>
@@ -363,7 +363,7 @@ lookup of a present key        about 1 + α/2 comparisons</code></pre>
 
 <p>In the first case the lookup stops at the gap in slot 6, although "tac" is still in the table. In the second the tombstone keeps it walking, because only a truly empty slot ends a search.</p>
 
-<p>Tombstones add two rules. An insert may reuse a tombstone's slot, but only after walking on to an empty slot to confirm that the key is not stored further along, or the table could end up holding the same key twice. Tombstones also lengthen every search without holding a key, so they count toward the load factor, and when the limit is reached the table is rebuilt from its live keys.</p>
+<p>Tombstones add two rules. An insert may reuse a tombstone's slot, but only after walking on to an empty slot to confirm that the key is not stored further along, or the table could end up holding the same key twice. Tombstones hold no key but still lengthen the searches that pass them, so they count toward the load factor, and when the limit is reached the table is rebuilt from its live keys.</p>
 
 <div class="figure">
   <div class="viz-stage">
@@ -437,7 +437,7 @@ i = (5 * i + 1 + perturb) % m</code></pre>
 
 <h3>A key must not change while it is stored</h3>
 
-<p>The table computes a key's hash once, when the key is inserted. If the key's hash changes afterward, every lookup goes to a different bucket from the one that holds the entry.</p>
+<p>The table computes a key's hash once, when the key is inserted. If the key's hash changes afterward, a lookup with the changed key searches a different bucket from the one that holds the entry.</p>
 
 <pre><code>class Point:
     def __init__(self, x, y): self.x, self.y = x, y
@@ -467,7 +467,7 @@ print(Point(1, 2) in seen)    # False</code></pre>
     <button>Lookups still work, because it is the same list object</button>
     <button data-correct>The entry becomes unreachable, because lookups go to the bucket for the new contents</button>
   </div>
-  <div class="fb right"><p>Nothing tells the table that the key changed, so the entry stays where its old hash put it while every lookup hashes the new contents. This is the reason Python makes lists unhashable.</p></div>
+  <div class="fb right"><p>Nothing tells the table that the key changed, so the entry stays where its old hash put it while a lookup with the list hashes its new contents. This is the reason Python makes lists unhashable.</p></div>
   <div class="fb wrong"><p>The table computed the key's hash once, at insert time, and it is never told about the append, so it cannot move anything. A later lookup hashes the list as it is now and searches a different bucket. Being the same object does not help, because the lookup goes to the wrong bucket before any keys are compared.</p></div>
 </div>
 
@@ -508,7 +508,7 @@ at about 10 ns each, about 50 seconds of CPU</code></pre>
 <details class="aside deeper">
   <summary>Go deeper: SipHash, patterned keys, integer keys and tree bins</summary>
   <p>Python's first fix, in 2012, mixed a random seed into its old string hash, and researchers soon showed how to recover the seed. Python 3.4 switched to SipHash, which is designed so that its output does not reveal its key.</p>
-  <p>A table whose size is a power of two takes the remainder from the low bits of the hash alone, so keys that are all multiples of 16 share bucket 0 of a 16-bucket table. Libraries defend against such patterns by mixing the high bits of the hash into the choice of slot.</p>
+  <p>Java, Python, Go and Rust keep the number of buckets a power of two, because the remainder is then just the low bits of the hash, and reading bits is cheaper than dividing. The catch is that keys that are all multiples of 16 then share bucket 0 of a 16-bucket table. Libraries defend against such patterns by mixing the high bits of the hash into the choice of slot.</p>
   <p>Python randomizes the hashes of strings and bytes, but not of numbers. An integer hashes to itself, reduced modulo 2⁶¹ − 1, so every number of the form below has hash 1.</p>
   <pre class="plain"><code>k × (2⁶¹ − 1) + 1        for k = 0, 1, 2, …</code></pre>
   <p>Building a dict from n such keys takes O(n²) time. If untrusted input becomes integer keys, cap its size or convert the keys to strings.</p>
@@ -555,7 +555,8 @@ at about 10 ns each, about 50 seconds of CPU</code></pre>
 </ul>
 
 <details class="aside deeper">
-  <summary>Go deeper: hash maps across machines</summary>
+  <summary>Go deeper: hash maps across threads and machines</summary>
+  <p>A hash map that several threads write to needs a lock. A <a href="concurrent-structures.html#s9">concurrent hash map</a>, such as Java's <code>ConcurrentHashMap</code>, locks one part of the table at a time, so writers to different parts do not wait.</p>
   <p>The natural way to spread keys over N servers is to take the hash modulo N. It has the same flaw as resizing: changing N from 10 to 11 changes the server of almost every key, so almost all the data has to move. <a href="../../02-algorithms/concepts/consistent-hashing.html">Consistent hashing</a> moves only about one key in N.</p>
 </details>
 
@@ -655,7 +656,7 @@ look up D   slot 3 holds A, slot 4 is a tombstone,
     def __hash__(self): return hash(self.email)</code></pre>
   <p>Which rule of the key contract does this class break? Give two <code>User</code> objects that show the bug, and fix it.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>Equal keys must have equal hashes. The objects <code>User("A@x.com")</code> and <code>User("a@x.com")</code> compare equal, but their hashes come from different strings, so they almost always land in different buckets. Put one in a set and the other is not found. The fix is to hash the value that equality compares, which is <code>self.email.lower()</code>. Better still, normalize the email once in <code>__init__</code> and use a frozen dataclass, so the email cannot change after the user goes into a set.</p>
+    <p>Equal keys must have equal hashes. The objects <code>User("A@x.com")</code> and <code>User("a@x.com")</code> compare equal, but their hashes come from different strings, so they almost always land in different buckets. Put one in a set and the other is not found. The fix is to hash the value that equality compares, which is <code>self.email.lower()</code>. Better still, make <code>User</code> a frozen dataclass and lower-case the email before creating it, so the email cannot change after the user goes into a set.</p>
   </details>
 </div>
 
@@ -674,7 +675,7 @@ look up D   slot 3 holds A, slot 4 is a tombstone,
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>6. Hash map patterns in O(n)</h4>
-  <p>In <code>exercises/hash_patterns.py</code>, write <code>two_sum</code>, <code>group_anagrams</code> and <code>subarray_sum_count</code>, which use the first, second and fourth patterns from section 11. The tests pass in a list that counts how often it is read, and they fail when a function reads it more than a few times per item. Comparing every pair reads it about n²/2 times.</p>
+  <p>In <code>exercises/hash_patterns.py</code>, write <code>two_sum</code>, <code>group_anagrams</code> and <code>subarray_sum_count</code>, which use the first, second and fourth patterns from section 11. The tests pass in a list that counts how often it is read, and they fail when a function reads it more than a few times per item. Comparing every pair reads it about half of n² times.</p>
 </div>
 
 <div class="exercise">
@@ -794,7 +795,23 @@ look up D   slot 3 holds A, slot 4 is a tombstone,
       mark = {}; grewNote = "";
       if (!key) return "Type a key first.";
       if (key === TOMB) return `"${TOMB}" is how this figure draws a tombstone. Pick another key.`;
-      if (mode === "chain" ? slots[toyHash(key) % m].includes(key) : search(key).at >= 0) return `${b(key)} is already in the table. A real map would overwrite its value.`;
+      // A key that is already stored: show where, marking the path a lookup takes to it.
+      const at = toyHash(key) % m;
+      if (mode === "chain") {
+        const j = slots[at].indexOf(key);
+        if (j >= 0) {
+          for (let q = 0; q < j; q++) mark[at + ":" + q] = "warn";
+          mark[at + ":" + j] = "done";
+          return `${b(key)} is already in bucket ${at}. A real map would overwrite its value there.`;
+        }
+      } else {
+        const r = search(key);
+        if (r.at >= 0) {
+          r.path.forEach((p) => (mark[p] = slots[p] === TOMB ? "bad" : "warn"));
+          mark[r.at] = "done";
+          return `${b(key)} is already in slot ${r.at}` + (r.path.some((p) => slots[p] === TOMB) ? ", past a tombstone" : "") + ". A real map would overwrite its value there.";
+        }
+      }
       makeRoom();
       const h = toyHash(key), home = h % m;
       let msg = `The hash of ${b(key)} is ${h.toLocaleString()}, and ${h.toLocaleString()} % ${m} = <b>${home}</b>.`;
