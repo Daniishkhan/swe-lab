@@ -1,6 +1,6 @@
+import ast
 import inspect
 import random
-import re
 import signal
 from bisect import bisect_left, bisect_right
 
@@ -91,7 +91,7 @@ def test_example():
     assert len(t) == 7 and list(t) == [20, 30, 40, 50, 60, 70, 80]
     assert t.successor(50) == 60 and t.successor(45) == 50 and t.successor(80) is None and t.successor(1) == 20
     assert t.range(25, 65) == [30, 40, 50, 60]
-    assert t.range(50, 50) == [] and t.range(0, 100) == [20, 30, 40, 50, 60, 70, 80] and t.range(81, 90) == []
+    assert t.range(50, 50) == [] and t.range(60, 20) == [] and t.range(0, 100) == [20, 30, 40, 50, 60, 70, 80] and t.range(81, 90) == []
     assert (t.min(), t.max(), t.height()) == (20, 80, 3)
     t.delete(50)
     assert list(t) == [20, 30, 40, 60, 70, 80] and 50 not in t and 60 in t and len(t) == 6
@@ -239,8 +239,20 @@ def test_delete_costs_one_path():
 
 def test_the_tree_does_the_work():
     """Comparisons can't see a hidden sorted list (bisect and list.insert do
-    their work in C), so check the source for the usual shortcuts."""
-    src = inspect.getsource(bst_module)
-    src = re.sub(r'""".*?"""', "", src, flags=re.S)  # ignore docstrings
-    for banned in ("bisect", "sorted(", ".sort(", "SortedList", "dict(", "set("):
-        assert banned not in src, f"bst.py uses {banned!r}: the tree itself must keep the order"
+    their work in C), so inspect the AST for the usual shortcuts."""
+    tree = ast.parse(inspect.getsource(bst_module))
+    banned_names = {"bisect", "sorted", "SortedList", "dict", "set"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                assert alias.name.split(".")[0] not in {"bisect", "sortedcontainers"}, f"bst.py imports {alias.name!r}: the tree itself must keep the order"
+        elif isinstance(node, ast.ImportFrom):
+            mod = (node.module or "").split(".")[0]
+            assert mod not in {"bisect", "sortedcontainers"}, f"bst.py imports from {node.module!r}: the tree itself must keep the order"
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                assert node.func.id not in banned_names, f"bst.py calls {node.func.id}(): the tree itself must keep the order"
+            elif isinstance(node.func, ast.Attribute):
+                assert node.func.attr not in banned_names | {"sort", "bisect_left", "bisect_right", "insort", "insort_left", "insort_right"}, f"bst.py calls .{node.func.attr}(): the tree itself must keep the order"
+        elif isinstance(node, (ast.Dict, ast.Set, ast.DictComp, ast.SetComp)):
+            raise AssertionError("bst.py uses a dict or set: the tree itself must keep the order")

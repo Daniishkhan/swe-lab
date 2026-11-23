@@ -4,13 +4,13 @@ Topic: 01.04  |  Priority: P0
 
 Problem
 -------
-Sections 8 to 10 of the chapter. You may use heapq's heappush, heappop,
+Sections 7 to 8 of the chapter. You may use heapq's heappush, heappop,
 heapify, heapreplace and heappushpop (or your MinHeap), but not
 heapq.nlargest, heapq.nsmallest or heapq.merge: those are the answers.
 
 1. top_k(stream, k): the k largest items of an iterable you can only walk
    once, sorted largest first. Fewer than k items: return them all, sorted
-   largest first.
+   largest first. If k <= 0, return [].
 
        top_k(iter([4, 9, 1, 7, 3, 8]), 3) -> [9, 8, 7]
 
@@ -33,7 +33,7 @@ Requirements
 ------------
 - top_k: O(n log k) time and O(k) memory. Never hold the whole stream.
   Items only need `<`. Once k items are kept, an item that doesn't beat the
-  smallest of them must cost exactly one comparison (section 8: compare
+  smallest of them must cost exactly one comparison (section 7: compare
   with the root before touching the heap).
 - merge_sorted: O(N log k) for N items in total, O(k) memory. Before yielding
   its m-th item, it must not have pulled more than k + m items in total, so
@@ -43,7 +43,7 @@ Requirements
 What the tests measure
 ----------------------
 - top_k: 100,000 counting items from a generator; comparisons must stay
-  under 3 per item (sorting needs about 17, and "push, then pop if over k"
+  under 3 per item (sorting needs about 15, and "push, then pop if over k"
   about 13) and peak memory under 1 MB (keeping every item needs about
   5 MB). A rising stream, where every item gets in, must cost under
   3 log2 k per item (re-scanning a plain list of k costs k). And k = 500,000
@@ -55,7 +55,7 @@ What the tests measure
   a heap about 18 to 30). Comparing two (item, index) tuples counts twice,
   because Python checks == before <.
 - assign_jobs: 1,000,000 jobs on 500,000 workers under a 20 s cap
-  (heapq takes about 1 s, a pure-Python heap about 5 s).
+  (heapq takes about 1 to 3 s, a pure-Python heap about 5 to 10 s).
   Scanning the workers for each job is 5 * 10^11 steps, and a sorted list
   with insort and pop(0) moves about as many items.
 

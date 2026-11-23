@@ -4,7 +4,7 @@ Topic: 01.02  |  Priority: P0
 
 Problem
 -------
-Build sections 7 and 8 of the chapter. Store the items in a Python list used
+Build section 6 of the chapter. Store the items in a Python list used
 as a fixed row of slots (`self.buf`), plus `self.head` (the slot of the
 first item, always in 0..len(self.buf) - 1) and a size. The tests look inside: item i must sit in
 self.buf[(self.head + i) % len(self.buf)]. Never shift items: move `head` instead, and wrap

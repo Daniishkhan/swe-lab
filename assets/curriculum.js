@@ -1276,6 +1276,21 @@ window.CURRICULUM = {
      "file": "hash-maps.html",
      "topic": "01.01",
      "title": "Find anything in one step (Hash maps)"
+    },
+    {
+     "file": "heaps.html",
+     "topic": "01.04",
+     "title": "Always grab the smallest next (Heaps and priority queues)"
+    },
+    {
+     "file": "linear-structures.html",
+     "topic": "01.02",
+     "title": "Lines, chains, and waiting lists (Linear structures & monotonic stack/queue)"
+    },
+    {
+     "file": "trees.html",
+     "topic": "01.03",
+     "title": "Split the search in half at every branch (Trees, BSTs & LCA)"
     }
    ],
    "exercises": [
@@ -1552,7 +1567,7 @@ window.CURRICULUM = {
     {
      "file": "tree_traversals.py",
      "module": "tree_traversals",
-     "title": "Tree traversals, BST validation and building a balanced tree",
+     "title": "tree_traversals",
      "topics": [
       "01.03"
      ],
@@ -3935,5 +3950,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 10:19"
+ "generated": "2026-11-23 11:11"
 };

@@ -5,12 +5,12 @@ Topic: 01.02  |  Priority: P0
 Problem
 -------
 1. next_greater(nums): for each index, the next value to its right that is
-   strictly greater, or -1 if there is none (section 9 of the chapter).
+   strictly greater, or -1 if there is none (section 7 of the chapter).
 
        next_greater([2, 1, 2, 4, 3]) -> [4, 2, 4, -1, -1]
 
 2. sliding_window_max(nums, k): the max of every window of k consecutive
-   values, left to right (section 10).
+   values, left to right (section 7).
 
        sliding_window_max([1, 3, -1, -3, 5, 3, 6, 7], 3) -> [3, 3, 5, 5, 6, 7]
 

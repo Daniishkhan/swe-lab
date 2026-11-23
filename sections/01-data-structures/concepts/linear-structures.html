@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="01.02">
+  <title>Lines, chains, and waiting lists (Linear structures &amp; monotonic stack/queue)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 1 · Part 2</div>
+  <h1>Lines, chains, and waiting lists</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> in almost every coding round</span><span>about 17 minutes</span><span>7 quick checks · 6 exercises</span></div>
+</header>
+
+<p>Keeping items in a line looks effortless until the line grows to half a million entries and the front keeps moving. Interviews test three practical skills here: rewiring a chain of links by hand without dropping nodes, bending a flat row into a circle so both ends stay fast, and keeping a self-cleaning waiting list that answers "next taller" and "window max" in one pass.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Spot why front removals stall a plain list, and trade off flat arrays, linked chains, and circular buffers.</li>
+    <li>Reverse a linked list, find its middle, and detect a loop in one pass with constant extra memory.</li>
+    <li>Wrap a fixed array into a circle so both ends stay fast without shifting a single item.</li>
+    <li>Discard hopeless candidates on the fly so "next taller" and "sliding window max" finish in one scan.</li>
+    <li>Recognize the classic bare-editor traps — and deliver a crisp 2-minute explanation aloud.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass (section 5 prepares <code>linked_lists.py</code>; section 6 prepares stretch <code>ring_deque.py</code>; section 7 prepares <code>monotonic.py</code>). Builds on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a> and <a href="hash-maps.html">Find anything in one step</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>Why do plain lists hurt when the front moves?</h2>
+
+<div class="story">
+  <p>Your worker service keeps <b>500,000</b> pending jobs in a Python list and pulls the oldest job off the front with <code>jobs.pop(0)</code>. On 100 test jobs it finishes instantly.</p>
+  <p>Under real traffic, draining 500,000 jobs slides 499,999 slots left on the first pop, 499,998 on the second, and so on — roughly <b>125 billion</b> slot copies. Your worker burns 30+ seconds shuffling pointers before running any real work.</p>
+</div>
+
+<p>Picture a <b>row of numbered theater seats</b> (<code>0, 1, 2, …</code>). Tight packing makes jumping straight to seat <code>#42</code> instant arithmetic, yet it leaves <b>zero gaps</b>: whenever someone leaves seat <code>0</code>, every remaining person stands up and scoots one seat left.</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 188" role="img" aria-label="Comparing list pop(0) shifting every remaining item left against moving a head pointer in one step">
+    <text x="16" y="22" class="label" fill="var(--bad)" font-weight="700">PLAIN LIST — pop(0) shifts all remaining items left: O(n)</text>
+    <rect x="16" y="34" width="66" height="32" rx="6" fill="color-mix(in srgb, var(--bad) 14%, var(--surface))" stroke="var(--bad)" stroke-width="1.6" stroke-dasharray="4 3"/>
+    <text x="49" y="54" class="label" text-anchor="middle" fill="var(--bad)">job 0</text>
+    <rect x="92" y="34" width="66" height="32" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="125" y="54" class="label" text-anchor="middle">job 1</text>
+    <rect x="168" y="34" width="66" height="32" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="201" y="54" class="label" text-anchor="middle">job 2</text>
+    <rect x="244" y="34" width="66" height="32" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="277" y="54" class="label" text-anchor="middle">job 3</text>
+    <text x="378" y="54" class="label" text-anchor="middle" fill="var(--muted)">… 499,995 more …</text>
+    <rect x="446" y="34" width="76" height="32" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="484" y="54" class="label" text-anchor="middle">job 499k</text>
+    <path d="M 125 72 Q 87 86 52 72" fill="none" stroke="var(--bad)" stroke-width="1.8"/>
+    <polygon points="52,72 61,70 57,78" fill="var(--bad)"/>
+    <path d="M 201 72 Q 163 86 128 72" fill="none" stroke="var(--bad)" stroke-width="1.8"/>
+    <polygon points="128,72 137,70 133,78" fill="var(--bad)"/>
+    <path d="M 277 72 Q 239 86 204 72" fill="none" stroke="var(--bad)" stroke-width="1.8"/>
+    <polygon points="204,72 213,70 209,78" fill="var(--bad)"/>
+    <text x="534" y="54" class="label" fill="var(--bad)">→ n − 1 shifts</text>
+
+    <line x1="16" y1="98" x2="684" y2="98" stroke="var(--border)" stroke-dasharray="4 4"/>
+
+    <text x="16" y="122" class="label" fill="var(--ok)" font-weight="700">MOVE THE HEAD POINTER — leave the others untouched: O(1)</text>
+    <rect x="16" y="136" width="66" height="32" rx="6" fill="var(--surface)" stroke="var(--border)" stroke-dasharray="4 3" opacity="0.5"/>
+    <text x="49" y="156" class="label" text-anchor="middle" fill="var(--muted)">job 0</text>
+    <rect x="112" y="136" width="66" height="32" rx="6" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="145" y="156" class="label" text-anchor="middle" font-weight="700">job 1</text>
+    <rect x="208" y="136" width="66" height="32" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="241" y="156" class="label" text-anchor="middle">job 2</text>
+    <rect x="304" y="136" width="66" height="32" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="337" y="156" class="label" text-anchor="middle">job 3</text>
+    <line x1="178" y1="152" x2="202" y2="152" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="202,148 208,152 202,156" fill="var(--border-strong)"/>
+    <line x1="274" y1="152" x2="298" y2="152" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="298,148 304,152 298,156" fill="var(--border-strong)"/>
+    <text x="145" y="182" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">head moves here</text>
+    <text x="394" y="156" class="label" fill="var(--ok)">→ 1 write (499,999 untouched)</text>
+  </svg>
+  <div class="cap">Tight packing makes indexing fast and front removals expensive. To drop the front in <code>O(1)</code>, move where "front" starts instead of shifting every item.</div>
+</div>
+
+<p>Solving this shifting problem unlocks four staples of coding rounds:</p>
+<ul>
+  <li><b>Pointer surgery:</b> reversing, splitting, or checking cycles in linked chains with zero extra memory.</li>
+  <li><b>Fast caches &amp; queues:</b> <code>O(1)</code> LRU cache eviction and <code>O(1)</code> double-ended queues.</li>
+  <li><b>Nested matching:</b> validating brackets, undo stacks, and tracking a running minimum.</li>
+  <li><b>One-pass waiting lines:</b> next warmer day, sliding-window maximum, and largest histogram rectangle.</li>
+</ul>
+
+<div class="keyidea">A Python <code>list</code> is fast at the <em>back</em> (<code>append</code>, <code>pop</code>) and fast by index (<code>a[i]</code>). Inserting or deleting at the front or middle costs <code>O(n)</code> shifts.</div>
+
+<div class="check" id="check-shift-wall">
+  <p class="q">You have 100,000 items in a Python <code>list</code>. Which loop finishes in <code>O(n)</code> total time instead of <code>O(n²)</code>?</p>
+  <div class="opts">
+    <button><code>while items: items.pop(0)</code> — removes each item from the front</button>
+    <button data-correct><code>while items: items.pop()</code> — removes each item from the back</button>
+    <button><code>for x in data: items.insert(0, x)</code> — prepends each item at index 0</button>
+  </div>
+  <div class="fb right"><p>Right! Removing from the back leaves all other seats still: <code>n</code> steps at <code>O(1)</code> each gives <code>O(n)</code> total.</p></div>
+  <div class="fb wrong"><p>Count total moves on a 4-seat row <code>[A, B, C, D]</code>: removing seat <code>0</code> shifts 3, then 2, then 1 items (<code>n(n−1)/2 = O(n²)</code>). Removing seat <code>3</code>, then <code>2</code>, then <code>1</code> shifts zero items at every step.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>What if items didn't have to sit side by side?</h2>
+
+<p>To escape theater-seat shifting, let people stand anywhere in the room and <b>hold hands in a chain</b>. Each person (a <b>node</b>) holds two fields: a value (<code>val</code>) and a link to the next person (<code>next</code>, or <code>None</code> at the tail). Splicing a newcomer behind a node you already hold takes two pointer writes and zero shifts:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 135" role="img" aria-label="Singly linked list nodes 10, 20, 30 showing how inserting node 25 splices two next pointers without shifting other nodes">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">SPLICE NODE 25 AFTER NODE 20 — 2 POINTER WRITES, ZERO SHIFTS</text>
+    <text x="26" y="64" class="label" fill="var(--accent)" font-weight="700">head</text>
+    <line x1="56" y1="60" x2="80" y2="60" stroke="var(--accent)" stroke-width="2"/>
+    <polygon points="80,55 88,60 80,65" fill="var(--accent)"/>
+
+    <rect x="90" y="42" width="76" height="36" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <line x1="138" y1="42" x2="138" y2="78" stroke="var(--border)"/>
+    <text x="114" y="64" class="label" text-anchor="middle" font-weight="700">10</text>
+    <circle cx="152" cy="60" r="3" fill="var(--text-strong)"/>
+    <line x1="155" y1="60" x2="210" y2="60" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="210,55 218,60 210,65" fill="var(--border-strong)"/>
+
+    <rect x="220" y="42" width="76" height="36" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.8"/>
+    <line x1="268" y1="42" x2="268" y2="78" stroke="var(--border)"/>
+    <text x="244" y="64" class="label" text-anchor="middle" font-weight="700">20</text>
+    <circle cx="282" cy="60" r="3" fill="var(--accent)"/>
+
+    <line x1="286" y1="54" x2="460" y2="54" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="373" y="46" class="label" text-anchor="middle" fill="var(--bad)">old link broken</text>
+
+    <path d="M 282 63 Q 305 104 334 104" fill="none" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="334,99 342,104 334,109" fill="var(--ok)"/>
+
+    <rect x="344" y="86" width="76" height="36" rx="6" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <line x1="392" y1="86" x2="392" y2="122" stroke="var(--ok)" opacity="0.5"/>
+    <text x="368" y="108" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">25</text>
+    <circle cx="406" cy="104" r="3" fill="var(--ok)"/>
+
+    <path d="M 409 104 Q 440 104 460 66" fill="none" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="455,67 464,61 463,71" fill="var(--ok)"/>
+
+    <rect x="466" y="42" width="76" height="36" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <line x1="514" y1="42" x2="514" y2="78" stroke="var(--border)"/>
+    <text x="490" y="64" class="label" text-anchor="middle" font-weight="700">30</text>
+    <circle cx="528" cy="60" r="3" fill="var(--text-strong)"/>
+    <line x1="531" y1="60" x2="578" y2="60" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="578,55 586,60 578,65" fill="var(--border-strong)"/>
+    <text x="594" y="64" class="label" fill="var(--muted)">None</text>
+  </svg>
+  <div class="cap">Splicing 25 after 20 takes two writes: <code>new.next = cur.next</code> first, then <code>cur.next = new</code> so node 30 is never dropped.</div>
+</div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Operation</th><th>Dynamic array (<code>list</code>)</th><th>Singly linked list</th><th>Doubly linked list</th></tr></thead>
+  <tbody>
+    <tr><td>Read item <code>i</code></td><td><b>O(1)</b></td><td>O(n) walk from head</td><td>O(n) walk from nearer end</td></tr>
+    <tr><td>Insert / delete at head</td><td>O(n) shift</td><td><b>O(1)</b></td><td><b>O(1)</b></td></tr>
+    <tr><td>Insert / delete at tail</td><td><b>O(1)</b> amortized</td><td>O(1) insert (w/ tail), O(n) delete</td><td><b>O(1)</b> (with tail pointer)</td></tr>
+    <tr><td>Delete node <code>x</code> you hold</td><td>O(n) shift</td><td>O(n) (must find predecessor)</td><td><b>O(1)</b></td></tr>
+    <tr><td>Memory &amp; CPU cache</td><td>Compact, cache-friendly</td><td>+1 pointer/node, scattered</td><td>+2 pointers/node, scattered</td></tr>
+  </tbody>
+</table></div>
+
+<p><em>Where the hand-holding picture breaks:</em> walking past 100,000 items in a flat array vs. scattered nodes are both <code>O(n)</code> on paper, yet real CPUs load contiguous 64-byte cache lines in bursts. Scanning a Python list beats walking a linked list by a huge constant factor, so production code only reaches for linked nodes when it needs <code>O(1)</code> middle unlinks.</p>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>How do you stop losing the head or walking backward?</h2>
+
+<p>Linked-list code breaks in two predictable places: editing the very first node (which has no predecessor) and removing a middle node when you only hold a forward link. Two lightweight upgrades fix both:</p>
+
+<ul>
+  <li><b>Dummy head (sentinel):</b> whenever an edit might change which node is first (delete, merge, partition), prepend one throwaway node: <code>dummy = Node(0, head)</code>. Now <em>every</em> real node has a predecessor, removing special-case head branches; return <code>dummy.next</code> at the end.</li>
+  <li><b>Doubly linked list (<code>prev</code> + <code>next</code>):</b> give every node a backward link (plus dummy <code>head</code> and <code>tail</code> sentinels), and unlinking any known node <code>x</code> becomes two pointer writes: <code>x.prev.next = x.next; x.next.prev = x.prev</code>.</li>
+</ul>
+
+<details class="aside deeper">
+  <summary>Go deeper: how an LRU cache pairs a hash map with a doubly linked list</summary>
+  <p>An LRU (Least Recently Used) cache needs <code>O(1)</code> <code>get(key)</code>, <code>O(1)</code> <code>put(key, val)</code>, and <code>O(1)</code> eviction of the stalest key. A hash map from <a href="hash-maps.html">Chapter 1.1</a> stores <code>key → Node</code> for <code>O(1)</code> lookup; a doubly linked list tracks recency (newest right after dummy <code>head</code>, oldest right before dummy <code>tail</code>). On every hit, unlink <code>node</code> in <code>O(1)</code> via <code>prev</code>/<code>next</code> and move it to the front. On overflow, evict <code>tail.prev</code> and delete its key from the map.</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: deleting node x in a singly linked list without head</summary>
+  <p>A classic trick question hands you only <code>x</code> (not <code>head</code>) and asks to delete it. You can copy <code>x.val = x.next.val</code> and skip <code>x.next = x.next.next</code> — <em>provided</em> <code>x</code> isn't the tail and nothing outside holds a reference to <code>x.next</code>. In real systems (like an LRU cache), external pointers to nodes exist, which is why you use a doubly linked list instead of mutating values.</p>
+</details>
+
+<div class="check" id="check-doubly-unlink">
+  <p class="q">A hash map hands you a direct pointer to node <code>x</code> in the middle of a 100,000-node list, and you must remove <code>x</code> in <code>O(1)</code>. Which layout makes that work?</p>
+  <div class="opts">
+    <button data-correct>A doubly linked list, where <code>x.prev</code> reaches the predecessor directly</button>
+    <button>A singly linked list with a dummy head, avoiding head edge cases</button>
+    <button>A dynamic array, where knowing <code>x</code>'s index makes deletion instant</button>
+  </div>
+  <div class="fb right"><p>Spot on! Unlinking <code>x</code> rewires the node <em>before</em> <code>x</code> to point past it; only <code>x.prev</code> reaches that predecessor in one jump.</p></div>
+  <div class="fb wrong"><p>Trace removing <code>B</code> from <code>A → B → C</code> when your finger is only on <code>B</code>. To make <code>A</code> point to <code>C</code>, you must reach <code>A</code>. A singly linked chain has no arrow from <code>B</code> back to <code>A</code>, and a flat array still shifts everything after <code>B</code> left in <code>O(n)</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How do stacks and queues keep lines disciplined?</h2>
+
+<p>A <b>stack</b> and a <b>queue</b> are rules about which end of a line you touch:</p>
+<ul>
+  <li><b>Stack (LIFO — Last In, First Out):</b> push and pop only at the back. In Python, a plain <code>list</code> is already an <code>O(1)</code> amortized stack via <code>append()</code> and <code>pop()</code>. Use it whenever the newest open task must close first (nested brackets, undo history, explicit DFS).</li>
+  <li><b>Queue (FIFO — First In, First Out):</b> join at the back (<code>append</code>), leave from the front (<code>popleft</code>). Always use <code>collections.deque</code> so both ends stay <code>O(1)</code>.</li>
+</ul>
+
+<p><b>Classic interview twist — Min Stack:</b> support <code>push</code>, <code>pop</code>, <code>top</code>, and <code>get_min</code> all in <code>O(1)</code>. A single <code>min_so_far</code> integer breaks when you pop the minimum. Instead, store <code>(val, min_at_or_below)</code> at every level (or push onto a parallel <code>mins</code> stack whenever <code>val &lt;= mins[-1]</code> — using <code>&lt;=</code>, NOT strict <code>&lt;</code>, so duplicate minimums aren't erased early):</p>
+
+<pre><code>class MinStack:
+    def __init__(self): self.st = []            # stores (val, min_so_far)
+    def push(self, x):
+        lo = x if not self.st else min(x, self.st[-1][1])
+        self.st.append((x, lo))
+    def pop(self): return self.st.pop()[0]
+    def top(self): return self.st[-1][0]
+    def get_min(self): return self.st[-1][1]    # O(1), survives any pop</code></pre>
+
+<details class="aside deeper">
+  <summary>Go deeper: building an amortized O(1) queue from two stacks</summary>
+  <p>Keep two stacks: <code>inbox</code> (for <code>enqueue</code>) and <code>outbox</code> (for <code>dequeue</code>). Push arrivals onto <code>inbox</code> in <code>O(1)</code>. On <code>dequeue</code>, if <code>outbox</code> is empty, pop every item from <code>inbox</code> and push it onto <code>outbox</code> — reversing the order into FIFO! Each item is moved from <code>inbox</code> to <code>outbox</code> at most once, so amortized cost per operation is <code>O(1)</code>.</p>
+</details>
+
+<div class="check" id="check-min-stack">
+  <p class="q">You implement a Min Stack with a parallel <code>mins</code> stack, pushing only when <code>x &lt; mins[-1]</code> (strict). You push <code>5, 2, 7, 2</code> then pop <code>2</code>. What happens next?</p>
+  <div class="opts">
+    <button><code>get_min()</code> returns <code>2</code> because the earlier <code>2</code> is still tracked</button>
+    <button><code>pop()</code> raises <code>IndexError</code> on the empty <code>mins</code> stack</button>
+    <button data-correct><code>get_min()</code> falsely returns <code>5</code> because both <code>2</code>s shared one entry</button>
+  </div>
+  <div class="fb right"><p>Sharp catch! Tracking duplicates with <code>&lt;=</code> (or storing <code>(val, cur_min)</code> pairs) guarantees popping the top <code>2</code> still leaves <code>2</code> as the active minimum.</p></div>
+  <div class="fb wrong"><p>Trace the two stacks step by step: after pushing <code>5, 2, 7, 2</code> with strict <code>&lt;</code>, <code>vals = [5, 2, 7, 2]</code> while <code>mins = [5, 2]</code> (the second <code>2</code> was skipped). Popping the top <code>2</code> sees <code>2 == mins[-1]</code> and pops <code>2</code> off <code>mins</code>, leaving <code>mins = [5]</code> even though <code>[5, 2, 7]</code> still holds a <code>2</code>!</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>How do you rewire or inspect a chain in O(1) memory?</h2>
+
+<p>Singly linked list questions test whether you can track pointers cleanly in <code>O(n)</code> time and <code>O(1)</code> extra memory — with zero recursion (a 200,000-node list blows Python's ~1,000-frame recursion limit). Three moves cover almost all of them:</p>
+
+<h3>Move 1: Reverse in place</h3>
+<p>Walk three pointers — <code>prev</code> (reversed prefix), <code>cur</code> (node being flipped), and <code>nxt</code> (saved bookmark to the untouched suffix). Always save <code>nxt = cur.next</code> <em>before</em> overwriting <code>cur.next = prev</code>:</p>
+
+<pre><code>prev, cur = None, head
+while cur is not None:
+    nxt = cur.next      # 1. save the rest of the chain first
+    cur.next = prev     # 2. flip cur's arrow backward
+    prev, cur = cur, nxt
+return prev             # old tail is now the new head</code></pre>
+
+<div class="figure">
+  <div id="viz-reverse"></div>
+  <div class="cap">Step through reversing <code>1 → 2 → 3 → 4 → None</code>. At every pause, <code>prev</code> heads the reversed prefix and <code>cur</code> heads the remaining suffix.</div>
+</div>
+
+<h3>Moves 2 &amp; 3: Middle and cycle detection (fast &amp; slow runners)</h3>
+<p>Start <code>slow = fast = head</code> and move <code>slow</code> by 1 step and <code>fast</code> by 2 steps while <code>fast and fast.next</code>:</p>
+<ul>
+  <li><b>Middle in one pass:</b> when <code>fast</code> reaches the end, <code>slow</code> lands on the middle (for even length <code>1→2→3→4</code>, the second middle <code>3</code>).</li>
+  <li><b>Cycle detection (Floyd's tortoise &amp; hare):</b> advance <em>first</em>, then check <code>if slow is fast: return True</code> (always use object identity <code>is</code>, never <code>slow.val == fast.val</code>, so duplicate values don't trigger false positives!).</li>
+</ul>
+
+<pre><code>slow = fast = head
+while fast is not None and fast.next is not None:
+    slow = slow.next
+    fast = fast.next.next
+    if slow is fast:    # check AFTER moving, using identity (`is`)
+        return True
+return False</code></pre>
+
+<p>Why must <code>fast</code> catch <code>slow</code> inside a loop? Once both runners enter the ring, measure the forward distance <code>d</code> from <code>fast</code> to <code>slow</code>. Each turn changes the gap by <code>−2 + 1 = −1</code>. A positive integer dropping by <b>1</b> every turn (<code>d, d−1, …, 1, 0</code>) cannot jump over <code>0</code>.</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 185" role="img" aria-label="Floyd cycle detection starting from node 1: at step 2 slow is on 3 and fast is on 5, closing gap 2 to 1 to 0 at node 5">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">FLOYD'S TORTOISE &amp; HARE (from head = 1) — gap shrinks by 1 each turn</text>
+
+    <circle cx="48" cy="96" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <text x="48" y="100" class="label" text-anchor="middle" font-weight="700">1</text>
+    <line x1="64" y1="96" x2="104" y2="96" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="104,91 112,96 104,101" fill="var(--border-strong)"/>
+
+    <circle cx="130" cy="96" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <text x="130" y="100" class="label" text-anchor="middle" font-weight="700">2</text>
+    <line x1="146" y1="96" x2="186" y2="96" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="186,91 194,96 186,101" fill="var(--border-strong)"/>
+
+    <!-- Cycle nodes: 3 (left, slow), 4 (top), 5 (right, fast), 6 (bottom) -->
+    <circle cx="214" cy="96" r="17" fill="color-mix(in srgb, var(--accent) 14%, var(--surface))" stroke="var(--accent)" stroke-width="2"/>
+    <text x="214" y="100" class="label" text-anchor="middle" font-weight="700">3</text>
+    <text x="214" y="128" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">slow (+1)</text>
+
+    <circle cx="290" cy="48" r="17" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <text x="290" y="52" class="label" text-anchor="middle" font-weight="700">4</text>
+
+    <circle cx="366" cy="96" r="17" fill="color-mix(in srgb, var(--warn) 14%, var(--surface))" stroke="var(--warn)" stroke-width="2"/>
+    <text x="366" y="100" class="label" text-anchor="middle" font-weight="700">5</text>
+    <text x="422" y="100" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">fast (+2)</text>
+
+    <circle cx="290" cy="144" r="17" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <text x="290" y="148" class="label" text-anchor="middle" font-weight="700">6</text>
+
+    <!-- Arrows around cycle 3->4->5->6->3 -->
+    <line x1="229" y1="86" x2="269" y2="60" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="265,56 275,56 270,65" fill="var(--border-strong)"/>
+    <line x1="305" y1="58" x2="345" y2="83" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="346,78 352,87 341,86" fill="var(--border-strong)"/>
+    <line x1="351" y1="106" x2="311" y2="131" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="315,135 305,135 310,126" fill="var(--border-strong)"/>
+    <line x1="275" y1="134" x2="235" y2="109" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <polygon points="234,114 228,105 239,106" fill="var(--border-strong)"/>
+
+    <!-- Explanation box on right -->
+    <rect x="462" y="42" width="222" height="114" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="573" y="64" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">Gap from fast to slow</text>
+    <text x="573" y="86" class="label" text-anchor="middle">t=2: f=5, s=3 (gap = 2)</text>
+    <text x="573" y="106" class="label" text-anchor="middle">t=3: f=3, s=4 (gap = 1)</text>
+    <text x="573" y="126" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">t=4: f=5, s=5 (meet!)</text>
+    <text x="573" y="145" class="label" text-anchor="middle" fill="var(--muted)">O(n) time · O(1) extra space</text>
+  </svg>
+  <div class="cap">Starting <code>slow = fast = 1</code>, after two turns <code>slow</code> enters at <code>3</code> while <code>fast</code> is at <code>5</code>; two turns later they meet at <code>5</code>.</div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: first middle for splitting, and finding the cycle entry (Floyd phase 2)</summary>
+  <p><b>Splitting a list (merge sort / palindrome):</b> starting <code>slow = fast = head</code> lands on the <em>second</em> middle of an even list, which doesn't let you sever the left half. Start <code>fast = head.next</code> instead so <code>slow</code> stops at the <em>first</em> middle, then cut with <code>right = slow.next; slow.next = None</code>.</p>
+  <p><b>Finding the exact loop entry:</b> if the tail has length <code>a</code>, the cycle has length <code>c</code>, and they meet at offset <code>b</code> past entry, then <code>2(a + b) = a + b + k·c</code>, so <code>a = k·c − b</code>. Reset one pointer to <code>head</code>, walk both at speed 1, and they collide right on the loop entrance.</p>
+</details>
+
+<div class="check" id="check-floyd-gap">
+  <p class="q">Inside a 2-node loop (<code>A → B → A</code>), <code>slow</code> starts at <code>A</code> (+1 step/turn) and <code>fast</code> starts at <code>B</code> (+3 steps/turn). What happens?</p>
+  <div class="opts">
+    <button data-correct>They swap places forever and never meet, because the gap drops by 2 each turn</button>
+    <button>They meet on turn 1 at node <code>A</code>, because <code>fast</code> laps the 2-node ring</button>
+    <button>They meet on turn 2 at node <code>B</code>, because 3 is odd and 2 is even</button>
+  </div>
+  <div class="fb right"><p>Exact! Relative speed <code>3 − 1 = 2</code> preserves parity: starting at gap 1 on an even-length ring keeps the gap odd forever! Relative speed <code>2 − 1 = 1</code> guarantees meeting from <em>any</em> starting offset.</p></div>
+  <div class="fb wrong"><p>Trace turn 1 by hand: <code>slow</code> moves 1 step <code>A → B</code>; <code>fast</code> moves 3 steps <code>B → A → B → A</code>. Now <code>slow = B, fast = A</code> — the exact mirror image! On turn 2 they swap right back, looping forever.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Can we keep array speed without shifting the front?</h2>
+
+<p>Linked lists give <code>O(1)</code> ends at the cost of pointer overhead, scattered RAM, and <code>O(n)</code> indexing. To get <b>both</b> contiguous array indexing <code>d[i]</code> <em>and</em> <code>O(1)</code> push/pop at both ends, bend our theater row into a <b>circle of numbered chairs</b> (a <b>ring buffer</b>).</p>
+
+<p>Store three fields: backing array <code>buf</code> of length <code>cap</code>, front chair index <code>head</code>, and count <code>size</code>. Modulo <code>% cap</code> wraps past chair <code>cap − 1</code> back to chair <code>0</code>:</p>
+
+<ul>
+  <li><b>Index <code>d[i]</code>:</b> map negative <code>i += size</code>, check <code>0 &lt;= i &lt; size</code> (else <code>IndexError</code>), return <code>buf[(head + i) % cap]</code>.</li>
+  <li><b>Back <code>append(x)</code> / front <code>appendleft(x)</code>:</b> if <code>size == cap</code>, double first (below). Back writes <code>buf[(head + size) % cap] = x</code>; front steps <code>head = (head - 1) % cap</code> and writes <code>buf[head] = x</code> (in Python, <code>(0 - 1) % 4 == 3</code>). Increment <code>size</code>.</li>
+  <li><b><code>pop()</code> / <code>popleft()</code>:</b> if <code>size == 0</code>, raise <code>IndexError</code>! Clear vacated slots to <code>None</code> so old objects can be garbage-collected, move <code>head = (head + 1) % cap</code> on <code>popleft</code>, decrement <code>size</code>.</li>
+</ul>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 198" role="img" aria-label="A 4-slot ring buffer holding C, D, E, F starting at head index 2, shown both as a flat backing array and as four chairs in a circle">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">RING BUFFER (cap = 4, head = 2, size = 4) — logical line: [C, D, E, F]</text>
+
+    <text x="16" y="54" class="label" font-weight="700">Backing array buf[0..3]</text>
+    <rect x="16" y="66" width="66" height="44" rx="6" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
+    <text x="49" y="92" class="label" text-anchor="middle" font-weight="700">E</text>
+    <text x="49" y="126" class="label" text-anchor="middle" fill="var(--muted)">slot 0</text>
+    <text x="49" y="142" class="label" text-anchor="middle" fill="var(--accent-2)">item [2]</text>
+
+    <rect x="88" y="66" width="66" height="44" rx="6" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
+    <text x="121" y="92" class="label" text-anchor="middle" font-weight="700">F</text>
+    <text x="121" y="126" class="label" text-anchor="middle" fill="var(--muted)">slot 1</text>
+    <text x="121" y="142" class="label" text-anchor="middle" fill="var(--accent-2)">item [3]</text>
+
+    <rect x="160" y="66" width="66" height="44" rx="6" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="193" y="92" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">C</text>
+    <text x="193" y="126" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">slot 2 (head)</text>
+    <text x="193" y="142" class="label" text-anchor="middle" fill="var(--ok)">item [0]</text>
+
+    <rect x="232" y="66" width="66" height="44" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <text x="265" y="92" class="label" text-anchor="middle" font-weight="700">D</text>
+    <text x="265" y="126" class="label" text-anchor="middle" fill="var(--muted)">slot 3</text>
+    <text x="265" y="142" class="label" text-anchor="middle" fill="var(--muted)">item [1]</text>
+
+    <text x="16" y="172" class="label" fill="var(--muted)">d[2] = buf[(2 + 2) % 4] = buf[0] = "E"</text>
+    <text x="16" y="189" class="label" fill="var(--muted)">wrap-around cost: 0 shifts, 0 copies</text>
+
+    <!-- Circular view shifted left so right text fits comfortably inside 700px -->
+    <circle cx="485" cy="112" r="52" fill="none" stroke="var(--border)" stroke-width="1.6" stroke-dasharray="4 4"/>
+    <circle cx="485" cy="60" r="20" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.8"/>
+    <text x="485" y="64" class="label" text-anchor="middle" font-weight="700">0: E</text>
+    <circle cx="537" cy="112" r="20" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.8"/>
+    <text x="537" y="116" class="label" text-anchor="middle" font-weight="700">1: F</text>
+    <circle cx="485" cy="164" r="20" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="2.2"/>
+    <text x="485" y="168" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">2: C</text>
+    <circle cx="433" cy="112" r="20" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <text x="433" y="116" class="label" text-anchor="middle" font-weight="700">3: D</text>
+
+    <text x="576" y="96" class="label" fill="var(--ok)" font-weight="700">head → slot 2</text>
+    <text x="576" y="115" class="label" fill="var(--muted)">line wraps:</text>
+    <text x="576" y="133" class="label" fill="var(--text-strong)">2 → 3 → 0 → 1</text>
+  </svg>
+  <div class="cap">After appending A, B, C, popping A and B, and appending D, E, F, the line wraps from slot 3 back to slot 0 with zero shifts.</div>
+</div>
+
+<p><b>Growing when full:</b> never copy raw slots <code>0..cap-1</code> straight into a bigger array — that tears a wrapped line down the middle! Unwind in logical order starting at <code>head</code>, then reset <code>head = 0</code>:</p>
+
+<pre><code>new_buf = [None] * (cap * 2)
+for i in range(size):
+    new_buf[i] = buf[(head + i) % cap]
+buf, head = new_buf, 0</code></pre>
+
+<p>Doubling keeps total copies under <code>2n</code> across <code>n</code> appends — <b>amortized <code>O(1)</code></b> (<a href="../../02-algorithms/concepts/complexity.html">Chapter 2.1</a>). A steady queue holding at most 1,000 items across 300,000 enqueues and dequeues grows through powers of two up to 1,024 slots (~1,020 total copies) and then <em>never copies again</em>.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: shrinking without thrashing, power-of-2 bitmasks, and CPython deque</summary>
+  <p><b>Shrinking safely:</b> halving capacity at <code>size == cap // 2</code> causes <code>O(n)</code> thrashing on alternating push/pop right at the boundary. Shrinking only when <code>size &lt;= cap // 4</code> leaves a quarter-buffer of hysteresis and preserves amortized <code>O(1)</code>.</p>
+  <p><b>Fast bitmasks:</b> when <code>cap</code> is a power of two, low-level ring buffers replace <code>% cap</code> with bitwise <code>&amp; (cap - 1)</code> (avoiding integer division and negative-modulo bugs in C++/Java).</p>
+  <p><b>CPython's <code>collections.deque</code>:</b> uses a doubly linked list of 64-slot blocks — <code>O(1)</code> ends with zero resize pauses and good cache locality, trading away <code>O(1)</code> random middle indexing (<code>d[i]</code> is <code>O(n/64) = O(n)</code>).</p>
+</details>
+
+<div class="check" id="check-ring-wrap">
+  <p class="q">A ring buffer has <code>cap = 8</code>, <code>head = 0</code>, and <code>size = 3</code> (items at slots <code>0, 1, 2</code>). You call <code>appendleft("z")</code>. What changes?</p>
+  <div class="opts">
+    <button>Slots <code>0, 1, 2</code> shift into <code>1, 2, 3</code>, and <code>"z"</code> goes in slot <code>0</code></button>
+    <button>Slot <code>3</code> receives <code>"z"</code>, and <code>head</code> stays at slot <code>0</code></button>
+    <button data-correct>Slot <code>7</code> receives <code>"z"</code>, and <code>head</code> moves backward to slot <code>7</code></button>
+  </div>
+  <div class="fb right"><p>Exact! <code>(0 - 1) % 8 == 7</code>. Only one slot is written, and logical item <code>1</code> now reads from <code>(7 + 1) % 8 == 0</code>.</p></div>
+  <div class="fb wrong"><p>Picture chairs <code>0..7</code> in a circle: chair <code>7</code> sits right in front of chair <code>0</code>. Putting <code>"z"</code> at the front without moving anyone steps <code>head</code> one chair backward to <code>(0 - 1) % 8 = 7</code> and writes slot <code>7</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Why re-scan people you already know can't win?</h2>
+
+<p>Now extend our line-of-people picture to one of the highest-leverage patterns in coding rounds. Given heights <code>nums = [2, 1, 2, 4, 3]</code>, find for every position the <b>first strictly taller value to its right</b> (or <code>-1</code>). Scanning right from each item takes <code>O(n²)</code> on a falling list.</p>
+
+<h3>Monotonic stack (next greater / next smaller)</h3>
+<p>Walk left to right keeping a <b>waiting stack</b> of indexes whose answer hasn't arrived yet. When newcomer <code>val</code> arrives, ask: <em>"Is <code>val</code> taller than the person on top of the waiting stack?"</em> While yes, pop that person — <code>val</code> is their exact answer! Then push the newcomer's index.</p>
+
+<div class="figure">
+  <div id="viz-mono-stack"></div>
+  <div class="cap">Watch <code>next_greater([2, 1, 2, 4, 3])</code>. Because anyone shorter than a newcomer is popped before the newcomer enters, remaining stack heights stay non-increasing.</div>
+</div>
+
+<p><b>Why the nested <code>while</code> is still <code>O(n)</code>:</b> every index is pushed <b>once</b> and popped <b>at most once</b> — at most <code>2n</code> stack operations across the entire run! Note where the line picture needs care: equal heights do <em>not</em> answer a "strictly taller" query, so the waiting stack stays <b>non-increasing</b> (weakly decreasing — equal values stay stacked).</p>
+
+<pre><code>ans = [-1] * len(nums)
+waiting = []                    # indexes; nums[waiting] is non-increasing
+for i, val in enumerate(nums):
+    while waiting and nums[waiting[-1]] &lt; val:
+        ans[waiting.pop()] = val
+    waiting.append(i)
+return ans</code></pre>
+
+<div class="keyidea">The query picks the stack order: <b>next greater</b> evicts smaller waiters (stack stays decreasing); <b>next smaller</b> evicts taller waiters (stack stays increasing).</div>
+
+<h3>Monotonic deque (sliding window maximum)</h3>
+<p>Given <code>nums</code> and window width <code>k</code>, return the max of every length-<code>k</code> window. Taking <code>max()</code> per window costs <code>(n − k + 1)·k</code> (~5.6 billion reads for <code>n = 300,000, k = 20,000</code>). Apply the same eviction insight: an older value <code>3</code> sitting left of a newer <code>5</code> can <b>never</b> win this or any future window (it's smaller <em>and</em> expires sooner) — pop it from the back! Meanwhile, winners at the front eventually fall past the window's left edge (<code>dq[0] &lt;= i - k</code>) — pop them from the front.</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 188" role="img" aria-label="Monotonic deque with two doors: popleft expires old indexes past i minus k on the left, while pop evicts smaller dominated values on the right">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">MONOTONIC DEQUE — two doors keep the window champion at index 0</text>
+
+    <rect x="16" y="42" width="166" height="92" rx="8" fill="color-mix(in srgb, var(--warn) 10%, var(--surface))" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="99" y="64" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">FRONT DOOR (left)</text>
+    <text x="99" y="84" class="label" text-anchor="middle">dq.popleft()</text>
+    <text x="99" y="103" class="label" text-anchor="middle" fill="var(--muted)">expire if</text>
+    <text x="99" y="120" class="label" text-anchor="middle" fill="var(--warn)">dq[0] &lt;= i − k</text>
+
+    <line x1="214" y1="88" x2="188" y2="88" stroke="var(--warn)" stroke-width="2"/>
+    <polygon points="188,83 180,88 188,93" fill="var(--warn)"/>
+
+    <rect x="218" y="42" width="264" height="92" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <text x="350" y="62" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">CANDIDATE DEQUE (decreasing)</text>
+    <rect x="234" y="74" width="68" height="44" rx="6" fill="color-mix(in srgb, var(--ok) 15%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="268" y="94" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">idx 4: 5</text>
+    <text x="268" y="110" class="label" text-anchor="middle" fill="var(--ok)">MAX</text>
+
+    <rect x="314" y="74" width="68" height="44" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="348" y="94" class="label" text-anchor="middle" font-weight="700">idx 5: 3</text>
+    <text x="348" y="110" class="label" text-anchor="middle" fill="var(--muted)">backup</text>
+
+    <rect x="394" y="74" width="72" height="44" rx="6" fill="color-mix(in srgb, var(--bad) 12%, var(--surface))" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="430" y="94" class="label" text-anchor="middle" fill="var(--bad)">smaller</text>
+    <text x="430" y="110" class="label" text-anchor="middle" fill="var(--bad)">evicted!</text>
+
+    <line x1="486" y1="88" x2="512" y2="88" stroke="var(--bad)" stroke-width="2"/>
+    <polygon points="512,83 520,88 512,93" fill="var(--bad)"/>
+
+    <rect x="522" y="42" width="162" height="92" rx="8" fill="color-mix(in srgb, var(--bad) 10%, var(--surface))" stroke="var(--bad)" stroke-width="1.6"/>
+    <text x="603" y="64" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">BACK DOOR (right)</text>
+    <text x="603" y="84" class="label" text-anchor="middle">dq.pop() / append()</text>
+    <text x="603" y="103" class="label" text-anchor="middle" fill="var(--muted)">evict while</text>
+    <text x="603" y="120" class="label" text-anchor="middle" fill="var(--bad)">nums[dq[-1]] &lt;= val</text>
+
+    <text x="350" y="162" class="label" text-anchor="middle" fill="var(--text-strong)" font-weight="700">Each index enters once and leaves from either door at most once → O(n) total</text>
+    <text x="350" y="180" class="label" text-anchor="middle" fill="var(--muted)">Once i &gt;= k − 1, the window maximum is always nums[dq[0]] in O(1)</text>
+  </svg>
+  <div class="cap">Front door drops winners that fell behind the window; back door drops dominated losers. Four short steps keep total work <code>O(n)</code> for any <code>k</code>.</div>
+</div>
+
+<p>Trace the four steps at each index <code>i</code> (guarding empty <code>nums</code> up front):</p>
+<pre><code>from collections import deque
+
+def sliding_window_max(nums, k):
+    if not nums: return []
+    dq, out = deque(), []
+    for i, val in enumerate(nums):
+        while dq and nums[dq[-1]] &lt;= val:   # 1. evict dominated back items
+            dq.pop()
+        dq.append(i)                        # 2. add newcomer index
+        if dq[0] &lt;= i - k:                  # 3. expire front if out of window
+            dq.popleft()
+        if i &gt;= k - 1:                      # 4. record window max
+            out.append(nums[dq[0]])
+    return out</code></pre>
+
+<p><em>Why store indexes?</em> Storing indexes makes expiration exact (<code>dq[0] &lt;= i - k</code>) while letting you evict equal older values with <code>&lt;=</code>. (You <em>can</em> store raw values on a random-access array if you switch back-eviction to strict <code>&lt;</code> and expire via <code>dq[0] == nums[i - k]</code>, but indexes generalize cleanly to streams.)</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: streaming time-based windows without a backing array</summary>
+  <p>What if events arrive as a live stream <code>(timestamp, val)</code> and you need the maximum over the last 60 seconds (variable count per window, no array <code>nums</code>)? Store <code>(timestamp, val)</code> pairs directly in the deque: evict back entries with <code>dq[-1][1] &lt;= val</code>, push <code>(ts, val)</code>, and expire front entries while <code>dq[0][0] &lt; ts - 60</code>. Same amortized <code>O(1)</code> per event.</p>
+</details>
+
+<div class="check" id="check-mono-order">
+  <p class="q">You want the <b>next strictly smaller</b> bar to the right of every bar in a histogram. Which pop condition keeps the right invariant in the waiting stack?</p>
+  <div class="opts">
+    <button>Pop while <code>nums[top] &lt; val</code>; remaining heights decrease</button>
+    <button data-correct>Pop while <code>nums[top] &gt; val</code>; remaining heights stay non-decreasing</button>
+    <button>Pop while <code>nums[top] &gt;= val</code>; remaining heights strictly increase</button>
+  </div>
+  <div class="fb right"><p>Exact! Only a strictly shorter bar answers "next strictly smaller" (so <code>&gt;</code>, not <code>&gt;=</code> — equal bars stay waiting), leaving the stack non-decreasing from bottom to top.</p></div>
+  <div class="fb wrong"><p>Test on <code>[3, 3, 1]</code>: index <code>0</code> (height 3) needs the next <em>strictly smaller</em> bar, which is <code>1</code> (not the equal <code>3</code> at index <code>1</code>). So <code>3</code> must NOT pop <code>3</code> (rules out <code>&gt;=</code>), while <code>1</code> MUST pop both <code>3</code>s (<code>nums[top] &gt; val</code>).</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>How can this break — and when is it the wrong tool?</h2>
+
+<p>Four classic bare-editor bugs sink candidates on these exact structures:</p>
+<ol>
+  <li><b><code>has_cycle</code> traps:</b> checking <code>slow is fast</code> <em>before</em> moving them (always returns <code>True</code> immediately!), or writing <code>slow.val == fast.val</code> instead of <code>slow is fast</code> (fails on acyclic lists with duplicate values like <code>[5, 5]</code>).</li>
+  <li><b>Forgetting to detach the old tail:</b> reversing a sublist without setting the old head's <code>.next</code> to the next segment leaves a silent cycle.</li>
+  <li><b>Negative modulo outside Python:</b> Python's <code>(0 - 1) % 8 == 7</code> wraps cleanly, while C++, Java, and JavaScript return <code>-1</code> — always write <code>(head - 1 + cap) % cap</code> in those languages.</li>
+  <li><b><code>&lt;</code> vs <code>&lt;=</code> on duplicates:</b> in <code>next_greater</code>, changing <code>&lt;</code> to <code>&lt;=</code> wrongly marks an equal neighbor as "strictly greater".</li>
+</ol>
+
+<p><b>When these structures are the wrong tool:</b></p>
+<ul>
+  <li>Need fast key lookup? Use a hash map (<a href="hash-maps.html">Chapter 1.1</a>), not a linked list scan.</li>
+  <li>Need a sliding-window <b>median</b> or arbitrary <b>k-th smallest</b>? A monotonic deque only tracks the extreme (min or max), because smaller items get discarded forever — use two heaps (<a href="heaps.html">Chapter 1.4</a>) or a balanced tree instead.</li>
+</ul>
+
+<div class="check" id="check-wrong-tool">
+  <p class="q">Why can a monotonic deque solve <b>sliding-window maximum</b> in <code>O(n)</code>, yet fail for <b>sliding-window median</b>?</p>
+  <div class="opts">
+    <button data-correct>Evicting smaller older items discards middle values that could become the median</button>
+    <button>A deque only supports <code>O(1)</code> pops from the right, not from the left</button>
+    <button>Expiring old indexes by <code>i − k</code> breaks whenever values can be negative</button>
+  </div>
+  <div class="fb right"><p>Spot on! A smaller older value can never beat a newer larger value for the <em>maximum</em>, yet it can still become the <em>median</em> once bigger numbers slide out. Monotonic eviction only works when dominance is permanent.</p></div>
+  <div class="fb wrong"><p>Trace window size <code>k = 3</code> on <code>[4, 9, 1, 2]</code>: when <code>9</code> arrives, a max-deque throws away <code>4</code> forever — safe for max, fatal for median, because the median of <code>[4, 9, 1]</code> IS <code>4</code>!</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>How you use this in interviews (and what to say)</h2>
+
+<p>Three flagship interview drills reuse the exact machinery from Sections 4 and 7:</p>
+<ul>
+  <li><b>Valid Parentheses (stack):</b> map each closing bracket to its opener (<code>{')':'(', ']':'[', '}':'{'}</code>). Push openers; on a closer, reject if the stack is empty or <code>stack.pop() != match[ch]</code>; at the end return <code>not stack</code>.</li>
+  <li><b>Daily Temperatures (monotonic stack):</b> identical to <code>next_greater</code>, except record the <em>wait distance</em> <code>ans[idx] = i - idx</code> instead of <code>val</code>.</li>
+  <li><b>Largest Rectangle in Histogram (monotonic stack):</b> maintain an increasing stack of bar indexes, and append a trailing sentinel height <code>0</code> so every remaining bar flushes out cleanly at the end:</li>
+</ul>
+
+<pre><code>def largest_rectangle(heights):
+    st, best = [], 0                    # increasing stack of indexes
+    for i, h in enumerate(heights + [0]):
+        while st and heights[st[-1]] &gt; h:
+            bar = heights[st.pop()]
+            left = st[-1] if st else -1 # left boundary (&lt;= bar)
+            best = max(best, bar * (i - left - 1))
+        st.append(i)
+    return best</code></pre>
+
+<p><b>What to say in the interview (4 beats, ~90 seconds):</b></p>
+<ol>
+  <li><b>Arrays vs. linked lists:</b> "Contiguous arrays give <code>O(1)</code> indexing and strong CPU cache locality, but front/middle edits shift <code>O(n)</code> items. Linked lists give <code>O(1)</code> splices at a known pointer — and doubly linked lists add <code>O(1)</code> arbitrary unlink (the core of an LRU cache) — while sacrificing indexing and cache locality."</li>
+  <li><b>In-place pointer moves:</b> "Reversing tracks <code>prev/cur/nxt</code> (saving <code>nxt</code> before flipping); fast/slow runners find the middle or detect a cycle in <code>O(1)</code> space because relative speed 1 closes any cycle gap by 1 per step."</li>
+  <li><b>Ring buffers:</b> "Wrapping an array with <code>(head + i) % cap</code> gives <code>O(1)</code> push/pop at both ends and <code>O(1)</code> indexing; unwinding from <code>head</code> when doubling preserves amortized <code>O(1)</code>."</li>
+  <li><b>Monotonic stack/deque:</b> "Evicting dominated candidates keeps a waiting stack or deque sorted; since every index is pushed once and popped at most once, the nested <code>while</code> stays <code>O(n)</code> total."</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Structure / Move</th><th>Core Operation</th><th>Time</th><th>Extra Space</th></tr></thead>
+  <tbody>
+    <tr><td>Python <code>list</code> (stack)</td><td><code>append</code> / <code>pop</code> / <code>a[i]</code></td><td>O(1) amort. / O(1)</td><td>O(n)</td></tr>
+    <tr><td>Doubly linked list</td><td>Insert / unlink known node</td><td>O(1)</td><td>O(n) (+2 ptrs)</td></tr>
+    <tr><td>Ring buffer deque</td><td>Both ends + <code>d[i]</code></td><td>O(1) amort. / O(1)</td><td>O(n)</td></tr>
+    <tr><td>Reverse / middle / cycle</td><td>Pointer rewiring / runners</td><td>O(n)</td><td><b>O(1)</b></td></tr>
+    <tr><td>Monotonic stack / deque</td><td>Next greater / window max</td><td><b>O(n)</b></td><td>O(n) / O(k)</td></tr>
+  </tbody>
+</table></div>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Trace the warm-ups on paper first, then make the core tests pass from a blank editor without peeking.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Trace pointer reversal &amp; monotonic stack by hand</h4>
+  <p>(a) Trace <code>reverse</code> on <code>1 → 2 → 3 → None</code> listing <code>(prev, cur, nxt)</code> at every step; then swap lines 1 and 2 and circle which node becomes unreachable. (b) Trace <code>next_greater([2, 7, 3, 5, 4, 6, 8])</code> writing the waiting stack after each arrival and count total pushes and pops.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Swapping lines sets <code>1.next = None</code> before saving <code>2</code>, stranding <code>2 → 3 → None</code> forever. (b) Output is <code>[7, 8, 5, 6, 6, 8, -1]</code> with 7 pushes and 6 pops (only index 6 with value 8 remains on the stack).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>2. Linked list moves in O(1) extra memory</h4>
+  <p>Implement <code>reverse</code>, <code>middle</code>, and <code>has_cycle</code> (Section 5) in <a href="../exercises/linked_lists.py">linked_lists.py</a> without recursion. Tests count <code>.next</code> reads, verify original node identity, check duplicate values, and cap memory via <code>tracemalloc</code>.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>3. Monotonic stack &amp; monotonic deque in O(n)</h4>
+  <p>Implement <code>next_greater</code> and <code>sliding_window_max</code> (Section 7) in <a href="../exercises/monotonic.py">monotonic.py</a>. Tests wrap the input to count reads and reject <code>O(n²)</code> and <code>O(n·k)</code> scans.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · code</div>
+  <h4>4. Build a ring buffer deque from scratch</h4>
+  <p>Implement <code>RingDeque</code> (Section 6) in <a href="../exercises/ring_deque.py">ring_deque.py</a> using <code>self.buf</code>, <code>self.head</code>, modulo wrap-around, and doubling growth in logical order (<code>&lt; 2</code> copies per append).</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · timed bare-editor drills</div>
+  <h4>5. Week 1 Day 3 interview drills</h4>
+  <p>Pick two from <em>Daily Temperatures</em>, <em>Min Stack</em>, <em>Valid Parentheses</em>, <em>Reverse Linked List</em>, <em>Linked List Cycle</em>, <em>Sliding Window Maximum</em>, or <em>Largest Rectangle in Histogram</em>. Solve in a plain editor and hand-trace empty, 1-item, all-equal, rising, and falling inputs before running.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · say it out loud</div>
+  <h4>6. 2-minute interview explanation</h4>
+  <p>Set a 2-minute timer and answer without notes: (a) why <code>fast</code> (+2) cannot hop over <code>slow</code> (+1) in a loop, and (b) why a <code>while</code> loop inside a <code>for</code> loop in <code>next_greater</code> is still <code>O(n)</code>.</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>pytest -k "linked_lists or monotonic or ring_deque"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="hash-maps.html"><small>← Previous</small>Find anything in one step</a>
+  <a class="next" href="trees.html"><small>Next →</small>Split the search in half at every branch</a>
+</nav>
+
+</main>
+
+<script>
+(function () {
+  /* ---- Player 1: In-place linked list reversal (section 5) ---- */
+  (function () {
+    const vals = [1, 2, 3, 4];
+    const frames = [
+      { prev: -1, cur: 0, nxt: null, flipped: [], msg: "Start: <b>prev = None</b>, <b>cur = 1</b>. All arrows still point right." },
+      { prev: -1, cur: 0, nxt: 1, flipped: [], msg: "Save <b>nxt = cur.next</b> (node 2) before touching <code>cur.next</code>, so the chain isn't lost." },
+      { prev: -1, cur: 0, nxt: 1, flipped: [0], msg: "Flip <b>1.next = None</b> (<code>prev</code>). Old head 1 is now the tail of the reversed prefix." },
+      { prev: 0, cur: 1, nxt: null, flipped: [0], msg: "Advance <b>prev = 1</b>, <b>cur = 2</b>. Reversed prefix: <code>1 → None</code>." },
+      { prev: 0, cur: 1, nxt: 2, flipped: [0], msg: "Save <b>nxt = 3</b> so we keep hold of <code>3 → 4</code>." },
+      { prev: 0, cur: 1, nxt: 2, flipped: [0, 1], msg: "Flip <b>2.next = 1</b>. Now <code>2 → 1 → None</code> is reversed." },
+      { prev: 1, cur: 2, nxt: null, flipped: [0, 1], msg: "Advance <b>prev = 2</b>, <b>cur = 3</b>." },
+      { prev: 1, cur: 2, nxt: 3, flipped: [0, 1], msg: "Save <b>nxt = 4</b> before flipping node 3." },
+      { prev: 1, cur: 2, nxt: 3, flipped: [0, 1, 2], msg: "Flip <b>3.next = 2</b>. Reversed prefix: <code>3 → 2 → 1 → None</code>." },
+      { prev: 2, cur: 3, nxt: null, flipped: [0, 1, 2], msg: "Advance <b>prev = 3</b>, <b>cur = 4</b>." },
+      { prev: 2, cur: 3, nxt: 4, flipped: [0, 1, 2], msg: "Save <b>nxt = None</b> (end of the original list)." },
+      { prev: 2, cur: 3, nxt: 4, flipped: [0, 1, 2, 3], msg: "Flip <b>4.next = 3</b>. Every link now points backward!" },
+      { prev: 3, cur: 4, nxt: null, flipped: [0, 1, 2, 3], msg: "Advance <b>prev = 4</b>, <b>cur = None</b>. Loop stops — return <b>prev</b> (node 4, the new head)." }
+    ];
+
+    V.player(document.getElementById("viz-reverse"), {
+      frames,
+      speed: 950,
+      draw(f, stage) {
+        const svg = V.s("svg", { class: "viz", viewBox: "0 0 640 128", style: "max-width:640px" });
+        const xs = [110, 230, 350, 470];
+        const y = 70;
+        const revSet = new Set(f.flipped);
+
+        svg.append(V.s("text", { x: 34, y: y + 4, class: "label", "text-anchor": "middle", fill: revSet.has(0) ? "var(--ok)" : "var(--muted)" }, "None"));
+        svg.append(V.s("text", { x: 582, y: y + 4, class: "label", "text-anchor": "middle", fill: "var(--muted)" }, "None"));
+
+        for (let i = 0; i < 4; i++) {
+          if (revSet.has(i)) {
+            if (i === 0) {
+              svg.append(V.s("line", { x1: xs[0] - 24, y1: y, x2: 58, y2: y, stroke: "var(--ok)", "stroke-width": 2.2 }));
+              svg.append(V.s("polygon", { points: "58,65 50,70 58,75", fill: "var(--ok)" }));
+            } else {
+              svg.append(V.s("line", { x1: xs[i] - 24, y1: y, x2: xs[i - 1] + 30, y2: y, stroke: "var(--ok)", "stroke-width": 2.2 }));
+              svg.append(V.s("polygon", { points: `${xs[i - 1] + 30},65 ${xs[i - 1] + 22},70 ${xs[i - 1] + 30},75`, fill: "var(--ok)" }));
+            }
+          } else {
+            const tx = i < 3 ? xs[i + 1] - 30 : 552;
+            svg.append(V.s("line", { x1: xs[i] + 24, y1: y, x2: tx, y2: y, stroke: "var(--border-strong)", "stroke-width": 1.8 }));
+            svg.append(V.s("polygon", { points: `${tx},65 ${tx + 8},70 ${tx},75`, fill: "var(--border-strong)" }));
+          }
+        }
+
+        for (let i = 0; i < 4; i++) {
+          const isCur = f.cur === i, isPrev = f.prev === i, isNxt = f.nxt === i;
+          const stroke = isCur ? "var(--accent)" : isPrev ? "var(--ok)" : isNxt ? "var(--warn)" : revSet.has(i) ? "var(--ok)" : "var(--border-strong)";
+          const fill = isCur ? "color-mix(in srgb, var(--accent) 16%, var(--surface))" : isPrev ? "color-mix(in srgb, var(--ok) 14%, var(--surface))" : "var(--surface)";
+          svg.append(V.s("rect", { x: xs[i] - 22, y: y - 20, width: 44, height: 40, rx: 8, fill, stroke, "stroke-width": isCur || isPrev ? 2.2 : 1.6 }));
+          svg.append(V.s("text", { x: xs[i], y: y + 5, class: "label", "text-anchor": "middle", "font-weight": "700", fill: "var(--text-strong)" }, String(vals[i])));
+        }
+
+        const ptrX = (idx) => (idx === -1 ? 34 : idx === 4 ? 582 : xs[idx]);
+        const labels = [];
+        if (f.prev !== null) labels.push({ x: ptrX(f.prev), text: "prev", color: "var(--ok)" });
+        if (f.cur !== null) labels.push({ x: ptrX(f.cur), text: "cur", color: "var(--accent)" });
+        if (f.nxt !== null) labels.push({ x: ptrX(f.nxt), text: "nxt", color: "var(--warn)" });
+        for (const p of labels) {
+          svg.append(V.s("text", { x: p.x, y: 26, class: "label", "text-anchor": "middle", "font-weight": "700", fill: p.color }, p.text));
+        }
+        stage.append(svg);
+      }
+    });
+  })();
+
+  /* ---- Player 2: Monotonic stack on [2, 1, 2, 4, 3] (section 7) ---- */
+  (function () {
+    const nums = [2, 1, 2, 4, 3];
+    const frames = [];
+    const ans = Array(nums.length).fill(-1);
+    const st = [];
+    let pushes = 0, pops = 0;
+
+    frames.push({ i: -1, st: [], ans: [...ans], popped: null, pushes, pops, msg: "Start with empty <b>waiting</b> stack and <code>ans = [-1, -1, -1, -1, -1]</code>." });
+    for (let i = 0; i < nums.length; i++) {
+      const v = nums[i];
+      frames.push({ i, st: [...st], ans: [...ans], popped: null, pushes, pops, msg: `Arrive at index <b>${i}</b> (height <b>${v}</b>). Compare against top of waiting stack.` });
+      while (st.length && nums[st[st.length - 1]] < v) {
+        const idx = st.pop();
+        pops++;
+        ans[idx] = v;
+        frames.push({ i, st: [...st], ans: [...ans], popped: idx, pushes, pops, msg: `<b>${v} &gt; ${nums[idx]}</b>! Height ${v} answers waiting index <b>${idx}</b> → pop ${idx}, set <code>ans[${idx}] = ${v}</code>.` });
+      }
+      st.push(i);
+      pushes++;
+      frames.push({ i, st: [...st], ans: [...ans], popped: null, pushes, pops, msg: `Push index <b>${i}</b> (height ${v}) onto waiting stack. Stack heights stay non-increasing.` });
+    }
+    frames.push({ i: nums.length, st: [...st], ans: [...ans], popped: null, pushes, pops, msg: `Done! Indexes <b>[${st.join(", ")}]</b> never met anyone taller, so they keep <code>-1</code>. Total: <b>${pushes} pushes, ${pops} pops</b> (O(n)).` });
+
+    V.player(document.getElementById("viz-mono-stack"), {
+      frames,
+      speed: 950,
+      draw(f, stage) {
+        const ptrs = {};
+        if (f.i >= 0 && f.i < nums.length) ptrs[f.i] = "i";
+        const inRow = V.el("div", { style: "margin-bottom:14px" },
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Input heights (nums)"),
+          V.cells(nums, {
+            ptrs,
+            cls: (idx) => idx === f.i ? "hl" : idx === f.popped ? "done" : f.st.includes(idx) ? "warn" : ""
+          }));
+        const stRow = V.el("div", { style: "margin-bottom:14px" },
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, `Waiting stack (bottom → top) · pushes: ${f.pushes}, pops: ${f.pops}`),
+          f.st.length
+            ? V.cells(f.st.map((idx) => `${idx}:${nums[idx]}`), { idx: false, cls: () => "warn" })
+            : V.el("div", { class: "small muted", style: "font-family:var(--mono);padding:6px 0" }, "(empty)"));
+        const ansRow = V.el("div", {},
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Output (ans)"),
+          V.cells(f.ans, { cls: (idx, v) => idx === f.popped ? "done" : v !== -1 ? "win" : "dim" }));
+        stage.append(inRow, stRow, ansRow);
+      }
+    });
+  })();
+})();
+</script>
+</body>
+</html>

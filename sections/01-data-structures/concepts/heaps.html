@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="01.04">
+  <title>Always grab the smallest next (Heaps and priority queues)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="01" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 1 · Part 4</div>
+  <h1>Always grab the smallest next</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> core Google &amp; Anthropic round</span><span>about 18 minutes</span><span>6 quick checks · 6 exercises</span></div>
+</header>
+
+<p>Many programs never need every item kept in full sorted order — they only ever ask for the <b>next most urgent</b> item while new work keeps arriving. Giving up full sorting lets us pack a branching priority board flat inside a plain list with zero pointer objects, peek at the winner instantly, and update fast even at a million entries.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Pack a priority tree into a flat list with no node objects, using simple slot arithmetic.</li>
+    <li>Add new arrivals, remove the top winner, and organize an unsorted list from the bottom up in linear time.</li>
+    <li>Avoid the classic Python priority-queue traps — reversed ordering, tied priorities, and in-place mutation.</li>
+    <li>Spot and code the four flagship interview moves: top-k streams, merging sorted streams, worker scheduling, and live medians.</li>
+    <li>Choose cleanly between a heap, full sorting, and a balanced search tree when an interviewer shifts constraints.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass (sections 3–5 prepare <code>min_heap.py</code>; sections 7–8 prepare <code>heap_patterns.py</code>). Builds on <a href="linear-structures.html">Lines, chains, and waiting lists</a> and <a href="trees.html">Split the search in half at every branch</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>Why is full sorting overkill for "who is next?"</h2>
+
+<div class="story">
+  <p>Your scheduler manages <b>500,000</b> workers and assigns <b>1,000,000</b> incoming jobs. Each job goes to whichever worker becomes free soonest, updating that worker's next free time right away.</p>
+  <p>Scanning an unsorted list of 500,000 workers on every job performs <b>500 billion</b> comparisons. Keeping a descending sorted list shifts up to 500,000 entries per job (hundreds of billions of shifts) when workers rotate to the back. Yet you never asked who is the 213,419th-soonest worker — you only ever asked who is <b>#1</b>.</p>
+</div>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 184" role="img" aria-label="Comparing unsorted list, sorted list, and binary min-heap on push, peek min, and pop min">
+    <text x="16" y="22" class="label" fill="var(--accent)" font-weight="700">PICKING THE MINIMUM REPEATEDLY — why a partial order wins</text>
+
+    <rect x="16" y="36" width="206" height="132" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="119" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">Unsorted list</text>
+    <text x="119" y="82" class="label" text-anchor="middle" fill="var(--ok)">push: O(1) amort.</text>
+    <text x="119" y="102" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">pop min: O(n) scan</text>
+    <text x="119" y="122" class="label" text-anchor="middle" fill="var(--bad)">peek min: O(n)</text>
+    <text x="119" y="150" class="label" text-anchor="middle" fill="var(--muted)">~500B cmps for 1M jobs</text>
+
+    <rect x="247" y="36" width="206" height="132" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="350" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">Sorted list (descending)</text>
+    <text x="350" y="82" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">push: O(n) shift</text>
+    <text x="350" y="102" class="label" text-anchor="middle" fill="var(--ok)">pop min: O(1)</text>
+    <text x="350" y="122" class="label" text-anchor="middle" fill="var(--ok)">peek min: O(1)</text>
+    <text x="350" y="150" class="label" text-anchor="middle" fill="var(--muted)">hundreds of billions shifts</text>
+
+    <rect x="478" y="36" width="206" height="132" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="581" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">Binary min-heap</text>
+    <text x="581" y="82" class="label" text-anchor="middle" fill="var(--ok)">push: O(log n)</text>
+    <text x="581" y="102" class="label" text-anchor="middle" fill="var(--ok)">pop min: O(log n)</text>
+    <text x="581" y="122" class="label" text-anchor="middle" fill="var(--ok)">peek min: O(1)</text>
+    <text x="581" y="150" class="label" text-anchor="middle" fill="var(--text-strong)">~19M levels (~1–2 s!)</text>
+  </svg>
+  <div class="cap">A binary heap does just enough ordering to pin the smallest item at slot 0, turning 500 billion comparisons into ~19 million tree levels (~38 million comparisons).</div>
+</div>
+
+<p>That "only keep #1 on top" primitive unlocks four interview staples:</p>
+<ul>
+  <li><b>Top-k from a stream:</b> keep only the <code>k</code> biggest values out of millions in <code>O(k)</code> RAM.</li>
+  <li><b>K-way merge:</b> combine <code>k</code> sorted log shards or linked lists lazily in <code>O(N log k)</code>.</li>
+  <li><b>Worker / event scheduling:</b> always dispatch to the next available worker or earliest deadline.</li>
+  <li><b>Live running median:</b> pair two heaps back-to-back so the middle sits exposed in <code>O(1)</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>What rule puts the most urgent item on top?</h2>
+
+<p>Picture an <b>ER triage board arranged like a two-report org chart</b>. Each patient card appears <b>once</b> in its own slot, labeled with an urgency score (smaller number = more urgent). The board enforces one vertical rule: <b>every slot's score must be <code>&lt;=</code> both slots directly beneath it</b> (a <b>min-heap</b>; flip the inequality for a <b>max-heap</b>).</p>
+
+<p>That vertical rule pins the most urgent patient straight to the top slot, while relaxing horizontal order completely — unlike a Binary Search Tree from <a href="trees.html">Chapter 1.3</a>, <b>siblings have zero order between them!</b> The right child can be smaller than the left child, and a grandchild on the left can be larger than a child on the right.</p>
+
+<p><em>Where the triage-board picture breaks:</em> because siblings aren't ordered left-to-right, you cannot search for patient #42 or list everyone with urgency between 3 and 7 without scanning the whole board in <code>O(n)</code>. Need arbitrary lookup, deletion by key, or range queries? Use a hash map or balanced BST instead.</p>
+
+<div class="keyidea">A <b>binary heap</b> keeps two invariants: <b>(1) Shape</b> — a <em>complete</em> binary tree (every level packed full top-to-bottom, left-to-right, zero gaps); <b>(2) Order</b> — every parent is <code>&lt;=</code> both of its children.</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Why can we throw away all node pointers?</h2>
+
+<p>Because our triage board is <b>complete</b> (zero gaps anywhere), number its slots <code>0, 1, 2, …</code> level by level from left to right and drop the values straight into a plain Python list <code>a[0..n-1]</code> — no <code>Node</code> objects, no <code>left</code>/<code>right</code> references, and packed side by side in RAM so the CPU cache prefetches nearby slots fast:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 205" role="img" aria-label="A 7-element min-heap drawn as a complete binary tree alongside its flat 0-indexed backing list, showing parent and child index arithmetic">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">COMPLETE TREE IN A FLAT ARRAY — zero Node objects, pure arithmetic</text>
+
+    <line x1="160" y1="54" x2="90" y2="104" stroke="var(--accent)" stroke-width="2"/>
+    <line x1="160" y1="54" x2="230" y2="104" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="90" y1="104" x2="52" y2="156" stroke="var(--ok)" stroke-width="2"/>
+    <line x1="90" y1="104" x2="128" y2="156" stroke="var(--ok)" stroke-width="2"/>
+    <line x1="230" y1="104" x2="192" y2="156" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="230" y1="104" x2="268" y2="156" stroke="var(--border-strong)" stroke-width="1.8"/>
+
+    <circle cx="160" cy="54" r="16" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="160" y="58" class="label" text-anchor="middle" font-weight="700">1</text><text x="184" y="47" class="label" fill="var(--muted)">[0]</text>
+    <circle cx="90" cy="104" r="16" fill="color-mix(in srgb, var(--accent) 14%, var(--surface))" stroke="var(--accent)" stroke-width="2.2"/><text x="90" y="108" class="label" text-anchor="middle" font-weight="700" fill="var(--accent)">3</text><text x="64" y="96" class="label" fill="var(--accent)" font-weight="700">[1]</text>
+    <circle cx="230" cy="104" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/><text x="230" y="108" class="label" text-anchor="middle" font-weight="700">5</text><text x="255" y="96" class="label" fill="var(--muted)">[2]</text>
+    <circle cx="52" cy="156" r="16" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="2"/><text x="52" y="160" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">8</text><text x="52" y="185" class="label" text-anchor="middle" fill="var(--ok)">[3]</text>
+    <circle cx="128" cy="156" r="16" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="2"/><text x="128" y="160" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">4</text><text x="128" y="185" class="label" text-anchor="middle" fill="var(--ok)">[4]</text>
+    <circle cx="192" cy="156" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/><text x="192" y="160" class="label" text-anchor="middle" font-weight="700">9</text><text x="192" y="185" class="label" text-anchor="middle" fill="var(--muted)">[5]</text>
+    <circle cx="268" cy="156" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/><text x="268" y="160" class="label" text-anchor="middle" font-weight="700">7</text><text x="268" y="185" class="label" text-anchor="middle" fill="var(--muted)">[6]</text>
+
+    <text x="342" y="54" class="label" font-weight="700" fill="var(--text-strong)">Backing list a[0..6]:</text>
+    <rect x="342" y="64" width="44" height="36" rx="5" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.8"/><text x="364" y="86" class="label" text-anchor="middle" font-weight="700">1</text><text x="364" y="114" class="label" text-anchor="middle" fill="var(--muted)">0</text>
+    <rect x="390" y="64" width="44" height="36" rx="5" fill="color-mix(in srgb, var(--accent) 14%, var(--surface))" stroke="var(--accent)" stroke-width="2"/><text x="412" y="86" class="label" text-anchor="middle" font-weight="700" fill="var(--accent)">3</text><text x="412" y="114" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">1</text>
+    <rect x="438" y="64" width="44" height="36" rx="5" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/><text x="460" y="86" class="label" text-anchor="middle" font-weight="700">5</text><text x="460" y="114" class="label" text-anchor="middle" fill="var(--muted)">2</text>
+    <rect x="486" y="64" width="44" height="36" rx="5" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/><text x="508" y="86" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">8</text><text x="508" y="114" class="label" text-anchor="middle" fill="var(--ok)">3</text>
+    <rect x="534" y="64" width="44" height="36" rx="5" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/><text x="556" y="86" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">4</text><text x="556" y="114" class="label" text-anchor="middle" fill="var(--ok)">4</text>
+    <rect x="582" y="64" width="44" height="36" rx="5" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/><text x="604" y="86" class="label" text-anchor="middle" font-weight="700">9</text><text x="604" y="114" class="label" text-anchor="middle" fill="var(--muted)">5</text>
+    <rect x="630" y="64" width="44" height="36" rx="5" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/><text x="652" y="86" class="label" text-anchor="middle" font-weight="700">7</text><text x="652" y="114" class="label" text-anchor="middle" fill="var(--muted)">6</text>
+
+    <rect x="342" y="128" width="332" height="62" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.4"/>
+    <text x="358" y="149" class="label" fill="var(--ok)" font-weight="700">left(i)  = 2*i + 1    right(i) = 2*i + 2</text>
+    <text x="358" y="168" class="label" fill="var(--accent)" font-weight="700">parent(i) = (i - 1) // 2</text>
+    <text x="358" y="184" class="label" fill="var(--muted)">e.g. i=1 → parent 0, children 3 &amp; 4</text>
+  </svg>
+  <div class="cap">Notice <code>a[4] = 4 &lt; a[2] = 5</code> — completely legal in a min-heap! Every parent-child edge is instant integer math inside one flat list.</div>
+</div>
+
+<div class="keyidea">A complete tree of <code>n</code> items is <b>always balanced</b> with zero rotation code: its height is strictly <code>⌊log₂ n⌋</code> edges (<code>⌊log₂ n⌋ + 1</code> levels — at most 20 levels for a million items), and every index <code>i &gt;= n // 2</code> is a leaf (its left child <code>2i + 1 &gt;= n</code> does not exist).</div>
+
+<div class="check" id="check-heap-index">
+  <p class="q">In a 0-indexed binary heap of <code>n = 10</code> items, why is index <code>5</code> guaranteed to be a leaf?</p>
+  <div class="opts">
+    <button data-correct>Its left child <code>2*5 + 1 = 11</code> is past the end of the 10-item array</button>
+    <button>Index <code>5</code> is odd, and every odd index in a binary heap is a leaf</button>
+    <button>Only indices <code>0, 1, 2</code> can ever have children in a 10-item heap</button>
+  </div>
+  <div class="fb right"><p>Exact! For any index <code>i &gt;= n // 2</code>, <code>2*i + 1 &gt;= n</code> — so indices <code>5..9</code> (half the array!) have zero children, while index <code>4</code> is the last non-leaf (left child <code>9</code>).</p></div>
+  <div class="fb wrong"><p>Plug each index into <code>left(i) = 2*i + 1</code> for valid slots <code>0..9</code>: index <code>4</code> has left child <code>9</code> (inside the array!), whereas index <code>5</code> would need left child <code>11</code> (outside <code>0..9</code>). Therefore <code>n // 2</code> marks the very first leaf.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How do push and pop keep the board packed tight?</h2>
+
+<p>Both updates keep the triage board packed with zero holes first, then repair the vertical urgency rule along one root-to-leaf path:</p>
+
+<ul>
+  <li><b><code>push(x)</code> + sift-up:</b> seat the new patient in the <b>next open slot at the end</b> (<code>a.append(x)</code>). While <code>i &gt; 0</code> and <code>a[i] &lt; a[parent]</code>, trade places upward with the less-urgent boss above you. On a heap of <code>n</code> items (after appending), climbing one level per swap performs at most <b><code>⌊log₂ n⌋</code> comparisons</b> — <b><code>O(log n)</code></b> worst case (and ~1–2 swaps on random data).</li>
+  <li><b><code>pop()</code> + sift-down:</b> save the top patient <code>a[0]</code> to send to the OR. Never pull a child straight up into slot 0 (that opens a hole in the middle of the board!). Instead, pop the <b>very last slot</b> (<code>last = a.pop()</code>), place it at <code>a[0]</code>, and step it downward — always swapping with the <b>more urgent (smaller)</b> of its two direct reports so the promoted patient beats its old sibling too!</li>
+</ul>
+
+<pre><code>def _sift_up(a, i):
+    while i &gt; 0:
+        p = (i - 1) // 2
+        if a[i] &lt; a[p]: a[i], a[p] = a[p], a[i]; i = p
+        else: break
+
+def _sift_down(a, i):
+    n = len(a)
+    while 2 * i + 1 &lt; n:
+        l, r = 2 * i + 1, 2 * i + 2
+        sm = r if (r &lt; n and a[r] &lt; a[l]) else l    # pick the smaller child!
+        if a[sm] &lt; a[i]: a[i], a[sm] = a[sm], a[i]; i = sm
+        else: break</code></pre>
+
+<div class="figure">
+  <div id="viz-heap-ops"></div>
+  <div class="cap">Watch the triage tree and its flat backing list stay in lockstep during <code>push(2)</code> (sift-up, 3 comparisons on 8 items) and <code>pop()</code> (last item to slot 0, then sift-down with the smaller child).</div>
+</div>
+
+<div class="check" id="check-sift-down">
+  <p class="q">During <code>pop()</code>, node <code>9</code> sits at the root with left child <code>5</code> and right child <code>3</code>. What happens if you swap <code>9</code> with <code>5</code> instead of <code>3</code>?</p>
+  <div class="opts">
+    <button>Nothing breaks — both children beat <code>9</code>, so either swap stays valid</button>
+    <button>It stays valid, only adding one extra swap near the bottom row</button>
+    <button data-correct><code>5</code> lands above right child <code>3</code>, breaking the root minimum permanently</button>
+  </div>
+  <div class="fb right"><p>Exact! Sift-down descends only into the left branch and never revisits <code>3</code>, leaving <code>peek()</code> falsely returning <code>5</code> instead of <code>3</code>.</p></div>
+  <div class="fb wrong"><p>Draw the top three slots after swapping <code>9</code> with <code>5</code>: root is <code>5</code>, left child is <code>9</code>, right child is <code>3</code>. Now sift-down keeps walking down <code>9</code>'s side — nobody ever compares <code>5</code> against <code>3</code>, leaving the true minimum <code>3</code> buried under <code>5</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>Can we build a heap faster than n pushes?</h2>
+
+<p>Suppose a waiting room of <code>n</code> unsorted patients arrives at once (<code>MinHeap.from_list(items)</code> or <code>heapq.heapify(items)</code>). Pushing them one by one calls <code>sift_up</code> <code>n</code> times — on a falling list <code>[n, n−1, …, 1]</code>, every bottom-row patient climbs all the way to the root, costing <code>O(n log n)</code>.</p>
+
+<p><b>Floyd's bottom-up heapify</b> organizes the room from the bottom rows up in strict <b><code>O(n)</code> time</b> (under <code>2n</code> comparisons even in the worst case!). Copy <code>items</code> into <code>a</code> (never mutating the caller's list). All indices <code>n // 2 .. n − 1</code> are already leaves (valid 1-node heaps!). Loop <code>i</code> backward from the last non-leaf <code>(n // 2) - 1</code> down to <code>0</code>, calling <code>_sift_down(a, i)</code>.</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 198" role="img" aria-label="Bottom-up heapify work per level: half of all nodes are leaves doing 0 work, a quarter sift down at most 1 step, an eighth at most 2 steps, summing to under 2n total">
+    <text x="16" y="20" class="label" fill="var(--ok)" font-weight="700">WHY BOTTOM-UP HEAPIFY IS O(n) — almost every node sits near the bottom</text>
+
+    <text x="16" y="50" class="label" fill="var(--text-strong)" font-weight="700">Root (1 node)</text>
+    <rect x="170" y="36" width="22" height="18" rx="4" fill="var(--bad)"/>
+    <text x="204" y="49" class="label">≤ log₂ n swaps → tiny slice</text>
+
+    <text x="90" y="70" class="label" text-anchor="middle" fill="var(--muted)">⋮</text>
+    <text x="181" y="70" class="label" text-anchor="middle" fill="var(--muted)">⋮</text>
+
+    <text x="16" y="92" class="label" fill="var(--text-strong)">Height 2 (n/8 nodes)</text>
+    <rect x="170" y="78" width="58" height="18" rx="4" fill="var(--warn)"/>
+    <text x="240" y="91" class="label">≤ 2 swaps each → 2n / 8 work</text>
+
+    <text x="16" y="120" class="label" fill="var(--text-strong)">Height 1 (n/4 nodes)</text>
+    <rect x="170" y="106" width="116" height="18" rx="4" fill="var(--accent)"/>
+    <text x="298" y="119" class="label">≤ 1 swap each  → 1n / 4 work</text>
+
+    <text x="16" y="148" class="label" fill="var(--ok)" font-weight="700">Leaves (n/2 nodes)</text>
+    <rect x="170" y="134" width="232" height="18" rx="4" fill="color-mix(in srgb, var(--ok) 25%, var(--surface))" stroke="var(--ok)" stroke-width="1.5"/>
+    <text x="414" y="147" class="label" fill="var(--ok)" font-weight="700">0 swaps! (skipped completely)</text>
+
+    <text x="16" y="176" class="label" fill="var(--text-strong)" font-weight="700">Total swaps ≤ n · (0/2 + 1/4 + 2/8 + 3/16 + …) = n</text>
+    <text x="16" y="192" class="label" fill="var(--muted)">At most 2 comparisons per swap → strictly ≤ 2n comparisons = O(n)</text>
+  </svg>
+  <div class="cap">With <code>sift_up</code>, the huge bottom half travels farthest (<code>log₂ n</code>). With bottom-up <code>sift_down</code>, the bottom half moves 0 steps and the next row moves at most 1.</div>
+</div>
+
+<div class="keyidea">Bottom-up <code>heapify</code> is <b><code>O(n)</code> worst case</b> (not just average) because the series <code>0/2 + 1/4 + 2/8 + 3/16 + …</code> sums to 1 — almost all nodes sit near the bottom where sift-down barely travels.</div>
+
+<div class="check" id="check-heapify-linear">
+  <p class="q">You call bottom-up <code>MinHeap.from_list(items)</code> on 32,768 values in worst-case reverse-sorted order. What bounds the work?</p>
+  <div class="opts">
+    <button><code>O(n log n)</code> — bottom-up is only linear on average-case random inputs</button>
+    <button data-correct><code>O(n)</code> — half the nodes do 0 swaps and only the few top nodes sift far</button>
+    <button><code>O(n)</code> — because <code>sift_down</code> never swaps any node more than twice</button>
+  </div>
+  <div class="fb right"><p>Spot on! Even when every single node sifts all the way down to a leaf, 16,384 leaves move 0 steps, 8,192 nodes move ≤ 1 step, and only 1 root moves 15 steps — always under <code>2n</code> comparisons!</p></div>
+  <div class="fb wrong"><p>Count the worst case on a 15-node reverse-sorted tree: 8 leaves do 0 swaps, 4 nodes at height 1 do ≤ 1 swap (4), 2 nodes at height 2 do ≤ 2 swaps (4), and 1 root does ≤ 3 swaps (3). Total = 11 swaps (&lt; 15) even in the worst possible order!</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>How can heaps break — and when is a heap the wrong tool?</h2>
+
+<p>In interviews, use Python's C-accelerated <code>heapq</code> on a plain list: <code>heappush</code>, <code>heappop</code>, <code>heapify</code>, <code>heapreplace(h, x)</code> (pop then push in one sift), and <code>heappushpop(h, x)</code> (checks <code>h[0] &lt; x</code> first — returning <code>x</code> in <b>1 comparison</b> if it loses to the root, else replacing in one sift!). Watch four classic traps:</p>
+
+<ol>
+  <li><b><code>heapq.heapify(lst)</code> mutates in place and returns <code>None</code>:</b> writing <code>h = heapq.heapify(nums)</code> silently sets <code>h = None</code>!</li>
+  <li><b>Max-heap (numbers vs. objects):</b> <code>heapq</code> is min-only. Negate numbers (<code>-x</code>). For strings or custom objects (like <em>Top K Frequent Words</em>), use a mixed tuple <code>(-freq, word)</code> or a tiny wrapper class reversing <code>__lt__</code>.</li>
+  <li><b>Tuple tie-breaker crash:</b> pushing <code>(priority, payload)</code> compares <code>payload</code> whenever two priorities tie! If <code>payload</code> is an iterator, dict, or custom object without <code>&lt;</code>, Python raises <code>TypeError</code>. Always place a unique integer tie-breaker <em>between</em> them: <code>(priority, idx, payload)</code>.</li>
+  <li><b>Mutating priorities in place:</b> changing a queued object's priority field does <em>not</em> re-sift it, silently corrupting the heap! Push a new entry and use lazy deletion (Section 9) instead.</li>
+</ol>
+
+<p><b>When a heap is the wrong tool — decision guide:</b></p>
+<div class="table-wrap"><table>
+  <thead><tr><th>What the problem asks</th><th>Best tool</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Repeatedly grab min/max while items arrive</td><td><b>Binary heap</b></td><td><code>O(1)</code> peek, <code>O(log n)</code> push/pop, flat RAM</td></tr>
+    <tr><td>One-shot full sort (or <code>k ≈ n</code>)</td><td><b>Timsort (<code>sort()</code>)</b></td><td><code>O(n log n)</code> with far better cache constants</td></tr>
+    <tr><td>Lookup by key, arbitrary delete, or <code>range(lo, hi)</code></td><td><b>Balanced BST / hash map</b></td><td>Heaps scan <code>O(n)</code> for arbitrary items/ranges</td></tr>
+    <tr><td>Static one-shot <code>k</code>-th largest (small <code>k</code>)</td><td><b><code>heapify</code> + <code>k</code> pops</b></td><td><code>O(n + k log n)</code> (Chapter 2.2's quickselect even hits <code>O(n)</code> avg!)</td></tr>
+  </tbody>
+</table></div>
+
+<div class="check" id="check-heapq-tie">
+  <p class="q">Merging sorted iterators with <code>heapq</code>, you push <code>(val, it)</code> and hit <code>TypeError: '&lt;' not supported between instances of 'list_iterator'</code>. Which tuple prevents the crash?</p>
+  <div class="opts">
+    <button data-correct><code>(val, list_idx, it)</code> — unique <code>list_idx</code> breaks equal-<code>val</code> ties before <code>it</code></button>
+    <button><code>(val, it, list_idx)</code> — appending <code>list_idx</code> resolves ties on equal <code>val</code></button>
+    <button><code>(list_idx, val, it)</code> — putting <code>list_idx</code> first avoids comparing <code>val</code></button>
+  </div>
+  <div class="fb right"><p>Spot on! Python compares tuples left-to-right: equal <code>val</code>s compare slot 1 (unique integer <code>list_idx</code>) and stop before ever touching <code>it</code> in slot 2.</p></div>
+  <div class="fb wrong"><p>Check slot order left-to-right on two tied values <code>(5, …)</code> and <code>(5, …)</code>: putting <code>list_idx</code> <em>first</em> sorts by list number instead of value; putting <code>list_idx</code> <em>last</em> still compares <code>it1 &lt; it2</code> at slot 1 and crashes! Only <code>(val, list_idx, it)</code> orders by <code>val</code> and breaks ties on <code>list_idx</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>Pattern 1: Top-k largest from a stream</h2>
+
+<p>Given a single-pass stream of <code>n</code> items (say 10 million from a generator) and small <code>k</code>, return the <b><code>k</code> largest</b> items sorted largest-first in <b><code>O(n log k)</code> time</b> and <b><code>O(k)</code> memory</b> (returning <code>[]</code> if <code>k &lt;= 0</code>).</p>
+
+<p>The key twist: to keep the <code>k</code> <b>largest</b>, keep a <b>min-heap</b> of size <code>k</code>! It pins the <em>weakest</em> current winner right at <code>h[0]</code>, acting as a threshold gate:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 172" role="img" aria-label="Top-k min-heap threshold gate: incoming items not greater than h[0] bounce in 1 comparison, while larger items call heapreplace in O(log k)">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">TOP-k LARGEST (k = 3) — min-heap pins the weakest winner at h[0]</text>
+
+    <rect x="16" y="42" width="132" height="96" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="82" y="64" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">Stream item x</text>
+    <text x="82" y="88" class="label" text-anchor="middle" fill="var(--bad)">x = 3 ≤ 7</text>
+    <text x="82" y="106" class="label" text-anchor="middle" fill="var(--muted)">vs</text>
+    <text x="82" y="124" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">x = 12 &gt; 7</text>
+
+    <line x1="150" y1="88" x2="210" y2="88" stroke="var(--accent)" stroke-width="2"/>
+    <polygon points="210,83 218,88 210,93" fill="var(--accent)"/>
+
+    <rect x="220" y="42" width="166" height="96" rx="8" fill="color-mix(in srgb, var(--accent) 10%, var(--surface))" stroke="var(--accent)" stroke-width="1.8"/>
+    <text x="303" y="64" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">Gate: h[0] &lt; x?</text>
+    <text x="303" y="88" class="label" text-anchor="middle" fill="var(--bad)">No → reject (1 cmp!)</text>
+    <text x="303" y="110" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">Yes → heapreplace</text>
+    <text x="303" y="128" class="label" text-anchor="middle" fill="var(--muted)">O(log k) sift-down</text>
+
+    <line x1="388" y1="88" x2="444" y2="88" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="444,83 452,88 444,93" fill="var(--ok)"/>
+
+    <rect x="454" y="42" width="230" height="96" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="569" y="62" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">Size-k Min-Heap (top 3)</text>
+    <line x1="569" y1="84" x2="520" y2="118" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <line x1="569" y1="84" x2="618" y2="118" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <circle cx="569" cy="84" r="14" fill="var(--surface)" stroke="var(--warn)" stroke-width="2"/>
+    <text x="569" y="88" class="label" text-anchor="middle" font-weight="700" fill="var(--warn)">7</text>
+    <text x="615" y="88" class="label" fill="var(--warn)" font-weight="700">← h[0]</text>
+    <circle cx="520" cy="118" r="14" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text x="520" y="122" class="label" text-anchor="middle" font-weight="700">9</text>
+    <circle cx="618" cy="118" r="14" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text x="618" y="122" class="label" text-anchor="middle" font-weight="700">11</text>
+
+    <text x="350" y="160" class="label" text-anchor="middle" fill="var(--muted)">O(k) memory · O(n log k) worst-case time · ~1 cmp/item on random streams</text>
+  </svg>
+  <div class="cap">Testing <code>h[0] &lt; x</code> first bounces non-contenders in 1 comparison (and uses only <code>&lt;</code>, never <code>&lt;=</code>).</div>
+</div>
+
+<pre><code>def top_k(stream, k):
+    if k &lt;= 0: return []
+    h = []
+    for x in stream:
+        if len(h) &lt; k:      heapq.heappush(h, x)
+        elif h[0] &lt; x:      heapq.heapreplace(h, x)   # or heapq.heappushpop(h, x)!
+    h.sort(reverse=True)    # popping a min-heap yields smallest-first; sort/reverse for largest-first!
+    return h</code></pre>
+
+<div class="keyidea">Use a <b>min-heap</b> of size <code>k</code> for the <code>k</code> <b>largest</b> (and a max-heap for the <code>k</code> smallest). Testing <code>h[0] &lt; x</code> (or calling <code>heapq.heappushpop</code>) rejects weak arrivals in 1 comparison instead of two sifts.</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: distributed top-k across 100 machines</summary>
+  <p>If 10 billion events are sharded across 100 servers, each server runs the exact <code>top_k</code> size-<code>k</code> min-heap locally and sends only its <code>k</code> winners (not 100M raw records!) to a coordinator, which runs a final size-<code>k</code> merge over the <code>100·k</code> candidates.</p>
+</details>
+
+<div class="check" id="check-top-k">
+  <p class="q">On 100,000 random items with <code>k = 100</code>, why is <code>if h[0] &lt; x: heapreplace(h, x)</code> (or <code>heappushpop</code>) far faster than calling <code>heappush(h, x)</code> followed by <code>heappop(h)</code>?</p>
+  <div class="opts">
+    <button>It lowers worst-case Big-O from <code>O(n log k)</code> down to <code>O(n)</code></button>
+    <button>It lowers memory usage from <code>O(n)</code> down to <code>O(k)</code></button>
+    <button data-correct>Rejected items pay 1 comparison against <code>h[0]</code> instead of two sifts</button>
+  </div>
+  <div class="fb right"><p>Exact! Both keep <code>O(k)</code> memory and <code>O(n log k)</code> worst-case time (e.g. a rising stream), yet on random streams &gt;99% of arrivals lose to <code>h[0]</code> — dropping average work from ~13 comparisons/item down to ~1!</p></div>
+  <div class="fb wrong"><p>Trace a tiny arrival <code>x = -5</code> when the 100th-largest winner at <code>h[0]</code> is <code>99,000</code>: <code>heappush</code> sifts <code>-5</code> all the way up to slot 0 (~7 cmps) and <code>heappop</code> immediately pops <code>-5</code> and sifts back down (~6 cmps). Testing <code>h[0] &lt; x</code> skips both sifts in 1 check.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>Patterns 2 &amp; 3: K-way merge and worker scheduling</h2>
+
+<h3>K-way merge of sorted streams</h3>
+<p>Given <code>k</code> sorted iterators holding <code>N</code> items total, keep a size-<code>k</code> min-heap holding <b>one front item per non-empty stream</b>: <code>(val, idx, iterator)</code>. Watch on <code>[[1, 4], [2, 3], [5]]</code>:</p>
+<ul>
+  <li>Seed heap with one item from each stream: <code>[(1, 0, it0), (2, 1, it1), (5, 2, it2)]</code>.</li>
+  <li>Pop/yield <code>1</code> from stream <code>0</code> → pull next item <code>4</code> from <code>it0</code> → heap becomes <code>[(2, 1, it1), (4, 0, it0), (5, 2, it2)]</code>.</li>
+  <li>Pop/yield <code>2</code> from stream <code>1</code> → pull <code>3</code> from <code>it1</code> → heap becomes <code>[(3, 1, it1), (4, 0, it0), (5, 2, it2)]</code>.</li>
+</ul>
+
+<pre><code>def merge_sorted(iterables):
+    _END = object()
+    h = []
+    for idx, it in enumerate(iterables):
+        it = iter(it)
+        if (v := next(it, _END)) is not _END: h.append((v, idx, it))
+    heapq.heapify(h)                        # O(k) bulk seed
+    while h:
+        v, idx, it = h[0]
+        yield v                             # pull AFTER yielding so streams stay lazy!
+        if (nxt := next(it, _END)) is not _END: heapq.heapreplace(h, (nxt, idx, it))
+        else: heapq.heappop(h)</code></pre>
+
+<p>Total time is <b><code>O(N log k)</code></b>, memory is <b><code>O(k)</code></b>, and before yielding the <code>m</code>-th item you have pulled at most <code>k + m − 1</code> items (or <code>k + m</code> if refilling right before yielding) — working even on <em>infinite</em> streams!</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: external merge sort and database SSTable compaction</summary>
+  <p>When a 500 GB file won't fit in 16 GB of RAM, sort 10 GB chunks in memory and write 50 sorted runs to disk. Then run this exact <b>50-way merge</b> with buffered file iterators! LSM-tree storage engines (RocksDB, LevelDB, Bigtable) use the same k-way merge to compact sorted SSTable files.</p>
+</details>
+
+<h3>Worker scheduling (<code>assign_jobs</code>)</h3>
+<p>Back to Section 1: seed a min-heap with <code>h = [(0, w) for w in range(workers)]</code> (already a valid heap!). Tuple order <code>(free_time, worker)</code> breaks ties automatically by lowest worker ID. On <code>durations = [1, 2, 3], workers = 2</code>: job 0 → worker 0 at <code>t=0</code> (push <code>(1, 0)</code>); job 1 → worker 1 at <code>t=0</code> (push <code>(2, 1)</code>); job 2 → worker 0 at <code>t=1</code> (push <code>(4, 0)</code>). Total time: <b><code>O(w + n log w)</code></b>, heap space <b><code>O(w)</code></b>:</p>
+
+<pre><code>def assign_jobs(durations, workers):
+    h, out = [(0, w) for w in range(workers)], []
+    for d in durations:
+        t, w = h[0]
+        out.append((w, t))
+        heapq.heapreplace(h, (t + d, w))    # one combined sift!
+    return out</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>Pattern 4: Two-heap running median (and what to say)</h2>
+
+<p>To answer <code>find_median()</code> in <b><code>O(1)</code></b> as numbers stream in, split the stream into two halves sitting <b>back-to-back at the middle</b>: a <b>max-heap <code>lo</code></b> (negated values) holding the smaller half, and a <b>min-heap <code>hi</code></b> holding the larger half.</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 182" role="img" aria-label="Two-heap running median: max-heap lo holds {2, 5, 8} stored negated as [-8, -5, -2] exposing 8, min-heap hi holds {10, 14, 21} exposing 10, so the median sits on the two roots">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">TWO HEAPS BACK-TO-BACK — the median always sits on the two roots</text>
+
+    <rect x="16" y="38" width="278" height="90" rx="8" fill="color-mix(in srgb, var(--accent) 10%, var(--surface))" stroke="var(--accent)" stroke-width="1.8"/>
+    <text x="155" y="59" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">LOWER HALF — Max-Heap lo</text>
+    <text x="155" y="82" class="label" text-anchor="middle" fill="var(--text-strong)">values {2, 5, 8} → root = 8</text>
+    <text x="155" y="102" class="label" text-anchor="middle" fill="var(--muted)">stored negated: [-8, -5, -2]</text>
+    <text x="155" y="119" class="label" text-anchor="middle" fill="var(--muted)">largest of the small half</text>
+
+    <rect x="308" y="56" width="84" height="54" rx="8" fill="color-mix(in srgb, var(--ok) 15%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="350" y="79" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">MEDIAN</text>
+    <text x="350" y="98" class="label" text-anchor="middle" fill="var(--ok)">(8+10)/2=9</text>
+
+    <rect x="406" y="38" width="278" height="90" rx="8" fill="color-mix(in srgb, var(--accent-2) 10%, var(--surface))" stroke="var(--accent-2)" stroke-width="1.8"/>
+    <text x="545" y="59" class="label" text-anchor="middle" fill="var(--accent-2)" font-weight="700">UPPER HALF — Min-Heap hi</text>
+    <text x="545" y="82" class="label" text-anchor="middle" fill="var(--text-strong)">root = 10 ← values {10, 14, 21}</text>
+    <text x="545" y="102" class="label" text-anchor="middle" fill="var(--muted)">stored as: [10, 14, 21]</text>
+    <text x="545" y="119" class="label" text-anchor="middle" fill="var(--muted)">smallest of the large half</text>
+
+    <text x="350" y="152" class="label" text-anchor="middle" fill="var(--text-strong)" font-weight="700">Invariants: max(lo) ≤ min(hi), and len(lo) ∈ {len(hi), len(hi) + 1}</text>
+    <text x="350" y="170" class="label" text-anchor="middle" fill="var(--muted)">add_num: O(log n) · find_median: O(1) · space: O(n)</text>
+  </svg>
+  <div class="cap">Routing every arrival across the boundary (<code>lo → hi</code>, then rebalance if <code>hi</code> is bigger) keeps both invariants tight in 3 clean lines.</div>
+</div>
+
+<p>Trace adding <code>5</code>, then <code>2</code>, then <code>10</code>: after <code>5</code> → <code>lo={5}, hi={}</code> (median <code>5</code>); after <code>2</code> → <code>lo={2}, hi={5}</code> (median <code>3.5</code>); after <code>10</code> → <code>lo={2,5}, hi={10}</code> (median <code>5</code>):</p>
+
+<pre><code>class MedianFinder:
+    def __init__(self): self.lo, self.hi = [], []       # max-heap (negated), min-heap
+
+    def add_num(self, x):
+        heapq.heappush(self.lo, -x)                     # 1. push to lower half
+        heapq.heappush(self.hi, -heapq.heappop(self.lo))# 2. bounce lo's max to hi
+        if len(self.hi) &gt; len(self.lo):                 # 3. keep len(lo) >= len(hi)
+            heapq.heappush(self.lo, -heapq.heappop(self.hi))
+
+    def find_median(self):
+        if len(self.lo) &gt; len(self.hi): return -self.lo[0]
+        return (-self.lo[0] + self.hi[0]) / 2</code></pre>
+
+<details class="aside deeper">
+  <summary>Go deeper: lazy deletion for sliding-window median and indexed heaps</summary>
+  <p><b>Lazy deletion (e.g. Sliding Window Median):</b> record removed values in a <code>collections.Counter</code> and prune dead elements whenever they float to the <em>top</em> of a heap. <b>Critical two-heap trap:</b> <code>len(lo)</code> and <code>len(hi)</code> still include dead entries! You must maintain separate <code>live_lo</code> and <code>live_hi</code> counters, rebalance strictly using those live counts, and prune dead elements from <em>both</em> roots before reading the median.</p>
+  <p><b>Indexed heap vs. lazy deletion:</b> an <em>indexed heap</em> keeps a companion <code>key → array_index</code> dict so arbitrary <code>decrease_key</code>/delete runs in true <code>O(log n)</code>. In Python interviews (e.g. Dijkstra), pushing a duplicate <code>(new_dist, node)</code> and lazily skipping stale entries is shorter and faster unless unbounded updates on the same key could bloat RAM.</p>
+</details>
+
+<div class="check" id="check-two-heaps">
+  <p class="q"><code>lo</code> (max-heap) holds values <code>{2, 5, 8}</code> and <code>hi</code> (min-heap) holds <code>{10, 14}</code>. Why shouldn't <code>add_num(x)</code> push straight into the shorter heap <code>hi</code>?</p>
+  <div class="opts">
+    <button>Because both heaps must keep strictly equal lengths after every insert</button>
+    <button data-correct>If <code>x = 3</code> enters <code>hi</code> directly, <code>max(lo) = 8 &gt; min(hi) = 3</code></button>
+    <button>Because pushing into <code>hi</code> first makes <code>find_median()</code> run in <code>O(log n)</code></button>
+  </div>
+  <div class="fb right"><p>Spot on! Bouncing <code>lo</code>'s max into <code>hi</code> guarantees every value in <code>lo</code> is <code>&lt;=</code> every value in <code>hi</code> for any arrival, with zero messy <code>if/else</code> branches.</p></div>
+  <div class="fb wrong"><p>Check what <code>find_median()</code> would return if <code>3</code> went straight into <code>hi</code>: <code>lo</code> root is <code>8</code>, <code>hi</code> root is <code>3</code>, giving <code>(8 + 3) / 2 = 5.5</code> — completely wrong for <code>[2, 3, 5, 8, 10, 14]</code> whose true median is <code>(5 + 8) / 2 = 6.5</code>!</p></div>
+</div>
+
+<p><b>What to say in the interview (4 beats, ~90 seconds):</b></p>
+<ol>
+  <li><b>Flat complete tree:</b> "A binary heap packs a complete binary tree into a plain array with zero pointers: parent is <code>(i − 1) // 2</code>, children are <code>2i + 1</code> and <code>2i + 2</code>, and every parent is <code>&lt;=</code> its children."</li>
+  <li><b>Core costs:</b> "<code>peek</code> is <code>O(1)</code>; <code>push</code> (append + sift-up) and <code>pop</code> (last element to root + sift-down with the smaller child) are <code>O(log n)</code>; bottom-up <code>heapify</code> from the last non-leaf is <code>O(n)</code> worst case because most nodes live near the bottom."</li>
+  <li><b>Python pitfalls:</b> "<code>heapq</code> is min-only (negate numbers or wrap objects), <code>heapify</code> mutates in place returning <code>None</code>, and tuples use an integer tie-breaker <code>(priority, idx, payload)</code>."</li>
+  <li><b>Patterns &amp; trade-offs:</b> "Min-heap of size <code>k</code> for top-<code>k</code> largest (gate on <code>h[0] &lt; x</code>), size-<code>k</code> heap for <code>O(N log k)</code> k-way merge, <code>(free_time, worker)</code> for scheduling, and two back-to-back heaps for <code>O(1)</code> running median. For arbitrary lookup or ranges, switch to a hash map or balanced BST."</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Operation / Pattern</th><th>Best / Avg</th><th>Worst / Amortized</th><th>Extra Space</th></tr></thead>
+  <tbody>
+    <tr><td><code>peek()</code></td><td><b>O(1)</b></td><td><b>O(1)</b></td><td>O(1)</td></tr>
+    <tr><td><code>push(x)</code></td><td>O(1) avg (random)</td><td>O(log n) (amort. resize)</td><td>O(1)</td></tr>
+    <tr><td><code>pop()</code></td><td>O(log n)</td><td>O(log n)</td><td>O(1)</td></tr>
+    <tr><td>Bottom-up <code>heapify</code></td><td><b>O(n)</b></td><td><b>O(n)</b> (&lt; 2n cmps)</td><td>O(1) in-place</td></tr>
+    <tr><td>Arbitrary search / delete</td><td>O(n)</td><td>O(n)</td><td>O(1)</td></tr>
+    <tr><td><code>top_k</code> (stream of <code>n</code>)</td><td>~1 cmp/item (random)</td><td><code>O(n log k)</code></td><td><code>O(k)</code></td></tr>
+    <tr><td><code>merge_sorted</code> (<code>k</code> streams, <code>N</code> items)</td><td>—</td><td><code>O(N log k)</code></td><td><code>O(k)</code></td></tr>
+    <tr><td><code>assign_jobs</code> (<code>n</code> jobs, <code>w</code> workers)</td><td>—</td><td><code>O(w + n log w)</code></td><td><code>O(w)</code> heap</td></tr>
+    <tr><td><code>MedianFinder</code> (two heaps)</td><td>—</td><td><code>O(log n)</code> add · <b><code>O(1)</code></b> median</td><td><code>O(n)</code></td></tr>
+  </tbody>
+</table></div>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Sketch the flat list on paper first, then implement both core exercise modules without peeking.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Trace push, pop, and bottom-up heapify by hand</h4>
+  <p>(a) Push <code>[5, 3, 8, 1, 4]</code> into an empty min-heap writing the flat list after each push, then call <code>pop()</code> twice. (b) Run bottom-up <code>heapify</code> on <code>[9, 4, 7, 1, 8, 2, 6]</code> from index <code>2</code> down to <code>0</code> and count total comparisons.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) After pushes: <code>[1, 3, 8, 5, 4]</code>; after 1st pop (returns <code>1</code>): <code>[3, 4, 8, 5]</code>; after 2nd pop (returns <code>3</code>): <code>[4, 5, 8]</code>. (b) <code>i=2</code>: swap <code>7,2</code> → <code>[9,4,2,1,8,7,6]</code>; <code>i=1</code>: swap <code>4,1</code> → <code>[9,1,2,4,8,7,6]</code>; <code>i=0</code>: swap <code>9,1</code> then <code>9,4</code> → <code>[1,4,2,9,8,7,6]</code> (~8 comparisons vs ~20 for <code>n log₂ n</code>).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>2. Build a binary min-heap from scratch</h4>
+  <p>Implement <code>MinHeap</code> (Sections 3–5: <code>push</code>, <code>pop</code>, <code>peek</code>, <code>__len__</code>, and <code>O(n)</code> bottom-up <code>from_list</code>) in <a href="../exercises/min_heap.py">min_heap.py</a> without <code>heapq</code> or sorting. Tests count every comparison, enforce 0-comparison <code>peek()</code>, and test <code>&lt;</code>-only objects.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>3. Three heap patterns in practice</h4>
+  <p>Implement <code>top_k</code> (gate on <code>h[0] &lt; x</code>!), lazy <code>merge_sorted</code>, and <code>assign_jobs</code> (Sections 7–8) in <a href="../exercises/heap_patterns.py">heap_patterns.py</a>. Tests count comparisons, memory, and lazy pulls on infinite streams.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · timed bare-editor drills</div>
+  <h4>4. Week 1 Day 5 interview drills</h4>
+  <p>Pick two from <em>Kth Largest Element in an Array</em>, <em>Find Median from Data Stream</em>, <em>Merge k Sorted Lists</em>, <em>K Closest Points to Origin</em>, or <em>Task Scheduler</em>. Hand-trace empty stream, <code>k = 0</code>, <code>k &gt; len</code>, equal priorities, and <code>k = 1</code> before running.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · trade-off drill</div>
+  <h4>5. Shifting constraints: static → stream → ranges</h4>
+  <p>An interviewer starts with static <em>Kth Largest Element</em> in RAM, switches to a 10M-item live stream, then asks for dynamic range queries <code>[lo, hi)</code>. Explain aloud when you pick full sort (<code>O(n log n)</code>), <code>heapify + k pops</code> (<code>O(n + k log n)</code>), a size-<code>k</code> min-heap (<code>O(n log k)</code>), and a balanced BST.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · say it out loud</div>
+  <h4>6. 2-minute interview explanation</h4>
+  <p>Explain without notes: (a) why top-<code>k</code> <em>largest</em> uses a <em>min</em>-heap, (b) why <code>pop()</code> puts the last item at index <code>0</code> instead of pulling a child up, and (c) why bottom-up <code>heapify</code> is <code>O(n)</code> worst case.</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>pytest -k "min_heap or heap_patterns"</code></pre>
+
+<nav class="chapter-nav">
+  <a href="trees.html"><small>← Previous</small>Split the search in half at every branch</a>
+  <a class="next" href="../index.html#t-01.05"><small>Next →</small>Graphs (Section 01 overview)</a>
+</nav>
+
+</main>
+
+<script>
+(function () {
+  function arrToTree(arr, i = 0) {
+    if (i >= arr.length) return null;
+    return { val: arr[i], idx: i, left: arrToTree(arr, 2 * i + 1), right: arrToTree(arr, 2 * i + 2) };
+  }
+
+  const scenarios = {
+    push2: {
+      frames: [
+        { arr: [1, 3, 5, 8, 4, 9, 7], hl: [], cmp: [], msg: "Start with valid min-heap <code>[1, 3, 5, 8, 4, 9, 7]</code>. We want to <b>push(2)</b>." },
+        { arr: [1, 3, 5, 8, 4, 9, 7, 2], hl: [7], cmp: [3], msg: "Step 1: append <b>2</b> at end (index <b>7</b>) to keep the board complete. Compare with parent at <code>(7-1)//2 = 3</code> (val 8)." },
+        { arr: [1, 3, 5, 2, 4, 9, 7, 8], hl: [3], cmp: [1], msg: "<b>2 &lt; 8</b> → swap indices 7 and 3. Now compare index <b>3</b> (val 2) with parent <code>(3-1)//2 = 1</code> (val 3)." },
+        { arr: [1, 2, 5, 3, 4, 9, 7, 8], hl: [1], cmp: [0], msg: "<b>2 &lt; 3</b> → swap indices 3 and 1. Compare index <b>1</b> (val 2) with parent <b>0</b> (val 1)." },
+        { arr: [1, 2, 5, 3, 4, 9, 7, 8], done: [1], hl: [], cmp: [], msg: "<b>2 &gt;= 1</b> → stop! Heap restored in 3 comparisons (<code>⌊log₂ 8⌋ = 3</code>)." }
+      ]
+    },
+    popMin: {
+      frames: [
+        { arr: [1, 3, 5, 8, 4, 9, 7], hl: [0], cmp: [6], msg: "Start <b>pop()</b>: save minimum <b>1</b> at index 0. Move the <b>last</b> item (<b>7</b> at index 6) to fill slot 0." },
+        { arr: [7, 3, 5, 8, 4, 9], hl: [0], cmp: [1, 2], msg: "Placed <b>7</b> at root (index 0); list shrinks to 6 items. Compare children <code>a[1]=3</code> and <code>a[2]=5</code> → smaller child is <b>3</b> (index 1)." },
+        { arr: [3, 7, 5, 8, 4, 9], hl: [1], cmp: [3, 4], msg: "<b>3 &lt; 7</b> → swap indices 0 and 1. At index 1, compare children <code>a[3]=8</code> and <code>a[4]=4</code> → smaller child is <b>4</b> (index 4)." },
+        { arr: [3, 4, 5, 8, 7, 9], done: [4], hl: [], cmp: [], msg: "<b>4 &lt; 7</b> → swap indices 1 and 4. Index 4 is a leaf (<code>2*4+1 = 9 &gt;= 6</code>) → stop and return <b>1</b>!" }
+      ]
+    }
+  };
+
+  const sel = V.el("select", { "aria-label": "Choose heap operation" },
+    V.el("option", { value: "push2" }, "push(2) — sift-up"),
+    V.el("option", { value: "popMin" }, "pop() — sift-down"));
+
+  const api = V.player(document.getElementById("viz-heap-ops"), {
+    frames: scenarios.push2.frames,
+    speed: 1100,
+    extraControls: [sel],
+    draw(f, stage) {
+      const hl = new Set(f.hl || []), cmp = new Set(f.cmp || []), done = new Set(f.done || []);
+      const svg = V.s("svg", { class: "viz" });
+      V.binaryTree(svg, arrToTree(f.arr), {
+        dx: 46, dy: 52, r: 16,
+        cls(n) {
+          if (done.has(n.idx)) return "done";
+          if (hl.has(n.idx)) return "hl";
+          if (cmp.has(n.idx)) return "cmp";
+          return "";
+        }
+      });
+      const ptrs = {};
+      if (f.hl && f.hl.length === 1) ptrs[f.hl[0]] = "i";
+      const arrBox = V.el("div", { style: "margin-top:12px" },
+        V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Flat backing list a[] (same data, zero pointers)"),
+        V.cells(f.arr, {
+          ptrs,
+          cls(idx) {
+            if (done.has(idx)) return "done";
+            if (hl.has(idx)) return "hl";
+            if (cmp.has(idx)) return "cmp";
+            return "";
+          }
+        }));
+      stage.append(svg, arrBox);
+    }
+  });
+  sel.onchange = () => api.load(scenarios[sel.value].frames);
+})();
+</script>
+</body>
+</html>
