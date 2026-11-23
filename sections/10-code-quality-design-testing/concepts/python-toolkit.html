@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="10.01">
+  <title>Python standard library toolkit</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="10" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Phase 0 · Python warm-up</div>
+  <h1>Python standard library toolkit</h1>
+  <div class="meta"><span>about 15 minutes</span><span>4 quick checks · 1 exercise suite</span></div>
+</header>
+
+<p>Half of interview speed in Python comes from reaching straight for the right standard-library tool instead of accidentally slipping an O(n) list scan inside a loop. Master six tiny modules here, build your one-page cheat sheet, and keep it next to you during Week 1 drills until every method is muscle memory.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Spot the exact hidden O(n) list operations that silently turn clean Python into O(n²).</li>
+    <li>Reach automatically for <code>Counter</code>, <code>defaultdict</code>, and <code>deque</code> without hesitation.</li>
+    <li>Use <code>heapq</code> for min-heaps, max-heaps, top-k, and tie-safe tuples.</li>
+    <li>Use <code>bisect_left</code> and <code>bisect_right</code> cleanly for range counting and insertion points.</li>
+    <li>Write a crisp one-page interview cheat sheet covering <code>collections</code>, <code>heapq</code>, <code>bisect</code>, <code>itertools</code>, and <code>functools</code>.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: builds on <a href="python-idioms.html">Python fluency: idioms, lambdas, generators &amp; gotchas</a>. Read top to bottom, answer every quick check, write your one-page cheat sheet on paper or markdown, then complete <code>py_toolkit.py</code>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>The hidden O(n) traps inside plain Python lists</h2>
+
+<div class="story">
+  <p>You write a clean BFS queue using a plain Python <code>list</code> and <code>queue.pop(0)</code>. On a 10-node test graph it passes instantly. On a 300,000-node input, every <code>pop(0)</code> slides 300,000 pointers left—about <b>45 billion moves</b>. Your O(n) algorithm quietly became O(n²).</p>
+</div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Hidden O(n) trap on <code>list</code></th><th>Why it's slow</th><th>O(1) or O(log n) stdlib replacement</th></tr></thead>
+  <tbody>
+    <tr><td><code>q.pop(0)</code> / <code>q.insert(0, x)</code></td><td>Shifts every remaining element</td><td><code>collections.deque</code> → <code>popleft()</code> / <code>appendleft()</code> <b>O(1)</b></td></tr>
+    <tr><td><code>x in my_list</code> inside a loop</td><td>Linear scan over all items</td><td><code>set</code> or <code>dict</code> → <code>x in seen</code> <b>O(1) avg</b></td></tr>
+    <tr><td><code>words.count(w)</code> in a loop</td><td>Scans the whole list per word</td><td><code>collections.Counter(words)</code> → <b>O(n)</b> total</td></tr>
+    <tr><td>Re-sorting a list after every push</td><td>O(n log n) per step</td><td><code>heapq.heappush</code> / <code>heappop</code> → <b>O(log n)</b></td></tr>
+    <tr><td>Scanning a sorted list for <code>lo..hi</code></td><td>O(n) per query</td><td><code>bisect_right(a, hi) - bisect_left(a, lo)</code> → <b>O(log n)</b></td></tr>
+    <tr><td><code>s += ch</code> in a tight loop</td><td>Copies growing string</td><td><code>parts.append(ch)</code> then <code>"".join(parts)</code> → <b>O(n)</b></td></tr>
+  </tbody>
+</table></div>
+
+<div class="check" id="check-deque">
+  <p class="q">You run a round-robin scheduler over 200,000 jobs, popping from the front and pushing back to the tail. Why does <code>deque</code> finish in milliseconds while <code>list.pop(0)</code> times out?</p>
+  <div class="opts">
+    <button><code>deque</code> stores items in a hash table instead of memory blocks</button>
+    <button data-correct><code>deque</code> pops from the front in O(1), while <code>list.pop(0)</code> shifts every remaining item in O(n)</button>
+    <button><code>list</code> cannot grow past 100,000 elements cleanly</button>
+  </div>
+  <div class="fb right"><p>Exactly. Removing index 0 from a contiguous array shifts all <code>n - 1</code> elements left; a doubly-linked block <code>deque</code> simply advances its head pointer in O(1).</p></div>
+  <div class="fb wrong"><p>A Python <code>list</code> is a contiguous array: deleting slot 0 forces slot 1→0, 2→1, …, 199,999→199,998 on <em>every single turn</em>. A <code>deque</code> supports O(1) operations at both ends.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span><code>collections</code>: Counter, defaultdict, deque</h2>
+
+<pre><code>from collections import Counter, defaultdict, deque
+
+# 1. Counter: instant frequency map (+ subtraction &amp; top-k!)
+freq = Counter(["b", "a", "b", "c", "a", "b"])  # {'b': 3, 'a': 2, 'c': 1}
+freq["missing"]                                  # 0 (no KeyError!)
+
+# 2. defaultdict: graph adjacency lists &amp; grouping with zero boilerplate
+graph = defaultdict(list)
+for u, v in edges:
+    graph[u].append(v)
+
+# 3. deque: O(1) queue &amp; monotonic deque (maxlen auto-evicts oldest!)
+q = deque([start])
+cur = q.popleft()</code></pre>
+
+<div class="keyidea">Gotcha on <code>defaultdict</code>: reading <code>d[missing]</code> <em>creates</em> the key with a default value! Use <code>if k in d:</code> or <code>d.get(k)</code> when checking membership without mutating the dictionary.</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span><code>heapq</code>: min-heaps, max-heaps &amp; top-k</h2>
+
+<p>Python's <code>heapq</code> is a <b>min-heap</b> stored in a plain list. You only need five patterns to cover 95% of Google and Anthropic heap problems:</p>
+
+<pre><code>import heapq
+
+# 1. Build a heap in O(n) (faster than n pushes = O(n log n)!)
+nums = [5, 1, 9, 3]
+heapq.heapify(nums)               # in-place min-heap: nums[0] is min
+
+# 2. Push / pop in O(log n)
+heapq.heappush(nums, 2)
+smallest = heapq.heappop(nums)
+
+# 3. Max-heap for numbers: negate on push and negate back on pop
+max_h = []
+heapq.heappush(max_h, -val)
+largest = -heapq.heappop(max_h)
+
+# 4. Top-k largest in O(n log k): keep a MIN-heap of size k
+top_k = []
+for x in stream:
+    heapq.heappush(top_k, x)
+    if len(top_k) &gt; k:
+        heapq.heappop(top_k)      # evicts smallest; k largest survive!
+
+# 5. Built-in helpers for one-shot top-k
+heapq.nsmallest(k, items, key=lambda x: (-x.score, x.name))</code></pre>
+
+<div class="check" id="check-heap-topk">
+  <p class="q">To find the <b>k largest</b> numbers in a stream of 10 million integers using only O(k) memory, should your size-k heap be a min-heap or a max-heap?</p>
+  <div class="opts">
+    <button>A max-heap, because we want the largest values</button>
+    <button data-correct>A min-heap, so the weakest of the current top k sits at the root for O(log k) eviction</button>
+    <button>Either works with the same O(n log k) time</button>
+  </div>
+  <div class="fb right"><p>Spot on! The root is the gatekeeper—the smallest of your top-k VIPs. Any newcomer bigger than the root kicks it out in O(log k).</p></div>
+  <div class="fb wrong"><p>With a max-heap of size k, the <em>biggest</em> element sits at the top, so you have no O(1) way to find and evict the <em>smallest</em> element when a bigger newcomer arrives. A min-heap keeps the eviction target right at index 0.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span><code>bisect</code>: exact boundaries without off-by-one bugs</h2>
+
+<p>Whenever an array is sorted, <code>bisect_left</code> and <code>bisect_right</code> give you bug-free binary search in one line. Hold this single picture in your head:</p>
+
+<div class="figure">
+<pre class="diagram"><code>index:          0    1    2    3    4    5
+sorted array: [ 1,   5,   5,   5,   9,  12 ]
+                     ↑              ↑
+      bisect_left(a, 5) = 1   bisect_right(a, 5) = 4
+
+Count of elements equal to 5:       4 - 1 = 3
+Count of elements in [lo, hi]:      bisect_right(a, hi) - bisect_left(a, lo)</code></pre>
+  <div class="cap"><code>bisect_left</code> lands at the <em>first</em> position where <code>x</code> could go (before existing <code>x</code>s); <code>bisect_right</code> lands <em>after</em> all existing <code>x</code>s.</div>
+</div>
+
+<div class="check" id="check-bisect">
+  <p class="q">In <code>a = [2, 4, 4, 4, 8]</code>, what are <code>bisect_left(a, 4)</code> and <code>bisect_right(a, 4)</code>?</p>
+  <div class="opts">
+    <button><code>1</code> and <code>3</code></button>
+    <button data-correct><code>1</code> and <code>4</code></button>
+    <button><code>0</code> and <code>3</code></button>
+  </div>
+  <div class="fb right"><p>Right! Index <code>1</code> is the first <code>4</code>, and index <code>4</code> is right after the last <code>4</code>—so <code>4 - 1 = 3</code> copies of <code>4</code>.</p></div>
+  <div class="fb wrong"><p>Remember: <code>bisect_right</code> returns the index <em>past</em> the last match, just like Python's half-open slices <code>a[left:right]</code>! For <code>[2, 4, 4, 4, 8]</code>, the slice of 4s is <code>a[1:4]</code>, so <code>left=1, right=4</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span><code>itertools</code> &amp; <code>functools</code>: your interview shortcuts</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Tool</th><th>One-line usage</th><th>Where it shines in interviews</th></tr></thead>
+  <tbody>
+    <tr><td><code>functools.cache</code></td><td><code>@cache</code> on recursive <code>dfs(i, j)</code></td><td>Instant top-down DP (no manual memo dict!)</td></tr>
+    <tr><td><code>functools.cmp_to_key</code></td><td><code>sorted(xs, key=cmp_to_key(cmp))</code></td><td>Pairwise custom ordering (e.g., Largest Number)</td></tr>
+    <tr><td><code>itertools.accumulate</code></td><td><code>[0, *accumulate(nums)]</code></td><td>One-line prefix sums in O(n)</td></tr>
+    <tr><td><code>itertools.pairwise</code></td><td><code>for a, b in pairwise(nums):</code></td><td>Adjacent pairs without index math (Python 3.10+)</td></tr>
+    <tr><td><code>itertools.islice</code></td><td><code>list(islice(gen, k))</code></td><td>Take first k items from any lazy stream</td></tr>
+    <tr><td><code>itertools.product</code></td><td><code>product(range(r), range(c))</code></td><td>Clean grid loops &amp; Cartesian combinations</td></tr>
+  </tbody>
+</table></div>
+
+<div class="check" id="check-cache">
+  <p class="q">You decorate <code>def dfs(idx, visited):</code> with <code>@functools.cache</code> and pass a Python <code>set</code> as <code>visited</code>. What happens?</p>
+  <div class="opts">
+    <button>It caches normally using the set's elements</button>
+    <button data-correct>Raises <code>TypeError: unhashable type: 'set'</code></button>
+    <button>Silently skips caching whenever a set is passed</button>
+  </div>
+  <div class="fb right"><p>Spot on! <code>@cache</code> puts all arguments into a dict key, so every argument must be hashable—pass an immutable <code>frozenset</code>, <code>tuple</code>, or integer bitmask instead.</p></div>
+  <div class="fb wrong"><p>Under the hood, <code>@cache</code> keys an internal dict by the tuple of arguments. Mutable containers (<code>list</code>, <code>set</code>, <code>dict</code>) aren't hashable—convert to <code>tuple</code>, <code>frozenset</code>, or an int bitmask.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>One-page cheat sheet checklist</h2>
+<ol>
+  <li><b>Queue / sliding deque:</b> <code>deque</code> (<code>append</code>, <code>popleft</code>, <code>pop</code>, <code>appendleft</code> — all O(1)).</li>
+  <li><b>Counting &amp; grouping:</b> <code>Counter(xs)</code>, <code>defaultdict(list)</code>, <code>dict.get(k, 0)</code>.</li>
+  <li><b>Priority queues:</b> <code>heapify</code> O(n), <code>heappush</code>/<code>heappop</code> O(log n), negate for max-heap, min-heap of size k for top-k largest.</li>
+  <li><b>Sorted binary search:</b> <code>bisect_left</code> (first ≥ x), <code>bisect_right</code> (first &gt; x), range count = <code>bisect_right(hi) - bisect_left(lo)</code>.</li>
+  <li><b>DP &amp; streams:</b> <code>@functools.cache</code> (hashable args only!), <code>accumulate</code>, <code>pairwise</code>, <code>islice</code>, <code>cmp_to_key</code>.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Build your one-page cheat sheet</h4>
+  <p>Write out the 5 sections above on a single sheet of paper (or scratch note) from memory, including the time complexity of every call. Keep it beside you through Week 1 drills.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>2. <code>py_toolkit.py</code> — Four stdlib speed drills</h4>
+  <p>Implement <code>top_k_frequent</code>, <code>group_anagrams</code>, <code>round_robin</code>, and <code>count_in_ranges</code> in <code>sections/10-code-quality-design-testing/exercises/py_toolkit.py</code>. Tests run inputs of 100k–670k items with hard timeouts that reject <code>list.pop(0)</code>, <code>list.count()</code>, and linear scans.</p>
+</div>
+
+<pre class="plain"><code>python3 -m pytest -k py_toolkit</code></pre>
+
+<nav class="chapter-nav">
+  <a href="python-idioms.html"><small>← Previous</small>Python idioms, lambdas, generators &amp; gotchas</a>
+  <a class="next" href="../../15-interview-formats/concepts/bare-editor-playbook.html"><small>Next →</small>Bare-editor coding playbook</a>
+</nav>
+
+</main>
+</body>
+</html>

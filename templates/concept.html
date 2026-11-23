@@ -3,8 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- tools/build.py reads this tag to link the page from its chapter. -->
+  <!-- tools/build.py reads these tags to link the page from its chapter.
+       Remove status="outline" once full chapter prose, visuals and checks are written. -->
   <meta name="topic" content="{{TOPIC_ID}}">
+  <meta name="status" content="outline">
   <title>{{TITLE}}</title>
   <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
   <link rel="stylesheet" href="../../../assets/style.css">
@@ -21,7 +23,7 @@
 <main class="content book">
 
 <header class="chapter-head">
-  <div class="eyebrow">§{{SECTION_ID}} {{SECTION_TITLE}} · {{TOPIC_ID}}</div>
+  <div class="eyebrow">{{SECTION_TITLE}}</div>
   <h1>{{TITLE}}</h1>
   <div class="meta"><span><span class="badge {{TAG}}">{{TAG}}</span> {{TOPIC_TEXT}}</span><span>about 15 minutes</span><span>6 quick checks · 5 exercises</span></div>
 </header>

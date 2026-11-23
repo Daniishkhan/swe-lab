@@ -324,7 +324,142 @@ window.CURRICULUM = {
      "title": "Mock 2: Google-style Medium-Hard (graphs, intervals or tries)",
      "bar": "One unseen Medium-Hard graph, interval or trie problem in 45 minutes in a bare editor, with two escalating follow-ups and a clean hand trace. Score 3+ on all four coding signals.",
      "ask": "mock interview, coding (Google L5 bare-editor style, 1 medium-hard graph/interval/trie + 2 follow-ups), 45 minutes"
-    }
+    },
+    "dayNote": "About 28 hours (~4 to 4.5 hours/day Mon–Sat + light Sunday mock, leaving ~1h on Sunday for your Parallel Behavioral track). Always hand-trace before running code.",
+    "days": [
+     {
+      "label": "Day 1 · Monday",
+      "plan": [
+       {
+        "t": "1h 15m",
+        "topic": "02.03",
+        "do": "Learn binary search invariants and 'search on the answer'"
+       },
+       {
+        "t": "2h",
+        "topic": "02.03",
+        "do": "Complete binary_search"
+       }
+      ],
+      "drills": [
+       "Search in Rotated Sorted Array",
+       "Koko Eating Bananas"
+      ]
+     },
+     {
+      "label": "Day 2 · Tuesday",
+      "plan": [
+       {
+        "t": "1h 15m",
+        "topic": "02.04",
+        "do": "Learn two pointers, sliding window and prefix sums"
+       },
+       {
+        "t": "2h",
+        "topic": "02.04",
+        "do": "Complete sliding_window"
+       }
+      ],
+      "drills": [
+       "Longest Substring Without Repeating Characters",
+       "Minimum Window Substring"
+      ]
+     },
+     {
+      "label": "Day 3 · Wednesday",
+      "plan": [
+       {
+        "t": "1h",
+        "topic": "01.05",
+        "do": "Graph representations: adjacency list vs matrix + graph_basics & clone_graph"
+       },
+       {
+        "t": "2h 15m",
+        "topic": "02.05",
+        "do": "Learn BFS, DFS, multi-source BFS & topological sort, then complete graphs"
+       }
+      ],
+      "drills": [
+       "Course Schedule II",
+       "Rotting Oranges"
+      ]
+     },
+     {
+      "label": "Day 4 · Thursday",
+      "plan": [
+       {
+        "t": "1h",
+        "topic": "01.07",
+        "do": "Learn Union-Find with path compression and union by rank"
+       },
+       {
+        "t": "2h",
+        "topic": "01.07",
+        "do": "Complete union_find and union_find_patterns"
+       }
+      ],
+      "drills": [
+       "Accounts Merge",
+       "Number of Islands II"
+      ]
+     },
+     {
+      "label": "Day 5 · Friday",
+      "plan": [
+       {
+        "t": "1h",
+        "topic": "01.06",
+        "do": "Learn tries and prefix trees"
+       },
+       {
+        "t": "2h",
+        "topic": "01.06",
+        "do": "Complete trie and trie_patterns (skip max-XOR for now)"
+       }
+      ],
+      "drills": [
+       "Implement Trie (Prefix Tree)",
+       "Word Search II"
+      ]
+     },
+     {
+      "label": "Day 6 · Saturday",
+      "plan": [
+       {
+        "t": "1h 45m",
+        "topic": "01.09",
+        "do": "Learn intervals & sweep line, then complete interval_merge and interval_sweep"
+       },
+       {
+        "t": "1h 45m",
+        "topic": "02.08",
+        "do": "Learn Dijkstra & 0-1 BFS, then complete dijkstra"
+       }
+      ],
+      "drills": [
+       "Merge Intervals",
+       "Path With Minimum Effort"
+      ]
+     },
+     {
+      "label": "Day 7 · Sunday",
+      "plan": [
+       {
+        "t": "1h",
+        "topic": "m2",
+        "do": "45-minute Google Medium-Hard bare-editor mock + feedback & log"
+       },
+       {
+        "t": "1h",
+        "topic": "02.08",
+        "do": "Redo weakest Week 2 drill from a blank editor (+ ~1h on Parallel Behavioral track)"
+       }
+      ],
+      "drills": [
+       "Swim in Rising Water"
+      ]
+     }
+    ]
    },
    {
     "id": "w3",
@@ -372,7 +507,136 @@ window.CURRICULUM = {
      "title": "Mock 3: practical 4-level screen (Anthropic CodeSignal style)",
      "bar": "A 4-level progressive build in 90 minutes, tests first. Levels 1 to 3 pass cleanly without rewriting earlier code, Level 4 is cleanly scoped, and you score 3+ on code quality and testing.",
      "ask": "mock interview, practical coding, 4 levels, 90 minutes"
-    }
+    },
+    "dayNote": "About 28 hours (~4.5 hours/day Mon–Sat + 90m practical mock on Sunday). Write 3 tests before running any practical build.",
+    "days": [
+     {
+      "label": "Day 1 · Monday",
+      "plan": [
+       {
+        "t": "1h 15m",
+        "topic": "02.06",
+        "do": "Learn recursion trees, backtracking and pruning"
+       },
+       {
+        "t": "2h",
+        "topic": "02.06",
+        "do": "Complete backtracking"
+       }
+      ],
+      "drills": [
+       "Combination Sum",
+       "Word Search"
+      ]
+     },
+     {
+      "label": "Day 2 · Tuesday",
+      "plan": [
+       {
+        "t": "1h 30m",
+        "topic": "02.07",
+        "do": "Learn DP state definition, 1D/2D, knapsack, LIS, LCS and DAG DP"
+       },
+       {
+        "t": "2h",
+        "topic": "02.07",
+        "do": "Start dp exercises"
+       }
+      ],
+      "drills": [
+       "Coin Change",
+       "Longest Increasing Subsequence"
+      ]
+     },
+     {
+      "label": "Day 3 · Wednesday",
+      "plan": [
+       {
+        "t": "1h 30m",
+        "topic": "02.07",
+        "do": "Finish dp exercises and trace transitions on paper"
+       },
+       {
+        "t": "1h 45m",
+        "topic": "02.10",
+        "do": "Learn greedy choice & exchange arguments, then greedy_intervals, gas_station & job_scheduling"
+       }
+      ],
+      "drills": [
+       "Edit Distance",
+       "Jump Game II"
+      ]
+     },
+     {
+      "label": "Day 4 · Thursday",
+      "plan": [
+       {
+        "t": "2h",
+        "topic": "01.08",
+        "do": "Learn LRU/TTL caches, then complete lru_cache and ttl_cache"
+       },
+       {
+        "t": "1h 30m",
+        "topic": "02.14",
+        "do": "Learn rate limiters, then complete token_bucket and rate_window_counter"
+       }
+      ],
+      "drills": [
+       "LRU Cache"
+      ]
+     },
+     {
+      "label": "Day 5 · Friday",
+      "plan": [
+       {
+        "t": "45m",
+        "topic": "10.03",
+        "do": "Teach session: testing for interviews (fakes vs mocks, edge cases)"
+       },
+       {
+        "t": "45m",
+        "topic": "10.02",
+        "do": "Teach session: designing for change (composition, clean seams)"
+       },
+       {
+        "t": "2h",
+        "topic": "10.04",
+        "do": "Timed 90-min Build #1 (4 levels, tests first): in-memory KV store with TTL, prefix scan & transactions + review"
+       }
+      ],
+      "drills": []
+     },
+     {
+      "label": "Day 6 · Saturday",
+      "plan": [
+       {
+        "t": "2h",
+        "topic": "10.04",
+        "do": "Timed 90-min Build #2 (4 levels, tests first): in-memory file system with quotas (or banking ledger) + review"
+       },
+       {
+        "t": "1h",
+        "topic": "02.07",
+        "do": "Blank-editor DP + greedy refresher"
+       }
+      ],
+      "drills": [
+       "Longest Increasing Path in a Matrix",
+       "Gas Station"
+      ]
+     },
+     {
+      "label": "Day 7 · Sunday",
+      "plan": [
+       {
+        "t": "1h 45m",
+        "topic": "m3",
+        "do": "90-minute Anthropic CodeSignal-style 4-level mock + feedback & log (+ ~1h Parallel Behavioral track)"
+       }
+      ],
+      "drills": []
+     }
+    ]
    },
    {
     "id": "w4",
@@ -407,7 +671,7 @@ window.CURRICULUM = {
      },
      {
       "topic": "03.07",
-      "do": "Anthropic staple — code and explain two classics: a bounded producer-consumer queue with graceful shutdown, and a thread-safe LRU cache with single-flight (coalescing concurrent misses for the same key)."
+      "do": "Anthropic staple — implement bounded_queue, single_flight_cache (coalescing concurrent misses without holding a global lock), and concurrent_crawler (worker pool + per-host concurrency cap)."
      },
      {
       "topic": "01.14",
@@ -437,7 +701,140 @@ window.CURRICULUM = {
      "title": "Mock 4: concurrency coding (Anthropic bar)",
      "bar": "Build a concurrent web crawler with per-host rate limiting (or a thread-safe single-flight cache) in 45 to 60 minutes, with a race-catching test and a clear proof of thread safety and deadlock freedom. Pass M2, M3 and M4 and you are ready for technical screens.",
      "ask": "mock interview, concurrency coding: a concurrent web crawler with per-host rate limiting, 60 minutes"
-    }
+    },
+    "dayNote": "About 28 hours (~4.5 hours/day Mon–Sat + 60m concurrency mock on Sunday). After passing M4, you are technical-screen ready!",
+    "days": [
+     {
+      "label": "Day 1 · Monday",
+      "plan": [
+       {
+        "t": "30m",
+        "topic": "09.01",
+        "do": "Teach session: processes, threads & context switches"
+       },
+       {
+        "t": "1h",
+        "topic": "03.01",
+        "do": "Teach session: Python threads, processes, GIL & asyncio"
+       },
+       {
+        "t": "1h 30m",
+        "topic": "03.02",
+        "do": "Learn race conditions, critical sections, atomicity & visibility"
+       }
+      ],
+      "drills": [
+       "Word Ladder"
+      ]
+     },
+     {
+      "label": "Day 2 · Tuesday",
+      "plan": [
+       {
+        "t": "1h 30m",
+        "topic": "03.03",
+        "do": "Learn mutexes, RW locks, semaphores & condition variables"
+       },
+       {
+        "t": "1h",
+        "topic": "03.04",
+        "do": "Learn deadlock conditions, lock ordering, livelock & starvation"
+       },
+       {
+        "t": "1h",
+        "topic": "03.05",
+        "do": "Learn thread pools, work queues & backpressure"
+       }
+      ],
+      "drills": [
+       "Alien Dictionary"
+      ]
+     },
+     {
+      "label": "Day 3 · Wednesday",
+      "plan": [
+       {
+        "t": "1h",
+        "topic": "03.06",
+        "do": "Teach session: async I/O, event loops, cancellation & timeouts"
+       },
+       {
+        "t": "2h 30m",
+        "topic": "03.07",
+        "do": "Implement bounded_queue (Condition + graceful shutdown) and pass all tests"
+       }
+      ],
+      "drills": []
+     },
+     {
+      "label": "Day 4 · Thursday",
+      "plan": [
+       {
+        "t": "2h 30m",
+        "topic": "03.07",
+        "do": "Implement single_flight_cache (coalescing concurrent misses without holding global lock)"
+       },
+       {
+        "t": "1h",
+        "topic": "01.14",
+        "do": "Optional: implement striped_hash_map"
+       }
+      ],
+      "drills": [
+       "Employee Free Time"
+      ]
+     },
+     {
+      "label": "Day 5 · Friday",
+      "plan": [
+       {
+        "t": "2h 30m",
+        "topic": "03.07",
+        "do": "Implement concurrent_crawler (worker pool + per-host concurrency cap + error safety)"
+       },
+       {
+        "t": "1h",
+        "topic": "08.01",
+        "do": "Teach sessions: systematic debugging & reading unfamiliar code quickly"
+       }
+      ],
+      "drills": []
+     },
+     {
+      "label": "Day 6 · Saturday",
+      "plan": [
+       {
+        "t": "45m",
+        "topic": "08.03",
+        "do": "Practice reading an unfamiliar Python module: entry points, data flow, invariants"
+       },
+       {
+        "t": "1h",
+        "topic": "08.04",
+        "do": "Practice spotting subtle & concurrency bugs in unfamiliar code"
+       },
+       {
+        "t": "1h 45m",
+        "topic": "13.06",
+        "do": "Coding with AI & verification: implement differential.py and practice skeptical diff review"
+       }
+      ],
+      "drills": [
+       "Range Module"
+      ]
+     },
+     {
+      "label": "Day 7 · Sunday",
+      "plan": [
+       {
+        "t": "1h 15m",
+        "topic": "m4",
+        "do": "60-minute Anthropic-bar concurrency coding mock + feedback & log (+ ~1h Parallel Behavioral track)"
+       }
+      ],
+      "drills": []
+     }
+    ]
    },
    {
     "id": "w5",
@@ -1357,9 +1754,70 @@ window.CURRICULUM = {
    ],
    "concepts": [
     {
+     "file": "concurrent-structures.html",
+     "topic": "01.14",
+     "title": "Concurrent data structures",
+     "status": "outline"
+    },
+    {
      "file": "hash-maps.html",
      "topic": "01.01",
-     "title": "Find anything in one step (Hash maps)"
+     "title": "Find anything in one step (Hash maps)",
+     "status": "complete"
+    },
+    {
+     "file": "heaps.html",
+     "topic": "01.04",
+     "title": "Heaps & priority queues",
+     "status": "outline"
+    },
+    {
+     "file": "intervals.html",
+     "topic": "01.09",
+     "title": "Intervals & sweep line",
+     "status": "outline"
+    },
+    {
+     "file": "linear-structures.html",
+     "topic": "01.02",
+     "title": "Linked lists, stacks, queues & monotonic stacks",
+     "status": "outline"
+    },
+    {
+     "file": "lru-lfu-cache.html",
+     "topic": "01.08",
+     "title": "LRU, TTL & LFU caches",
+     "status": "outline"
+    },
+    {
+     "file": "probabilistic-structures.html",
+     "topic": "01.12",
+     "title": "Bloom filters & probabilistic structures",
+     "status": "outline"
+    },
+    {
+     "file": "storage-structures.html",
+     "topic": "01.13",
+     "title": "Storage engines: B-trees, LSM trees & WAL",
+     "status": "outline"
+    },
+    {
+     "file": "trees.html",
+     "topic": "01.03",
+     "title": "Trees, BSTs & traversals",
+     "status": "outline"
+    },
+    {
+     "file": "tries.html",
+     "topic": "01.06",
+     "title": "Tries & prefix trees",
+     "status": "outline"
+    },
+    {
+     "file": "union-find.html",
+     "topic": "01.07",
+     "title": "Union-Find (disjoint sets)",
+     "status": "outline"
     }
    ],
    "exercises": [
@@ -2132,7 +2590,50 @@ window.CURRICULUM = {
      "short": "Probability & capacity math"
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "binary-search.html",
+     "topic": "02.03",
+     "title": "Binary search & search on the answer",
+     "status": "outline"
+    },
+    {
+     "file": "complexity.html",
+     "topic": "02.01",
+     "title": "How fast is your code? (Complexity & amortized cost)",
+     "status": "outline"
+    },
+    {
+     "file": "consistent-hashing.html",
+     "topic": "02.15",
+     "title": "Consistent & rendezvous hashing",
+     "status": "outline"
+    },
+    {
+     "file": "dynamic-programming.html",
+     "topic": "02.07",
+     "title": "Dynamic programming",
+     "status": "outline"
+    },
+    {
+     "file": "graphs.html",
+     "topic": "02.05",
+     "title": "Graph traversals & topological sort",
+     "status": "outline"
+    },
+    {
+     "file": "shortest-paths.html",
+     "topic": "02.08",
+     "title": "Shortest paths (Dijkstra & 0-1 BFS)",
+     "status": "outline"
+    },
+    {
+     "file": "sliding-window.html",
+     "topic": "02.04",
+     "title": "Two pointers, sliding window & prefix sums",
+     "status": "outline"
+    }
+   ],
    "exercises": [
     {
      "file": "astar_grid.py",
@@ -2571,8 +3072,45 @@ window.CURRICULUM = {
      "text": "Implement from scratch: thread-safe queue, rate limiter, connection pool, scheduler, read-through cache with single-flight"
     }
    ],
-   "concepts": [],
-   "exercises": []
+   "concepts": [
+    {
+     "file": "locks-and-races.html",
+     "topic": "03.03",
+     "title": "Locks, semaphores & condition variables",
+     "status": "outline"
+    }
+   ],
+   "exercises": [
+    {
+     "file": "bounded_queue.py",
+     "module": "bounded_queue",
+     "title": "Thread-safe bounded producer-consumer queue with graceful shutdown",
+     "topics": [
+      "03.05",
+      "03.07"
+     ],
+     "result": null
+    },
+    {
+     "file": "concurrent_crawler.py",
+     "module": "concurrent_crawler",
+     "title": "Concurrent web crawler with worker pool and per-host concurrency cap",
+     "topics": [
+      "03.05",
+      "03.07"
+     ],
+     "result": null
+    },
+    {
+     "file": "single_flight_cache.py",
+     "module": "single_flight_cache",
+     "title": "Thread-safe LRU cache with single-flight (cache stampede coalescing)",
+     "topics": [
+      "03.07"
+     ],
+     "result": null
+    }
+   ]
   },
   {
    "num": 4,
@@ -2886,7 +3424,14 @@ window.CURRICULUM = {
      ]
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "raft-consensus.html",
+     "topic": "05.04",
+     "title": "Consensus: Raft, Paxos & leader election",
+     "status": "outline"
+    }
+   ],
    "exercises": []
   },
   {
@@ -3616,7 +4161,20 @@ window.CURRICULUM = {
      "text": "Dependency management, build systems, monorepo trade-offs"
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "python-idioms.html",
+     "topic": "10.10",
+     "title": "Python fluency: idioms, lambdas, generators & gotchas",
+     "status": "complete"
+    },
+    {
+     "file": "python-toolkit.html",
+     "topic": "10.01",
+     "title": "Python standard library toolkit",
+     "status": "complete"
+    }
+   ],
    "exercises": [
     {
      "file": "py_idioms.py",
@@ -3877,7 +4435,14 @@ window.CURRICULUM = {
      "text": "Training infrastructure basics: data loaders, checkpointing, distributed training"
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "inference-serving.html",
+     "topic": "13.02",
+     "title": "LLM inference serving & the KV cache",
+     "status": "outline"
+    }
+   ],
    "exercises": [
     {
      "file": "bisect_skip.py",
@@ -3979,7 +4544,14 @@ window.CURRICULUM = {
      "text": "Product sense: why are we building this, how would we measure it?"
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "project-deep-dive.html",
+     "topic": "14.01",
+     "title": "Flagship project & 60-sec intro",
+     "status": "complete"
+    }
+   ],
    "exercises": []
   },
   {
@@ -4081,12 +4653,19 @@ window.CURRICULUM = {
      "short": "Hiring manager round mock"
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "bare-editor-playbook.html",
+     "topic": "15.01",
+     "title": "Bare-editor coding playbook",
+     "status": "complete"
+    }
+   ],
    "exercises": []
   }
  ],
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 17:09"
+ "generated": "2026-11-23 17:41"
 };

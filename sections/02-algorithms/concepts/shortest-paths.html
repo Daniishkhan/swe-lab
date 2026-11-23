@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.08">
+  <meta name="status" content="outline">
+  <title>Shortest paths (Dijkstra &amp; 0-1 BFS)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Week 2 · Algorithms</div>
+  <h1>Shortest paths (Dijkstra &amp; 0-1 BFS)</h1>
+  <div class="meta"><span><span class="kind k-outline">Outline</span> ready to author</span><span>Builds on: Graph traversals &amp;amp; topological sort, Heaps &amp;amp; priority queues.</span></div>
+</header>
+
+<p>Shortest paths: Dijkstra, 0-1 BFS, Bellman-Ford, A* basics.</p>
+
+<div class="outline-banner">
+  <div>
+    <b>Chapter skeleton ready.</b> Study this interactively right now via <code>teach</code>, or author the full visual chapter later (remove <code>status="outline"</code> once written).
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn primary" type="button" data-copy="teach me shortest paths (Dijkstra &amp; 0-1 BFS)">Copy teach prompt</button>
+    <button class="btn" type="button" data-copy="write the chapter for 02.08 (Shortest paths (Dijkstra &amp; 0-1 BFS)) following write-chapter, visuals-and-layout, and review-chapter">Copy write-chapter prompt</button>
+  </div>
+</div>
+
+<h2 id="s1"><span class="sec-num">1</span>Planned chapter arc</h2>
+<ol>
+  <li><b>Why do we even need this?</b> — Concrete pain story with real numbers + early before/after visual + immediate payoff.</li>
+  <li><b>Running physical analogy &amp; rebuild</b> — One everyday mental model carried through <code>Question → Naive attempt → Break → Fix</code>.</li>
+  <li><b>Interactive visualization</b> — Step-through or live playground built with <code>assets/viz.js</code>.</li>
+  <li><b>How can this break?</b> — Core gotchas, worst-case bounds, and when this is the wrong tool.</li>
+  <li><b>How you use this in interviews</b> — 3 to 5 concrete before/after patterns (plus Google L5 scale follow-ups).</li>
+  <li><b>What to say in the interview</b> — 2-minute spoken summary + 5 to 8 intuition quick checks.</li>
+</ol>
+
+<h2 id="exercises"><span class="sec-num">✎</span>Linked exercises &amp; drills</h2>
+<ul>
+  <li><code>astar_grid.py</code> — A* on a grid</li>
+  <li><code>bellman_ford.py</code> — Bellman-Ford: shortest paths with negative edges, and negative cycles</li>
+  <li><code>dijkstra.py</code> — Dijkstra&#x27;s shortest paths</li>
+</ul>
+<pre class="plain"><code>python3 -m pytest -k "astar_grid or bellman_ford or dijkstra"</code></pre>
+<h3>Timed drills (bare editor)</h3>
+<ul style="list-style:none;padding:0;display:grid;gap:4px">
+  <li><span class="lvl M">M</span> Network Delay Time</li>
+  <li><span class="lvl M">M</span> Path With Minimum Effort</li>
+  <li><span class="lvl M">M</span> Cheapest Flights Within K Stops</li>
+  <li><span class="lvl H">H</span> Swim in Rising Water</li>
+  <li><span class="lvl H">H</span> Shortest Path in a Grid with Obstacles Elimination</li>
+</ul>
+
+<nav class="chapter-nav">
+  <a href="../index.html"><small>← Subject</small>Algorithms</a>
+  <a class="next" href="../../../index.html"><small>Back to →</small>Your track</a>
+</nav>
+
+</main>
+<script>
+document.querySelectorAll("[data-copy]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const txt = btn.getAttribute("data-copy");
+    const done = () => { const o = btn.textContent; btn.textContent = "Copied"; setTimeout(() => (btn.textContent = o), 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done);
+    else { const ta = document.createElement("textarea"); ta.value = txt; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); done(); }
+  });
+});
+</script>
+</body>
+</html>

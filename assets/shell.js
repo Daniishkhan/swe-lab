@@ -52,9 +52,12 @@
       const o = Object.assign({}, st, { si });
       o.steps = st.steps.map((x) => {
         const { t, s } = topic[x.topic];
+        const pages = s.concepts.filter((c) => c.topic === x.topic);
+        const isWritten = pages.some((c) => c.status !== "outline");
+        const isOutline = pages.length > 0 && !isWritten;
         return Object.assign({}, x, {
           id: x.topic, key: x.topic, t, s, stage: o, optional: !!x.optional, kind: KIND[s.id] || "learn",
-          pages: s.concepts.filter((c) => c.topic === x.topic),
+          pages, isWritten, isOutline,
           exercises: s.exercises.filter((e) => e.topics.includes(x.topic)),
         });
       });
@@ -76,8 +79,8 @@
       stages, all, byTopic, items, short, pagePath,
       isDone: (x, st = status()) => st[x.key] === "confident",
       readPct: (x, r = read()) => (x.pages && x.pages.length ? Math.min(...x.pages.map((c) => r[pagePath(x, c)] || 0)) : 0),
-      title: (x) => (x.isMilestone ? x.title : x.pages.length ? x.pages[0].title : short(x.t)),
-      kindLabel: (x) => ({ learn: x.pages && x.pages.length ? "Read" : "Learn", design: "Design", story: "Story", mock: x.pages && x.pages.length ? "Read" : "Mock", milestone: "Milestone" })[x.kind],
+      title: (x) => (x.isMilestone ? x.title : x.isWritten ? x.pages[0].title : short(x.t)),
+      kindLabel: (x) => ({ learn: x.isWritten ? "Read" : x.isOutline ? "Outline" : "Learn", design: "Design", story: "Story", mock: x.isWritten ? "Read" : "Mock", milestone: "Milestone" })[x.kind],
       href: (x, root) => x.isMilestone ? `${root}/index.html#stage-${x.stage.id}`
         : x.pages.length ? `${root}/${pagePath(x, x.pages[0])}` : `${root}/sections/${x.s.slug}/index.html#t-${x.id}`,
       // What to do for this step, as DOM nodes
@@ -90,7 +93,7 @@
         if (x.kind === "design") return ["45 minutes, timed, out loud. Start a worksheet with ", h("code", {}, `python3 tools/new.py case "${short(x.t)}"`), "."];
         if (x.kind === "story") return ["Write one STAR story that answers it: ", h("code", {}, 'python3 tools/new.py story "Your title"'), "."];
         if (x.kind === "mock") return ask("mock interview, " + lower(short(x.t)));
-        if (!x.pages.length) return ["Not written yet. ", ...ask("teach me " + lower(short(x.t))), " Plan on 45 minutes, and end by explaining it back."];
+        if (!x.isWritten) return ["Outline ready — ", ...ask("teach me " + lower(short(x.t))), " Plan on 45 minutes, and end by explaining it back."];
         const n = x.exercises.length;
         const ex = n === 1 ? "the exercise" : `the ${n} exercises`;
         return ["Read it and answer each quick check", n ? [", then do ", root ? h("a", { href: `${root}/sections/${x.s.slug}/index.html#exercises` }, ex) : ex] : null, "."];
@@ -156,6 +159,7 @@
     expand: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
     flag: '<path d="M5.5 21V4"/><path d="M5.5 4.5h11l-2.2 4 2.2 4h-11"/>',
     route: '<circle cx="6" cy="18.5" r="2.2"/><circle cx="18" cy="5.5" r="2.2"/><path d="M8.2 18.5H16a3.2 3.2 0 0 0 0-6.4H8a3.2 3.2 0 0 1 0-6.4h7.8"/>',
+    play: '<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5v3.5l2.5 1.5M9.5 3h5"/>',
   };
   const icon = (name) => { const w = document.createElement("span"); w.className = "svg-wrap"; w.innerHTML = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`; return w; };
 
@@ -254,6 +258,8 @@
       crumbs.append(h("span", { class: "sep" }, "/"));
       crumbs.append(PAGE === "concept" ? h("a", { href: chapterHref(sec) }, `§${sec.id} ${sec.title}`) : h("span", { class: "cur" }, `§${sec.id} ${sec.title}`));
       if (PAGE === "concept") crumbs.append(h("span", { class: "sep" }, "/"), h("span", { class: "cur" }, document.title));
+    } else if (PAGE === "practice") {
+      crumbs.append(h("span", { class: "sep" }, "/"), h("span", { class: "cur" }, "Practice hub"));
     }
     const sideBtn = iconButton("panelL", "Toggle sidebar  [", toggleSidebar);
     toggles.side.push(sideBtn);
@@ -320,7 +326,7 @@
         const active = x === cur;
         const done = T.isDone(x, status);
         const tip = x.isMilestone ? x.bar : `${T.kindLabel(x)}${x.optional ? " (optional)" : ""} · ${x.t.tag} · ${x.t.text}`;
-        kids.append(h("a", { class: "kid" + (x.isMilestone ? " ms" : x.pages.length ? "" : " pending") + (active ? " active" : "") + (x === nextUp ? " next-up" : ""),
+        kids.append(h("a", { class: "kid" + (x.isMilestone ? " ms" : x.isWritten ? "" : " pending") + (active ? " active" : "") + (x === nextUp ? " next-up" : ""),
           href: T.href(x, ROOT), title: tip, "aria-current": active ? "page" : null },
           x.isMilestone ? icon("flag") : h("span", { class: "dot " + x.t.tag }),
           h("span", {}, T.title(x)), x.optional ? h("span", { class: "opt" }, "opt") : null,
@@ -336,7 +342,9 @@
 
   function buildSidebar() {
     const nav = h("nav", { class: "nav", "aria-label": "Track and chapters" });
-    nav.append(h("a", { class: "nav-link" + (PAGE === "home" ? " active" : ""), href: `${ROOT}/index.html` }, icon("home"), "Home"));
+    nav.append(
+      h("a", { class: "nav-link" + (PAGE === "home" ? " active" : ""), href: `${ROOT}/index.html` }, icon("home"), "Home"),
+      h("a", { class: "nav-link" + (PAGE === "practice" ? " active" : ""), href: `${ROOT}/practice.html` }, icon("play"), "Practice hub"));
     const chapters = buildChapterNav();
     if (window.SWETrack) {
       const track = buildTrackNav();
@@ -367,9 +375,10 @@
     const T = window.SWETrack;
     for (const s of C.sections) {
       const isCur = s.id === SECTION;
+      const writtenCount = s.concepts.filter((c) => c.status !== "outline").length;
       const link = h("a", { href: chapterHref(s), class: isCur && PAGE === "chapter" ? "active" : null, title: `§${s.id} ${s.title}` },
         h("span", { class: "no" }, s.id), h("span", { class: "title" }, s.title),
-        s.concepts.length ? h("span", { class: "count", title: `${s.concepts.length} pages written` }, s.concepts.length) : null);
+        writtenCount ? h("span", { class: "count", title: `${writtenCount} chapters written` }, writtenCount) : null);
       const kids = h("div", { class: "sec-kids" });
       for (const t of s.topics) {
         const pages = s.concepts.filter((c) => c.topic === t.id);
@@ -378,17 +387,18 @@
         if (pages.length) {
           for (const c of pages) {
             const active = isCur && PAGE === "concept" && c.file === here;
-            const done = (readMap[`sections/${s.slug}/concepts/${c.file}`] || 0) >= 90;
-            kids.append(h("a", { class: "kid" + off + (active ? " active" : ""), href: conceptHref(s, c.file), title: `${t.tag} · ${t.text}${offTip}`, "aria-current": active ? "page" : null },
-              h("span", { class: "dot " + t.tag }), h("span", {}, c.title), done && !active ? h("span", { class: "read-mark", title: "Read" }, "✓") : null));
+            const isOutline = c.status === "outline";
+            const done = !isOutline && (readMap[`sections/${s.slug}/concepts/${c.file}`] || 0) >= 90;
+            kids.append(h("a", { class: "kid" + off + (isOutline ? " pending" : "") + (active ? " active" : ""), href: conceptHref(s, c.file), title: `${t.tag} · ${isOutline ? "outline · " : ""}${t.text}${offTip}`, "aria-current": active ? "page" : null },
+              h("span", { class: "dot " + t.tag }), h("span", {}, c.title), isOutline ? h("span", { class: "opt" }, "out") : null, done && !active ? h("span", { class: "read-mark", title: "Read" }, "✓") : null));
             if (active && heads.length) kids.append(tocList("toc-inline"));
           }
         } else {
-          kids.append(h("a", { class: "kid pending" + off, href: chapterHref(s) + "#t-" + t.id, title: `${t.tag} · not written yet${offTip}` },
+          kids.append(h("a", { class: "kid pending" + off, href: chapterHref(s) + "#t-" + t.id, title: `${t.tag} · teach/worksheet${offTip}` },
             h("span", { class: "dot " + t.tag }), shortTitle(t)));
         }
       }
-      nav.append(navGroup(isCur || openSet.has(s.id), isCur, s.concepts.length ? null : "empty-sec", s.title, "openSecs", s.id, link, kids));
+      nav.append(navGroup(isCur || openSet.has(s.id), isCur, writtenCount ? null : "empty-sec", s.title, "openSecs", s.id, link, kids));
     }
     return nav;
   }
@@ -491,6 +501,36 @@
     SIZES.forEach((px, i) => ticks.append(h("span", { title: px + "px", onclick: () => { prefs.size = i; savePrefs(); paintPop(); } })));
     const sizeVal = h("span", { class: "val" });
     const step = (d) => { prefs.size = Math.max(0, Math.min(SIZES.length - 1, prefs.size + d)); savePrefs(); paintPop(); };
+    const importInput = h("input", { type: "file", accept: ".json", style: "display:none" });
+    importInput.addEventListener("change", () => {
+      const f = importInput.files && importInput.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const obj = JSON.parse(String(r.result || "{}"));
+          if (!obj || typeof obj !== "object") return;
+          Object.entries(obj).forEach(([k, v]) => { if (k.startsWith("swe-prep:")) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v)); });
+          location.reload();
+        } catch (_) { alert("Could not read backup JSON."); }
+      };
+      r.readAsText(f);
+    });
+    const exportProgress = () => {
+      const out = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("swe-prep:")) {
+          try { out[k] = JSON.parse(localStorage.getItem(k)); } catch (_) { out[k] = localStorage.getItem(k); }
+        }
+      }
+      const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `swe-lab-progress-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
     pop = h("div", { class: "pop", id: "appearance", role: "dialog", "aria-label": "Appearance", onclick: (e) => e.stopPropagation() },
       h("h3", {}, "Appearance", h("button", { class: "ghost", type: "button", "aria-label": "Close", onclick: () => togglePop(false), style: "width:28px;height:28px" }, icon("x"))),
       h("div", { class: "group" }, h("div", { class: "glabel" }, h("span", {}, "Theme"), h("kbd", {}, "t")), themeGroup),
@@ -504,7 +544,12 @@
           sizeVal)),
       h("div", { class: "group" }, h("div", { class: "glabel" }, "Line width"), seg("width", [["narrow", "Narrow"], ["normal", "Normal"], ["wide", "Wide"]], "Line width")),
       h("div", { class: "group" }, h("div", { class: "glabel" }, "Code font"), seg("code", [["jetbrains", "JetBrains Mono"], ["system", "SF Mono"]], "Code font")),
-      h("div", { class: "group" }, h("button", { class: "btn reset", type: "button", onclick: () => { Object.assign(prefs, DEFAULTS); savePrefs(); setTheme("dark"); paintPop(); } }, "Reset to defaults")));
+      h("div", { class: "group" }, h("div", { class: "glabel" }, "Progress backup"),
+        h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px" },
+          h("button", { class: "btn", type: "button", style: "justify-content:center", onclick: exportProgress }, "Export JSON"),
+          h("button", { class: "btn", type: "button", style: "justify-content:center", onclick: () => importInput.click() }, "Import JSON")),
+        importInput),
+      h("div", { class: "group" }, h("button", { class: "btn reset", type: "button", onclick: () => { Object.assign(prefs, DEFAULTS); savePrefs(); setTheme("dark"); paintPop(); } }, "Reset appearance")));
     pop._paint = () => {
       pop.querySelectorAll(".theme-opt").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.v === theme)));
       pop.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-checked", String(prefs[b.dataset.k] === b.dataset.v)));
@@ -531,11 +576,16 @@
   function paletteItems() {
     const items = [];
     heads.forEach((hd) => { const { num, text } = headParts(hd); items.push({ grp: "On this page", icon: "hash", title: (num ? num + ". " : "") + text, href: "#" + hd.id, where: "" }); });
-    items.push({ grp: "Chapters", icon: "home", title: "Home", href: `${ROOT}/index.html`, where: "" });
+    items.push(
+      { grp: "Workspace", icon: "home", title: "Home · Track dashboard", href: `${ROOT}/index.html`, where: "" },
+      { grp: "Workspace", icon: "play", title: "Practice hub · Bare editor, Mock log & STAR matrix", href: `${ROOT}/practice.html`, where: "" });
     for (const s of C.sections) {
-      items.push({ grp: "Chapters", icon: "grid", title: `§${s.id} ${s.title}`, href: chapterHref(s), where: s.concepts.length ? `${s.concepts.length} written` : "" });
-      for (const c of s.concepts) items.push({ grp: "Reading", icon: "book", title: c.title, href: conceptHref(s, c.file), where: `§${s.id} ${s.title}` });
-      for (const t of s.topics) if (!s.concepts.some((c) => c.topic === t.id)) items.push({ grp: "Topics not written yet", icon: "dot", title: shortTitle(t), href: chapterHref(s) + "#t-" + t.id, where: `§${s.id} · ${t.tag}`, extra: t.text });
+      const written = s.concepts.filter((c) => c.status !== "outline");
+      const outlines = s.concepts.filter((c) => c.status === "outline");
+      items.push({ grp: "Subjects", icon: "grid", title: `§${s.id} ${s.title}`, href: chapterHref(s), where: written.length ? `${written.length} written` : outlines.length ? `${outlines.length} outlines` : "" });
+      for (const c of written) items.push({ grp: "Chapters", icon: "book", title: c.title, href: conceptHref(s, c.file), where: `§${s.id} ${s.title}` });
+      for (const c of outlines) items.push({ grp: "Outlines", icon: "dot", title: c.title, href: conceptHref(s, c.file), where: `§${s.id} outline` });
+      for (const t of s.topics) if (!s.concepts.some((c) => c.topic === t.id)) items.push({ grp: "Topics", icon: "dot", title: shortTitle(t), href: chapterHref(s) + "#t-" + t.id, where: `§${s.id} · ${t.tag}`, extra: t.text });
     }
     return items;
   }
@@ -547,7 +597,7 @@
     const draw = () => {
       const q = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
       shown = all.filter((it) => {
-        if (!q.length) return it.grp !== "Topics not written yet" && (heads.length ? it.grp !== "Reading" || it.where.startsWith("§" + SECTION) : true);
+        if (!q.length) return it.grp !== "Topics" && it.grp !== "Outlines" && (heads.length ? it.grp !== "Chapters" || it.where.startsWith("§" + SECTION) : true);
         const hay = (it.title + " " + it.where + " " + (it.extra || "")).toLowerCase();
         return q.every((w) => hay.includes(w));
       }).slice(0, 80);

@@ -56,10 +56,11 @@ swe-prep/
 
 | Chapter | Book chapters (`concepts/*.html`) | Exercises (stubs + work-measuring tests) |
 |---|---|---|
-| §01 Data structures | `hash-maps.html` (`01.01`) written; other high-ROI core chapters authored as needed (see `CLAUDE.md`) | 37 exercises, from `hash_map` and `lru_cache` to `bloom_filter`, `lsm_store` and `mpmc_queue` |
+| Phase 0 (§10, §14, §15) | All 4 Phase 0 guides written: `python-idioms.html`, `python-toolkit.html`, `bare-editor-playbook.html` (with 45m/25m timer), `project-deep-dive.html` | 3 Python warm-up suites (`py_idioms`, `py_internals`, `py_toolkit`) |
+| §01 Data structures | `hash-maps.html` written; other high-ROI core chapters authored as needed (see `CLAUDE.md`) | 37 exercises, from `hash_map` and `lru_cache` to `bloom_filter`, `lsm_store` and `mpmc_queue` |
 | §02 Algorithms | Learned via targeted chapters + `teach` sessions | 36 exercises, from `sorts` and `graphs` to `dijkstra`, `kruskal_mst`, `kmp_search`, `external_sort`, `token_bucket`, `consistent_hash` and `capacity_estimate` |
-| §10 Code quality & §13 AI/ML | Learned via `teach` sessions + worksheets | 6 exercises (`py_idioms`, `py_internals`, `py_toolkit`, `differential`, `delta_debug`, `bisect_skip`) |
-| §03–§09, §11–§12, §14–§15 | Learned via `teach` sessions, worksheets & mocks | Scaffolded with chapter dashboards and templates |
+| §03 Concurrency | Learned via `teach` sessions + targeted chapter | 3 concurrency suites (`bounded_queue`, `single_flight_cache`, `concurrent_crawler`) |
+| §13 AI/ML & other sections | Learned via `teach` sessions, worksheets & mocks | 3 verification suites (`differential`, `delta_debug`, `bisect_skip`) + chapter dashboards and templates |
 
 ## Priority key
 

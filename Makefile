@@ -1,7 +1,7 @@
 # Common tasks. Run `make` or `make help` to list them.
-PY ?= python3
 VENV := .venv
 BIN := $(VENV)/bin
+PY ?= $(if $(wildcard $(BIN)/python),$(BIN)/python,python3)
 
 .PHONY: help setup test one progress build serve open
 

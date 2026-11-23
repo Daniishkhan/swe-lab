@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="14.01">
+  <title>Flagship project &amp; 60-sec intro</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="14" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Phase 0 · Recruiter &amp; HM baseline</div>
+  <h1>Flagship project &amp; 60-sec intro</h1>
+  <div class="meta"><span>about 12 minutes</span><span>3 quick checks · worksheet setup</span></div>
+</header>
+
+<p>Because your resumes are going out now, recruiter calls and hiring manager screens can land while you're deep in Week 2 graphs. Doing this baseline once in Phase 0 ensures you never get caught rambling on "Tell me about yourself" or fumbling numbers on the hardest system you built.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll have</h4>
+  <ol>
+    <li>A crisp 60-second "Tell me about yourself" tuned for Senior / L5 scope.</li>
+    <li>Your strongest flagship project selected using an objective L5-scope rubric.</li>
+    <li>A filled deep-dive worksheet with real numbers, rejected alternatives, a real failure, and a 5-rung follow-up ladder.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: read through once, then generate your worksheet with <code>python3 tools/new.py deepdive "Your project name"</code> and rehearse the 5-minute map out loud.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>Pick the right flagship project (the L5 scope test)</h2>
+
+<p>Most senior candidates pick their <em>most recent</em> project instead of their <em>most defensible</em> project. Score your top 3 past projects from 1 to 3 on each row below—your highest scorer is your flagship:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>L5 Signal</th><th>Weak (L4 / task execution)</th><th>Strong (L5 / Senior ownership)</th></tr></thead>
+  <tbody>
+    <tr><td><b>Ambiguity</b></td><td>Clear spec handed to you</td><td>Messy problem; you defined requirements &amp; architecture</td></tr>
+    <tr><td><b>Personal impact ("I")</b></td><td>"We built a microservice…"</td><td>3–5 concrete technical decisions <em>you</em> drove and can defend</td></tr>
+    <tr><td><b>Real constraints</b></td><td>Toy traffic or no hard trade-offs</td><td>Measurable scale (QPS, data, p99, cost, org alignment)</td></tr>
+    <tr><td><b>Rejected alternatives</b></td><td>"We just used Postgres + Kafka"</td><td>Can name 2 rejected designs and the exact constraint that ruled them out</td></tr>
+    <tr><td><b>Scars &amp; hindsight</b></td><td>"Everything went smoothly"</td><td>One real outage or wrong call + what you'd change today and why</td></tr>
+  </tbody>
+</table></div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>The 60-second "Tell me about yourself"</h2>
+
+<p>Interviewers use this opener to calibrate your seniority in the first minute. Keep it strictly under 60 seconds using <b>Present → Past → Future</b>:</p>
+
+<div class="figure">
+<pre class="diagram"><code>1. PRESENT (15s): Role, team scope, and the core systems you own today.
+2. PAST    (30s): 1–2 defining achievements with real numbers (tease your flagship project).
+3. FUTURE  (15s): Why this level &amp; type of problem now (tailored to Google / Anthropic / target).</code></pre>
+  <div class="cap">Say it out loud with a stopwatch until it feels conversational—never memorized like a script, never a 4-minute chronological resume reading.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>How to deliver the 5-minute architecture map</h2>
+
+<p>In a past-project deep dive (common in Anthropic HM/technical screens and Google team-match/G&amp;L probes), never dump 20 minutes of monologue. Give a tight <b>5-minute zoomable overview</b> and invite the interviewer to pull on any thread:</p>
+
+<ol>
+  <li><b>Context &amp; pain (45s):</b> What product, what broke or scaled poorly, and the baseline number.</li>
+  <li><b>4–7 box diagram (2m):</b> Draw the request/data flow cleanly with approximate QPS, data size, and latency targets.</li>
+  <li><b>Your 2 hardest trade-offs (1m 30s):</b> State what you chose, what you <em>rejected</em>, and which constraint forced your hand.</li>
+  <li><b>Measured result &amp; invitation (45s):</b> Give the before/after metric, then ask: <i>"Which part would you like to dive deepest into—the storage layer, failure handling, or rollout?"</i></li>
+</ol>
+
+<div class="keyidea">Saying "we" hides your level. Use <b>"I"</b> for decisions you made and credit teammates explicitly for what they owned—interviewers respect honesty and clarity about scope.</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>Quick checks</h2>
+
+<div class="check" id="check-we">
+  <p class="q">An interviewer asks about your flagship migration and you say: "We decided to dual-write and we migrated traffic over two weeks." What signal does that accidentally hide?</p>
+  <div class="opts">
+    <button>That you're a team player</button>
+    <button data-correct>Whether you designed and drove the migration strategy or merely executed someone else's plan</button>
+    <button>How many engineers were on the team</button>
+  </div>
+  <div class="fb right"><p>Spot on. Give team context once ("three of us worked on this"), then switch cleanly to "I designed the shadow-traffic verifier and owned the cutover plan, while Sarah built the backfill workers."</p></div>
+  <div class="fb wrong"><p>Hiring committees at Google and Anthropic specifically scan behavioral notes for individual ownership. Using "we" throughout leaves the committee unable to distinguish L4 execution from L5 technical leadership.</p></div>
+</div>
+
+<div class="check" id="check-alt">
+  <p class="q">Why do interviewers always ask "What alternatives did you reject, and what would you change now?" during a project deep dive?</p>
+  <div class="opts">
+    <button>To see if you memorized the names of rival technologies</button>
+    <button data-correct>To test engineering judgment—whether choices were grounded in real constraints and whether you have the epistemic humility to spot flaws in your own past work</button>
+    <button>To catch you admitting mistakes so they can reject you</button>
+  </div>
+  <div class="fb right"><p>Exactly. Especially at Anthropic (epistemic humility) and Google L5 (senior judgment), candidly explaining a trade-off that aged poorly is a strong hire signal.</p></div>
+  <div class="fb wrong"><p>Every real system has scars and trade-offs. Claiming a design had no downsides signals either junior scope or lack of self-awareness—naming the rejected alternative and the constraint that settled it proves real ownership.</p></div>
+</div>
+
+<div class="check" id="check-opener">
+  <p class="q">In a 45-minute past-project deep dive, how long should your initial project overview take before pausing for questions?</p>
+  <div class="opts">
+    <button>15–20 minutes so you cover every box thoroughly</button>
+    <button data-correct>About 5 minutes: context, 4–7 boxes with numbers, 2 key trade-offs, measured result, then ask where to zoom in</button>
+    <button>30 seconds, then wait for the interviewer to ask everything</button>
+  </div>
+  <div class="fb right"><p>Right! A 5-minute high-signal map proves you can summarize at executive altitude while leaving 35+ minutes for the deep technical grilling that earns a Strong Hire.</p></div>
+  <div class="fb wrong"><p>A 20-minute monologue burns half the round on areas the interviewer doesn't care about, while a 30-second opener forces them to drag context out of you. Aim for a tight 5-minute map and hand them the zoom lens.</p></div>
+</div>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Phase 0 Day 4 Setup</h2>
+
+<div class="exercise">
+  <div class="tier core">Core · worksheet</div>
+  <h4>1. Create and fill your flagship deep-dive worksheet</h4>
+  <p>Run the command below, fill every section (60-sec version, 4–7 box map, scale table, rejected alternatives, what broke, follow-up ladder), and practice the 5-minute map out loud with a timer.</p>
+<pre class="plain"><code>python3 tools/new.py deepdive "Your flagship project"</code></pre>
+</div>
+
+<nav class="chapter-nav">
+  <a href="../../15-interview-formats/concepts/bare-editor-playbook.html"><small>← Previous</small>Bare-editor coding playbook</a>
+  <a class="next" href="../../../index.html#stage-w1"><small>Next →</small>Week 1: Complexity &amp; core data structures</a>
+</nav>
+
+</main>
+</body>
+</html>
