@@ -73,5 +73,5 @@ def count_pairs_with_sum(sorted_nums, target: int) -> int:
     raise NotImplementedError
 
 
-def fast_power(base: int, exp: int) -> tuple[int, int]:
+def fast_power(base, exp: int) -> tuple:
     raise NotImplementedError

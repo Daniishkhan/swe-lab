@@ -41,6 +41,7 @@ def test_top_k_ties_alphabetical():
 def test_top_k_small_cases():
     assert top_k_frequent([], 3) == []
     assert top_k_frequent(["x", "y"], 0) == []
+    assert top_k_frequent(["x", "y"], -1) == []
     assert top_k_frequent(["x", "y", "x"], 10) == [("x", 2), ("y", 1)]
 
 

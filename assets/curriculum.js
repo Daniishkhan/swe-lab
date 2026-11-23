@@ -2032,7 +2032,13 @@ window.CURRICULUM = {
      ]
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "complexity.html",
+     "topic": "02.01",
+     "title": "How fast is your code? (Complexity analysis)"
+    }
+   ],
    "exercises": [
     {
      "file": "astar_grid.py",
@@ -3474,7 +3480,13 @@ window.CURRICULUM = {
      "text": "Dependency management, build systems, monorepo trade-offs"
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "python-toolkit.html",
+     "topic": "10.01",
+     "title": "Python for interview speed (Standard library toolkit)"
+    }
+   ],
    "exercises": [
     {
      "file": "py_toolkit.py",
@@ -3806,7 +3818,13 @@ window.CURRICULUM = {
      "text": "Product sense: why are we building this, how would we measure it?"
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "project-deep-dive.html",
+     "topic": "14.01",
+     "title": "Explain a system you built (Project deep dive)"
+    }
+   ],
    "exercises": []
   },
   {
@@ -3904,12 +3922,18 @@ window.CURRICULUM = {
      ]
     }
    ],
-   "concepts": [],
+   "concepts": [
+    {
+     "file": "algorithmic-round.html",
+     "topic": "15.01",
+     "title": "How to run an algorithmic coding round"
+    }
+   ],
    "exercises": []
   }
  ],
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 14:39"
+ "generated": "2026-11-23 10:19"
 };

@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.01">
+  <title>How fast is your code? (Complexity analysis)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 1</div>
+  <h1>How fast is your code?</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> asked in every coding round</span><span>about 18 minutes</span><span>7 quick checks · 8 exercises</span></div>
+</header>
+
+<p>Every coding interview asks the same follow-up the moment you finish writing a solution: <em>"How does this scale?"</em> Nobody wants a memorized chart of math symbols. They want to know whether you can look at ten lines of code, picture how the pile of work grows when the input gets 100× bigger, and catch a slowdown before it hits production.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Predict how much slower your code gets when the input doubles, without running a stopwatch.</li>
+    <li>Spot the six growth shapes on sight and read them straight off Python loops and built-ins.</li>
+    <li>Count extra memory, including the invisible stack of paused recursive calls.</li>
+    <li>Explain why a rare, expensive copy step (like growing a list) still averages out to cheap over time.</li>
+    <li>Catch the four real-world cases where growth formulas mislead — and read input limits backward to pick an approach.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom. This is the first chapter in the track — it assumes only basic Python loops and lists. Answer every quick check before moving on; a wrong answer explains the idea another way. Skip collapsed "Go deeper" boxes on your first pass.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>Why can't we just time our code with a stopwatch?</h2>
+
+<div class="story">
+  <p>You write a feature that checks whether a playlist has duplicate songs by comparing every pair. On your laptop with <b>500 songs</b>, it finishes in <b>2 milliseconds</b>. Ship it.</p>
+  <p>Next week a power user imports <b>50,000 songs</b> (<b>100×</b> bigger). You expect 0.2 seconds. Instead it freezes the server for <b>20 full seconds</b> — <b>10,000×</b> slower.</p>
+</div>
+
+<p>A stopwatch only measures <em>one laptop</em> on <em>one input size</em>. Run the same code on a faster server and the milliseconds shrink, yet the 10,000× cliff stays identical. Timing measures the hardware; we need a way to measure the <b>method</b>.</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 184" role="img" aria-label="Comparing 500 songs against 50,000 songs: checking every pair jumps 10,000x to 1.25 billion checks, while checking each song once grows only 100x to 50,000 checks">
+    <text x="16" y="22" class="label" fill="var(--bad)" font-weight="700">COMPARE EVERY PAIR — 100× more songs → 10,000× more work</text>
+    <rect x="16" y="32" width="156" height="40" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="94" y="49" class="label" text-anchor="middle" font-weight="700">500 songs</text>
+    <text x="94" y="64" class="label" text-anchor="middle" fill="var(--muted)">124,750 pairs (~2 ms)</text>
+    <line x1="174" y1="52" x2="254" y2="52" stroke="var(--bad)" stroke-width="2"/>
+    <polygon points="254,46 266,52 254,58" fill="var(--bad)"/>
+    <text x="216" y="44" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">×100 input</text>
+    <rect x="270" y="32" width="414" height="40" rx="6" fill="color-mix(in srgb, var(--bad) 14%, var(--surface))" stroke="var(--bad)" stroke-width="2"/>
+    <text x="477" y="49" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">50,000 songs → 1,249,975,000 pairs (~20 s!)</text>
+    <text x="477" y="64" class="label" text-anchor="middle" fill="var(--muted)">each new song compared against every earlier song</text>
+
+    <line x1="16" y1="92" x2="684" y2="92" stroke="var(--border)" stroke-dasharray="4 4"/>
+
+    <text x="16" y="114" class="label" fill="var(--ok)" font-weight="700">CHECK EACH SONG ONCE (TRACKING SEEN SONGS) — 100× songs → 100× work</text>
+    <rect x="16" y="124" width="156" height="40" rx="6" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="94" y="141" class="label" text-anchor="middle" font-weight="700">500 songs</text>
+    <text x="94" y="156" class="label" text-anchor="middle" fill="var(--muted)">500 checks (&lt;0.1 ms)</text>
+    <line x1="174" y1="144" x2="254" y2="144" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="254,138 266,144 254,150" fill="var(--ok)"/>
+    <text x="216" y="136" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">×100 input</text>
+    <rect x="270" y="124" width="414" height="40" rx="6" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="477" y="141" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">50,000 songs → 50,000 checks (~3 ms!)</text>
+    <text x="477" y="156" class="label" text-anchor="middle" fill="var(--muted)">100× bigger playlist, 100× work — still instant</text>
+  </svg>
+  <div class="cap">Both methods feel instant on 500 songs. Counting how work scales exposes the 20-second cliff before a user hits it.</div>
+</div>
+
+<p>Reading how work scales unlocks three immediate payoffs:</p>
+<ul>
+  <li><b>Spot timeouts before coding:</b> glance at <code>n = 100,000</code> in a prompt and rule out slow methods immediately.</li>
+  <li><b>Pinpoint the slow line:</b> catch harmless-looking Python helpers (like <code>x in list</code> inside a loop) that silently multiply work.</li>
+  <li><b>Defend trade-offs:</b> weigh extra memory against speed, rare copy pauses against long-run averages, and math against real CPUs.</li>
+</ul>
+
+<div class="keyidea">A stopwatch measures one machine on one input. Complexity analysis counts how simple steps grow with input size <code>n</code>, isolating the method from the hardware.</div>
+
+<div class="check" id="check-stopwatch">
+  <p class="q">Your pair-checking code takes 20 seconds on 50,000 songs. You buy a server that is 10× faster. What happens on 500,000 songs (10× bigger)?</p>
+  <div class="opts">
+    <button>It still takes 20 seconds — the 10× faster CPU cancels out the 10× bigger input</button>
+    <button data-correct>It gets 10× slower (~200 seconds) because 10× more songs creates 100× more pairs</button>
+    <button>It finishes in 2 seconds because the CPU is 10× faster</button>
+  </div>
+  <div class="fb right"><p>Exactly! 10× more songs means 10 × 10 = 100× more pairs. A 10× faster CPU divides that by 10, still leaving 10× slower (~200 s). Growth shape always beats faster hardware at scale.</p></div>
+  <div class="fb wrong"><p>Contrast two methods on that 10× faster server when the playlist grows 10×: a <em>single-pass</em> scan does 10× more work, so the 10× CPU cancels it out (still 20 s). Pair-checking scales with the <em>square</em> (10 × 10 = 100× work), so a 10× CPU still leaves 10× more time (~200 s).</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>What happens when the stack doubles?</h2>
+
+<p>Picture <b>a stack of index cards on a desk</b> — one card per song or item. Every comparison, copy, or flip is <b>one card touch</b>. Instead of timing milliseconds, ask: <b>"When the stack doubles, what multiplies my card touches?"</b> <em>(In section 7 we'll see where this breaks on real CPUs and huge integers.)</em></p>
+
+<p>Put <code>n = 8</code> cards on the desk, then double to <code>16</code>, then <code>32</code>. Almost every algorithm falls into one of <b>six growth shapes</b>:</p>
+<ul>
+  <li><b>Stays flat:</b> grab the top card — even a million cards takes 1 touch.</li>
+  <li><b>Adds +1 touch:</b> halve a sorted stack and drop the wrong half (<b>binary search</b>). Doubling 8 → 16 adds just <b>one</b> split (3 → 4); 1,000,000 cards takes only ~20 splits! That halving count ("how many times you halve <code>n</code> to reach 1") is written <b><code>log₂ n</code></b>.</li>
+  <li><b>Doubles (×2):</b> read every card once.</li>
+  <li><b>Doubles plus one extra pass:</b> halve the stack down to single cards, then zip sorted halves back together — each of the <code>log₂ n</code> levels touches all <code>n</code> cards.</li>
+  <li><b>Quadruples (×4):</b> compare every card with every other card (2 × 2 = 4× touches).</li>
+  <li><b>Explodes on +1 card:</b> test every subset of cards (keep or skip each card). Adding just <em>one</em> card doubles total subsets!</li>
+</ul>
+
+<p>Computer scientists label each growth shape with <b>Big-O notation</b>, written <code>O(…)</code>. Slide <code>n</code> below — or click <b>Double n</b> — to watch the six curves pull apart:</p>
+
+<div class="figure">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px" class="small">
+    <label>cards (n): <b id="gr-nval">8</b> <input id="gr-n" type="range" min="2" max="128" value="8" style="vertical-align:middle"></label>
+    <button class="btn primary" id="gr-dbl">Double n (×2)</button>
+    <button class="btn" id="gr-rst">Reset to 8</button>
+    <label>scale:
+      <select id="gr-scale" style="padding:3px 6px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text)">
+        <option value="linear" selected>Linear (feel the cliff)</option>
+        <option value="log">Logarithmic (see all curves)</option>
+      </select>
+    </label>
+  </div>
+  <svg class="viz" id="gr-svg" viewBox="0 0 660 242" role="img" aria-label="Interactive chart comparing step counts for 1, log n, n, n log n, n squared, and 2 to the n"></svg>
+  <div class="viz-caption" id="gr-msg"></div>
+  <div class="cap">Click <b>Double n</b> from 8 (8 → 16 → 32 → 64 → 128). Watch <code>log₂ n</code> creep up by +1 while <code>n²</code> quadruples and <code>2ⁿ</code> blasts off the chart.</div>
+</div>
+
+<p>Rough laptop times assuming <b>100 million (10⁸)</b> simple steps per second (1 µs = one microsecond, a millionth of a second):</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Big-O</th><th>Name</th><th>Double <code>n</code> → work</th><th>n = 8</th><th>n = 16</th><th>n = 1,000</th><th>n = 1,000,000</th></tr></thead>
+  <tbody>
+    <tr><td><b><code>O(1)</code></b></td><td>Constant</td><td>×1 (flat)</td><td>1</td><td>1</td><td>1</td><td>1 (&lt;1 µs)</td></tr>
+    <tr><td><b><code>O(log n)</code></b></td><td>Logarithmic</td><td>+1 step</td><td>3</td><td>4</td><td>~10</td><td>~20 (&lt;1 µs)</td></tr>
+    <tr><td><b><code>O(n)</code></b></td><td>Linear</td><td>×2</td><td>8</td><td>16</td><td>1,000</td><td>1,000,000 (~10 ms)</td></tr>
+    <tr><td><b><code>O(n log n)</code></b></td><td>Linearithmic (n × log n)</td><td>×2 + 2n (~×2 at big n)</td><td>24</td><td>64</td><td>~10,000</td><td>~20M (~0.2 s)</td></tr>
+    <tr><td><b><code>O(n²)</code></b></td><td>Quadratic</td><td>×4</td><td>64</td><td>256</td><td>1,000,000</td><td>10¹² (~3 hours!)</td></tr>
+    <tr><td><b><code>O(2ⁿ)</code></b></td><td>Exponential</td><td>+1 card → ×2</td><td>256</td><td>65,536</td><td>10³⁰¹ (past universe age!)</td><td>unimaginable</td></tr>
+  </tbody>
+</table></div>
+<p class="small muted">Notice <code>O(n log n)</code> jumps 2.67× from 8→16 (one extra pass of 2n), shrinking toward 2.1× from 1M→2M.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: Big-O vs. Big-Omega (Ω), Big-Theta (Θ), and why log base disappears</summary>
+  <p>Formally, <b>O(g(n))</b> is an upper bound ("at most"), <b>Ω(g(n))</b> is a lower bound ("at least"), and <b>Θ(g(n))</b> is a tight bound (both). Saying a linear loop is <code>O(n³)</code> is technically true and completely unhelpful — in interviews, "Big-O" always means the tight worst-case bound unless you say otherwise.</p>
+  <p>Why omit the base in <code>O(log n)</code>? Halving (<code>log₂ n</code>) and cutting in thirds (<code>log₃ n</code>) always differ by the same constant factor (<code>log₂ 3 ≈ 1.58</code>), and section 3 drops constant factors.</p>
+</details>
+
+<div class="keyidea">Big-O names the <em>growth shape</em> as <code>n</code> scales: doubling <code>n</code> leaves <code>O(1)</code> flat, adds +1 to <code>O(log n)</code>, doubles <code>O(n)</code>, quadruples <code>O(n²)</code>, while adding just +1 card doubles <code>O(2ⁿ)</code>.</div>
+
+<div class="check" id="check-double">
+  <p class="q">Two jobs run on a deck of cards: Job A is <code>O(log n)</code> (halving search) and Job B is <code>O(2ⁿ)</code> (testing every subset). You add <b>3 more cards</b> to Job B, and you <b>double</b> Job A from 1,000,000 to 2,000,000 cards. What happens to their work?</p>
+  <div class="opts">
+    <button>Job A doubles to ~40 steps; Job B grows by 3×</button>
+    <button data-correct>Job A adds just 1 step (20 → 21); Job B multiplies by 8× (2³)</button>
+    <button>Job A adds 1,000,000 steps; Job B adds 9 steps (3²)</button>
+  </div>
+  <div class="fb right"><p>Spot on! Halving 2,000,000 cards takes just one extra split to drop back down to 1,000,000 (20 → 21). Meanwhile each single card doubles the subsets, so 3 extra cards multiplies work by 2 × 2 × 2 = 8×.</p></div>
+  <div class="fb wrong"><p>Check both on small stacks: halving 16 cards takes 4 splits, and 32 cards takes 5 splits — doubling adds just <b>+1</b> split (so 1M → 2M goes 20 → 21). For subsets, 1 card gives 2 subsets, 2 cards gives 4, 3 cards gives 8 — each +1 card doubles the pile, so +3 cards multiplies by 2³ = 8×.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Why do we throw away constants and smaller terms?</h2>
+
+<p>Suppose Method A spends <b>20 setup touches</b> opening and labeling the card box, then touches each card <b>3 times</b>: <code>3n + 20</code> touches. Method B starts immediately and checks half of all pairs: <code>0.5 n²</code> touches. On <code>n = 4</code> cards, Method B wins (8 touches vs. 32)! Why does Big-O still call Method A <code>O(n)</code> and Method B <code>O(n²)</code>?</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 192" role="img" aria-label="Crossover graph of 3n + 20 versus 0.5 n squared: they cross at n = 10 (50 touches), and by n = 20 quadratic hits 200 versus 80">
+    <!-- Linear y(v) = 155 - 0.66*v : v=0->155, v=50->122, v=80->102.2, v=100->89, v=200->23 -->
+    <line x1="60" y1="155" x2="640" y2="155" class="axis" stroke-width="1.5"/>
+    <line x1="60" y1="16" x2="60" y2="155" class="axis" stroke-width="1.5"/>
+    <line x1="60" y1="89" x2="640" y2="89" class="grid-line"/>
+    <line x1="60" y1="23" x2="640" y2="23" class="grid-line"/>
+
+    <path d="M 60 141.8 L 350 122 L 640 102.2" fill="none" stroke="var(--ok)" stroke-width="2.6"/>
+    <path d="M 60 155 Q 350 155 640 23" fill="none" stroke="var(--bad)" stroke-width="2.6"/>
+
+    <line x1="350" y1="122" x2="350" y2="155" stroke="var(--accent)" stroke-dasharray="3 3"/>
+    <circle cx="350" cy="122" r="5" fill="var(--accent)"/>
+    <text x="275" y="108" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">crossover: n = 10 (both = 50)</text>
+
+    <text x="498" y="38" class="label" text-anchor="end" fill="var(--bad)" font-weight="700">0.5 n² (n=20 → 200)</text>
+    <text x="636" y="128" class="label" text-anchor="end" fill="var(--ok)" font-weight="700">3n + 20 (n=20 → 80)</text>
+
+    <text x="60" y="175" class="label" text-anchor="middle">n = 0</text>
+    <text x="176" y="175" class="label" text-anchor="middle">n = 4 (B wins)</text>
+    <text x="350" y="175" class="label" text-anchor="middle">n = 10</text>
+    <text x="640" y="175" class="label" text-anchor="middle">n = 20</text>
+    <text x="52" y="27" class="label" text-anchor="end">200</text>
+    <text x="52" y="93" class="label" text-anchor="end">100</text>
+    <text x="52" y="158" class="label" text-anchor="end">0</text>
+  </svg>
+  <div class="cap">At <code>n = 4</code>, <code>0.5 n²</code> (8) beats <code>3n + 20</code> (32). By <code>n = 1,000</code>, <code>3n + 20</code> is 3,020 while <code>0.5 n²</code> is 500,000 — ~166× slower.</div>
+</div>
+
+<p>Two rules drop out directly:</p>
+<ol>
+  <li><b>Drop constant multipliers:</b> <code>3n</code> and <code>0.5n</code> both double when <code>n</code> doubles → <code>O(n)</code>.</li>
+  <li><b>Drop slower terms:</b> in <code>n² + 50n + 200</code>, at <code>n = 1,000</code> the <code>n²</code> term is 1,000,000 while <code>50n + 200</code> is only 50,200 (~5%) → <code>O(n²)</code>.</li>
+</ol>
+
+<p><b>What you NEVER drop: a second independent input.</b> Scanning <code>u</code> users and <code>p</code> permissions sequentially is <b><code>O(u + p)</code></b> (not "<code>O(n)</code>" — what if <code>u = 10</code> and <code>p = 10,000,000</code>?). Checking every user against every permission is <b><code>O(u · p)</code></b>.</p>
+
+<div class="keyidea">Drop constant multipliers and smaller terms of the <em>same</em> variable because the steepest curve dominates at scale. Keep separate inputs separate (<code>O(u + p)</code>, <code>O(u · p)</code>).</div>
+
+<div class="check" id="check-two-inputs">
+  <p class="q">A function loops over <code>M</code> words, each of length <code>K</code>, and checks every character in each word. What is its time complexity?</p>
+  <div class="opts">
+    <button><code>O(M²)</code> because there is a loop inside a loop</button>
+    <button data-correct><code>O(M · K)</code> — linear in the total number of characters across all words</button>
+    <button><code>O(M + K)</code> because we only read each word once</button>
+  </div>
+  <div class="fb right"><p>Exactly! Not every nested loop is <code>O(n²)</code>. The outer loop runs <code>M</code> times and the inner loop runs <code>K</code> times per word, touching <code>M · K</code> characters total.</p></div>
+  <div class="fb wrong"><p>Plug in small numbers: 1,000 words of length 5 is <code>1,000 × 5 = 5,000</code> character touches — nowhere near <code>1,000² = 1,000,000</code>, and bigger than <code>1,000 + 5 = 1,005</code>. Nested loops over two independent sizes multiply: <code>O(M · K)</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How do you read complexity straight off Python code?</h2>
+
+<p>Four patterns let you read Big-O straight off a screen of Python in seconds:</p>
+
+<h3>Pattern 1: Sequential adds, nested multiplies — unless the inner pointer never resets</h3>
+<div class="cols">
+  <div>
+    <p class="small"><b>One after another → ADD: <code>O(a + b)</code></b></p>
+<pre><code>for x in list_a:      # a steps
+    total += x
+for y in list_b:      # + b steps
+    total += y</code></pre>
+  </div>
+  <div>
+    <p class="small"><b>Nested &amp; restarting → MULTIPLY: <code>O(a · b)</code></b></p>
+<pre><code>for x in list_a:      # a times ...
+    for y in list_b:  #   ... full b scan
+        pairs += (x == y)</code></pre>
+  </div>
+</div>
+<p class="small muted"><b>Watch out:</b> count <em>total</em> steps, not indentation! Below, <code>j</code> never resets to 0, so the inner <code>while</code> advances at most <code>n</code> times across the entire function — making the whole block <b><code>O(n)</code></b>:</p>
+<pre><code>j = 0
+for i in range(n):
+    while j &lt; n and arr[j] &lt; arr[i] + 5:
+        j += 1        # runs at most n times TOTAL, not n per i!</code></pre>
+
+<h3>Pattern 2: The triangle loop is still <code>O(n²)</code></h3>
+<p>When the inner loop starts at <code>i + 1</code>, it shrinks each round — yet on an <code>n × n</code> grid of pairs, skipping <code>j ≤ i</code> just cuts the square in half along the diagonal:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 640 152" role="img" aria-label="6 by 6 grid showing i less than j fills the upper triangle: 15 pairs out of 36 cells, still roughly half of n squared">
+    <text x="16" y="18" class="label" fill="var(--text-strong)" font-weight="700">n = 6 cards: pairs with i &lt; j</text>
+    <g>
+      <rect x="16" y="28" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="36" y="28" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="56" y="28" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="76" y="28" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="96" y="28" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="116" y="28" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="16" y="48" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="36" y="48" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="56" y="48" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="76" y="48" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="96" y="48" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="116" y="48" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="16" y="68" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="36" y="68" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="56" y="68" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="76" y="68" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="96" y="68" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="116" y="68" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="16" y="88" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="36" y="88" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="56" y="88" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="76" y="88" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="96" y="88" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="116" y="88" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="16" y="108" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="36" y="108" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="56" y="108" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="76" y="108" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="96" y="108" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="116" y="108" width="16" height="16" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <rect x="16" y="128" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="36" y="128" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="56" y="128" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="76" y="128" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="96" y="128" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+      <rect x="116" y="128" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+    </g>
+    <text x="165" y="50" class="label" fill="var(--text-strong)" font-weight="700">Pairs = 5 + 4 + 3 + 2 + 1 = 15</text>
+    <text x="165" y="72" class="label" fill="var(--accent)">Formula: n(n − 1) / 2 = 0.5 n² − 0.5 n</text>
+    <text x="165" y="96" class="label" fill="var(--muted)">Half a square still quadruples in area</text>
+    <text x="165" y="112" class="label" fill="var(--muted)">whenever you double the side n.</text>
+    <text x="165" y="136" class="label" fill="var(--bad)" font-weight="700">Drop 0.5 and −0.5n → still O(n²)!</text>
+  </svg>
+  <div class="cap"><code>1 + 2 + … + (n−1) = n(n−1)/2</code> appears constantly in interviews. Half a square is always <code>O(n²)</code>.</div>
+</div>
+
+<h3>Pattern 3: Halving or doubling a counter gives <code>O(log n)</code></h3>
+<pre><code>while n > 1:
+    n //= 2          # 16 -> 8 -> 4 -> 2 -> 1 (4 trips; doubling i *= 2 up to n is identical!)</code></pre>
+
+<h3>Pattern 4: Hidden loops inside Python one-liners</h3>
+<p>A single <code>for</code> loop becomes <code>O(n²)</code> if one line inside it quietly walks the whole stack:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Python one-liner</th><th>Hidden work</th><th>Real cost</th><th>Fast alternative</th></tr></thead>
+  <tbody>
+    <tr><td><code>x in my_list</code></td><td>Scans cards left to right</td><td><code>O(n)</code></td><td><code>x in my_set</code> (jumps via hash table — Ch. 1, ~<code>O(1)</code>)</td></tr>
+    <tr><td><code>my_list.pop(0)</code> / <code>insert(0, x)</code></td><td>Slides every remaining card</td><td><code>O(n)</code></td><td><code>collections.deque.popleft()</code> (2-ended queue, <code>O(1)</code>)</td></tr>
+    <tr><td><code>arr[i:j]</code> (slicing)</td><td>Copies every card in the slice</td><td><code>O(j − i)</code></td><td>Pass index bounds <code>(lo, hi)</code> → <code>O(1)</code></td></tr>
+    <tr><td><code>s += ch</code> repeated <code>k</code> times</td><td>Strings can't edit in place (immutable): copies growing text</td><td><code>O(k²)</code> total</td><td>Append to list, then <code>"".join(parts)</code> → <code>O(k)</code></td></tr>
+    <tr><td><code>s1 == s2</code> / set lookup on length-<code>k</code> string</td><td>Reads characters to compare or fingerprint</td><td><code>O(k)</code></td><td>Fine for short keys; sorting <code>n</code> length-<code>k</code> strings is <code>O(k · n log n)</code></td></tr>
+    <tr><td><code>sorted(arr)</code></td><td>Compares and merges cards</td><td><code>O(n log n)</code></td><td>Fast once; never call <em>inside</em> a loop</td></tr>
+  </tbody>
+</table></div>
+
+<details class="aside deeper">
+  <summary>Go deeper: CPython's string-concatenation quirk</summary>
+  <p>CPython has a narrow optimization that occasionally extends an unshared string in place, masking <code>s += ch</code> in tiny benchmarks. Never rely on it — interviews (and Java, JS, Go, PyPy) treat repeated immutable string concatenation as <code>O(k²)</code>; always collect chunks in a list and <code>"".join()</code>.</p>
+</details>
+
+<div class="keyidea">Inspect every helper inside a loop for hidden scans, shifts, copies, or string length <code>k</code> — and remember that a nested pointer that never resets still totals <code>O(n)</code>.</div>
+
+<div class="check" id="check-hidden-loop">
+  <p class="q">What is the time complexity of this single-loop function on <code>n</code> distinct numbers?</p>
+<pre><code>def unique_items(items):
+    seen = []
+    for x in items:
+        if x not in seen:
+            seen.append(x)
+    return seen</code></pre>
+  <div class="opts">
+    <button><code>O(n)</code> — there is only one <code>for</code> loop</button>
+    <button data-correct><code>O(n²)</code> — <code>x not in seen</code> scans a growing list on every iteration</button>
+    <button><code>O(n log n)</code> — checking membership uses binary search</button>
+  </div>
+  <div class="fb right"><p>Sharp catch! On distinct items, <code>seen</code> grows 0, 1, 2, …, n−1, so <code>x not in seen</code> checks <code>0 + 1 + … + (n−1) = n(n−1)/2</code> cards — our exact triangle! Keeping a <code>set</code> alongside <code>seen</code> drops it to <code>O(n)</code>.</p></div>
+  <div class="fb wrong"><p>Trace the 100th unique number: <code>seen</code> is an unsorted Python <code>list</code>, so <code>x not in seen</code> checks all 99 prior numbers one by one. Summing <code>0 + 1 + 2 + … + (n−1)</code> checks gives <code>n(n−1)/2</code> — <code>O(n²)</code> hiding inside one loop.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>What about memory — and the hidden pile of paused calls?</h2>
+
+<p>Checking songs in one pass had a price: storing seen songs takes space for up to <code>n</code> cards. That's the <b>time–space trade-off</b>: spend extra desk space to save card touches. Interviewers measure <b>auxiliary (extra) space</b> — extra memory you allocate beyond the input (name any returned output array separately).</p>
+
+<p>The space people forget most is <b>recursion</b>. Each time a function calls itself before finishing, Python writes a <b>sticky note</b> holding its local variables and where to resume, and stacks it on the <b>call stack</b>:</p>
+
+<div class="cols">
+  <div>
+    <p class="small" style="color:var(--ok)"><b>Iterative — <code>O(1)</code> extra space</b></p>
+<pre><code>def sum_to(n):
+    total = 0
+    for i in range(1, n + 1):
+        total += i
+    return total</code></pre>
+  </div>
+  <div>
+    <p class="small" style="color:var(--warn)"><b>Recursive — <code>O(n)</code> call-stack space</b></p>
+<pre><code>def sum_to(n):
+    if n &lt;= 0: return 0
+    if n == 1: return 1
+    return n + sum_to(n - 1)  # pauses here!</code></pre>
+  </div>
+</div>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 176" role="img" aria-label="Comparing iterative loop using two slots against recursive sum piling n stack frames on the call stack">
+    <rect x="16" y="14" width="290" height="148" rx="10" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text x="161" y="36" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">ITERATIVE — O(1) extra space</text>
+    <rect x="52" y="54" width="96" height="34" rx="6" fill="var(--bg-2)" stroke="var(--border-strong)"/>
+    <text x="100" y="75" class="label" text-anchor="middle" font-weight="700">total = 10</text>
+    <rect x="168" y="54" width="96" height="34" rx="6" fill="var(--bg-2)" stroke="var(--border-strong)"/>
+    <text x="216" y="75" class="label" text-anchor="middle" font-weight="700">i = 4</text>
+    <text x="161" y="118" class="label" text-anchor="middle" fill="var(--muted)">Overwrites the same 2 slots.</text>
+    <text x="161" y="136" class="label" text-anchor="middle" fill="var(--ok)">At n = 1,000,000 → still 2 slots!</text>
+
+    <rect x="336" y="14" width="328" height="148" rx="10" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="500" y="36" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">RECURSIVE — O(n) call-stack space</text>
+    <rect x="362" y="124" width="152" height="24" rx="4" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="438" y="140" class="label" text-anchor="middle">sum_to(4) waiting...</text>
+    <rect x="362" y="96" width="152" height="24" rx="4" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="438" y="112" class="label" text-anchor="middle">sum_to(3) waiting...</text>
+    <rect x="362" y="68" width="152" height="24" rx="4" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="438" y="84" class="label" text-anchor="middle">sum_to(2) waiting...</text>
+    <rect x="362" y="40" width="152" height="24" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="438" y="56" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">sum_to(1) → returns 1</text>
+
+    <text x="590" y="84" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">n frames</text>
+    <text x="590" y="100" class="label" text-anchor="middle" fill="var(--muted)">piled at once</text>
+    <text x="590" y="118" class="label" text-anchor="middle" fill="var(--bad)">hits ~1,000</text>
+    <text x="590" y="133" class="label" text-anchor="middle" fill="var(--bad)">limit in Py</text>
+  </svg>
+  <div class="cap">Stack space equals the <b>tallest</b> pile of paused calls alive at one instant — finished calls pop off and free their slots.</div>
+</div>
+
+<p>Two crisp consequences follow: a halving recursion (like recursive binary search) stacks at most <code>log₂ n</code> notes (<code>O(log n)</code> space). And a branching recursion (exploring all <code>2ⁿ</code> subsets of <code>n</code> cards) makes <code>O(2ⁿ)</code> total calls (<code>2ⁿ⁺¹ − 1</code> calls across the whole tree), yet only stacks <code>n</code> notes at once because Python discards the left branch before starting the right!</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: recursion trees &amp; auxiliary vs. output space</summary>
+  <p><b>Recursion trees (time):</b></p>
+  <ul>
+    <li><code>T(n) = T(n/2) + 1</code> (binary search): <code>log₂ n</code> levels × 1 → <b><code>O(log n)</code></b> time, <code>O(log n)</code> stack.</li>
+    <li><code>T(n) = 2T(n/2) + 1</code> (visiting every tree node) or <code>T(n) = T(n/2) + n</code> (work halves each level: <code>n + n/2 + n/4 + …</code>): both sum to <b><code>O(n)</code></b> — not every halving recursion is <code>O(n log n)</code>!</li>
+    <li><code>T(n) = 2T(n/2) + n</code> (mergesort): <code>log₂ n</code> levels × <code>n</code> → <b><code>O(n log n)</code></b> time, <code>O(n)</code> space.</li>
+    <li><code>T(n) = 2T(n−1) + 1</code> (all subsets): <code>2ⁿ⁺¹ − 1</code> calls → <b><code>Θ(2ⁿ)</code></b> time, <code>O(n)</code> stack. <em>(Naive Fibonacci is <code>T(n) = T(n−1) + T(n−2) + 1</code>: bounded by <code>O(2ⁿ)</code>, tightly <code>Θ(φⁿ)</code> where <code>φ ≈ 1.618</code>, so <code>O(1.62ⁿ)</code>.)</em></li>
+  </ul>
+  <p><b>Output space:</b> If you <em>return</em> all <code>2ⁿ</code> subsets (each up to length <code>n</code>), the returned list takes <b><code>O(n · 2ⁿ)</code></b> space — state <em>"<code>O(n)</code> auxiliary working space, <code>O(n · 2ⁿ)</code> output space."</em></p>
+</details>
+
+<div class="keyidea">Extra space counts both allocated data structures <em>and</em> peak recursion stack depth — not total function calls over time.</div>
+
+<div class="check" id="check-space">
+  <p class="q">A recursive function explores every subset of <code>n</code> cards (branching "keep" and "skip" at each card) and only increments a counter <code>total += 1</code> at each of the <code>2ⁿ</code> leaves — making <code>O(2ⁿ)</code> total calls without storing the subsets. What is its peak space complexity?</p>
+  <div class="opts">
+    <button><code>O(2ⁿ)</code> — every call stays in memory until the function finishes</button>
+    <button data-correct><code>O(n)</code> — at most <code>n</code> paused calls sit on the call stack at one time</button>
+    <button><code>O(1)</code> — it only updates one integer counter and allocates no lists</button>
+  </div>
+  <div class="fb right"><p>Nailed it! Python walks one root-to-leaf path of length <code>n</code>, pops those sticky notes off the stack, and reuses the space for the next branch — so peak space is <code>O(n)</code> even though time is <code>O(2ⁿ)</code>.</p></div>
+  <div class="fb wrong"><p>Check both traps: even with zero lists allocated, every paused recursive call still places a frame on the call stack (so it isn't <code>O(1)</code>). Yet those frames don't pile up to <code>2ⁿ</code> either — as soon as the "keep" branch returns, its sticky notes come off the desk before the "skip" branch begins, capping height at <code>n</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Why can one slow step still average out to fast?</h2>
+
+<p>Python lists keep cards inside a fixed-size binder in memory. When the binder fills up and you call <code>list.append(x)</code>, Python allocates a bigger binder and copies <b>every existing card</b> into it — an <b><code>O(n)</code></b> step! So why do engineers call <code>append</code> <b><code>O(1)</code></b>?</p>
+
+<p>Watch what happens when you multiply capacity by a fixed factor — say <b>doubling</b> (<code>1 → 2 → 4 → 8 → 16</code>) — whenever the binder fills. (Any constant multiplier <code>&gt; 1</code> works; doubling is cleanest for head math, while Java uses <code>×1.5</code> and CPython <code>~×1.125</code> to trade empty slots against copies.)</p>
+
+<div class="figure">
+  <div id="amort-player"></div>
+  <div class="cap">Press <b>▶ Play</b> or step with <b>▶|</b>. Resizes hit at appends 2, 3, 5, and 9 — farther apart each time — keeping total copies strictly below <code>2n</code>.</div>
+</div>
+
+<p>After <code>16</code> appends you copied <code>1 + 2 + 4 + 8 = 15</code> cards total — <b>under 1 copy per append</b>. Right after append <code>17</code> copies 16 cards, total copies are <code>31 &lt; 2 × 17</code>. Because resizes get exponentially rarer, <code>n</code> appends always do fewer than <code>2n</code> copies: <b><code>O(1)</code> amortized</b>.</p>
+
+<p>Compare doubling against adding a <b>fixed chunk</b> (<code>+10</code> slots) over 1,000 appends starting from capacity 1:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Growth rule (1,000 appends)</th><th>Resizes</th><th>Total copies</th><th>Copies / append</th><th>Amortized cost</th></tr></thead>
+  <tbody>
+    <tr><td><b>Multiply (<code>×2</code>)</b></td><td>10</td><td>1,023</td><td>~1.0</td><td><b><code>O(1)</code> amortized</b></td></tr>
+    <tr><td>Add constant (<code>+10</code>)</td><td>100</td><td>49,600</td><td>~49.6 (grows with <code>n</code>!)</td><td><code>O(n)</code> amortized (<code>O(n²)</code> total)</td></tr>
+  </tbody>
+</table></div>
+
+<p>Never blur three distinct ideas in interviews: <b>amortized <code>O(1)</code></b> is a deterministic guarantee over <em>every</em> sequence of operations; <b>average-case <code>O(1)</code></b> assumes typical/well-spread inputs; and <b>worst-case single op</b> is still <code>O(n)</code> on the one append that triggers a resize.</p>
+
+<details class="aside another">
+  <summary>Explain it another way: the moving-coin jar (accounting method)</summary>
+  <p>Charge each arriving card <b>3 coins</b>: <b>1 coin</b> pays to sit in an empty slot now, and <b>2 coins</b> drop into a jar. When a size-8 binder fills, the 4 newest cards (slots 4–7) dropped <code>4 × 2 = 8</code> coins — paying the exact bill to copy all 8 cards into the new size-16 binder! The jar never goes negative, proving every append costs at most 3 coins: <code>O(1)</code> amortized.</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: growth-factor math, shrink thrashing, and amortized vs. expected</summary>
+  <p><b>Tunable multiplier <code>r</code>:</b> Growing by factor <code>r &gt; 1</code> bounds copies at <b><code>r / (r − 1)</code></b> per append amortized (dropping to <code>1 / (r − 1)</code> right before a resize): <code>×2</code> → ≤2 copies (1 when full), up to 50% empty; <code>×1.5</code> → ≤3 copies (2 when full), up to 33% empty; CPython <code>~×1.125</code> → ≤9 copies (~8 when full), ~11% empty.</p>
+  <p><b>Shrinking trap (thrashing):</b> Shrinking in half the instant size drops below 50% causes alternating <code>append</code>/<code>pop</code> at the boundary to resize on <em>every single call</em>! Fix: shrink in half only at <b>25%</b> full (hysteresis).</p>
+  <p><b>Adversarial inputs:</b> Both <em>amortized</em> (deterministic over any sequence) and <em>randomized/expected</em> (random pivots or randomized string hashing) hold even against hostile worst-case inputs — unlike input-dependent average-case bounds, which an attacker can deliberately trigger into <code>O(n)</code>.</p>
+</details>
+
+<div class="keyidea">Multiplicative growth makes resizes exponentially rarer, guaranteeing fewer than <code>2n</code> copies across any <code>n</code> appends: <b><code>O(1)</code> amortized</b> — distinct from average case and single-op worst case.</div>
+
+<div class="check" id="check-amortized">
+  <p class="q">You change a growable array (like Python's <code>list</code>) to add <code>+100</code> slots whenever it fills instead of doubling (<code>×2</code>). What happens over <code>n = 100,000</code> appends?</p>
+  <div class="opts">
+    <button>It stays <code>O(1)</code> amortized — 100 is a big enough cushion</button>
+    <button data-correct>Total copies become <code>O(n²)</code> (~50 million copies), making each append <code>O(n)</code> amortized</button>
+    <button>It only changes memory usage, not copy count</button>
+  </div>
+  <div class="fb right"><p>Right! Any fixed addition <code>+c</code> triggers <code>n/c</code> resizes copying <code>c, 2c, 3c, …</code> cards — a triangle sum of <code>~n² / (2c)</code>. Here that's ~50 million copies instead of ~131,000!</p></div>
+  <div class="fb wrong"><p>Count the resizes for 100,000 appends with <code>+100</code>: you resize 1,000 times, copying 50,000 cards on average → <code>1,000 × 50,000 = 50,000,000</code> copies (<code>O(n²)</code>). Only multiplying capacity by a factor <code>&gt; 1</code> keeps resizes rare enough for <code>O(1)</code> amortized.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>When does Big-O lie to you?</h2>
+
+<p>Senior engineers know the four places our card-desk model breaks down on real hardware:</p>
+
+<h3>1. Best, average, and worst case aren't the same</h3>
+<p>Always say <em>which input shape</em> your Big-O describes. Scanning an unsorted stack is <b>best <code>O(1)</code></b> (top card), <b>average <code>O(n)</code></b> (middle), and <b>worst <code>O(n)</code></b> (last or absent). A Python <code>set</code> averages <b><code>O(1)</code></b> lookup, yet degrades to <b><code>O(n)</code></b> worst case if every key lands in the same slot (Chapter 1).</p>
+
+<h3>2. CPU cache locality beats equal Big-O by 10×–50×</h3>
+<p>Reading RAM takes ~100 nanoseconds, so CPUs fetch whole <b>64-byte chunks</b> (cache lines) into fast L1 cache (~1 nanosecond). Walking cards parked side-by-side rides that prefetched chunk; chasing scattered memory addresses stalls on every hop:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 174" role="img" aria-label="Comparing two O(n) scans: contiguous array rides CPU cache lines while scattered memory hops stall on RAM fetches">
+    <defs>
+      <marker id="ptr-arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,1 L9,5 L0,9 z" fill="var(--bad)"/>
+      </marker>
+    </defs>
+    <text x="16" y="20" class="label" fill="var(--ok)" font-weight="700">CONTIGUOUS ARRAY — O(n), cache-friendly (~1 ns / hop in L1)</text>
+    <rect x="16" y="30" width="358" height="36" rx="6" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.6" stroke-dasharray="6 3"/>
+    <rect x="24" y="36" width="52" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="50" y="52" class="label" text-anchor="middle" font-weight="700">10</text>
+    <rect x="82" y="36" width="52" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="108" y="52" class="label" text-anchor="middle" font-weight="700">20</text>
+    <rect x="140" y="36" width="52" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="166" y="52" class="label" text-anchor="middle" font-weight="700">30</text>
+    <rect x="198" y="36" width="52" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="224" y="52" class="label" text-anchor="middle" font-weight="700">40</text>
+    <rect x="256" y="36" width="52" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="282" y="52" class="label" text-anchor="middle" font-weight="700">50</text>
+    <rect x="314" y="36" width="52" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="340" y="52" class="label" text-anchor="middle" font-weight="700">60</text>
+    <text x="388" y="52" class="label" fill="var(--ok)">1 cache line prefetches neighbors</text>
+
+    <text x="16" y="96" class="label" fill="var(--bad)" font-weight="700">SCATTERED OBJECTS — also O(n), cache-hostile (~100 ns / RAM miss)</text>
+    <rect x="16" y="124" width="54" height="28" rx="5" fill="var(--surface)" stroke="var(--bad)"/>
+    <text x="43" y="142" class="label" text-anchor="middle" font-weight="700">10</text>
+    <path d="M 43 124 Q 165 92 282 122" fill="none" stroke="var(--bad)" stroke-width="1.6" marker-end="url(#ptr-arr)"/>
+    <rect x="260" y="124" width="54" height="28" rx="5" fill="var(--surface)" stroke="var(--bad)"/>
+    <text x="287" y="142" class="label" text-anchor="middle" font-weight="700">20</text>
+    <path d="M 287 152 Q 215 170 150 154" fill="none" stroke="var(--bad)" stroke-width="1.6" marker-end="url(#ptr-arr)"/>
+    <rect x="116" y="124" width="54" height="28" rx="5" fill="var(--surface)" stroke="var(--bad)"/>
+    <text x="143" y="142" class="label" text-anchor="middle" font-weight="700">30</text>
+    <path d="M 150 124 Q 290 92 432 122" fill="none" stroke="var(--bad)" stroke-width="1.6" marker-end="url(#ptr-arr)"/>
+    <rect x="410" y="124" width="54" height="28" rx="5" fill="var(--surface)" stroke="var(--bad)"/>
+    <text x="437" y="142" class="label" text-anchor="middle" font-weight="700">40</text>
+    <text x="478" y="142" class="label" fill="var(--bad)">each hop stalls in RAM</text>
+  </svg>
+  <div class="cap">Both loops are <code>O(n)</code>, yet scanning contiguous primitives in C/Rust/Go/NumPy runs 10×–50× faster than chasing scattered pointers.</div>
+</div>
+
+<h3>3. Small inputs &amp; huge numbers</h3>
+<p>At tiny <code>n</code>, low overhead beats a better Big-O: C++'s <code>std::sort</code> switches to <code>O(n²)</code> insertion sort below ~16 items, and Python's built-in <code>sort()</code> builds initial runs of 32–64 items with insertion sort before merging. Meanwhile, <code>O(1)</code> math only holds for fixed 64-bit numbers — multiplying two 100,000-digit Python <b>big integers</b> takes <b>millions of CPU ops (tens of milliseconds)</b>, so Exercise 7's <code>fast_power(3, 100_000)</code> uses <code>O(log exp)</code> <em>multiplications</em>, not <code>O(log exp)</code> wall-clock time.</p>
+
+<h3>4. Tail-latency pauses (slowest 1% of requests)</h3>
+<p>Amortized <code>O(1)</code> averages over time — the single request that resizes a 10-million-item array still pauses for tens of milliseconds (a <b>tail-latency</b> spike). When size is known upfront, <b>pre-allocate capacity</b> (<code>[None] * n</code>, C++ <code>reserve()</code>, Go <code>make</code>) to eliminate resize pauses altogether.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: Python lists vs. C arrays, incremental resizing, I/O, streams, and 100 machines</summary>
+  <p><b>Python lists:</b> A Python <code>list</code> holds contiguous 8-byte pointers to heap objects — better than a linked list, but still one hop per element compared to packed C <code>int[]</code> or NumPy arrays.</p>
+  <p><b>Avoiding resize spikes when <code>n</code> is unknown:</b> Low-latency stores like Redis use <b>incremental resizing</b> — copying one small slice per operation while reads check both old and new buffers.</p>
+  <p><b>I/O dwarfs CPU:</b> One network hop (~10–50 ms) or SSD random read (~100 µs) outweighs millions of RAM ops. Out-of-RAM data optimizes disk passes instead of CPU comparisons.</p>
+  <p><b>100 machines (Amdahl's Law):</b> If even 5% of a job must run sequentially (coordination/merging), 100 servers cap out under <code>1 / 0.05 = 20×</code> speedup.</p>
+</details>
+
+<div class="keyidea">Big-O predicts large-<code>n</code> scaling, not L1 cache wins, small-<code>n</code> crossovers, big-integer math, or resize spikes. Always name the case (best, average, worst, amortized).</div>
+
+<div class="check" id="check-cache">
+  <p class="q">In C++, two functions both sum 10 million integers in <code>O(n)</code> time with zero extra allocations: Function A walks a contiguous array (<code>std::vector</code>), while Function B follows pointers through a linked list scattered in RAM. Function A finishes 20× faster. Why?</p>
+  <div class="opts">
+    <button>Because following a pointer in RAM costs <code>O(log n)</code>, making the linked list <code>O(n log n)</code></button>
+    <button data-correct>Both are <code>O(n)</code>, but contiguous memory rides CPU cache lines (~1 ns) while scattered pointers stall waiting for RAM (~100 ns)</button>
+    <button>Because <code>std::vector</code> automatically splits the sum across 20 CPU cores</button>
+  </div>
+  <div class="fb right"><p>Exactly! Same Big-O, 20× different constant factor — hardware prefetching and L1 cache locality explain why flat arrays crush pointer-heavy structures on real CPUs.</p></div>
+  <div class="fb wrong"><p>Both loops visit every single integer once on one CPU core, and dereferencing a pointer is still <code>O(1)</code> — so both are strictly <code>O(n)</code>. The 20× gap is hardware physics: reading <code>arr[0]</code> pulls <code>arr[1..15]</code> into fast L1 cache for free, while every linked-list pointer jumps blind in RAM.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>How you use complexity in interviews</h2>
+
+<h3>Habit 1: Read the input limit backward</h3>
+<p>Ask for max <code>n</code> in minute 1. At ~<b>10⁸</b> simple ops/sec (~10⁶–10⁷ loop steps in Python), <code>n</code> tells you the slowest Big-O that finishes well under a second <em>(the technique column previews later track chapters; <code>n!</code> = factorial <code>n × (n−1) × … × 1</code>, so <code>10! ≈ 3.6M</code>)</em>:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Max <code>n</code></th><th>Target Big-O</th><th>Typical technique</th></tr></thead>
+  <tbody>
+    <tr><td><code>n ≤ 10</code></td><td><code>O(n!)</code></td><td>Permutations, brute-force orderings</td></tr>
+    <tr><td><code>n ≤ 20</code></td><td><code>O(2ⁿ)</code></td><td>Subsets, backtracking</td></tr>
+    <tr><td><code>n ≤ 2,000</code></td><td><code>O(n²)</code></td><td>Nested loops, 2D tables</td></tr>
+    <tr><td><code>n ≤ 100,000</code></td><td><code>O(n log n)</code> or <code>O(n)</code></td><td>Sorting, heaps, hash maps, two pointers</td></tr>
+    <tr><td><code>n ≤ 10⁸</code></td><td><code>O(n)</code></td><td>Single pass, counting array, streaming</td></tr>
+    <tr><td><code>n &gt; 10⁸</code></td><td><code>O(log n)</code> or <code>O(1)</code></td><td>Binary search, math, square-and-multiply</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Habit 2: Kill the bottleneck line (three core shifts)</h3>
+
+<p><b>Shift 1 — Trade space for speed (<code>O(n²) → O(n)</code> time, <code>O(n)</code> space, Exercise 4):</b></p>
+<div class="cols">
+  <div>
+    <p class="small muted"><b>Before: check every pair — <code>O(n²)</code></b></p>
+<pre><code>def has_dup_slow(nums):
+    for i in range(len(nums)):
+        for j in range(i + 1, len(nums)):
+            if nums[i] == nums[j]:
+                return True
+    return False</code></pre>
+  </div>
+  <div>
+    <p class="small" style="color:var(--ok)"><b>After: seen set — <code>O(n)</code> avg</b></p>
+<pre><code>def has_dup_fast(nums):
+    seen = set()          # requires hashable items
+    for x in nums:
+        if x in seen:     # O(1) avg lookup
+            return True
+        seen.add(x)
+    return False</code></pre>
+  </div>
+</div>
+
+<p><b>Shift 2 — Exploit sorted order (<code>O(n²) → O(n)</code> time, <code>O(1)</code> space, Exercise 6):</b> On a sorted distinct list, place two fingers at the left and right ends. Sum too big → move <code>R</code> left; sum too small → move <code>L</code> right; exact match → count it and move <b>both</b> inward (since values are distinct, neither end can pair again!):</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 118" role="img" aria-label="Sorted two pointers on [1, 2, 4, 5, 8] targeting 7: 1+8=9 moves R left, 1+5=6 moves L right, 2+5=7 matches and moves both inward">
+    <text x="14" y="18" class="label" fill="var(--accent)" font-weight="700">SORTED TWO POINTERS on [1, 2, 4, 5, 8], target = 7 — O(n) time, O(1) space</text>
+    <rect x="14" y="30" width="48" height="28" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="38" y="48" class="label" text-anchor="middle" font-weight="700">1</text>
+    <rect x="68" y="30" width="48" height="28" rx="5" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="92" y="48" class="label" text-anchor="middle" font-weight="700">2</text>
+    <rect x="122" y="30" width="48" height="28" rx="5" fill="var(--surface)" stroke="var(--border-strong)"/><text x="146" y="48" class="label" text-anchor="middle">4</text>
+    <rect x="176" y="30" width="48" height="28" rx="5" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="200" y="48" class="label" text-anchor="middle" font-weight="700">5</text>
+    <rect x="230" y="30" width="48" height="28" rx="5" fill="var(--warn-soft)" stroke="var(--warn)"/><text x="254" y="48" class="label" text-anchor="middle" font-weight="700">8</text>
+    <text x="38" y="74" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">L →</text>
+    <text x="254" y="74" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">← R</text>
+
+    <text x="306" y="44" class="label">1. 1 + 8 = 9 &gt; 7 → move R left (8 too big)</text>
+    <text x="306" y="64" class="label">2. 1 + 5 = 6 &lt; 7 → move L right (1 too small)</text>
+    <text x="306" y="84" class="label" fill="var(--ok)" font-weight="700">3. 2 + 5 = 7 == 7 → count! move BOTH inward</text>
+    <text x="14" y="106" class="label" fill="var(--muted)">Every step eliminates ≥1 card until L ≥ R → at most n steps total.</text>
+  </svg>
+  <div class="cap">Sorted order replaces an <code>O(n)</code> inner scan with two converging pointers in <code>O(1)</code> extra space.</div>
+</div>
+
+<p><b>Shift 3 — Halve the exponent (<code>O(exp) → O(log exp)</code> multiplications, Exercise 7):</b> Naive <code>3¹³</code> multiplies <code>3 × 3 × …</code> 12 times. Instead, square the base whenever <code>exp</code> is even (<code>b²ᵏ = (b²)ᵏ</code>), and peel off one factor of <code>b</code> whenever <code>exp</code> is odd (<code>b²ᵏ⁺¹ = b · (b²)ᵏ</code>):</p>
+
+<pre class="diagram"><code>3¹³  (13 odd  → peel 3, square base)   = 3 · 9⁶
+     ( 6 even → square base)           = 3 · 81³
+     ( 3 odd  → peel 81, square base)  = 3 · 81 · 6561¹
+     ( 1 odd  → peel 6561, done!)      = 1,594,323   (only 5–6 mults!)
+
+For exp = 100,000 → just 22–23 mults (≤ 33 worst case), instead of 99,999!</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>What to say in the interview</h2>
+
+<p>Every time you analyze a solution aloud, hit these four crisp beats:</p>
+<ol>
+  <li><b>Name the variables first:</b> "Let <code>n</code> be the number of songs, and <code>k</code> the max title length." (Never drop an unnamed independent variable.)</li>
+  <li><b>Brute force → bottleneck → improved cost:</b> "Checking every pair is <code>O(n²)</code> comparisons and <code>O(1)</code> space. A hash set removes the inner scan: <code>O(n)</code> average for bounded titles (or <code>O(n · k)</code> for length-<code>k</code> strings), trading <code>O(n)</code> extra space."</li>
+  <li><b>Keep cases and stack space separate:</b> "<code>list.append</code> is <code>O(1)</code> amortized (doubling keeps total copies under <code>2n</code>) with occasional <code>O(n)</code> resize spikes; recursion depth <code>h</code> adds <code>O(h)</code> call-stack space."</li>
+  <li><b>Ground in reality if asked:</b> "At <code>n = 10⁵</code>, <code>O(n)</code> or <code>O(n log n)</code> is well inside budget; on tiny slices or tight loops, contiguous arrays can win on CPU cache locality and constants."</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Count how operations scale as <code>n</code> doubles instead of trusting one stopwatch run.</li>
+  <li>Know the six growth shapes on sight: <code>O(1)</code>, <code>O(log n)</code>, <code>O(n)</code>, <code>O(n log n)</code>, <code>O(n²)</code>, <code>O(2ⁿ)</code>.</li>
+  <li>Drop constants and slower terms of the <em>same</em> variable, but never collapse independent inputs (<code>O(u + p)</code>, <code>O(u · p)</code>).</li>
+  <li>Half a square (<code>1 + 2 + … + n−1</code>) is <code>O(n²)</code>; check one-liners for hidden <code>O(n)</code> scans/shifts and length-<code>k</code> string work.</li>
+  <li>Space complexity equals allocated structures <em>plus</em> peak call-stack depth (not total calls).</li>
+  <li>Amortized <code>O(1)</code> (multiplicative growth) guarantees cheap cost over <em>every</em> sequence — distinct from average case and single-op worst case.</li>
+  <li>Big-O hides cache locality, small-<code>n</code> constants, big-integer math, and resize pauses; read max <code>n</code> backward to pick your target shape.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do Warm-ups 1–3 on paper before peeking. Core exercises 4–7 live in <code>exercises/complexity_drills.py</code>, and their tests <b>count comparisons, copies, reads, additions, and multiplications</b> — so correct-but-slow solutions fail.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Rank the growth shapes &amp; predict doubling</h4>
+  <p>Order these six functions from slowest-growing to fastest-growing at large <code>n</code>, and note what happens when <code>n</code> doubles: <code>500n + 10,000</code>, <code>0.01 n²</code>, <code>2ⁿ</code>, <code>12 log₂ n</code>, <code>4n log₂ n</code>, <code>999,999</code>.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p><code>999,999</code> (<code>O(1)</code>, ×1) → <code>12 log₂ n</code> (<code>O(log n)</code>, +12 steps) → <code>500n + 10,000</code> (<code>O(n)</code>, ~×2) → <code>4n log₂ n</code> (<code>O(n log n)</code>, ×2 + 8n) → <code>0.01 n²</code> (<code>O(n²)</code>, ×4) → <code>2ⁿ</code> (<code>O(2ⁿ)</code>, squares!).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Spot the hidden loop</h4>
+  <p>Give the tight time and auxiliary space complexity for each snippet on a list of length <code>n</code> (assume <code>process()</code> is <code>O(1)</code> time and space, and strings are immutable with no in-place optimization):</p>
+<pre><code># (1)
+while queue:
+    process(queue.pop(0))
+
+# (2)
+out = ""
+for ch in chars:
+    out += ch
+
+# (3)
+def sum_list(a):
+    return 0 if not a else a[0] + sum_list(a[1:])
+
+# (4) len(a) == n, len(b) == 10
+for x in a:
+    for y in b:
+        process(x, y)</code></pre>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(1) <code>O(n²)</code> time, <code>O(1)</code> space (<code>pop(0)</code> shifts every remaining item). (2) <code>O(n²)</code> time, <code>O(n)</code> space (copies 1 + 2 + … + n chars). (3) <code>O(n²)</code> time AND <code>O(n²)</code> space (every slice <code>a[1:]</code> allocates a new copy of size n−1, n−2, … sitting live on the call stack at once!). (4) <code>O(n)</code> time, <code>O(1)</code> space (10 is constant; if <code>len(b) = m</code> varies, it's <code>O(n · m)</code>).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Trace doubling vs. <code>+4</code> growth</h4>
+  <p>Start with capacity 1 and append 16 items. Count total copies under (a) doubling (<code>1 → 2 → 4 → 8 → 16</code>) and (b) adding 4 slots each resize (<code>1 → 5 → 9 → 13 → 17</code>). Which stays below <code>2n</code> at <code>n = 10,000</code>?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Doubling: <code>1 + 2 + 4 + 8 = 15</code> copies (&lt; 1/append). (b) Adding 4: <code>1 + 5 + 9 + 13 = 28</code> copies — and by <code>n = 10,000</code> it does ~12.5 million copies (<code>O(n²)</code>), whereas doubling does only 16,383 (&lt; <code>2n</code>).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>has_duplicate(nums)</code></h4>
+  <p>In <code>exercises/complexity_drills.py</code>, return <code>True</code> if any value repeats in <code>O(n)</code> time. Tests count item comparisons so nested loops and sorting fail.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>DynamicArray</code></h4>
+  <p>In <code>exercises/complexity_drills.py</code>, build a doubling array starting at capacity 1 and count every copied item in <code>self.copies</code>. Tests verify <code>copies &lt; 2n</code> on every append up to 100,000 items.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>count_pairs_with_sum(sorted_nums, target)</code></h4>
+  <p>In <code>exercises/complexity_drills.py</code>, use section 8's inward two-pointer shift to count pairs summing to <code>target</code> in <code>O(n)</code> time and <code>O(1)</code> extra space. Tests count reads, additions, and comparisons, ban slicing, and pass unhashable values.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>fast_power(base, exp)</code></h4>
+  <p>In <code>exercises/complexity_drills.py</code>, implement section 8's square-and-multiply without <code>**</code> or <code>pow()</code>, returning <code>(result, multiplications)</code> in at most <code>2 log₂(exp) + 2</code> multiplications.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure &amp; explain</div>
+  <h4>8. Break your own <code>DynamicArray</code> &amp; say it out loud</h4>
+  <p><b>Measure:</b> Temporarily change your resize from <code>* 2</code> to <code>+ 10</code>, run pytest, and watch how quickly the amortized check catches it (then revert). <b>Explain:</b> Close the page, set a 90-second timer, and explain why <code>list.append</code> is <code>O(1)</code> amortized while <code>list.pop(0)</code> is <code>O(n)</code>.</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k complexity_drills</code></pre>
+
+<nav class="chapter-nav">
+  <a href="../index.html"><small>← Back to</small>Chapter 2 overview</a>
+  <a class="next" href="sorting.html"><small>Next →</small>Sorting and its trade-offs</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ---- Interactive growth curve & Double-n explorer (section 2) ----
+  (function () {
+    const curves = [
+      { label: "O(1)", color: "var(--ok)", fn: () => 1 },
+      { label: "O(log n)", color: "var(--accent)", fn: (n) => Math.log2(n) },
+      { label: "O(n)", color: "var(--accent-2)", fn: (n) => n },
+      { label: "O(n log n)", color: "var(--brand)", fn: (n) => n * Math.log2(n) },
+      { label: "O(n²)", color: "var(--warn)", fn: (n) => n * n },
+      { label: "O(2ⁿ)", color: "var(--bad)", fn: (n) => Math.pow(2, n) },
+    ];
+    const fmt = (v) => {
+      if (!isFinite(v) || v >= 1e12) return v.toExponential(1);
+      if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
+      if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+      return v < 10 && !Number.isInteger(v) ? v.toFixed(1) : Math.round(v).toLocaleString();
+    };
+    let n = 8;
+    function draw() {
+      const mode = $("gr-scale").value;
+      $("gr-n").value = n;
+      $("gr-nval").textContent = n;
+      $("gr-dbl").disabled = n * 2 > 128;
+      const svg = $("gr-svg");
+      svg.replaceChildren();
+      const left = 84, right = 480, top = 16, rowH = 30, barW = right - left;
+      const vals = curves.map((c) => ({ ...c, v: c.fn(n) }));
+      const linMax = Math.max(16, n * n);
+      const maxExp = Math.max(4, Math.ceil(Math.log10(Math.max(10, ...vals.map((x) => x.v)))));
+
+      if (mode === "log") {
+        const step = maxExp <= 6 ? 1 : maxExp <= 16 ? 2 : maxExp <= 30 ? 5 : 10;
+        const ticks = [];
+        for (let e = 0; e <= maxExp; e += step) ticks.push(e);
+        if (ticks[ticks.length - 1] !== maxExp) {
+          if (((maxExp - ticks[ticks.length - 1]) / maxExp) * barW < 42) ticks.pop();
+          ticks.push(maxExp);
+        }
+        for (const e of ticks) {
+          const x = left + (e / maxExp) * barW;
+          svg.append(V.s("line", { class: "grid-line", x1: x, x2: x, y1: top, y2: top + curves.length * rowH }));
+          svg.append(V.s("text", { class: "label", x, y: top + curves.length * rowH + 14, "text-anchor": "middle", text: e === 0 ? "1" : `10^${e}` }));
+        }
+      }
+      let anyClip = false;
+      vals.forEach((c, idx) => {
+        const y = top + idx * rowH;
+        let frac, clipped = false;
+        if (mode === "linear") {
+          frac = c.v / linMax;
+          if (frac > 1) { frac = 1; clipped = true; anyClip = true; }
+        } else {
+          frac = Math.min(1, Math.max(0.015, Math.log10(Math.max(1, c.v)) / maxExp));
+        }
+        const w = Math.max(4, frac * barW);
+        svg.append(V.s("text", { class: "label", x: left - 10, y: y + 16, "text-anchor": "end", fill: c.color, "font-weight": "700", text: c.label }));
+        svg.append(V.s("rect", { x: left, y: y + 4, width: barW, height: 18, rx: 4, fill: "var(--surface)", stroke: "var(--border)" }));
+        svg.append(V.s("rect", { x: left, y: y + 4, width: w, height: 18, rx: 4, fill: c.color, opacity: clipped ? "0.9" : "0.78" }));
+        svg.append(V.s("text", { class: "label", x: right + 8, y: y + 16, fill: clipped ? "var(--bad)" : "var(--text-strong)", "font-weight": "600", text: clipped ? fmt(c.v) + " (off chart!)" : fmt(c.v) }));
+      });
+      svg.append(V.s("text", { class: "label", x: left, y: 232, text: mode === "linear" ? (anyClip ? `Linear scale capped at ${fmt(linMax)} so smaller bars stay visible` : `Linear scale 0 to ${fmt(linMax)} (all curves fit at small n)`) : `Logarithmic scale up to 10^${maxExp} (no curve clipped)` }));
+      const dblNote = n <= 64 ? `Doubling to ${n * 2} adds +1 to log₂ n, ×2 to n, ×4 to n².` : `At n = ${n}, n² = ${fmt(n * n)} while log₂ n is just ${Math.log2(n).toFixed(1)}!`;
+      $("gr-msg").innerHTML = `At <b>n = ${n}</b> cards: <code>log₂ n = ${Math.log2(n).toFixed(1)}</code>, <code>n = ${n}</code>, <code>n² = ${fmt(n * n)}</code>, <code>2ⁿ = ${fmt(Math.pow(2, n))}</code>. ${dblNote}`;
+    }
+    $("gr-n").addEventListener("input", (e) => { n = Number(e.target.value); draw(); });
+    $("gr-scale").addEventListener("change", draw);
+    $("gr-dbl").addEventListener("click", () => { if (n * 2 <= 128) { n *= 2; draw(); } });
+    $("gr-rst").addEventListener("click", () => { n = 8; draw(); });
+    draw();
+  })();
+
+  // ---- DynamicArray doubling stepper (section 6) ----
+  (function () {
+    const frames = [];
+    let cap = 1, size = 0, copies = 0, arr = [null];
+    const snap = (extra) => frames.push({ cap, size, copies, arr: arr.slice(), ...extra });
+    snap({ appends: 0, msg: "Start with an empty binder of capacity <b>1</b>. Total copies: <b>0</b>." });
+    for (let x = 1; x <= 10; x++) {
+      if (size === cap) {
+        const oldCap = cap, newCap = cap * 2;
+        const next = new Array(newCap).fill(null);
+        for (let i = 0; i < size; i++) next[i] = arr[i];
+        copies += size; cap = newCap; arr = next;
+        snap({
+          appends: x, resizing: true, copied: size,
+          msg: `Resizing for append #${x}: binder full (${size}/${oldCap})! Double <b>${oldCap} → ${newCap}</b> and copy <b>${size}</b> card${size > 1 ? "s" : ""}. Total copies: <b>${copies}</b> (budget after append #${x}: 2×${x} = ${2 * x}).`,
+        });
+      }
+      arr[size] = "c" + x;
+      size++;
+      snap({
+        appends: x, hl: size - 1,
+        msg: `Append #${x}: write <b>c${x}</b> into slot ${size - 1} (O(1) write). Size ${size}/${cap}, total copies: <b>${copies}</b> — average <b>${(copies / size).toFixed(2)}</b> copies/append.`,
+      });
+    }
+    V.player($("amort-player"), {
+      frames, speed: 1100,
+      draw(f, stage) {
+        const denom = f.appends || 0;
+        const bar = V.el("div", { class: "small", style: "margin-bottom:10px;display:flex;gap:16px;flex-wrap:wrap" },
+          V.el("span", {}, "size: ", V.el("b", {}, `${f.size} / ${f.cap}`)),
+          V.el("span", {}, "total copies: ", V.el("b", {}, f.copies)),
+          V.el("span", { class: "muted" }, f.resizing ? `resizing for append #${denom} (budget 2n = ${2 * denom})` : denom ? `avg copies/append: ${(f.copies / denom).toFixed(2)} (< 2.0)` : "avg copies/append: 0.00"));
+        const row = V.el("div", { style: "overflow-x:auto" }, V.cells(f.arr, {
+          cls: (i, v) => (i === f.hl ? "hl" : f.copied && i < f.copied ? "warn" : v != null ? "done" : ""),
+        }));
+        stage.append(bar, row);
+      },
+    });
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="10.01">
+  <title>Python for interview speed (Standard library toolkit)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="10" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 10 · Part 1</div>
+  <h1>Python for interview speed</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> turns 25 bug-prone lines into 5 fast ones</span><span>about 17 minutes</span><span>6 quick checks · 8 exercises</span></div>
+</header>
+
+<p>In a 45-minute coding round, every minute spent hand-rolling boilerplate — counting loops, manual queues, or off-by-one range searches — steals time from edge cases and follow-ups. Python's standard library gives you fast tools (written in C under the hood) that turn fragile loops into clear, senior-bar code.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Pick the right Python standard-library tool for counting, grouping, queuing, range counting, and tracking top-k items.</li>
+    <li>Spot why a plain <code>list</code> melts at scale when used as a front-popping queue or lookup table.</li>
+    <li>Write custom multi-rule sorting keys, range counts, and streaming top-k trackers cleanly.</li>
+    <li>Dodge the four famous Python traps (shared grid rows, shared default lists, mutating while looping, and negative integer division).</li>
+    <li>Build a one-page cheat sheet to keep beside you through every coding drill.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom on Days 1–2, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Then write your one-page cheat sheet (Exercise 3) and solve <code>py_toolkit.py</code>. We focus on <em>when</em> each tool wins and what it costs; Chapters 1 and 2 open the hood later. Builds on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>Why does plain-list Python melt under interview scale?</h2>
+
+<div class="story">
+  <p>You're building a round-robin job scheduler for <b>300,000 jobs</b>. You store them in a plain Python <code>list</code> and pull the next job with <code>jobs.pop(0)</code>. On 50 test jobs it feels instant. On 300,000 jobs, early <code>pop(0)</code> calls slide hundreds of thousands of remaining items left — stalling for <b>tens of seconds</b>. Swap two lines (<code>list</code> → <code>collections.deque</code> and <code>pop(0)</code> → <code>popleft()</code>) and the exact same logic finishes in <b>a fraction of a second</b>.</p>
+</div>
+
+<p>Picture Python's standard library as a <b>mechanic's pegboard</b> with five labeled tool bays. Reaching for a plain <code>list</code> on every problem is like attacking every bolt, nail, and wire with one wrench — it works on tiny examples and strips the bolt at scale:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 176" role="img" aria-label="Mechanic pegboard of five Python standard library bays comparing slow list hacks against fast stdlib tools">
+    <text x="14" y="20" class="label" fill="var(--text-strong)" font-weight="700">YOUR PYTHON PEGBOARD — pick the right bay before typing a loop</text>
+
+    <rect x="14" y="32" width="124" height="128" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="76" y="52" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">1. COUNT/GROUP</text>
+    <text x="76" y="74" class="label" text-anchor="middle" font-weight="700">Counter</text>
+    <text x="76" y="90" class="label" text-anchor="middle" font-weight="700">defaultdict</text>
+    <text x="76" y="118" class="label" text-anchor="middle" fill="var(--bad)">not list.count</text>
+    <text x="76" y="140" class="label" text-anchor="middle" fill="var(--ok)">O(1) avg / op</text>
+
+    <rect x="146" y="32" width="124" height="128" rx="8" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text x="208" y="52" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">2. QUEUE</text>
+    <text x="208" y="74" class="label" text-anchor="middle" font-weight="700">deque</text>
+    <text x="208" y="90" class="label" text-anchor="middle">popleft / append</text>
+    <text x="208" y="118" class="label" text-anchor="middle" fill="var(--bad)">not list.pop(0)</text>
+    <text x="208" y="140" class="label" text-anchor="middle" fill="var(--ok)">O(1) both ends</text>
+
+    <rect x="278" y="32" width="124" height="128" rx="8" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
+    <text x="340" y="52" class="label" text-anchor="middle" fill="var(--accent-2)" font-weight="700">3. ORDER/RANGE</text>
+    <text x="340" y="74" class="label" text-anchor="middle" font-weight="700">sorted(key=...)</text>
+    <text x="340" y="90" class="label" text-anchor="middle" font-weight="700">bisect</text>
+    <text x="340" y="118" class="label" text-anchor="middle" fill="var(--bad)">not full scan</text>
+    <text x="340" y="140" class="label" text-anchor="middle" fill="var(--ok)">sort + O(log n)</text>
+
+    <rect x="410" y="32" width="124" height="128" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="472" y="52" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">4. TOP-K / MIN</text>
+    <text x="472" y="74" class="label" text-anchor="middle" font-weight="700">heapq</text>
+    <text x="472" y="90" class="label" text-anchor="middle">push / pop</text>
+    <text x="472" y="118" class="label" text-anchor="middle" fill="var(--bad)">not re-sort</text>
+    <text x="472" y="140" class="label" text-anchor="middle" fill="var(--ok)">O(log n) step</text>
+
+    <rect x="542" y="32" width="124" height="128" rx="8" fill="var(--surface)" stroke="var(--brand)" stroke-width="1.6"/>
+    <text x="604" y="52" class="label" text-anchor="middle" fill="var(--brand)" font-weight="700">5. CLEAN GLUE</text>
+    <text x="604" y="74" class="label" text-anchor="middle" font-weight="700">enumerate / zip</text>
+    <text x="604" y="90" class="label" text-anchor="middle" font-weight="700">"".join()</text>
+    <text x="604" y="118" class="label" text-anchor="middle" fill="var(--bad)">not s += ch</text>
+    <text x="604" y="140" class="label" text-anchor="middle" fill="var(--ok)">fewer bugs</text>
+  </svg>
+  <div class="cap">Five bays cover 90% of coding rounds. Know the bay, the import, and the cost before you code.</div>
+</div>
+
+<p>Knowing these five bays cold pays off immediately:</p>
+<ul>
+  <li><b>Half the code, fewer bugs:</b> battle-tested tools replace 20 lines of manual loops with 4 readable lines.</li>
+  <li><b>Zero silent timeouts:</b> you spot hidden <code>O(n)</code> shifts and scans before large tests hit a timeout.</li>
+  <li><b>Idiomatic senior signal:</b> clean, native Python shows fluency instead of translating C loops line by line.</li>
+</ul>
+
+<p class="small muted"><em>Where the pegboard analogy breaks:</em> physical hand tools take fixed effort no matter how big the bolt pile gets. Python tools obey strict algorithmic preconditions and costs — calling <code>bisect</code> on an unsorted list silently returns nonsense, and indexing the middle of a <code>deque</code> takes <code>O(n)</code>, not <code>O(1)</code>.</p>
+
+<div class="keyidea">A plain <code>list</code> is only fast at the <em>back</em> and by <em>index</em>. Reach for the right pegboard bay whenever you count, group, pop from the front, query sorted ranges, or track top-k items.</div>
+
+<div class="check" id="check-pegboard">
+  <p class="q">You have 100,000 fixed timestamps and must answer 50,000 queries asking "how many timestamps fall between <code>lo</code> and <code>hi</code>?" Which pegboard bay fits?</p>
+  <div class="opts">
+    <button data-correct>Bay 3: <code>sorted()</code> once, then <code>bisect</code> for two <code>O(log n)</code> boundary lookups per query</button>
+    <button>Bay 1: <code>Counter</code> so you can loop over every timestamp between <code>lo</code> and <code>hi</code></button>
+    <button>Bay 2: <code>collections.deque</code> so you can pop timestamps off both ends</button>
+  </div>
+  <div class="fb right"><p>Spot on! Sorting once takes <code>O(n log n)</code>, and <code>bisect</code> answers each range query in <code>O(log n)</code> regardless of how wide <code>hi - lo</code> is.</p></div>
+  <div class="fb wrong"><p>Match the work to the bay: <code>Counter</code> only helps exact lookups (iterating every integer between <code>lo</code> and <code>hi</code> can take millions of steps!), and <code>deque</code> doesn't search ranges. Sorting once + <code>bisect</code> jumps straight to both range boundaries in <code>O(log n)</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>How do you count and group in one pass?</h2>
+
+<p>Suppose you walk down a shelf of word cards and want to tally frequencies or group anagrams like <code>["eat", "tea", "tan", "ate"]</code>. Calling <code>words.count(w)</code> inside a loop recounts the entire shelf every card (<code>O(n²)</code>!). Instead, <b>Bay 1</b> sets up auto-labeled sorting bins from <code>collections</code>: drop each word straight into its bin in one pass (<code>O(n)</code> average, <code>O(m)</code> space for <code>m</code> distinct keys; <code>O(n · L log L)</code> for grouping length-<code>L</code> anagrams):</p>
+
+<div class="cols">
+  <div>
+    <p class="small"><b><code>Counter</code>: frequency bins in one pass</b></p>
+<pre><code>from collections import Counter
+
+counts = Counter(["b", "a", "b", "c", "a", "b"])
+# Counter({'b': 3, 'a': 2, 'c': 1})
+counts["missing"]         # 0 (does NOT mutate!)
+counts.most_common(2)     # [('b', 3), ('a', 2)]</code></pre>
+  </div>
+  <div>
+    <p class="small"><b><code>defaultdict(list)</code>: auto-creating bins</b></p>
+<pre><code>from collections import defaultdict
+
+groups = defaultdict(list)
+for w in ["eat", "tea", "tan", "ate"]:
+    key = "".join(sorted(w)) # "aet","aet","ant","aet"
+    groups[key].append(w)    # creates [] on first hit
+# list(groups.values()) -> [['eat','tea','ate'], ['tan']]</code></pre>
+  </div>
+</div>
+
+<p>Why <code>"".join(sorted(w))</code> instead of just <code>sorted(w)</code>? Because <code>sorted(w)</code> returns a mutable <code>list</code> (<code>['a','e','t']</code>), and dictionary keys must be <b>hashable</b> (immutable values like <code>str</code>, <code>int</code>, or <code>tuple</code> — Chapter 1 explains why). Converting to a <code>str</code> or <code>tuple(sorted(w))</code> makes it a legal key.</p>
+
+<p>Three subtleties interviewers probe:</p>
+<ul>
+  <li><b>Insertion order is preserved:</b> Since Python 3.7, <code>dict</code> and <code>defaultdict</code> keep keys in <em>first-seen order</em> — so <code>list(groups.values())</code> naturally preserves first-word group order.</li>
+  <li><b><code>defaultdict</code> mutates on read:</b> Checking <code>groups["missing"]</code> silently inserts <code>"missing": []</code> (polluting <code>len()</code> and <code>.values()</code>); use <code>"missing" in groups</code> or <code>groups.get("missing")</code> to check without inserting. By contrast, <code>Counter["missing"]</code> returns <code>0</code> cleanly without mutating.</li>
+  <li><b>The <code>most_common(k)</code> tie-break catch:</b> <code>Counter.most_common(k)</code> only compares counts and keeps first-seen order on ties — NOT alphabetical! When equal counts must be alphabetical (Exercise 4), sort or heap-select with a tuple key <code>(-count, word)</code> (Sections 4–5).</li>
+</ul>
+
+<div class="keyidea">Bay 1's <code>Counter</code> counts in one <code>O(n)</code> avg pass without mutating on missing reads, and <code>defaultdict(list)</code> groups cleanly in first-seen order — just watch missing reads on <code>defaultdict</code> and tie order on <code>most_common(k)</code>.</div>
+
+<div class="check" id="check-counter">
+  <p class="q">You run <code>Counter(["pear", "apple", "pear", "apple"]).most_common(2)</code> expecting alphabetical order on ties (<code>"apple"</code> before <code>"pear"</code>). What actually happens?</p>
+  <div class="opts">
+    <button>It returns <code>[("apple", 2), ("pear", 2)]</code> because <code>Counter</code> always breaks equal counts alphabetically</button>
+    <button data-correct>It returns <code>[("pear", 2), ("apple", 2)]</code> because <code>most_common</code> only compares counts and keeps whichever word appeared first on ties</button>
+    <button>It raises a <code>TypeError</code> when two words have the same count</button>
+  </div>
+  <div class="fb right"><p>Sharp eye! <code>most_common</code> never compares word spelling on a tie. For alphabetical ties, pass an explicit two-part key <code>(-count, word)</code> to <code>sorted</code> or <code>heapq.nsmallest</code> (Sections 4–5).</p></div>
+  <div class="fb wrong"><p>Trace the bins: <code>"pear"</code> arrived first, so the counter holds <code>{'pear': 2, 'apple': 2}</code>. <code>most_common</code> ranks strictly by count and leaves equal-count words in arrival order — putting <code>"pear"</code> ahead of <code>"apple"</code>. Use an explicit tie-breaker key whenever alphabetical ties are required.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Why is popping from the front of a list a trap?</h2>
+
+<p>A Python <code>list</code> is a row of books packed on a shelf: adding or popping at the <em>right end</em> (<code>append</code> / <code>pop()</code>) takes <code>O(1)</code> <b>amortized</b>, but pulling book #0 off the <em>left end</em> (<code>pop(0)</code>) forces every remaining book to slide one slot left — <code>O(n)</code> every turn!</p>
+
+<p><b>Bay 2's <code>collections.deque</code></b> ("double-ended queue", pronounced <em>deck</em>) replaces that shelf with a conveyor belt open at <b>both</b> ends — <code>popleft()</code>, <code>appendleft()</code>, <code>pop()</code>, and <code>append()</code> are all <b><code>O(1)</code></b>. Step through <code>round_robin([("a", 3), ("b", 1), ("c", 5)], quantum=2)</code> below:</p>
+
+<div class="figure">
+  <div id="deque-player"></div>
+  <div class="cap">Press <b>▶ Play</b> or step with <b>▶|</b>. On 3 jobs the shift count looks tiny; on Exercise 6's 300,000 jobs, <code>deque</code> does 0 shifts while <code>list.pop(0)</code> slides <b>over 100 billion pointers</b>!</div>
+</div>
+
+<p><b>When <code>deque</code> is the wrong tool:</b> A <code>deque</code> links separate memory blocks together instead of using one flat array — so random middle indexing <code>d[i]</code> walks blocks from the nearest end in <b><code>O(n)</code></b> time (and slicing <code>d[1:4]</code> raises <code>TypeError</code>). Keep <code>list</code> for random indexing <code>arr[i]</code>; use <code>deque</code> for queues, level-by-level graph search (BFS), and sliding windows.</p>
+
+<div class="keyidea">Use Bay 2's <code>collections.deque</code> whenever you pop or push at the front (<code>O(1)</code> at both ends); keep plain <code>list</code> when you need <code>O(1)</code> random indexing <code>arr[i]</code>.</div>
+
+<div class="check" id="check-deque">
+  <p class="q">You want to run binary search (repeatedly reading middle index <code>seq[mid]</code>) on 500,000 sorted numbers. Should you store them in a <code>deque</code> or a <code>list</code>?</p>
+  <div class="opts">
+    <button><code>deque</code> — its linked-block layout is always faster than a plain <code>list</code> at large <code>n</code></button>
+    <button>Either — both <code>list</code> and <code>deque</code> jump straight to index <code>mid</code> in <code>O(1)</code></button>
+    <button data-correct><code>list</code> — <code>list[mid]</code> is <code>O(1)</code>, whereas middle indexing on a <code>deque</code> takes <code>O(n)</code> per probe</button>
+  </div>
+  <div class="fb right"><p>Right! Indexing <code>deque[mid]</code> walks blocks in <code>O(n)</code> on each of the <code>O(log n)</code> probes — turning an <code>O(log n)</code> binary search into <b><code>O(n log n)</code></b>, literally slower than a plain linear scan!</p></div>
+  <div class="fb wrong"><p>Check the internal shape: a <code>list</code> parks pointers side-by-side in one block, so jumping to index 250,000 is one multiply-and-add (<code>O(1)</code>). A <code>deque</code> links separate blocks to make both ends <code>O(1)</code>, so reaching the middle walks halfway down the chain on every probe — blowing binary search up to <code>O(n log n)</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How do you sort with custom rules and count ranges fast?</h2>
+
+<p><b>Bay 3</b> gives you two tools for ordering and range queries — without mutating your caller's list:</p>
+
+<h3>1. Multi-rule sorting with tuple keys</h3>
+<p><code>sorted(items, key=...)</code> returns a fresh sorted list in <b><code>O(n log n)</code></b> time (leaving input untouched; watch out: <code>items.sort()</code> sorts in place and returns <b><code>None</code></b>, so <code>a = items.sort()</code> is a classic bug!). Python's sort is <b>stable</b> (equal keys keep their original order). To sort by multiple rules — highest count first, then word alphabetically — pass a <b><code>lambda</code></b> (a one-line unnamed function) returning a tuple:</p>
+<pre><code># Tuple compares element 0 first (-count), then element 1 (word) on ties:
+ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))</code></pre>
+
+<h3>2. Counting ranges with <code>bisect</code> (the calibrated ruler)</h3>
+<p>Picture laying your values out in sorted order along a ruler: <code>[1, 5, 5, 5, 9]</code>. To measure how many items lie inside <code>[lo, hi]</code> without walking all 100,000 values per query (<code>O(n · q)</code>!), sort a copy <b>once</b> (<code>O(n log n)</code>), then snap two binary-search markers onto the ruler in <b><code>O(log n)</code></b> each:</p>
+<ul>
+  <li><code>bisect_left(a, lo)</code> snaps to the <b>left edge</b> of any <code>lo</code>s (first index with value <code>≥ lo</code>).</li>
+  <li><code>bisect_right(a, hi)</code> snaps to the <b>right edge</b> past any <code>hi</code>s (first index with value <code>&gt; hi</code>).</li>
+  <li>The count inside <code>[lo, hi]</code> equals <code>bisect_right(a, hi) - bisect_left(a, lo)</code> (return <code>0</code> immediately if <code>lo &gt; hi</code>!).</li>
+</ul>
+
+<pre><code>from bisect import bisect_left, bisect_right
+
+ordered = sorted(values)           # O(n log n) once; keeps caller's values intact
+def count_range(lo, hi):
+    if lo &gt; hi: return 0           # guard inverted bounds!
+    return bisect_right(ordered, hi) - bisect_left(ordered, lo)  # O(log n)</code></pre>
+<p class="small muted"><b>Trap:</b> <code>bisect.insort(a, x)</code> finds the index in <code>O(log n)</code>, then shifts the list to insert — making <code>insort</code> <b><code>O(n)</code></b>, not <code>O(log n)</code>!</p>
+
+<div class="figure">
+  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px" class="small">
+    <label>lo: <b id="bi-loval">5</b> <input id="bi-lo" type="range" min="0" max="10" value="5" style="vertical-align:middle"></label>
+    <label>hi: <b id="bi-hival">5</b> <input id="bi-hi" type="range" min="0" max="10" value="5" style="vertical-align:middle"></label>
+    <button class="btn" id="bi-p1">Try [1, 5]</button>
+    <button class="btn" id="bi-p2">Try [6, 8]</button>
+    <button class="btn" id="bi-p3">Try [7, 3] (lo &gt; hi)</button>
+  </div>
+  <div class="viz-stage" id="bi-stage"></div>
+  <div class="viz-caption" id="bi-msg"></div>
+  <div class="cap">Slide <code>lo</code> and <code>hi</code> on sorted <code>[1, 5, 5, 5, 9]</code> (<code>L = bisect_left</code>, <code>R = bisect_right</code>). Watch <code>L</code> hug the left edge of duplicates while <code>R</code> hugs the right edge!</div>
+</div>
+
+<div class="keyidea">Use tuple keys in <code>sorted()</code> for multi-rule ordering (never <code>x = arr.sort()</code>!), and <code>bisect_right(a, hi) - bisect_left(a, lo)</code> on a sorted copy to answer range counts in <code>O(log n)</code>.</div>
+
+<div class="check" id="check-bisect">
+  <p class="q">On sorted list <code>a = [1, 5, 5, 9]</code>, you accidentally write <code>bisect_left(a, 5) - bisect_left(a, 1)</code> to count values in <code>[1, 5]</code>. What goes wrong?</p>
+  <div class="opts">
+    <button>It crashes with an <code>IndexError</code> because <code>5</code> appears more than once</button>
+    <button data-correct>It returns <code>1</code> instead of <code>3</code> because <code>bisect_left(a, 5)</code> stops <em>before</em> both 5s instead of after them</button>
+    <button>It returns <code>4</code> because it accidentally includes <code>9</code> past the right edge</button>
+  </div>
+  <div class="fb right"><p>Exactly! <code>bisect_left(a, 1) = 0</code> and <code>bisect_left(a, 5) = 1</code>, giving <code>1 - 0 = 1</code> (counting only <code>[1]</code>). Use <code>bisect_right(a, 5) = 3</code> to include every <code>5</code>.</p></div>
+  <div class="fb wrong"><p>Picture the ruler <code>[1, 5, 5, 9]</code> at indices <code>0, 1, 2, 3</code>: <code>bisect_left(a, 5)</code> snaps to index <b>1</b> (the <em>left</em> side of both 5s), so <code>1 - 0 = 1</code> drops both 5s! Only <code>bisect_right(a, 5) = 3</code> snaps past them to yield <code>3 - 0 = 3</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>How do you grab the smallest or largest item fast?</h2>
+
+<p>Picture a <b>spring-loaded cup dispenser</b> that always floats the <b>smallest</b> item to the top slot (<code>h[0]</code>), without wasting effort sorting everything underneath. That's <b>Bay 4's <code>heapq</code></b>: pushing or popping takes <b><code>O(log n)</code></b>, peeking <code>h[0]</code> is <b><code>O(1)</code></b>, and turning an existing list into a heap with <code>heapify(h)</code> takes <b><code>O(n)</code></b>. <em>(Important: only <code>h[0]</code> is guaranteed minimum — the rest of <code>h</code> is only partially ordered, so <code>h[-1]</code> is NOT the maximum!)</em></p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 124" role="img" aria-label="Min-heap dispenser using heapq with negated counts (-count, word) to extract top-k most frequent words alphabetically on ties">
+    <rect x="14" y="16" width="224" height="90" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="126" y="40" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">MIN-HEAP DISPENSER</text>
+    <text x="126" y="64" class="label" text-anchor="middle">h[0] = smallest item</text>
+    <text x="126" y="88" class="label" text-anchor="middle" fill="var(--muted)">push/pop O(log n) · peek O(1)</text>
+
+    <line x1="238" y1="61" x2="270" y2="61" stroke="var(--accent)" stroke-width="2"/>
+    <polygon points="270,56 278,61 270,66" fill="var(--accent)"/>
+
+    <rect x="282" y="16" width="384" height="90" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="474" y="40" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">NEED LARGEST FIRST? NEGATE THE NUMBER!</text>
+    <text x="474" y="64" class="label" text-anchor="middle" font-weight="700">(-5000,"top0") &lt; (-4100,"top3") &lt; (-4100,"top3b")</text>
+    <text x="474" y="88" class="label" text-anchor="middle" fill="var(--ok)">highest count wins · ties sort A→Z!</text>
+  </svg>
+  <div class="cap">Python's <code>heapq</code> is always a <b>min-heap</b>. Negating numeric priority flips it into a max-heap while keeping string tie-breakers ascending!</div>
+</div>
+
+<p>Two patterns you'll use constantly — plus the famous tuple tie-break fix:</p>
+<pre><code>import heapq, itertools
+
+# 1. Batch top-k of m distinct items in O(m log k) (for k &lt;= m; + O(n) to build Counter):
+top = heapq.nsmallest(k, counts.items(), key=lambda kv: (-kv[1], kv[0]))
+
+# 2. Online stream ("k smallest seen so far" in O(k) memory): keep a size-k MAX-heap!
+best = []                                # stores negated values so largest of best sits on top
+for x in stream:
+    if len(best) &lt; k: heapq.heappush(best, -x)
+    elif best and -x &gt; best[0]: heapq.heapreplace(best, -x)  # drop the worst of our k
+
+# 3. Pushing custom objects: add a unique counter so tied priorities never compare objects!
+seq = itertools.count()
+heapq.heappush(tasks, (priority, next(seq), task_obj))</code></pre>
+
+<details class="aside deeper">
+  <summary>Go deeper: streams (heapq.merge &amp; generators), lazy heap deletion, itertools, and @cache</summary>
+  <p><b>Streaming &amp; out-of-RAM merges:</b> <code>heapq.merge(*sorted_streams)</code> merges <code>k</code> sorted iterables lazily in <code>O(k)</code> memory; use generator expressions <code>(x*x for x in big)</code> instead of list comprehensions <code>[...]</code> when you only iterate once.</p>
+  <p><b>Lazy deletion (no decrease-key):</b> Python's <code>heapq</code> can't delete or reprioritize an arbitrary item in <code>O(log n)</code>. Standard fix: push the updated entry, track active/stale states in a dict/set, and skip stale entries when they reach <code>heappop()</code>.</p>
+  <p><b><code>itertools</code> &amp; <code>functools</code>:</b> <code>accumulate(nums)</code> (prefix sums), <code>combinations</code>/<code>permutations</code> (tiny <code>n</code>), <code>groupby</code> (groups <em>consecutive</em> runs only — sort first!), and <code>@functools.cache</code> / <code>@lru_cache(maxsize=None)</code> (one-line memoization for hashable recursion args).</p>
+</details>
+
+<div class="keyidea">Use <code>heapq.nsmallest</code> for batch top-<code>k</code>, a bounded size-<code>k</code> heap for live streams, negated numbers for max-heaps, and a shared <code>seq = itertools.count()</code> whenever tuple elements aren't comparable.</div>
+
+<div class="check" id="check-heapq">
+  <p class="q">You push tuples <code>(priority, task_obj)</code> into a <code>heapq</code> heap without a sequence counter, where <code>task_obj</code> is a custom class that doesn't define less-than (<code>&lt;</code>). When does your code crash?</p>
+  <div class="opts">
+    <button data-correct>The moment two pushed tasks share the same <code>priority</code> and Python compares <code>task_obj &lt; task_obj</code> to break the tie</button>
+    <button>Immediately on the very first <code>heappush</code> because custom objects cannot be stored in heaps</button>
+    <button>Never — <code>heapq</code> only ever inspects element 0 of each tuple</button>
+  </div>
+  <div class="fb right"><p>Classic interview lifesaver! Distinct priorities pass small tests cleanly, then the first tie crashes with <code>TypeError</code>. Create <code>seq = itertools.count()</code> once outside the loop and push <code>(priority, next(seq), task_obj)</code> so every tie is unique.</p></div>
+  <div class="fb wrong"><p>Python compares tuples left to right, touching element 1 <em>only when element 0 ties</em>. Pushing one object (or objects with distinct priorities) works fine, so the bug hides until two equal priorities meet in the heap — create one counter <code>seq = itertools.count()</code> up front and insert <code>next(seq)</code> as element 1 so Python never compares <code>task_obj</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>How can Python trip you up?</h2>
+
+<p>Every tool bay has safety catches. These <b>four Python traps</b> silently break otherwise-right interview solutions:</p>
+
+<h3>1. Shared grid rows: <code>[[0] * 3] * 3</code></h3>
+<p>Multiplying integers (<code>[0] * 3</code>) is safe because ints are immutable. Multiplying a list <em>of lists</em> copies the <b>same inner-list reference</b> three times — so editing one cell edits every row at once!</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 150" role="img" aria-label="Comparing [[0]*3]*3 where all three rows point to the same list versus list comprehension creating three independent rows">
+    <text x="14" y="20" class="label" fill="var(--bad)" font-weight="700">BUG: g = [[0] * 3] * 3  (1 shared row!)</text>
+    <rect x="14" y="34" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--bad)"/><text x="47" y="50" class="label" text-anchor="middle">g[0]</text>
+    <rect x="14" y="64" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--bad)"/><text x="47" y="80" class="label" text-anchor="middle">g[1]</text>
+    <rect x="14" y="94" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--bad)"/><text x="47" y="110" class="label" text-anchor="middle">g[2]</text>
+    <line x1="80" y1="46" x2="156" y2="76" stroke="var(--bad)" stroke-width="1.6"/>
+    <line x1="80" y1="76" x2="156" y2="76" stroke="var(--bad)" stroke-width="1.6"/>
+    <line x1="80" y1="106" x2="156" y2="76" stroke="var(--bad)" stroke-width="1.6"/>
+    <rect x="158" y="58" width="132" height="36" rx="6" fill="var(--bad-soft)" stroke="var(--bad)" stroke-width="1.8"/>
+    <text x="224" y="81" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">[ 0,  9,  0 ]</text>
+    <text x="166" y="138" class="label" text-anchor="middle" fill="var(--bad)">g[0][1] = 9 mutates ALL 3 rows!</text>
+
+    <line x1="334" y1="14" x2="334" y2="142" stroke="var(--border)" stroke-dasharray="4 4"/>
+
+    <text x="352" y="20" class="label" fill="var(--ok)" font-weight="700">FIX: g = [[0] * 3 for _ in range(3)]</text>
+    <rect x="352" y="34" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="385" y="50" class="label" text-anchor="middle">g[0]</text>
+    <rect x="352" y="64" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="385" y="80" class="label" text-anchor="middle">g[1]</text>
+    <rect x="352" y="94" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="385" y="110" class="label" text-anchor="middle">g[2]</text>
+    <line x1="418" y1="46" x2="464" y2="46" stroke="var(--ok)" stroke-width="1.6"/>
+    <line x1="418" y1="76" x2="464" y2="76" stroke="var(--ok)" stroke-width="1.6"/>
+    <line x1="418" y1="106" x2="464" y2="106" stroke="var(--ok)" stroke-width="1.6"/>
+    <rect x="466" y="34" width="132" height="24" rx="4" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="532" y="50" class="label" text-anchor="middle" font-weight="700">[ 0,  9,  0 ]</text>
+    <rect x="466" y="64" width="132" height="24" rx="4" fill="var(--surface)" stroke="var(--border-strong)"/><text x="532" y="80" class="label" text-anchor="middle">[ 0,  0,  0 ]</text>
+    <rect x="466" y="94" width="132" height="24" rx="4" fill="var(--surface)" stroke="var(--border-strong)"/><text x="532" y="110" class="label" text-anchor="middle">[ 0,  0,  0 ]</text>
+    <text x="532" y="138" class="label" text-anchor="middle" fill="var(--ok)">3 independent lists!</text>
+  </svg>
+  <div class="cap">Every 2D grid or neighbor list (adjacency list) needs a comprehension (<code>[[] for _ in range(n)]</code>) so each row gets its own list.</div>
+</div>
+
+<h3>2. Shared mutable default arguments</h3>
+<p>In <code>def add(x, bag=[]):</code>, Python builds the default list <b>once when <code>def</code> runs</b> — not per call — so every call leaks into the same list! Always write <code>bag=None</code> and <code>if bag is None: bag = []</code>.</p>
+
+<h3>3. Mutating a collection while looping over it</h3>
+<p>Removing items from a <code>list</code> inside <code>for x in nums:</code> shifts indices and silently skips neighbors; adding/deleting keys inside <code>for k in d:</code> raises <code>RuntimeError</code>. Build a filtered comprehension (<code>[x for x in nums if keep(x)]</code>) or loop over <code>list(d)</code>.</p>
+
+<h3>4. Negative integer division (<code>//</code>) and remainder (<code>%</code>)</h3>
+<p>Python's <code>//</code> rounds toward <b>−∞</b> (floor), NOT toward zero like C++/Java: <code>-7 // 2 == -4</code> (while <code>int(-7 / 2) == -3</code>). Similarly, <code>%</code> always matches the divisor's sign (<code>-7 % 2 == 1</code>) — awesome for circular wrap-around <code>(i - 1) % n</code>, surprising if you expect C++'s <code>-1</code>!</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: five subtle Python power-user gotchas</summary>
+  <p><b>Two-pass stable sort for descending strings:</b> Since you can't negate a string, sort by secondary ascending key first, then sort by primary descending key (<code>reverse=True</code>) — Python's stable sort keeps ties ordered!</p>
+  <p><b><code>Counter</code> zero counts:</b> Decrementing <code>c[k] -= 1</code> leaves <code>k: 0</code> in the dict, so <code>len(c)</code> and <code>bool(c)</code> stay non-zero! Delete with <code>if c[k] == 0: del c[k]</code> when tracking distinct counts in windows.</p>
+  <p><b><code>deque(maxlen=k)</code>:</b> Auto-evicts the oldest item when full — a 1-line fixed ring buffer.</p>
+  <p><b>Shallow <code>.copy()</code> &amp; huge floats:</b> <code>grid.copy()</code> only copies outer row references (use <code>[r[:] for r in grid]</code>); and <code>int(a / b)</code> loses float precision above <code>2⁵³</code> (use integer floor math for huge numbers).</p>
+</details>
+
+<div class="keyidea">Never multiply mutable lists (<code>[[]] * n</code>), never use a mutable default parameter, never mutate while iterating, and watch floor division <code>//</code> on negatives.</div>
+
+<div class="check" id="check-traps">
+  <p class="q">What does this snippet print?</p>
+<pre><code>def record(val, log=[]):
+    log.append(val)
+    return log
+
+print(record("a"))
+print(record("b"))</code></pre>
+  <div class="opts">
+    <button><code>['a']</code> then <code>['b']</code> — each function call starts with a fresh empty list</button>
+    <button>It raises a <code>SyntaxError</code> because mutable lists aren't allowed as default values</button>
+    <button data-correct><code>['a']</code> then <code>['a', 'b']</code> — both calls mutate the single default list created at <code>def</code> time</button>
+  </div>
+  <div class="fb right"><p>Caught it! Default values evaluate once when <code>def</code> runs, so <code>log</code> survives across calls. Write <code>log=None</code> and create <code>[]</code> inside the body.</p></div>
+  <div class="fb wrong"><p>Python silently accepts <code>log=[]</code> — and evaluates it <em>once</em> when the function is defined, not when called! Call #1 appends <code>'a'</code> into that one shared list, and call #2 appends <code>'b'</code> into the very same list, printing <code>['a', 'b']</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>How you use the toolkit in interviews</h2>
+
+<p>See how Bays 1–5 collapse noisy <code>O(n²)</code> loops into short, readable Python (note: <b>tuple unpacking</b> like <code>a, b = b, a</code> or <code>for i, (name, score) in enumerate(zip(...))</code> unpacks pairs directly without manual indexing; <code>zip</code> stops at the shorter list — pass <code>strict=True</code> in Python 3.10+ if lengths must match):</p>
+
+<div class="cols">
+  <div>
+    <p class="small muted"><b>Before: <code>O(n²)</code> counting + manual queue</b></p>
+<pre><code># Count words: O(n²) via list.count
+freqs = {w: words.count(w) for w in set(words)}
+
+# Queue: O(n²) via list.pop(0)
+q = list(jobs)
+while q:
+    job = q.pop(0)</code></pre>
+  </div>
+  <div>
+    <p class="small" style="color:var(--ok)"><b>After: Bays 1 &amp; 2 — <code>O(n)</code> clean</b></p>
+<pre><code># Count words: O(n) single pass
+freqs = Counter(words)
+
+# Queue: O(1) per popleft
+q = deque(jobs)
+while q:
+    job = q.popleft()</code></pre>
+  </div>
+</div>
+
+<div class="cols">
+  <div>
+    <p class="small muted"><b>Before: manual index + slow string <code>+=</code></b></p>
+<pre><code>out = ""
+for i in range(len(names)):
+    if scores[i] &gt;= 80:
+        if out: out += ","
+        out += f"{i}:{names[i]}"</code></pre>
+  </div>
+  <div>
+    <p class="small" style="color:var(--ok)"><b>After: Bay 5 glue — <code>O(n)</code> &amp; identical output</b></p>
+<pre><code>parts = [
+    f"{i}:{name}"
+    for i, (name, score) in enumerate(zip(names, scores))
+    if score &gt;= 80
+]
+out = ",".join(parts)</code></pre>
+  </div>
+</div>
+
+<p>Use this reference table to verify your Exercise 3 cheat sheet (<code>len()</code> is <code>O(1)</code> on all built-ins):</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Tool</th><th>Import</th><th>Fast ops</th><th>Watch out (worst case / trap)</th></tr></thead>
+  <tbody>
+    <tr><td><code>list</code></td><td><em>built-in</em></td><td><code>arr[i]</code>, <code>append</code>, <code>pop()</code> → <code>O(1)</code>*</td><td><code>pop(0)</code>, <code>insert(0)</code>, <code>x in arr</code>, slice → <code>O(n)</code></td></tr>
+    <tr><td><code>dict</code> / <code>set</code></td><td><em>built-in</em></td><td><code>in</code>, <code>d[k]</code>, <code>del d[k]</code>, <code>s.add</code>/<code>discard</code> → <code>O(1)</code> avg</td><td><code>O(n)</code> worst on hash collisions; keys must be hashable (<code>O(k)</code> for length-<code>k</code> strings)</td></tr>
+    <tr><td><code>Counter</code> / <code>defaultdict</code></td><td><code>from collections import Counter, defaultdict</code></td><td>Build <code>O(n)</code> avg; ops <code>O(1)</code> avg; <code>O(m)</code> space</td><td><code>most_common</code> ties aren't alphabetical; reading missing key in <code>defaultdict</code> inserts it</td></tr>
+    <tr><td><code>deque</code></td><td><code>from collections import deque</code></td><td><code>append</code>, <code>appendleft</code>, <code>pop</code>, <code>popleft</code> → <code>O(1)</code></td><td>Middle index <code>d[i]</code> → <code>O(n)</code>; no slicing</td></tr>
+    <tr><td><code>heapq</code></td><td><code>import heapq</code></td><td><code>heappush</code>/<code>pop</code> → <code>O(log n)</code>; <code>heapify</code> → <code>O(n)</code></td><td>Min-heap only (negate for max); tie-break objects with <code>itertools.count()</code></td></tr>
+    <tr><td><code>sorted</code> / <code>bisect</code></td><td><em>built-in</em> / <code>import bisect</code></td><td><code>sorted</code> → <code>O(n log n)</code> (<code>O(n)</code> space); <code>bisect_left/right</code> → <code>O(log n)</code></td><td><code>arr.sort()</code> returns <code>None</code>; <code>bisect</code> fails silently on unsorted lists; <code>insort</code> is <code>O(n)</code></td></tr>
+  </tbody>
+</table></div>
+<p class="small muted">*<code>list.append</code> and <code>list.pop()</code> are <code>O(1)</code> amortized (see <a href="../../02-algorithms/concepts/complexity.html">Chapter 2.1</a>); <code>sorted()</code> is <code>O(n)</code> best-case on already-sorted input.</p>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
+
+<p>Senior candidates don't quietly import magic — they name the bay, its cost, and its trade-off in one sentence:</p>
+<ol>
+  <li><b>Justify the bay:</b> "I'll use <code>collections.deque</code> for the queue so <code>popleft()</code> stays <code>O(1)</code> instead of <code>list.pop(0)</code>'s <code>O(n)</code> shift."</li>
+  <li><b>Check preconditions aloud:</b> "I'll sort a copy once in <code>O(n log n)</code> without mutating the caller's list, then answer each range query in <code>O(log n)</code> with <code>bisect_left</code> and <code>bisect_right</code>."</li>
+  <li><b>Call out tie-breaking:</b> "To break frequency ties alphabetically, I'll pass <code>key=lambda kv: (-kv[1], kv[0])</code> rather than relying on <code>Counter.most_common</code>."</li>
+  <li><b>Offer to open the hood:</b> "Happy to use Python's <code>heapq</code> here, or build the binary heap from scratch if you'd like to see it."</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Match the job to the pegboard bay: <code>Counter</code>/<code>defaultdict</code> (count/group), <code>deque</code> (both ends), <code>sorted</code>/<code>bisect</code> (order/ranges), <code>heapq</code> (min/max/top-k), <code>enumerate</code>/<code>zip</code>/<code>join</code> (clean glue).</li>
+  <li><code>Counter.most_common(k)</code> keeps arrival order on ties — use tuple key <code>(-count, word)</code> for alphabetical ties; avoid reading missing keys directly on <code>defaultdict</code>.</li>
+  <li><code>deque</code> gives <code>O(1)</code> <code>popleft()</code>/<code>append()</code>, but <code>O(n)</code> middle indexing — keep <code>list</code> for random access.</li>
+  <li>Count items in <code>[lo, hi]</code> on a sorted copy with <code>bisect_right(a, hi) - bisect_left(a, lo)</code> (guard <code>lo &gt; hi</code>; never assume <code>insort</code> is <code>O(log n)</code>).</li>
+  <li><code>heapq</code> is a min-heap: negate priorities for max-heaps, keep a bounded size-<code>k</code> heap for live streams, and add <code>itertools.count()</code> before uncomparable objects.</li>
+  <li>Dodge the four traps: <code>[[0]*3]*3</code>, mutable default args, mutating while looping, and negative floor division <code>//</code>.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Complete Warm-ups 1–2 and build your one-page cheat sheet (Exercise 3) before coding Exercises 4–7 in <code>exercises/py_toolkit.py</code>. Those tests run on 100k–670k items under a 5-second cap so slow plain-list code times out.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Pick the pegboard bay</h4>
+  <p>Name the exact Python stdlib tool and target complexity for each task: (a) count 500k error codes; (b) level-by-level (BFS) queue over 200k nodes; (c) 100k range-count queries over a fixed array of timestamps; (d) maintain the 10 smallest latencies seen so far in an unbounded live stream; (e) group users by city in first-seen city order.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) <code>Counter</code> — <code>O(n)</code> avg. (b) <code>collections.deque</code> (<code>popleft</code>/<code>append</code>) — <code>O(1)</code> per op. (c) <code>sorted</code> + <code>bisect_left</code>/<code>bisect_right</code> — <code>O((n + q) log n)</code>. (d) <code>heapq</code> keeping a live size-10 max-heap of negated latencies (<code>heappush</code>/<code>heapreplace</code>) — <code>O(n log k)</code> time, <code>O(k)</code> space (note: <code>heapq.nsmallest</code> waits for end-of-stream!). (e) <code>defaultdict(list)</code> — <code>O(n)</code> avg, preserves first-seen key order.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Fix the four traps</h4>
+  <p>Each line hits one of section 6's four Python traps. Name the bug and write the fix: (a) <code>neighbors = [[]] * n</code>; (b) <code>def visit(node, seen=set()):</code>; (c) <code>for k in d: if d[k] == 0: del d[k]</code>; (d) <code>mid = -7 // 2</code> when you need truncation toward zero (<code>-3</code>).</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) All <code>n</code> slots share one inner list → <code>neighbors = [[] for _ in range(n)]</code>. (b) Mutable default set shared across calls → <code>seen=None</code>, then <code>if seen is None: seen = set()</code>. (c) Deleting keys while iterating dict raises <code>RuntimeError</code> → loop over <code>list(d)</code> or rebuild with a dict comprehension. (d) <code>//</code> floors toward −∞ (giving <code>-4</code>) → use <code>int(-7 / 2)</code> for small ints (giving <code>-3</code>).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · pen and paper (keep this next to you all week!)</div>
+  <h4>3. Write your one-page Python interview cheat sheet</h4>
+  <p>On a single sheet of paper (or one markdown note), write from memory — without peeking — the import line, main methods, Big-O cost, and #1 gotcha for: <code>list</code>, <code>dict</code>/<code>set</code>, <code>Counter</code>, <code>defaultdict</code>, <code>deque</code>, <code>heapq</code>, <code>sorted</code>, and <code>bisect</code>, plus the 4 traps from section 6. Check the tools against section 7 and the traps against section 6, then keep it beside you for every Week 1 drill.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>4. <code>top_k_frequent(words, k)</code></h4>
+  <p>In <code>exercises/py_toolkit.py</code>, return the <code>k</code> most common <code>(word, count)</code> pairs with equal counts sorted alphabetically (return <code>[]</code> when <code>k &lt;= 0</code>, or all distinct words if fewer than <code>k</code>). Tests run on &gt;600,000 words under a 5-second cap so <code>list.count</code> fails.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>5. <code>group_anagrams(words)</code></h4>
+  <p>In <code>exercises/py_toolkit.py</code>, group anagrams preserving first-word group order and input order inside each group. Tests run on 120,000 words under a 5-second cap so pairwise comparison fails.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>6. <code>round_robin(jobs, quantum)</code></h4>
+  <p>In <code>exercises/py_toolkit.py</code>, simulate round-robin scheduling without mutating <code>jobs</code> (raising <code>ValueError</code> if <code>quantum &lt; 1</code>). Tests run on 300,000 jobs under a 5-second cap so <code>list.pop(0)</code> times out.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>7. <code>count_in_ranges(values, queries)</code></h4>
+  <p>In <code>exercises/py_toolkit.py</code>, count values in each inclusive <code>(lo, hi)</code> without mutating <code>values</code> (<code>lo &gt; hi</code> returns <code>0</code>). Tests run 100,000 queries over 100,000 values under a 5-second cap.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · measure &amp; explain</div>
+  <h4>8. Benchmark <code>pop(0)</code> vs. <code>popleft()</code> &amp; say it out loud</h4>
+  <p><b>Measure:</b> In a 5-line Python REPL snippet, time draining 100,000 integers with <code>list.pop(0)</code> vs. <code>deque.popleft()</code> and record the speedup ratio. <b>Explain:</b> Close the page and speak section 8's four toolkit justifications aloud in under 60 seconds.</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k py_toolkit</code></pre>
+
+<nav class="chapter-nav">
+  <a href="../index.html"><small>← Back to</small>Chapter 10 overview</a>
+  <a class="next" href="../index.html#t-10.02"><small>Next →</small>Designing for change (OOP &amp; SOLID)</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ---- Round-robin deque vs list.pop(0) stepper (section 3) ----
+  (function () {
+    const q = [["a", 3], ["b", 1], ["c", 5]], quantum = 2;
+    const frames = [], done = [];
+    let listShifts = 0, turn = 0;
+    const snap = (extra) => frames.push({ q: q.map((x) => x.slice()), done: done.slice(), listShifts, turn, ...extra });
+    const items = (n) => `${n} item${n === 1 ? "" : "s"}`;
+    snap({ msg: "Start queue: <b>a(3), b(1), c(5)</b> with quantum = 2. Front is on the left, back is on the right." });
+    while (q.length) {
+      turn++;
+      const [name, rem] = q.shift();
+      const shifted = q.length;
+      listShifts += shifted;
+      const left = rem - quantum;
+      if (left > 0) {
+        q.push([name, left]);
+        snap({
+          hl: q.length - 1,
+          msg: `Turn ${turn}: <code>popleft()</code> <b>${name}(${rem})</b> (0 shifts in deque; <code>list.pop(0)</code> shifts ${items(shifted)}). Ran 2 → ${left} left → <code>append()</code> to back.`,
+        });
+      } else {
+        done.push(name);
+        snap({
+          msg: `Turn ${turn}: <code>popleft()</code> <b>${name}(${rem})</b> (0 shifts in deque; <code>list.pop(0)</code> shifts ${items(shifted)}). Needs ≤ 2 → <b>${name} finishes!</b>`,
+        });
+      }
+    }
+    V.player($("deque-player"), {
+      frames, speed: 1200,
+      draw(f, stage) {
+        const stats = V.el("div", { class: "small", style: "display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px" },
+          V.el("span", {}, "deque shifts: ", V.el("b", { style: "color:var(--ok)" }, "0")),
+          V.el("span", {}, "list.pop(0) shifts so far: ", V.el("b", { style: "color:var(--warn)" }, f.listShifts)),
+          V.el("span", {}, "finished order: ", V.el("b", {}, f.done.length ? f.done.join(" → ") : "—")));
+        const ptrs = f.q.length ? (f.q.length === 1 ? { 0: "front/back" } : { 0: "front", [f.q.length - 1]: "back" }) : {};
+        const row = f.q.length
+          ? V.cells(f.q.map(([n, r]) => `${n}:${r}`), { ptrs, idx: false, cls: (i) => (i === f.hl ? "hl" : i === 0 ? "warn" : "") })
+          : V.el("div", { class: "small muted" }, "(queue empty — all jobs finished!)");
+        stage.append(stats, row);
+      },
+    });
+  })();
+
+  // ---- Interactive bisect_left / bisect_right range counter (section 4) ----
+  (function () {
+    const arr = [1, 5, 5, 5, 9];
+    const bLeft = (a, x) => { let l = 0, r = a.length; while (l < r) { const m = (l + r) >> 1; if (a[m] < x) l = m + 1; else r = m; } return l; };
+    const bRight = (a, x) => { let l = 0, r = a.length; while (l < r) { const m = (l + r) >> 1; if (a[m] <= x) l = m + 1; else r = m; } return l; };
+    function draw() {
+      const lo = Number($("bi-lo").value), hi = Number($("bi-hi").value);
+      $("bi-loval").textContent = lo; $("bi-hival").textContent = hi;
+      const li = bLeft(arr, lo), ri = bRight(arr, hi);
+      const count = lo > hi ? 0 : ri - li;
+      const stage = $("bi-stage");
+      const ptrs = {};
+      if (li === ri) ptrs[li] = "L=R";
+      else { ptrs[li] = "L"; ptrs[ri] = "R"; }
+      const vals = arr.concat([null]);
+      const row = V.cells(vals, {
+        ptrs,
+        cls: (i, v) => (v === null ? "dim" : (lo <= hi && i >= li && i < ri) ? "win" : ""),
+      });
+      stage.replaceChildren(row);
+      $("bi-msg").innerHTML = lo > hi
+        ? `Range <b>[${lo}, ${hi}]</b> has <code>lo &gt; hi</code> → guard returns <b>0</b> immediately (raw <code>bisect_right − bisect_left = ${ri} − ${li} = ${ri - li}</code>!).`
+        : `<code>bisect_left(a, ${lo}) = <b>${li}</b></code>, <code>bisect_right(a, ${hi}) = <b>${ri}</b></code> → count in <b>[${lo}, ${hi}]</b> is <code>${ri} − ${li} = <b>${count}</b></code>.`;
+    }
+    $("bi-lo").addEventListener("input", draw);
+    $("bi-hi").addEventListener("input", draw);
+    $("bi-p1").onclick = () => { $("bi-lo").value = 1; $("bi-hi").value = 5; draw(); };
+    $("bi-p2").onclick = () => { $("bi-lo").value = 6; $("bi-hi").value = 8; draw(); };
+    $("bi-p3").onclick = () => { $("bi-lo").value = 7; $("bi-hi").value = 3; draw(); };
+    draw();
+  })();
+})();
+</script>
+</body>
+</html>

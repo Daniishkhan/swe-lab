@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="15.01">
+  <title>How to run an algorithmic coding round</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="15" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 15 · Part 1</div>
+  <h1>How to run an algorithmic coding round</h1>
+  <div class="meta"><span><span class="badge Format">Format</span> the method for every drill and mock</span><span>about 15 minutes</span><span>7 quick checks · 5 exercises</span></div>
+</header>
+
+<p>Strong senior engineers fail 45-minute coding rounds every week — not because they can't code, but because they improvise under a ticking clock. This chapter gives you a repeatable 45-minute playbook you will run on every timed drill and mock from Day 1 onward.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Budget a 45-minute coding round into five clear phases so you never panic at minute zero.</li>
+    <li>Ask only high-signal clarifying questions and lock in three tiny examples before designing.</li>
+    <li>Turn a brute-force idea into an agreed optimal plan without going silent.</li>
+    <li>Catch your own off-by-one and edge-case bugs with a literal trace table before pressing Run.</li>
+    <li>Recover calmly when you get stuck, receive a hint, or hit a broken invariant mid-code.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom on Day 1, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Reread section 8 the morning of every mock or screen. Builds on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>Why do strong engineers still fail coding rounds?</h2>
+
+<div class="story">
+  <p>A staff-level engineer enters a 45-minute screen. At <b>minute 2</b> they start typing without checking constraints. At <b>minute 24</b> they realize duplicates break their loop and rewrite half the file in silence. At <b>minute 42</b> they click Run for the first time, crash on an empty list, and run out of time. Verdict: <b>No Hire</b> — even though they knew the algorithm.</p>
+</div>
+
+<p>Compare that with running a repeatable 5-phase loop on the exact same 45-minute clock:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 172" role="img" aria-label="Comparing improvising a 45-minute round versus running a five-phase flight plan">
+    <text x="14" y="20" class="label" fill="var(--bad)" font-weight="700">IMPROVISING — dive straight into code (silent, risky, rushed finish)</text>
+    <rect x="14" y="30" width="38" height="32" rx="5" fill="var(--surface)" stroke="var(--border-strong)"/>
+    <text x="33" y="50" class="label" text-anchor="middle">0–2m</text>
+    <rect x="56" y="30" width="310" height="32" rx="5" fill="color-mix(in srgb, var(--warn) 14%, var(--surface))" stroke="var(--warn)"/>
+    <text x="211" y="50" class="label" text-anchor="middle">2–24m: silent coding on assumed spec</text>
+    <rect x="370" y="30" width="224" height="32" rx="5" fill="color-mix(in srgb, var(--bad) 15%, var(--surface))" stroke="var(--bad)"/>
+    <text x="482" y="50" class="label" text-anchor="middle">24–42m: panic rewrite</text>
+    <rect x="598" y="30" width="68" height="32" rx="5" fill="var(--bad-soft)" stroke="var(--bad)"/>
+    <text x="632" y="50" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">42–45m</text>
+
+    <line x1="14" y1="82" x2="666" y2="82" stroke="var(--border)" stroke-dasharray="4 4"/>
+
+    <text x="14" y="106" class="label" fill="var(--ok)" font-weight="700">THE 5-PHASE FLIGHT PLAN — clear milestones, agreed route, calm landing</text>
+    <rect x="14" y="116" width="76" height="36" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="52" y="132" class="label" text-anchor="middle" font-weight="700">1. Clarify</text>
+    <text x="52" y="146" class="label" text-anchor="middle" fill="var(--muted)">0–5m</text>
+    <rect x="94" y="116" width="144" height="36" rx="5" fill="color-mix(in srgb, var(--accent-2) 14%, var(--surface))" stroke="var(--accent-2)"/>
+    <text x="166" y="132" class="label" text-anchor="middle" font-weight="700">2. Plan + Sign-off</text>
+    <text x="166" y="146" class="label" text-anchor="middle" fill="var(--muted)">5–15m</text>
+    <rect x="242" y="116" width="218" height="36" rx="5" fill="var(--ok-soft)" stroke="var(--ok)"/>
+    <text x="351" y="132" class="label" text-anchor="middle" font-weight="700">3. Clean Code</text>
+    <text x="351" y="146" class="label" text-anchor="middle" fill="var(--muted)">15–32m</text>
+    <rect x="464" y="116" width="118" height="36" rx="5" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="523" y="132" class="label" text-anchor="middle" font-weight="700">4. Trace + Test</text>
+    <text x="523" y="146" class="label" text-anchor="middle" fill="var(--muted)">32–40m</text>
+    <rect x="586" y="116" width="80" height="36" rx="5" fill="var(--surface)" stroke="var(--ok)"/>
+    <text x="626" y="132" class="label" text-anchor="middle" font-weight="700">5. Wrap</text>
+    <text x="626" y="146" class="label" text-anchor="middle" fill="var(--muted)">40–45m</text>
+  </svg>
+  <div class="cap">The disciplined candidate writes code for only ~17 minutes — and finishes with verified, senior-bar signal on every axis.</div>
+</div>
+
+<p>This loop unlocks three immediate advantages:</p>
+<ul>
+  <li><b>Zero blank-page panic:</b> you always know the next small action, even on a brand-new problem.</li>
+  <li><b>Active evidence on all four grading axes:</b> interviewers score <b>Problem Solving</b>, <b>Code Quality</b>, <b>Testing &amp; Edge Cases</b>, and <b>Communication</b> from <b>1 to 4</b> (<code>1 = No Hire</code>, <code>2 = Lean No</code>, <code>3 = Hire</code> — requires active positive evidence, not just zero crashes — <code>4 = Strong Hire</code>). Typing fast only feeds one axis.</li>
+  <li><b>Self-caught bugs:</b> walking a literal trace table catches off-by-one bugs before the interviewer sees a failed test run.</li>
+</ul>
+
+<p>Carry one physical picture through the chapter: <b>a commercial pilot's 45-minute flight plan</b>. A pilot never rolls onto the runway at minute 2 hoping the weather clears — they run a pre-flight check, file the route with air-traffic control (your interviewer), fly smoothly calling out turns, run the landing checklist before touching down, and follow a calm drill if turbulence hits.</p>
+
+<p class="small muted"><em>Where the analogy breaks:</em> air-traffic control wants a routine flight; an interviewer may deliberately change the destination mid-flight (adding a scale-up or constraint twist) to see how you adapt.</p>
+
+<div class="keyidea">A coding round isn't a typing race — it is a 45-minute live collaboration scored 1–4 across problem solving, code quality, testing &amp; edge cases, and communication.</div>
+
+<div class="check" id="check-rubric">
+  <p class="q">Candidate A finishes coding in 20 silent minutes and says "looks good" without testing. Candidate B finishes in 36 minutes, explains the brute force first, confirms the improved plan, and catches an empty-input bug during a hand trace. Who clears the senior bar?</p>
+  <div class="opts">
+    <button data-correct>Candidate B — they gave active positive signal across all four rubric axes, including verification</button>
+    <button>Candidate A — finishing 16 minutes faster proves much stronger algorithmic skill and fluency</button>
+    <button>Neither — catching a bug during your own dry run automatically caps your coding score at Lean No</button>
+  </div>
+  <div class="fb right"><p>Exactly! Catching your own bug during verification is <em>positive</em> senior signal, whereas shipping untested code in silence leaves three of the four rubric boxes empty or weak.</p></div>
+  <div class="fb wrong"><p>Read the interviewer's scorecard after Candidate A hangs up: "Trade-offs explained? No evidence. Edge-case discipline? None. Debugging poise? Unknown." At senior level, a 3 (Hire) demands active evidence on every axis — and catching your own bug while tracing proves rigor rather than failing coding.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>What does a 45-minute flight plan look like?</h2>
+
+<p>Suppose your interviewer asks: <em>"Given a list of request IDs, return the shortest distance between any two identical IDs, or -1 if all IDs are unique."</em> Step through a sample 45-minute flight below and watch how the clock, candidate actions, and running rubric signal build across all five phases:</p>
+
+<div class="figure">
+  <div id="round-player"></div>
+  <div class="cap">Press <b>▶ Play</b> or step with <b>▶|</b>. Notice how much of the hire decision is already won before line 1 of Python is typed.</div>
+</div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Phase</th><th>45-min budget</th><th>Flight-plan job</th><th>Done when…</th></tr></thead>
+  <tbody>
+    <tr><td><b>1. Clarify</b></td><td>0–5 min</td><td>Pre-flight weather &amp; limits</td><td>Format, input size <code>n</code>, edge rules, and 3 tiny examples confirmed</td></tr>
+    <tr><td><b>2. Plan</b></td><td>5–15 min</td><td>File route with ATC</td><td>Brute force + optimal Big-O stated and interviewer says "go ahead"</td></tr>
+    <tr><td><b>3. Code</b></td><td>15–32 min</td><td>Fly clean, call out turns</td><td>Readable Python written top-down with clear names</td></tr>
+    <tr><td><b>4. Verify</b></td><td>32–40 min</td><td>Landing checklist</td><td>Literal trace table walked on 1 normal + 3 edge cases, bugs fixed</td></tr>
+    <tr><td><b>5. Wrap</b></td><td>40–45 min</td><td>Debrief &amp; follow-ups</td><td>Final time/space &amp; alternatives stated; ready for scale twist</td></tr>
+  </tbody>
+</table></div>
+
+<p>On <b>25-minute drills</b> during Week 1, compress the same five phases proportionally: 3m clarify → 6m plan → 10m code → 5m trace → 1m log. Never cut Phase 4 to squeeze in another problem.</p>
+
+<div class="keyidea">Split 45 minutes into five explicit checkpoints (5 / 10 / 17 / 8 / 5). Time-boxing keeps Phase 2 from eating the hour and protects Phase 4 verification.</div>
+
+<div class="check" id="check-timing">
+  <p class="q">You are 18 minutes into a 45-minute round with zero code written because you're hunting for an O(1)-space trick beyond your working O(n)-time, O(n)-space plan. What should you do?</p>
+  <div class="opts">
+    <button>Keep thinking quietly for another 10 minutes until the O(1)-space trick clicks</button>
+    <button>Start typing code for an unfinished O(1)-space hunch and patch the gaps along the way</button>
+    <button data-correct>Check in with the interviewer, confirm the O(n) plan, and start coding it now</button>
+  </div>
+  <div class="fb right"><p>Right! A working, verified O(n) solution leaves room to discuss O(1) space at minute 38; chasing perfection past minute 15 risks turning in zero working code.</p></div>
+  <div class="fb wrong"><p>Check the runway left: you need ~17 minutes to code and ~8 minutes to trace and verify. Sitting silent another 10 minutes leaves no time to finish, and coding an unverified hunch almost always ends in a minute-35 rewrite. Get clearance on your working O(n) plan and land cleanly.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>What must you check before takeoff?</h2>
+
+<p>Prompts are intentionally underspecified — just like real engineering tickets. At <b>minute 0</b>, confirm the round shape in one breath (<em>"One problem with follow-ups, or two problems? Will we run code or dry-run only?"</em>), then run a <b>5-point pre-flight check</b> in under three minutes:</p>
+
+<ol>
+  <li><b>Scale (<code>n</code>):</b> "How large can the input be?" Sets your Big-O target from <a href="../../02-algorithms/concepts/complexity.html">Chapter 2.1</a>.</li>
+  <li><b>Order &amp; values:</b> "Is the input already sorted? Can items be negative, strings, or duplicated?"</li>
+  <li><b>Empty / tiny cases:</b> "What should empty or 1-item input return?" (<code>-1</code>, <code>0</code>, <code>None</code>?)</li>
+  <li><b>Ties &amp; output definition:</b> "What exact metric do we return — index gap <code>j - i</code> (adjacent = 1) or items between (adjacent = 0)?"</li>
+  <li><b>Mutation:</b> "Is it okay to sort or modify the input list in place?"</li>
+</ol>
+
+<p>Then write <b>three tiny examples</b> (3–6 elements) at the top of the editor and confirm outputs — locking down both the metric (<code>j - i</code>) and subtle invariants:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 120" role="img" aria-label="Three tiny examples written before coding: normal case, no-match edge case, and three-repeat boundary case [5, 1, 5, 5] returning 1">
+    <rect x="14" y="16" width="206" height="88" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="117" y="38" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">1. NORMAL CASE</text>
+    <text x="117" y="62" class="label" text-anchor="middle" font-weight="700">[4, 1, 7, 4, 2, 1] → 3</text>
+    <text x="117" y="84" class="label" text-anchor="middle" fill="var(--muted)">4 at 0 &amp; 3 → gap 3 (&lt; 4)</text>
+
+    <rect x="237" y="16" width="206" height="88" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="340" y="38" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">2. EMPTY / NO-MATCH</text>
+    <text x="340" y="62" class="label" text-anchor="middle" font-weight="700">[] → -1,  [1, 2, 3] → -1</text>
+    <text x="340" y="84" class="label" text-anchor="middle" fill="var(--muted)">locks fallback return value</text>
+
+    <rect x="460" y="16" width="206" height="88" rx="8" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text x="563" y="38" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">3. TRICK / BOUNDARY</text>
+    <text x="563" y="62" class="label" text-anchor="middle" font-weight="700">[5, 1, 5, 5] → 1</text>
+    <text x="563" y="84" class="label" text-anchor="middle" fill="var(--muted)">3rd hit needs latest idx!</text>
+  </svg>
+  <div class="cap"><code>[5, 1, 5, 5] → 1</code> does double duty: it confirms adjacent distance = 1 (<code>j - i</code>), and it catches any buggy map that keeps the <em>first</em> index instead of updating to the <em>latest</em> (keeping first would wrongly return 2!).</div>
+</div>
+
+<div class="keyidea">Ask only questions that can change your algorithm or return contract, then lock in three tiny examples (normal, empty/missing, tricky) before designing.</div>
+
+<div class="check" id="check-clarify">
+  <p class="q">Prompt: <em>"Given a list of integers and a target, count how many pairs sum to target."</em> Which clarifying question changes your algorithm and space complexity the most?</p>
+  <div class="opts">
+    <button>Can the target integer itself be negative or zero?</button>
+    <button data-correct>Is the list already sorted (and are values distinct), and how large is <code>n</code>?</button>
+    <button>Can the input list contain the integer zero among its elements?</button>
+  </div>
+  <div class="fb right"><p>Bullseye! Just as you saw in Chapter 2.1, a sorted distinct list unlocks inward two pointers in <code>O(n)</code> time and <b><code>O(1)</code></b> extra space — whereas an unsorted list forces sorting or <code>O(n)</code> extra memory. Negative or zero values don't change the algorithm at all.</p></div>
+  <div class="fb wrong"><p>Use the flip test: "If the answer flips from Yes to No, do I choose a different algorithm?" Adding two numbers works identically whether values or target are negative or zero. Knowing whether the list is sorted and how large <code>n</code> is directly picks between <code>O(n²)</code> pairs, <code>O(n)</code> space, and <code>O(1)</code>-space two pointers.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How do you pick a plan without freezing?</h2>
+
+<p>This is the hardest ten minutes of the round. Never sit silent hoping a trick falls from the sky — file your route with ATC in <b>four spoken steps</b>:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 112" role="img" aria-label="Four-step design flow: Brute force and Big-O, Name bottleneck, Improve invariant, Ask ATC sign-off">
+    <rect x="12" y="24" width="144" height="64" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <text x="84" y="48" class="label" text-anchor="middle" fill="var(--muted)" font-weight="700">1. BRUTE FORCE</text>
+    <text x="84" y="68" class="label" text-anchor="middle">Check every pair</text>
+    <text x="84" y="82" class="label" text-anchor="middle" fill="var(--bad)">O(n²) time, O(1) sp</text>
+
+    <line x1="156" y1="56" x2="178" y2="56" stroke="var(--muted)" stroke-width="1.8"/>
+    <polygon points="178,51 186,56 178,61" fill="var(--muted)"/>
+
+    <rect x="188" y="24" width="148" height="64" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="262" y="48" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">2. BOTTLENECK</text>
+    <text x="262" y="68" class="label" text-anchor="middle">Inner loop re-scans</text>
+    <text x="262" y="82" class="label" text-anchor="middle" fill="var(--muted)">to find same ID</text>
+
+    <line x1="336" y1="56" x2="358" y2="56" stroke="var(--muted)" stroke-width="1.8"/>
+    <polygon points="358,51 366,56 358,61" fill="var(--muted)"/>
+
+    <rect x="368" y="24" width="146" height="64" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.8"/>
+    <text x="441" y="48" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">3. IMPROVED PLAN</text>
+    <text x="441" y="68" class="label" text-anchor="middle">Map id → last index</text>
+    <text x="441" y="82" class="label" text-anchor="middle" fill="var(--ok)">O(n) avg, O(n) sp</text>
+
+    <line x1="514" y1="56" x2="536" y2="56" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="536,51 544,56 536,61" fill="var(--ok)"/>
+
+    <rect x="546" y="24" width="122" height="64" rx="8" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="607" y="48" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">4. SIGN-OFF</text>
+    <text x="607" y="68" class="label" text-anchor="middle">"Sound good</text>
+    <text x="607" y="82" class="label" text-anchor="middle">to code this?"</text>
+  </svg>
+  <div class="cap">Ask for sign-off before coding. If you missed a constraint or there's a tighter path, the interviewer will steer you here — when pivoting costs 30 seconds instead of 15 minutes.</div>
+</div>
+
+<p>When the jump from Step 1 to Step 3 isn't obvious, ask yourself three concrete bottleneck questions out loud:</p>
+<ol>
+  <li><b>What am I re-scanning?</b> If an inner loop searches for something you already walked past, remember it in a dict or running variable.</li>
+  <li><b>Would order help?</b> Ask if sorting first (<code>O(n log n)</code>) puts matching or neighboring items right next to each other.</li>
+  <li><b>Still blank?</b> Solve a 4-item example <em>by hand</em> and watch what your own eyes keep jumping back to look at — that repeated glance is the data structure you're missing.</li>
+</ol>
+
+<div class="cols">
+  <div>
+    <p class="small muted"><b>Silent gamble (zero signal)</b></p>
+<pre class="plain"><code>(3 minutes of silence...)
+"Okay, I think I'll just start coding
+a dictionary approach and see."</code></pre>
+  </div>
+  <div>
+    <p class="small" style="color:var(--ok)"><b>Spoken flight plan (clear ATC sign-off)</b></p>
+<pre class="plain"><code>"Naive pair check is O(n²) — too slow for
+n = 10⁵. Storing each ID's latest index in
+a dict removes the inner scan: O(n) avg
+time, O(n) space. Sound good to code?"</code></pre>
+  </div>
+</div>
+
+<details class="aside another">
+  <summary>Explain it another way: why saying the brute force out loud finds the optimal answer</summary>
+  <p>Your brain struggles to invent a clever trick from thin air, but it excels at spotting <b>wasted work</b>. The second you say <em>"my inner loop scans backward looking for the last occurrence of <code>x</code>,"</em> the fix almost says itself: <em>"wait — I can remember the last index of <code>x</code> as I walk!"</em> Brute force isn't filler; it's your compass.</p>
+</details>
+
+<div class="keyidea">Speak the brute force and Big-O in 30 seconds, pinpoint the repeated work, propose the improved invariant, and get explicit sign-off before typing code.</div>
+
+<div class="check" id="check-plan">
+  <p class="q">You spot the optimal <code>O(n)</code> solution in the first 60 seconds. How should you open Phase 2?</p>
+  <div class="opts">
+    <button>Skip mentioning brute force completely so you look confident and start coding right away</button>
+    <button>Code the entire <code>O(n²)</code> brute force first so you have a working fallback before writing the optimal one</button>
+    <button data-correct>Give one sentence on brute force, state your <code>O(n)</code> plan and complexity, and ask "sound good?"</button>
+  </div>
+  <div class="fb right"><p>Spot on! That takes 25 seconds, proves structured trade-off thinking, and confirms you aren't missing a hidden constraint before you spend 15 minutes typing.</p></div>
+  <div class="fb wrong"><p>Check both pitfalls: jumping straight into code without sign-off risks missing a constraint ("wait, can we keep space O(1)?"), while spending 10 minutes <em>coding</em> a brute force you already outgrew burns half your Phase 3 budget! Summarize brute force in one sentence, state the optimal plan, and get the nod.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>How do you write clean code without sounding robotic?</h2>
+
+<p>Once ATC clears your route, fly smoothly. Avoid both extremes: 12 minutes of dead air AND reading syntax aloud (<em>"now I type <code>f-o-r</code>, space, <code>i</code>…"</em>). Narrate <b>intent at each decision point</b>:</p>
+
+<div class="cols">
+  <div>
+    <p class="small muted"><b>Hard to follow (cryptic names, magic sentinel)</b></p>
+<pre><code>def f(a):
+    d, m = {}, 10**9
+    for i in range(len(a)):
+        if a[i] in d:
+            if i - d[a[i]] &lt; m: m = i - d[a[i]]
+        d[a[i]] = i
+    return -1 if m == 10**9 else m</code></pre>
+  </div>
+  <div>
+    <p class="small" style="color:var(--ok)"><b>Senior signal (clear names, safe sentinel, early exit)</b></p>
+<pre><code>def min_duplicate_gap(ids):
+    last_seen = {}            # id -> latest index
+    best = float("inf")
+    for idx, req_id in enumerate(ids):
+        if req_id in last_seen:
+            best = min(best, idx - last_seen[req_id])
+            if best == 1: return 1   # shortest possible
+        last_seen[req_id] = idx
+    return -1 if best == float("inf") else best</code></pre>
+  </div>
+</div>
+
+<p>Three habits earn immediate Code Quality and Communication credit:</p>
+<ul>
+  <li><b>Names carry the invariant:</b> <code>last_seen</code> explains what the dict holds without comments; <code>float("inf")</code> never breaks on huge inputs, and <code>[]</code> / <code>[x]</code> naturally return <code>-1</code> without special-case clutter.</li>
+  <li><b>Skeleton first, helpers second:</b> if a sub-step is messy (parsing timestamps, checking grid bounds), call a clean helper like <code>is_valid(r, c)</code> and write its body right after.</li>
+  <li><b>Headline your quiet pauses:</b> need 30 seconds to verify an index? Say <em>"Give me 30 seconds to double-check this boundary."</em> Announced thinking feels calm; unexplained silence feels stuck.</li>
+</ul>
+
+<div class="keyidea">Narrate <em>why</em> each block exists, not the characters you're typing. Intent-revealing names, safe sentinels, and small helpers win Coding and Communication together.</div>
+
+<div class="check" id="check-narrate">
+  <p class="q">Midway through writing a loop, you aren't sure whether the boundary condition should be <code>&lt;</code> or <code>&lt;=</code>. What is the strongest move?</p>
+  <div class="opts">
+    <button data-correct>Say "Let me check this boundary on a 2-element list" and plug indices 0 and 1 aloud</button>
+    <button>Pick <code>&lt;</code> quickly to keep momentum up and let the test runner catch any off-by-one later</button>
+    <button>Stop talking for a minute while you mentally simulate several cases until you feel sure</button>
+  </div>
+  <div class="fb right"><p>Textbook senior behavior! A 15-second check on 2 items resolves the fencepost cleanly and shows method rather than guesswork.</p></div>
+  <div class="fb wrong"><p>Picture an interviewer watching both alternatives: guessing <code>&lt;</code> and hoping Run saves you fails on no-Run screens and looks careless; unannounced silence looks like freezing. Plugging in <code>[3, 7]</code> (indices 0 and 1) out loud takes 10 seconds and turns a snag into positive signal.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>How do you catch your own bugs before hitting Run?</h2>
+
+<p>When you finish typing the last line, <b>do not say "I'm done" and do not press Run yet.</b> Run the landing checklist: draw a tiny <b>trace table</b> and execute your code <em>literally</em> — acting like a dumb computer obeying only the exact tokens on screen.</p>
+
+<p>Watch how a literal trace immediately catches setting <code>best = 0</code> instead of <code>float("inf")</code> on <code>[4, 1, 4]</code>:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 176" role="img" aria-label="Literal trace table walking buggy code with best initialized to 0 on input [4, 1, 4] and spotting min(0, 2) stays 0">
+    <text x="14" y="20" class="label" fill="var(--warn)" font-weight="700">LITERAL TRACE ON [4, 1, 4]  (suppose you accidentally wrote best = 0)</text>
+    <rect x="14" y="30" width="652" height="28" rx="4" fill="var(--surface-2)" stroke="var(--border-strong)"/>
+    <text x="52" y="48" class="label" text-anchor="middle" font-weight="700">idx</text>
+    <text x="122" y="48" class="label" text-anchor="middle" font-weight="700">req_id</text>
+    <text x="234" y="48" class="label" text-anchor="middle" font-weight="700">in last_seen?</text>
+    <text x="380" y="48" class="label" text-anchor="middle" font-weight="700">best = min(best, gap)</text>
+    <text x="562" y="48" class="label" text-anchor="middle" font-weight="700">last_seen after</text>
+
+    <rect x="14" y="60" width="652" height="28" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+    <text x="52" y="78" class="label" text-anchor="middle">0</text>
+    <text x="122" y="78" class="label" text-anchor="middle">4</text>
+    <text x="234" y="78" class="label" text-anchor="middle" fill="var(--muted)">no</text>
+    <text x="380" y="78" class="label" text-anchor="middle" fill="var(--muted)">0 (unchanged)</text>
+    <text x="562" y="78" class="label" text-anchor="middle">{4: 0}</text>
+
+    <rect x="14" y="90" width="652" height="28" rx="3" fill="var(--surface)" stroke="var(--border)"/>
+    <text x="52" y="108" class="label" text-anchor="middle">1</text>
+    <text x="122" y="108" class="label" text-anchor="middle">1</text>
+    <text x="234" y="108" class="label" text-anchor="middle" fill="var(--muted)">no</text>
+    <text x="380" y="108" class="label" text-anchor="middle" fill="var(--muted)">0 (unchanged)</text>
+    <text x="562" y="108" class="label" text-anchor="middle">{4: 0, 1: 1}</text>
+
+    <rect x="14" y="120" width="652" height="32" rx="4" fill="var(--bad-soft)" stroke="var(--bad)" stroke-width="1.8"/>
+    <text x="52" y="140" class="label" text-anchor="middle" font-weight="700">2</text>
+    <text x="122" y="140" class="label" text-anchor="middle" font-weight="700">4</text>
+    <text x="234" y="140" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">yes (0)</text>
+    <text x="380" y="140" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">min(0, 2 - 0) = 0  ← BUG!</text>
+    <text x="562" y="140" class="label" text-anchor="middle">{4: 2, 1: 1}</text>
+
+    <text x="14" y="170" class="label" fill="var(--ok)" font-weight="700">Caught before Run! Fix: initialize best = float("inf"), then re-trace → min(inf, 2) = 2.</text>
+  </svg>
+  <div class="cap">Execute the literal tokens on screen (<code>min(0, 2)</code>), never what you <em>meant</em> to write. Then check your 3 edge cases (<code>[]</code>, <code>[1, 2]</code>, <code>[5, 1, 5, 5]</code>).</div>
+</div>
+
+<div class="keyidea">Walk 1 normal input through a literal variable table plus 3 edge cases (empty/1-item, no-match, tricky) <em>before</em> hitting Run. Self-caught bugs raise your Testing score.</div>
+
+<div class="check" id="check-trace">
+  <p class="q">What bug does a literal trace on <code>[4, 1, 4]</code> catch immediately in this version of <code>min_duplicate_gap</code>?</p>
+<pre><code>def min_duplicate_gap(ids):
+    last_seen, best = {}, float("inf")
+    for idx, req_id in enumerate(ids):
+        last_seen[req_id] = idx
+        if req_id in last_seen:
+            best = min(best, idx - last_seen[req_id])
+    return -1 if best == float("inf") else best</code></pre>
+  <div class="opts">
+    <button>It raises a <code>KeyError</code> on index 0 because <code>last_seen</code> starts empty</button>
+    <button data-correct>Storing <code>last_seen[req_id] = idx</code> first makes every element match itself, returning <code>0</code></button>
+    <button>It skips the last element <code>4</code> and wrongly returns <code>-1</code></button>
+  </div>
+  <div class="fb right"><p>Caught on row 0 of the trace! At <code>idx = 0, req_id = 4</code>, line 4 inserts <code>{4: 0}</code>, so line 5 is immediately True and sets <code>best = min(inf, 0 - 0) = 0</code>! Checking <em>before</em> overwriting fixes it.</p></div>
+  <div class="fb wrong"><p>Step row 0 literally: <code>idx = 0, req_id = 4</code>. Line 4 runs <em>first</em>: <code>last_seen = {4: 0}</code>. Now evaluate line 5 literally: is <code>4 in last_seen</code>? YES — you just put it there! So line 6 computes <code>0 - 0 = 0</code>, poisoning <code>best</code> to <code>0</code> on every non-empty list.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>How can a coding round break — and how do you recover?</h2>
+
+<p>Even top pilots hit turbulence. What separates Hire from No Hire is a calm drill for the five mid-flight emergencies:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Emergency</th><th>What panicking looks like</th><th>The calm recovery drill</th></tr></thead>
+  <tbody>
+    <tr><td><b>1. Blank mind at min 10</b></td><td>Staring silently for 5 minutes hoping a trick appears</td><td>Solve a 4-item example by hand, circle what your eyes re-scan, and pick a structure to remember it.</td></tr>
+    <tr><td><b>2. Approach breaks at min 22</b></td><td>Silently deleting and panic-rewriting half the file</td><td>Pause, name the exact counterexample aloud, and ask whether to patch the invariant or pivot cleanly.</td></tr>
+    <tr><td><b>3. Interviewer drops a hint</b></td><td>Brushing it off ("I'll check later") or fighting it</td><td>Stop immediately — treat hints as ATC warning of terrain. Echo it back and trace it on a tiny input.</td></tr>
+    <tr><td><b>4. Bug surfaces at min 38</b></td><td>Randomly flipping <code>+1</code> / <code>-1</code> and hoping tests pass</td><td>Shrink to a 2–3 item failing input, find the first line where actual ≠ expected, state root cause, fix once.</td></tr>
+    <tr><td><b>5. Clock hits min 41 mid-code</b></td><td>Frantic typing leaving broken half-syntax everywhere</td><td>Finish the core loop cleanly and explain the stubbed helper + exact complexity — coherent beats broken.</td></tr>
+  </tbody>
+</table></div>
+
+<p><b>When this 5-phase clock isn't the right fit:</b> In a <b>2-problem 45-minute screen</b> (like Week 3's milestone mock), split the clock into ~20 minutes per problem (2m clarify / 5m plan / 9m code / 4m trace). And in <b>practical multi-level coding</b> (<code>15.02</code>) or <b>debugging rounds</b> (<code>15.03</code>), run tests continuously after every small step instead of waiting until Phase 4.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: no-Run whiteboards, "why not sorting?", and production testing</summary>
+  <p><b>No execution environment:</b> Many screens disable Run completely — making Section 6's literal trace table your only compiler.</p>
+  <p><b>"Why a dict instead of sorting?"</b> Be ready for the obvious alternative: sorting <code>(val, idx)</code> pairs costs <code>O(n log n)</code> time AND still takes <code>O(n)</code> space to keep original indices, so the dict wins on time without losing on space (sorting only beats hashing on guaranteed worst-case <code>O(n log n)</code> if adversarial hash collisions are a threat).</p>
+  <p><b>"How would you test this in production?"</b> Name four distinct buckets beyond a quick dry run: happy path, boundaries (empty, 1 item, adjacent/3+ repeats), invalid/malformed types, and scale/stress tests.</p>
+</details>
+
+<div class="keyidea">Hints aren't penalties — ignoring a hint is. Pause cleanly if an invariant breaks, shrink any late bug to 2–3 items, and adapt the clock for 2-problem or practical rounds.</div>
+
+<div class="check" id="check-hint">
+  <p class="q">While coding this loop, your interviewer asks: <em>"Wait — what happens on line 4 if input is <code>[5, 1, 5, 5]</code>?"</em></p>
+<pre><code>for idx, req_id in enumerate(ids):
+    if req_id in last_seen:
+        best = min(best, idx - last_seen[req_id])
+    else:
+        last_seen[req_id] = idx</code></pre>
+  <div class="opts">
+    <button>Say "Good catch, I'll check edge cases right after I finish" and keep writing the return line</button>
+    <button data-correct>Pause now, trace <code>[5, 1, 5, 5]</code> through lines 2–5 aloud, spot that <code>else</code> skips updating 5's index, and fix it</button>
+    <button>Delete the <code>else</code> branch immediately without tracing because the interviewer wouldn't ask unless it's wrong</button>
+  </div>
+  <div class="fb right"><p>Spot on! Tracing <code>[5, 1, 5, 5]</code> exposes the bug in 10 seconds: <code>last_seen[5]</code> stays stuck at <code>0</code>, returning <code>2</code> instead of <code>1</code>! Removing <code>else:</code> so <code>last_seen[req_id] = idx</code> always updates fixes it with full understanding.</p></div>
+  <div class="fb wrong"><p>Never brush off ATC pointing at a specific line, and never blindly edit without seeing why. Tracing <code>[5, 1, 5, 5]</code> takes 10 seconds: at <code>idx=2</code>, <code>5</code> is in <code>last_seen</code> so <code>else</code> doesn't run, leaving <code>last_seen[5] = 0</code> — then at <code>idx=3</code> you compute <code>3 - 0 = 3</code> instead of <code>3 - 2 = 1</code>!</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>What to say — your pre-round checklist</h2>
+
+<p>Skim this 60-second checklist right before every timed drill, mock, or live screen:</p>
+<ol>
+  <li><b>Minute 0–5 (Clarify):</b> "Quick format check: one problem or two, and will we run code? Before designing, let me check max <code>n</code>, sortedness, duplicates/negatives, empty-input return, and mutation — then verify three tiny examples."</li>
+  <li><b>Minute 5–15 (Plan):</b> "The brute force is [X] in O(…) time and O(…) space. The repeated work is [Y]. If I maintain [Z], it drops to O(…) time and O(…) space. Does that look good before I code?"</li>
+  <li><b>Minute 15–32 (Code):</b> Name variables for their invariant; narrate intent per block; announce 30-second boundary checks openly.</li>
+  <li><b>Minute 32–40 (Verify):</b> "Before running, let me walk <code>[normal example]</code> through a literal trace table, then check empty, 1-item, and boundary cases."</li>
+  <li><b>Minute 40–45 (Wrap):</b> "Final cost is O(…) time and O(…) auxiliary space (including recursion stack). Happy to explain why this beats [obvious alternative] or walk through scale follow-ups."</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Interviewers score 1–4 across four equal axes: Problem Solving, Code Quality, Testing &amp; Edge Cases, and Communication (3 = Hire requires active evidence).</li>
+  <li>Run the 5-phase flight plan every time: Clarify (5m) → Plan &amp; Sign-off (10m) → Code (17m) → Trace &amp; Test (8m) → Wrap (5m).</li>
+  <li>Check minute-0 format (1 vs 2 problems, runnable?) and only high-signal constraints (<code>n</code>, sortedness, value range, empty behavior, mutation) + 3 tiny examples.</li>
+  <li>State brute force + Big-O in 30 seconds, pinpoint the repeated work, propose the improvement, and get ATC sign-off before typing.</li>
+  <li>Narrate intent, not keystrokes; verify with a literal trace table + 3 edge cases before clicking Run.</li>
+  <li>Absorb hints immediately, pause cleanly if an invariant breaks, and shrink any late bug to a 2–3 item trace instead of guess-editing.</li>
+</ol>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do Warm-ups 1 and 2 on paper on Day 1 before your first timed drill — they build the exact reflexes you'll use all week.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Run Phase 1 on two vague prompts</h4>
+  <p>For each prompt, write (a) your 3 highest-signal clarifying questions and (b) 3 tiny confirmed examples (normal, empty/missing, tricky):<br>
+  <b>Prompt A:</b> "Given a list of meeting times, return whether a person can attend all of them."<br>
+  <b>Prompt B:</b> "Given a string, find the first non-repeating character."</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p><b>Prompt A:</b> Questions: (1) Are back-to-back meetings like <code>[1, 3]</code> and <code>[3, 5]</code> allowed? (2) Are intervals already sorted, and how big is <code>n</code>? (3) Can input be empty or 1 meeting? Examples: <code>[[1,4],[2,5]] → False</code> (overlap); <code>[] → True</code>; <code>[[1,3],[3,5]] → True</code> (touching boundary).</p>
+    <p><b>Prompt B:</b> Questions: (1) Return the character or its index, and what if every character repeats? (2) Case-sensitive (<code>'A'</code> vs <code>'a'</code>) and ASCII or Unicode? (3) Max length <code>n</code>? Examples: <code>"swiss" → 'w'</code>; <code>"aabb" → None/-1</code>; <code>"a" → 'a'</code>.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Catch two bugs with a literal trace table</h4>
+  <p>Draw a literal trace table for this intended "return index of first occurrence of <code>target</code>, or <code>-1</code>" function on <code>([7, 7, 5], 7)</code> and <code>([5, 7], 7)</code> — without running Python — and find both bugs:</p>
+<pre><code>def first_index(nums, target):
+    ans = -1
+    for i in range(len(nums) - 1):
+        if nums[i] == target:
+            ans = i
+    return ans</code></pre>
+  <details class="aside another"><summary>Answer</summary>
+    <p><b>Trace 1 — <code>([7, 7, 5], 7)</code>:</b> <code>i=0 → ans=0</code>; <code>i=1 → ans=1</code> (overwrites 0!) → returns <code>1</code> instead of <code>0</code>. <b>Bug 1:</b> missing early <code>return i</code> (or <code>break</code>).<br>
+    <b>Trace 2 — <code>([5, 7], 7)</code>:</b> <code>range(1)</code> visits only <code>i=0</code> (5 ≠ 7) and stops → returns <code>-1</code> instead of <code>1</code>. <b>Bug 2:</b> <code>range(len(nums) - 1)</code> skips the last element.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · timed rehearsal</div>
+  <h4>3. Run your first 25-minute drill by the flight plan</h4>
+  <p>Pick an Easy/Medium Week 1 drill (e.g., <em>Contains Duplicate</em> or <em>Group Anagrams</em>). Set a 25-minute timer: 3m clarify + examples, 6m brute force → improved plan aloud, 10m clean code, 5m literal trace table + edge cases before running. Log one honest row in <code>sections/15-interview-formats/notes.md</code> (or <code>mock-log.md</code> marked <code>self N / solo</code>).</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · spoken drills</div>
+  <h4>4. Rehearse the three tough moments out loud</h4>
+  <p>Say each out loud in under 20 seconds until it feels natural: (a) asking for 30 quiet seconds to check an index boundary; (b) pausing to trace an interviewer's edge-case hint; (c) transitioning from an <code>O(n²)</code> brute force to an <code>O(n)</code> plan and asking for sign-off.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · full mock</div>
+  <h4>5. Day 7 Milestone Mock (45 minutes, bare editor)</h4>
+  <p>Skim section 8, then ask: <em>"mock interview, coding (Google L5 bare-editor style, 1 medium + follow-up), 45 minutes."</em> Hand-trace before running, self-score 1–4 on all four rubric axes before reading feedback, and log the delta in <code>sections/15-interview-formats/mock-log.md</code>.</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="../index.html"><small>← Back to</small>Chapter 15 overview</a>
+  <a class="next" href="../index.html#t-15.02"><small>Next →</small>Practical coding round</a>
+</nav>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ---- 45-minute flight-plan stepper (section 2) ----
+  (function () {
+    const frames = [
+      {
+        phase: "1. Clarify & Examples", clock: "Sample run: 00:00 – 04:30",
+        scores: { ps: 1, code: 0, ver: 1, com: 2 },
+        say: "\"One problem or two? Fixed int IDs or strings? Max n ≈ 10⁵? Empty/unique → -1, and adjacent gap = 1? Let me confirm: [4,1,7,4,2,1] → 3, [1,2] → -1, [5,1,5,5] → 1.\"",
+        note: "Locked in O(n)/O(n log n) budget, confirmed distance = j - i, and picked [5,1,5,5] to test updating to latest index.",
+        msg: "<b>Phase 1 (budget: 0–5 min):</b> Pre-flight check. Three tiny examples align both people on the spec.",
+      },
+      {
+        phase: "2. Brute Force → Improved Plan", clock: "Sample run: 04:30 – 12:00",
+        scores: { ps: 3, code: 0, ver: 1, com: 3 },
+        say: "\"Checking every pair is O(n²) time, O(1) space — too slow for n=10⁵. The inner loop re-scans for the previous matching ID. Storing last_seen[id] = idx drops it to O(n) avg time (assuming int IDs; O(n·L) for length-L strings) and O(n) space. Sound good to code?\"",
+        note: "Interviewer nods: \"Solid — go ahead.\" Route cleared with ATC!",
+        msg: "<b>Phase 2 (budget: 5–15 min):</b> Brute force named, bottleneck killed, complexity qualified, sign-off earned.",
+      },
+      {
+        phase: "3. Clean Code (Narrate Intent)", clock: "Sample run: 12:00 – 28:00",
+        scores: { ps: 3, code: 3, ver: 1, com: 3 },
+        say: "\"I'll init best to float('inf'), track each ID's latest index in last_seen, update best BEFORE overwriting last_seen[req_id], and return early if best hits 1.\"",
+        note: "Clean names, zero syntax narration, 9 readable lines with 17 minutes still on the clock.",
+        msg: "<b>Phase 3 (budget: 15–32 min):</b> Smooth cruising. Code reads cleanly and protects verification runway.",
+      },
+      {
+        phase: "4. Literal Trace & Edge Cases", clock: "Sample run: 28:00 – 38:00",
+        scores: { ps: 3, code: 4, ver: 4, com: 4 },
+        say: "\"Before clicking Run, let me trace [4, 1, 7, 4] literally: idx=0→{4:0}, idx=1→{4:0,1:1}, idx=2→{...,7:2}, idx=3→gap=3, best=3. Edge cases: [] → -1, [5] → -1, [5,1,5,5] → 2 then 1.\"",
+        note: "Verified every branch by hand, then ran tests — green on the very first Run!",
+        msg: "<b>Phase 4 (budget: 32–40 min):</b> Landing checklist done. Testing & Edge Cases signal jumps to 4.",
+      },
+      {
+        phase: "5. Complexity & Senior Follow-up", clock: "Sample run: 38:00 – 45:00",
+        scores: { ps: 4, code: 4, ver: 4, com: 4 },
+        say: "\"Final cost: O(n) avg time for int IDs, O(U) space for U ≤ n distinct IDs. If IDs stream forever and we only care about gaps ≤ k, we can pair the dict with a k-slot queue (evicting the element leaving the window in O(1)) to bound memory to O(k).\"",
+        note: "Strong Hire (4/4) across Problem Solving, Code Quality, Testing & Edge Cases, and Communication.",
+        msg: "<b>Phase 5 (budget: 40–45 min):</b> Debrief & scale-up. Five calm minutes of follow-up seals the senior bar.",
+      },
+    ];
+    const axisRow = (label, v) => V.el("div", { style: "display:flex;align-items:center;gap:8px;font-size:0.8rem" },
+      V.el("span", { class: "muted", style: "width:132px" }, label),
+      V.el("div", { style: "display:flex;gap:4px" },
+        [1, 2, 3, 4].map((k) => V.el("span", {
+          style: `display:inline-block;width:20px;height:10px;border-radius:3px;border:1px solid var(--border-strong);background:${k <= v ? (v >= 3 ? "var(--ok)" : "var(--accent)") : "var(--surface)"}`,
+        }))),
+      V.el("span", { style: "font-family:var(--mono);font-weight:600" }, v ? `${v}/4` : "—"));
+
+    V.player($("round-player"), {
+      frames, speed: 1400,
+      draw(f, stage) {
+        const top = V.el("div", { style: "display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:baseline" },
+          V.el("strong", { style: "color:var(--accent)" }, f.phase),
+          V.el("span", { class: "small", style: "font-family:var(--mono);padding:2px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border-strong)" }, f.clock));
+        const quote = V.el("div", { style: "padding:10px 12px;border-left:3px solid var(--accent-2);background:var(--surface);border-radius:6px;font-size:0.9rem;margin-bottom:10px;font-style:italic" }, f.say);
+        const grid = V.el("div", { style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;align-items:center" },
+          V.el("div", { style: "display:grid;gap:6px" },
+            V.el("div", { class: "small muted", style: "font-weight:600;margin-bottom:2px" }, "Running rubric signal"),
+            axisRow("Problem solving", f.scores.ps),
+            axisRow("Code quality", f.scores.code),
+            axisRow("Testing & edges", f.scores.ver),
+            axisRow("Communication", f.scores.com)),
+          V.el("div", { class: "small muted", style: "padding:8px 10px;border-radius:6px;border:1px dashed var(--border-strong)" }, f.note));
+        stage.append(top, quote, grid);
+      },
+    });
+  })();
+})();
+</script>
+</body>
+</html>
