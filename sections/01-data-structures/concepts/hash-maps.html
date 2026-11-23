@@ -74,7 +74,7 @@ address of slot 3  =  1000 + 3 × 8  =  1024</code></pre>
   <thead><tr><th>Approach</th><th>Check one name</th><th>Add one name</th><th>With 10 million names</th></tr></thead>
   <tbody>
     <tr><td>Unsorted list, scanned</td><td>O(n)</td><td>O(1) amortized, append at the end</td><td>10 million comparisons per check</td></tr>
-    <tr><td>Sorted list, binary search</td><td>O(log n)</td><td>O(n), shift the items after it</td><td>24 comparisons per check, about 5 million items shifted per insert</td></tr>
+    <tr><td>Sorted list, binary search</td><td>O(log n)</td><td>O(n), shift the items after it</td><td>24 comparisons per check, about 5 million shifts per insert</td></tr>
   </tbody>
 </table></div>
 
@@ -98,7 +98,7 @@ for c in "banana":
 
 <p>Direct addressing fits whenever the possible keys are few and packed close together: letters, ages from 0 to 150, days of the year, or user ids that run from 0 to 10 million. A <code>bytearray</code> with one flag for each of those ids takes about 10 MB.</p>
 
-<p>It fails for usernames, because the array needs a slot for every key that could exist and not only for the keys in use. Suppose a username is 20 characters drawn from 37 symbols: the letters, the digits and the underscore.</p>
+<p>It fails for usernames, because the array needs a slot for every key that could exist and not only for the keys in use. Suppose a username is 20 characters drawn from 37 symbols: the lowercase letters, the digits and the underscore.</p>
 
 <pre class="plain"><code>possible usernames       37²⁰, about 2 × 10³¹
 usernames in use         10,000,000
@@ -219,7 +219,7 @@ toy_hash("tac") = 114,582      114,582 % 8 = 6</code></pre>
 lookup of an absent key        about α comparisons
 lookup of a present key        about 1 + α/2 comparisons</code></pre>
 
-<p>An absent key costs one step to reach its bucket and then a comparison with every key in the chain, which holds α keys on average. The other keys land in buckets independently of a present key, so its chain also holds about α of them, and on average it is compared with half of those and then with itself.</p>
+<p>An absent key costs one step to reach its bucket and then a comparison with every key in the chain, which holds α keys on average. The other keys land in buckets independently of a present key, so its chain also holds about α of them. On average half of those sit ahead of it, so a lookup compares each of them and then the key itself.</p>
 
 <p>Two table sizes show what this means for 10 million names.</p>
 
@@ -296,7 +296,7 @@ lookup of a present key        about 1 + α/2 comparisons</code></pre>
 <details class="aside deeper">
   <summary>Go deeper: what a resize costs in real systems</summary>
   <p>Amortized O(1) is a statement about the total. The single insert that triggers a resize of a 10-million-key table still moves 10 million keys, and the request that issued it waits for about half a second. In a web service that shows up as a spike in tail latency.</p>
-  <p>Redis avoids the spike with incremental rehashing. It keeps the old and new tables side by side and moves one bucket on every operation, and lookups check both tables until the move is finished. Where the number of keys is known in advance, the simpler answer is to create the table at its final size, which Java, Go, Rust and C++ allow and Python does not. Java's constructor takes a bucket count, not a key count, so <code>new HashMap&lt;&gt;(1000)</code> still resizes at its 769th key. Since Java 19, <code>HashMap.newHashMap(1000)</code> sizes the table for 1,000 keys.</p>
+  <p>Redis avoids the spike with incremental rehashing. It keeps the old and new tables side by side and moves one bucket on every operation, and lookups check both tables until the move is finished. Where the number of keys is known in advance, the simpler answer is to create the table at its final size, which Java, Go, Rust and C++ allow and Python does not. Java's constructor takes a bucket count, not a key count, and rounds it up to a power of two, so <code>new HashMap&lt;&gt;(1000)</code> gets 1,024 buckets and still resizes at its 769th key. Since Java 19, <code>HashMap.newHashMap(1000)</code> sizes the table for 1,000 keys.</p>
   <p>Java and CPython keep each key's hash, so a resize places every key again without calling the hash function.</p>
   <p>Most tables never shrink. A table that has lost most of its keys keeps all its buckets, and iterating over it still visits every one of them, which costs O(n + m).</p>
 </details>
@@ -309,7 +309,7 @@ lookup of a present key        about 1 + α/2 comparisons</code></pre>
     <button>The hash function changes with the table size, so every key needs a new hash</button>
   </div>
   <div class="fb right"><p>Lookups in the new table take the hash modulo 16. A key left where modulo 8 put it may sit in a bucket that no lookup for it will ever visit.</p></div>
-  <div class="fb wrong"><p>Trace one key. In a table of 8 buckets "dog" is in bucket 4, and in a table of 16 its hash points to bucket 12. Copied straight across, "dog" would sit in bucket 4 while every later lookup searched bucket 12. Changing m means working out every key's bucket again, although each key's hash stays the same.</p></div>
+  <div class="fb wrong"><p>Trace one key. In a table of 8 buckets "emu" is in bucket 5, and in a table of 16 its hash points to bucket 13. Copied straight across, "emu" would sit in bucket 5 while every later lookup searched bucket 13. Changing m means working out every key's bucket again, although each key's hash stays the same.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -361,7 +361,7 @@ lookup of a present key        about 1 + α/2 comparisons</code></pre>
   </tbody>
 </table></div>
 
-<p>In the first case the lookup stops at the gap in slot 6, although "tac" is still in the table. In the second the tombstone keeps it walking, because only a truly empty slot ends a search.</p>
+<p>Only a truly empty slot ends a search, so the tombstone in slot 6 keeps the lookup walking to "tac" in slot 7.</p>
 
 <p>Tombstones add two rules. An insert may reuse a tombstone's slot, but only after walking on to an empty slot to confirm that the key is not stored further along, or the table could end up holding the same key twice. Tombstones hold no key but still lengthen the searches that pass them, so they count toward the load factor, and when the limit is reached the table is rebuilt from its live keys.</p>
 
@@ -388,7 +388,7 @@ lookup of a present key        about 1 + α/2 comparisons</code></pre>
 
 <h3>Separate chaining or open addressing</h3>
 
-<p>Chaining tolerates a high load factor and makes deletion easy. Open addressing is usually faster, because the slots next to a probe come into the CPU's cache together with it, while list nodes are scattered across the heap.</p>
+<p>Chaining tolerates a high load factor and makes deletion easy. Open addressing is usually faster, because the slots next to a probe come into the CPU's cache together with it, while list nodes are scattered across memory.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th></th><th>Separate chaining</th><th>Open addressing</th></tr></thead>
@@ -437,7 +437,7 @@ i = (5 * i + 1 + perturb) % m</code></pre>
 
 <h3>A key must not change while it is stored</h3>
 
-<p>The table computes a key's hash once, when the key is inserted. If the key's hash changes afterward, a lookup with the changed key searches a different bucket from the one that holds the entry.</p>
+<p>The table hashes a key when it stores it. If the key's hash changes afterward, a lookup with the changed key searches a different bucket from the one that holds the entry.</p>
 
 <pre><code>class Point:
     def __init__(self, x, y): self.x, self.y = x, y
@@ -499,6 +499,7 @@ at about 10 ns each, about 50 seconds of CPU</code></pre>
     <tr><td>Insert, with resizes counted</td><td>O(1) amortized</td><td>O(n)</td><td>the insert that triggers a resize rehashes every key</td></tr>
     <tr><td>Iterate over all keys</td><td>O(n + m)</td><td>O(n + m)</td><td>it visits every bucket, empty or not</td></tr>
     <tr><td>Smallest key, or keys in a range</td><td>O(n)</td><td>O(n)</td><td>hashing scatters the keys on purpose</td></tr>
+    <tr><td>Find a value</td><td>O(n)</td><td>O(n)</td><td>only keys are hashed</td></tr>
     <tr><td>Space</td><td>O(n)</td><td>O(n)</td><td>plus the empty slots, so a lower load factor costs more memory</td></tr>
   </tbody>
 </table></div>
@@ -508,11 +509,11 @@ at about 10 ns each, about 50 seconds of CPU</code></pre>
 <details class="aside deeper">
   <summary>Go deeper: SipHash, patterned keys, integer keys and tree bins</summary>
   <p>Python's first fix, in 2012, mixed a random seed into its old string hash, and researchers soon showed how to recover the seed. Python 3.4 switched to SipHash, which is designed so that its output does not reveal its key.</p>
-  <p>Java, Python, Go and Rust keep the number of buckets a power of two, because the remainder is then just the low bits of the hash, and reading bits is cheaper than dividing. The catch is that keys that are all multiples of 16 then share bucket 0 of a 16-bucket table. Libraries defend against such patterns by mixing the high bits of the hash into the choice of slot.</p>
+  <p>Java, Python, Go and Rust keep the number of buckets a power of two, because the remainder is then just the low bits of the hash, and reading bits is cheaper than dividing. The catch is that where an integer hashes to itself, as in Python and Java, keys that are all multiples of 16 share bucket 0 of a 16-bucket table. Libraries defend against such patterns by mixing the high bits of the hash into the choice of slot.</p>
   <p>Python randomizes the hashes of strings and bytes, but not of numbers. An integer hashes to itself, reduced modulo 2⁶¹ − 1, so every number of the form below has hash 1.</p>
   <pre class="plain"><code>k × (2⁶¹ − 1) + 1        for k = 0, 1, 2, …</code></pre>
   <p>Building a dict from n such keys takes O(n²) time. If untrusted input becomes integer keys, cap its size or convert the keys to strings.</p>
-  <p>Java's <code>String.hashCode</code> is the toy hash from section 4 and is not randomized, so colliding keys are cheap to make. The strings "Aa" and "BB" both hash to 2,112, so every string made of 17 such two-letter blocks shares one hash: 131,072 field names of 34 characters, about 4.5 MB. That is why Java added tree bins. A bucket becomes a tree only in a table of at least 64 buckets, and the O(log n) bound holds only when the keys are <code>Comparable</code>.</p>
+  <p>Java's <code>String.hashCode</code> is the toy hash from section 4 and is not randomized, so colliding keys are cheap to make. The strings "Aa" and "BB" both hash to 2,112, so every string made of 17 such two-letter blocks shares one hash: 131,072 field names of 34 characters, about 4.5 MB. That is why Java added tree bins. A bucket becomes a tree only in a table of at least 64 buckets, and when many keys share one hash, the O(log n) bound holds only if they are <code>Comparable</code>.</p>
 </details>
 
 <div class="check" id="check-randomized-hash">
@@ -578,7 +579,7 @@ at about 10 ns each, about 50 seconds of CPU</code></pre>
 
 <ol>
   <li><b>Array indexing.</b> "An array reads any slot in one step, because the slot's address is computed. A hash function turns any key into a number, and that number modulo the table size picks the slot."</li>
-  <li><b>Collisions.</b> "Different keys can share a slot, and that starts early. I would chain, so each bucket holds a short list of key and value pairs and I compare keys for equality. The alternative is open addressing, which needs tombstones for deletes."</li>
+  <li><b>Collisions.</b> "Different keys can share a bucket, and that starts early. I would chain, so each bucket holds a short list of key and value pairs and I compare keys for equality. The alternative is open addressing, which needs tombstones for deletes."</li>
   <li><b>Load factor and resizing.</b> "A lookup costs about one step plus the load factor, which is keys divided by buckets. I keep it under a limit such as 0.75 by doubling the table and rehashing. An occasional insert costs O(n), and the amortized cost is O(1)."</li>
   <li><b>Worst case.</b> "That is O(1) on average. The worst case is O(n) if the keys pile into one bucket, which an attacker can force unless the hash is randomized."</li>
   <li><b>Trade-off.</b> "A hash map spends extra memory and gives up order. For range queries or a guaranteed worst case I would use a balanced tree."</li>
@@ -675,7 +676,7 @@ look up D   slot 3 holds A, slot 4 is a tombstone,
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>6. Hash map patterns in O(n)</h4>
-  <p>In <code>exercises/hash_patterns.py</code>, write <code>two_sum</code>, <code>group_anagrams</code> and <code>subarray_sum_count</code>, which use the first, second and fourth patterns from section 11. The tests pass in a list that counts how often it is read, and they fail when a function reads it more than a few times per item. Comparing every pair reads it about half of n² times.</p>
+  <p>In <code>exercises/hash_patterns.py</code>, write <code>two_sum</code>, <code>group_anagrams</code> and <code>subarray_sum_count</code>, which use the first, second and fourth patterns from section 11. The tests pass in a list that counts how often it is read, and they fail when a function reads it more than a few times per item. Comparing every pair reads it about half of n² times. The track saves <code>subarray_sum_count</code> for week 2, because it needs <a href="../../02-algorithms/concepts/two-pointers-sliding-window.html#s8">prefix sums</a>, which a later chapter builds.</p>
 </div>
 
 <div class="exercise">
