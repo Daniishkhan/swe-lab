@@ -56,11 +56,11 @@ swe-prep/
 
 ## What's written so far
 
-10 full visual chapters (all 4 Phase 0 guides + all 6 Week 1 chapters), 16 blueprint chapter outlines (`Weeks 2–9`), and 82 Python exercises with work-measuring tests:
+12 full visual chapters (all 6 Phase 0 guides + all 6 Week 1 chapters), 16 blueprint chapter outlines (`Weeks 2–9`), and 82 Python exercises with work-measuring tests:
 
 | Chapter | Book chapters (`concepts/*.html`) | Exercises (stubs + work-measuring tests) |
 |---|---|---|
-| Phase 0 (§10, §14, §15) | All 4 Phase 0 chapters written: `python-idioms.html`, `python-toolkit.html`, `algorithmic-round.html`, `project-deep-dive.html` | 3 Python warm-up suites (`py_idioms`, `py_internals`, `py_toolkit`) |
+| Phase 0 (§10, §14, §15) | All 6 Phase 0 chapters written: `python-memory-model.html`, `python-idioms.html`, `python-building-blocks.html`, `python-toolkit.html`, `algorithmic-round.html`, `project-deep-dive.html` | 3 Python warm-up suites (`py_idioms`, `py_internals`, `py_toolkit`) |
 | §01 Data structures | 4 full Week 1 chapters (`hash-maps.html`, `linear-structures.html`, `trees.html`, `heaps.html`) + 2 outlines (`tries.html`, `probabilistic-ds.html`) | 37 exercises, from `hash_map` and `lru_cache` to `bloom_filter`, `lsm_store` and `mpmc_queue` |
 | §02 Algorithms | 2 full Week 1 chapters (`complexity.html`, `sorting.html`) + 6 outlines (`binary-search.html`, `sliding-window.html`, `graphs.html`, `intervals.html`, `backtracking-dp.html`, `greedy.html`) | 36 exercises, from `sorts` and `graphs` to `dijkstra`, `kruskal_mst`, `kmp_search`, `external_sort`, `token_bucket`, `consistent_hash` and `capacity_estimate` |
 | §03 Concurrency | 2 outlines (`concurrency-fundamentals.html`, `concurrency-patterns.html`) | 3 concurrency suites (`bounded_queue`, `single_flight_cache`, `concurrent_crawler`) |

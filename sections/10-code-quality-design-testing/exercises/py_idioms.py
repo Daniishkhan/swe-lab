@@ -1,7 +1,7 @@
 """
 Python idioms: comprehensions, lambdas, closures, generators and itertools
-Topic: 10.10  |  Priority: P0
-Chapter: sections/10-code-quality-design-testing/concepts/python-idioms.html
+Topic: 10.11  |  Priority: P0
+Chapters: sections/10-code-quality-design-testing/concepts/python-memory-model.html, sections/10-code-quality-design-testing/concepts/python-idioms.html
 
 Five interview-essential Python fluency drills. Practice writing clean,
 readable Python without fighting syntax or falling into closure / O(n^2) traps.

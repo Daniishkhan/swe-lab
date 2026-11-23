@@ -10,7 +10,15 @@
         "steps": [
           {
             "topic": "10.10",
-            "do": "Spend real time here so Python never slows you down in mocks. Ask Claude: “teach me Python interview fluency in depth” — cover list/dict/set comprehensions, multi-key lambdas, closures and late binding, lazy generators (yield/yield from), itertools, dataclasses, decorators, context managers, and classic pitfalls (2D grid aliasing, mutable defaults, slicing costs). Then solve py_idioms and py_internals."
+            "do": "Master Python's object & reference model from one physical picture (sticky notes on boxes): mutable vs immutable, 2D grid aliasing, shallow vs deep copy, hidden slicing cost, mutable default args, and late-binding loop closures."
+          },
+          {
+            "topic": "10.11",
+            "do": "Master transforming and streaming data cleanly: comprehensions, multi-key lambda sorting, enumerate/zip/zip(*matrix), generator expressions, itertools (accumulate/islice/chain/groupby), and lazy yield / yield from. Then solve py_idioms."
+          },
+          {
+            "topic": "10.12",
+            "do": "Master Python's @ decorators and clean building blocks: how @ wraps objects, @dataclass(frozen=True, order=True), custom @memoize with @wraps and falsy-value safety, and exception-safe @contextmanager. Then solve py_internals."
           },
           {
             "topic": "10.01",
@@ -28,32 +36,37 @@
         "dayNote": "About 17 hours across 4 days (~4 to 4.5 hours/day) before Week 1. Investing time in Python fluency upfront pays off on every coding mock and drill.",
         "days": [
           {
-            "label": "Day 1 · Comprehensions, lambdas, closures & generators",
+            "label": "Day 1 · Memory model, comprehensions, lambdas & lazy streams",
             "plan": [
               {
-                "t": "2h",
+                "t": "1h 15m",
                 "topic": "10.10",
-                "do": "Deep dive with Claude: list/dict/set comprehensions, lambda sort keys, late-binding closures, zip/enumerate/itertools, yield and yield from"
+                "do": "Read How Python holds data in memory: sticky notes on boxes, mutability, 2D grid aliasing, shallow vs deep copy, slicing cost, mutable defaults, and loop closures"
               },
               {
-                "t": "2h 15m",
-                "topic": "10.10",
+                "t": "1h 15m",
+                "topic": "10.11",
+                "do": "Read Transforming and streaming data: comprehensions, lambda sort keys, zip/enumerate, itertools, and lazy yield / yield from"
+              },
+              {
+                "t": "2h",
+                "topic": "10.11",
                 "do": "Complete py_idioms (all 5 functions) and explain the 'say it out loud' questions"
               }
             ],
             "drills": []
           },
           {
-            "label": "Day 2 · Python data model, gotchas, decorators & context managers",
+            "label": "Day 2 · Decorators, dataclasses, memoization & context managers",
             "plan": [
               {
-                "t": "2h",
-                "topic": "10.10",
-                "do": "Deep dive with Claude: object references, shallow vs deep copy, 2D grid aliasing, mutable defaults, slicing costs, @dataclass(frozen=True, order=True), @wraps/@cache decorators and @contextmanager"
+                "t": "1h 30m",
+                "topic": "10.12",
+                "do": "Read Python decorators and clean building blocks: how @ works, @dataclass(frozen=True, order=True), @memoize/@wraps with falsy values, and @contextmanager try/finally"
               },
               {
-                "t": "2h 15m",
-                "topic": "10.10",
+                "t": "2h 30m",
+                "topic": "10.12",
                 "do": "Complete py_internals (all 5 drills) and review every trap you hit"
               }
             ],
@@ -95,7 +108,7 @@
               },
               {
                 "t": "45m",
-                "topic": "10.10",
+                "topic": "10.12",
                 "do": "Redo any shaky idiom from py_idioms / py_internals / py_toolkit from a blank editor"
               }
             ],
@@ -3266,9 +3279,28 @@
         {
           "id": "10.10",
           "tag": "P0",
-          "short": "Python idioms, lambdas, generators & gotchas",
-          "text": "Python fluency in depth: list/dict/set comprehensions, lambdas and closures, generators (yield/yield from), itertools, dataclasses, decorators, context managers, and classic pitfalls",
+          "short": "Python memory model, copies & closures",
+          "text": "How Python holds data in memory: names vs objects, mutable vs immutable, 2D grid aliasing, shallow vs deep copy, hidden slicing cost, mutable default arguments, late-binding closures, truthiness, and mutating while iterating",
           "requires": []
+        },
+        {
+          "id": "10.11",
+          "tag": "P0",
+          "short": "Comprehensions, itertools & lazy generators",
+          "text": "Transforming and streaming data in Python: list/dict/set comprehensions, multi-key lambda sorting, enumerate/zip/zip(*matrix), lazy generator expressions, itertools (accumulate, islice, chain, groupby), and pausing generators (yield / yield from)",
+          "requires": [
+            "10.10"
+          ]
+        },
+        {
+          "id": "10.12",
+          "tag": "P0",
+          "short": "Dataclasses, decorators & context managers",
+          "text": "Python decorators and clean building blocks: how @ wraps objects, @dataclass(frozen=True, order=True), custom @memoize with @wraps and falsy-value safety, and exception-safe @contextmanager with try/finally",
+          "requires": [
+            "10.10",
+            "10.11"
+          ]
         },
         {
           "id": "10.01",
@@ -3276,7 +3308,9 @@
           "text": "Clean, idiomatic code in your primary language; deep knowledge of its standard library",
           "short": "Python standard library toolkit",
           "requires": [
-            "10.10"
+            "10.10",
+            "10.11",
+            "10.12"
           ]
         },
         {

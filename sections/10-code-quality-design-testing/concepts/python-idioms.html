@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="topic" content="10.10">
-  <title>Write clean Python without fighting the language (Python idioms &amp; gotchas)</title>
+  <meta name="topic" content="10.11">
+  <title>Transforming and streaming data (Comprehensions, itertools &amp; lazy generators)</title>
   <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
   <link rel="stylesheet" href="../../../assets/style.css">
   <script src="../../../assets/curriculum.js"></script>
@@ -16,186 +16,293 @@
 <main class="content book">
 
 <header class="chapter-head">
-  <div class="eyebrow">Phase 0 · Days 1–2</div>
-  <h1>Write clean Python without fighting the language</h1>
-  <div class="meta"><span><span class="badge P0">P0</span> Phase 0 Python warm-up</span><span>about 18 minutes</span><span>7 quick checks · 5 exercises</span></div>
+  <div class="eyebrow">Phase 0 · Day 1 · Part 2</div>
+  <h1>Transforming and streaming data</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> Phase 0 Python pipelines</span><span>about 16 minutes</span><span>6 quick checks · 4 exercises</span></div>
 </header>
 
-<p>In a 45-minute bare-editor interview, every minute spent fighting syntax, hunting down a mysteriously linked grid row, or rewriting boilerplate is a minute stolen from solving the real problem. Spending two warm-up days sharpening how Python handles data, functions, and streams makes the language disappear into the background for the next ten weeks.</p>
+<p>Half of every coding interview is reshaping data: filtering invalid rows, sorting by two rules, flipping rows into columns, sliding a window over 100,000 numbers, or flattening nested streams. Writing manual index loops for every step eats half your clock — and building giant intermediate lists eats your memory. Python gives you one clean pipeline vocabulary that moves smoothly from small in-memory batches to endless lazy streams.</p>
 
 <div class="learn-list">
   <h4>By the end you'll be able to</h4>
   <ol>
-    <li>Transform, filter, and stream data cleanly — knowing when to build a list upfront and when to pull one item at a time.</li>
-    <li>Sort by multiple rules in one line and build callback functions inside loops without accidentally sharing the last loop value.</li>
-    <li>Write pausing streams that flatten nested or endless inputs without loading everything into memory.</li>
-    <li>Predict how Python variables share objects in memory — dodging linked grid rows, shared default lists, shallow-copy surprises, and hidden slicing stalls.</li>
-    <li>Replace 40 lines of class, caching, and cleanup boilerplate with compact, exception-safe Python building blocks.</li>
+    <li>Filter, reshape, and rank collections in one readable pass using comprehensions and multi-rule sort keys.</li>
+    <li>Walk parallel sequences in lockstep and transpose 2D tables cleanly without manual index math.</li>
+    <li>Flip an eager in-memory list into a constant-memory lazy stream by swapping square brackets for parentheses.</li>
+    <li>Combine prebuilt stream helpers to replace slow sliding-window slicing with a single linear pass.</li>
+    <li>Write custom pausing streams that flatten arbitrarily nested or infinite inputs without hanging.</li>
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Phase 0 Days 1–2. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Sections 2–4 prepare Day 1's <code>py_idioms.py</code>; sections 5–6 prepare Day 2's <code>py_internals.py</code>. Builds on no prior chapters.</p>
+<p class="muted small">How to read this: top to bottom on Phase 0 Day 1 right after Part 1. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Builds on <a href="python-memory-model.html">How Python holds data in memory</a>.</p>
 
 <!-- ============================================================ -->
-<h2 id="s1"><span class="sec-num">1</span>Why warm up Python before algorithms?</h2>
+<h2 id="s1"><span class="sec-num">1</span>Why do giant intermediate lists stall (or blow up) your code?</h2>
 
 <div class="story">
-  <p>Picture a 45-minute Google bare-editor round. You spot the optimal dynamic programming solution in 8 minutes, type <code>dp = [[0] * cols] * rows</code>, and spend the next 15 minutes mystified during your dry run because updating row 0 silently overwrote row 3.</p>
+  <p>Your service opens a <b>50-million-line</b> production log file to check one question: <em>"Does any line contain <code>FATAL</code>?"</em> The very third line is <code>FATAL: disk full</code>. Yet if you write <code>any(["FATAL" in line for line in lines])</code>, Python reads and allocates <b>all 50 million</b> booleans in RAM before <code>any()</code> ever inspects line 1 — burning over 400 MB of RAM and seconds of latency to find an answer sitting three lines in.</p>
 </div>
 
-<p>Senior interviewers rarely reject candidates for forgetting an obscure API — they reject candidates whose code is noisy, trips over Python's object model, or spends 20 bug-prone lines doing what Python expresses cleanly in 3.</p>
-
-<div class="figure">
-  <svg class="viz" viewBox="0 0 720 144" role="img" aria-label="Comparing fragile verbose Python loops against concise idiomatic interview Python">
-    <rect x="14" y="18" width="324" height="108" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
-    <text x="28" y="40" class="label" fill="var(--bad)" font-weight="700">FIGHTING PYTHON (noisy &amp; fragile)</text>
-    <text x="28" y="63" class="label">• Manual index loops + temp buckets</text>
-    <text x="28" y="83" class="label">• [[0] * cols] * rows links every row</text>
-    <text x="28" y="103" class="label">• Inner-loop s[i:j] copies k items/turn</text>
-
-    <line x1="346" y1="72" x2="370" y2="72" stroke="var(--ok)" stroke-width="2"/>
-    <polygon points="370,67 380,72 370,77" fill="var(--ok)"/>
-
-    <rect x="384" y="18" width="322" height="108" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
-    <text x="398" y="40" class="label" fill="var(--ok)" font-weight="700">INTERVIEW FLUENCY (clear &amp; safe)</text>
-    <text x="398" y="63" class="label">• Comprehensions, zip, enumerate, itertools</text>
-    <text x="398" y="83" class="label">• Lazy yield / yield from (depth-only RAM)</text>
-    <text x="398" y="103" class="label">• Frozen dataclasses, @wraps, try/finally</text>
-  </svg>
-  <div class="cap">Clean Python leaves more screen room and more mental bandwidth for edge cases and follow-ups.</div>
-</div>
-
-<p>Everything in this chapter rests on one physical picture: think of Python variables as <b>sticky notes stuck onto containers sitting on a workshop bench</b>. Assigning <code>b = a</code> does <em>not</em> photocopy the container — it sticks a second sticky note onto the exact same box. That single rule explains aliasing, shallow vs. deep copies, 2D grid bugs, mutable defaults, and late-binding loop closures all at once.</p>
-
-<p><em>Where the sticky-note picture breaks:</em> immutable values like integers (<code>0</code>, <code>42</code>), strings (<code>"hi"</code>), and tuples can safely share sticky notes because you cannot reach inside an integer and edit it — reassigning <code>x = x + 1</code> moves the sticky note onto a brand-new number.</p>
-
-<!-- ============================================================ -->
-<h2 id="s2"><span class="sec-num">2</span>When should you build a list versus stream one item at a time?</h2>
-
-<p>Python lets you transform or filter any collection in one readable expression instead of allocating an empty container and calling <code>.append()</code> inside a manual loop:</p>
-
-<pre><code># List, dict, and set comprehensions
-squares = [x * x for x in nums if x % 2 == 0]
-by_id   = {u.id: u.name for u in users if u.active}
-domains = {email.split("@")[1] for email in emails}
-
-# Unpack &amp; transpose a matrix into filtered columns (py_idioms: transpose_and_filter)
-cols = [[v for v in col if v &gt;= thresh] for col in zip(*matrix)]
-
-# Generator expression: parens () instead of [] — O(1) RAM &amp; short-circuits!
-total_bytes = sum(len(line) for line in log_stream)
-has_neg     = any(x &lt; 0 for x in nums)
-first_hit   = next((x for x in nums if x &gt; 100), None)</code></pre>
-
-<p><b>List comprehension <code>[...]</code> vs. generator expression <code>(...)</code>:</b> whenever values flow straight into <code>sum()</code>, <code>any()</code>, <code>all()</code>, <code>min()</code>, <code>max()</code>, or <code>next()</code>, use <code>(...)</code> — never <code>[...]</code>. Square brackets allocate all 10 million entries in RAM upfront (<code>O(n)</code> space, scaling with input size <code>n</code>) before <code>any()</code> even looks at item #0; parentheses pull one item at a time in constant memory (<code>O(1)</code> space) and stop the instant a match appears.</p>
-
-<div class="figure">
-<pre class="diagram"><code>List comprehension:     [f(x) for x in 10M_items]  → allocates all 10M upfront (O(n) RAM)
-Generator expression:   (f(x) for x in 10M_items)  → yields 1 item at a time  (O(1) RAM)
-                                                     any() / next() stops on first hit!</code></pre>
-  <div class="cap">Readability rule: if a comprehension needs more than two <code>for</code> clauses or nested <code>if/else</code> branches, write a normal <code>for</code> loop. Clever one-liners hurt clarity in bare-editor reviews.</div>
-</div>
-
-<h3>Everyday iteration helpers and one-pass sliding windows</h3>
-<p>Pair <code>enumerate(xs)</code> (index + item) and <code>zip(a, b)</code> (walk two sequences in lockstep) with four <code>itertools</code> helpers that eliminate manual index arithmetic:</p>
+<p>Every data-processing move in Python comes down to one physical choice: are you filling a <b>batch warehouse</b> or running a <b>conveyor belt</b>?</p>
 <ul>
-  <li><b><code>accumulate(nums, initial=0)</code>:</b> builds running cumulative totals (prefix sums) in one pass: <code>[1, 2, 3, 4] → [0, 1, 3, 6, 10]</code>.</li>
-  <li><b><code>islice(stream, n)</code>:</b> grabs the first <code>n</code> items from any lazy or infinite iterator without converting it to a list.</li>
-  <li><b><code>chain.from_iterable(groups)</code>:</b> flattens one level of lists lazily in <code>O(1)</code> (constant) extra memory.</li>
-  <li><b><code>groupby(items, key=...)</code>:</b> groups <em>consecutive</em> runs sharing the same key (sort first if equal keys aren't adjacent!).</li>
+  <li><b>Batch warehouse (eager lists, dicts, sets):</b> builds every finished item upfront and stores them all on shelves in memory. Great when you need random access (<code>arr[i]</code>), sorting, <code>len()</code>, or multiple passes over the data.</li>
+  <li><b>Conveyor belt (lazy iterators &amp; generators):</b> produces <b>one item at a time</b> only when the next station pulls it — and halts immediately the moment you find your match or reach your limit.</li>
 </ul>
 
-<p>Look how cleanly <code>accumulate</code> + <code>islice</code> + <code>zip</code> turns a slow <code>O(n·k)</code> sliding-window sum (<code>sum(nums[i:i+k])</code> — ~2.5 billion additions for <code>n = 100k, k = 50k</code>!) into a crisp single-pass <code>O(n)</code> linear-time two-liner (<code>py_idioms.py</code>'s <code>window_sums</code>):</p>
+<div class="figure">
+  <svg class="viz" viewBox="0 0 720 148" role="img" aria-label="Comparing an eager batch warehouse allocating 50 million entries upfront against a pull-based conveyor belt inspecting one line at a time and halting on the first match">
+    <rect x="14" y="16" width="324" height="116" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
+    <text x="28" y="38" class="label" fill="var(--bad)" font-weight="700">BATCH WAREHOUSE: [...] upfront</text>
+    <text x="28" y="62" class="label">• Builds all 50M results in RAM first</text>
+    <text x="28" y="84" class="label">• Wastes ~400 MB when hit is line #3</text>
+    <text x="28" y="106" class="label" fill="var(--bad)">• Hangs forever on an infinite stream!</text>
 
+    <line x1="346" y1="74" x2="370" y2="74" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="370,69 380,74 370,79" fill="var(--ok)"/>
+
+    <rect x="384" y="16" width="322" height="116" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="398" y="38" class="label" fill="var(--ok)" font-weight="700">CONVEYOR BELT: (...) or yield</text>
+    <text x="398" y="62" class="label">• Pulls 1 item at a time on demand</text>
+    <text x="398" y="84" class="label">• Stops on line #3 (49,999,997 skipped)</text>
+    <text x="398" y="106" class="label" fill="var(--ok)">• Handles infinite streams in O(1) RAM</text>
+  </svg>
+  <div class="cap">Pick the warehouse when you need the whole result stored; pick the conveyor belt when items only flow forward once.</div>
+</div>
+
+<p><em>Where the conveyor-belt analogy breaks:</em> a real factory belt runs on its own motor even if nobody picks up boxes. A Python iterator is <b>pull-driven</b> — zero work happens until the caller pulls the next item via <code>next()</code>, a <code>for</code> loop, <code>any()</code>, or <code>list()</code>.</p>
+
+<p>Let's walk this pipeline in order: first, shaping and ranking clean in-memory batches (§2–§3); then flipping the exact same syntax onto a lazy conveyor belt (§4); snapping on prebuilt <code>itertools</code> stations (§5); and finally building your own pausing stations with <code>yield</code> (§6).</p>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>How do you filter, shape, and rank a batch in one pass?</h2>
+
+<p>When you genuinely want a finished list, dictionary, or set in memory, Python's <b>comprehensions</b> replace 5 lines of <code>out = []; for ...: if ...: out.append(...)</code> with one scannable expression:</p>
+
+<pre><code># List, dict, and set comprehensions — build a finished batch cleanly
+squares = [x * x for x in nums if x % 2 == 0]
+by_id   = {u.id: u.name for u in users if u.active}
+domains = {email.split("@")[1] for email in emails}</code></pre>
+
+<p>Once you've filtered a batch of records, the very next interview move is usually <b>ranking</b> them by multiple rules — without mutating the caller's list. Pass a 1-line <code>lambda</code> (an unnamed rule function) returning a tuple to <code>sorted()</code>. Because Python compares tuples left-to-right (slot 0 first, slot 1 on ties, slot 2 next), negating numeric fields flips ascending into descending in one line:</p>
+
+<pre><code># py_idioms: rank_candidates — drop None scores, sort score DESC, penalty ASC, name ASC
+valid   = [r for r in records if r[1] is not None]      # Chapter 10.10: NOT `if r[1]:` (keeps 0!)
+ordered = sorted(valid, key=lambda r: (-r[1], r[2], r[0]))
+names   = [name for name, _, _ in ordered]</code></pre>
+
+<p>Trace three records through that key tuple: <code>("b", 90, 5) → (-90, 5, "b")</code>, <code>("c", 90, 2) → (-90, 2, "c")</code>, and <code>("a", 90, 2) → (-90, 2, "a")</code>. Slot 0 ties at <code>-90</code>, so slot 1 puts penalty <code>2</code> ahead of <code>5</code>, and slot 2 breaks the final tie alphabetically → <code>["a", "c", "b"]</code>. Notice also how Chapter 10.10's truthiness rule plugs in: checking <code>if r[1] is not None</code> keeps a legal score of <code>0</code> while <code>sorted()</code> returns a fresh batch, leaving <code>records</code> untouched.</p>
+
+<div class="keyidea">Use comprehensions to filter and reshape a batch in one line, test <code>is not None</code> whenever <code>0</code> or <code>""</code> is legal, and pass a tuple-returning <code>lambda</code> to <code>sorted()</code> for multi-rule ranking (negating numbers to sort descending).</div>
+
+<div class="check" id="check-comp-sort">
+  <p class="q">You want to rank <code>(name, score, penalty)</code> records by score <b>descending</b>, penalty <b>ascending</b>, then name <b>A→Z</b>. What breaks if you write <code>sorted(valid, key=lambda r: (r[1], r[2], r[0]), reverse=True)</code> instead of negating <code>r[1]</code>?</p>
+  <div class="opts">
+    <button data-correct>It flips penalty and name too — ranking both descending instead of ascending</button>
+    <button>Python raises <code>TypeError</code> because <code>reverse=True</code> cannot pair with a tuple key</button>
+    <button>It ignores <code>r[2]</code> and <code>r[0]</code> completely whenever two records tie on score</button>
+  </div>
+  <div class="fb right"><p>Sharp catch! Passing <code>reverse=True</code> reverses the <em>entire</em> tuple comparison — putting higher penalties and <code>"z"</code> before <code>"a"</code>. Negating only descending numeric fields inside the key (<code>(-r[1], r[2], r[0])</code>) keeps every rule's direction independent.</p></div>
+  <div class="fb wrong"><p>Trace two tied records: <code>("a", 90, 2)</code> vs. <code>("b", 90, 5)</code>. Their keys are <code>(90, 2, "a")</code> and <code>(90, 5, "b")</code>. With <code>reverse=True</code>, Python puts the <em>larger</em> tuple first — ranking penalty <code>5</code> ahead of penalty <code>2</code>! Negate only score (<code>(-r[1], r[2], r[0])</code>) so penalty and name stay ascending.</p></div>
+</div>
+
+<p>That shapes and ranks one flat list of records. What when your input arrives across <em>two</em> parallel lists — or as a 2D table of rows that you need to read column by column?</p>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>How do you walk multiple sequences — or flip rows into columns?</h2>
+
+<p>Manual index loops (<code>for i in range(len(arr)):</code>) are an off-by-one magnet in bare-editor rounds. Instead, pair parallel sequences directly:</p>
+<ul>
+  <li><b><code>enumerate(xs)</code>:</b> pairs each item with its index <code>(0, x0), (1, x1), …</code> without maintaining a counter.</li>
+  <li><b><code>zip(names, scores)</code>:</b> walks two or more sequences in lockstep, stopping at the shortest one (pass <code>strict=True</code> in Python 3.10+ if unequal lengths should raise an error).</li>
+  <li><b><code>zip(*matrix)</code>:</b> the <code>*</code> unpacks each row of a 2D matrix as a separate argument to <code>zip</code> — tipping rows sideways into columns in three tokens!</li>
+</ul>
+
+<p>Better yet, both <code>enumerate</code> and <code>zip</code> already return lazy iterators — they pull one paired tuple at a time, and wrapping them in <code>[...]</code> or <code>list(...)</code> packs the stream into a batch warehouse whenever you need a finished list.</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 144" role="img" aria-label="Visualizing zip(*matrix) unpacking two rows [1,5,3] and [4,2,6] into three column tuples (1,4), (5,2), (3,6) and filtering values >= 3">
+    <rect x="14" y="20" width="166" height="96" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="97" y="42" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">ROWS (matrix)</text>
+    <text x="97" y="70" class="label" text-anchor="middle">[ 1,  5,  3 ]</text>
+    <text x="97" y="94" class="label" text-anchor="middle">[ 4,  2,  6 ]</text>
+
+    <line x1="186" y1="68" x2="224" y2="68" stroke="var(--accent)" stroke-width="2"/>
+    <polygon points="224,63 234,68 224,73" fill="var(--accent)"/>
+    <text x="208" y="56" class="label" text-anchor="middle" fill="var(--muted)">zip(*m)</text>
+
+    <rect x="238" y="20" width="202" height="96" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="339" y="42" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">COLUMNS (tuples)</text>
+    <text x="339" y="64" class="label" text-anchor="middle">col 0: (1, 4)</text>
+    <text x="339" y="83" class="label" text-anchor="middle">col 1: (5, 2)</text>
+    <text x="339" y="102" class="label" text-anchor="middle">col 2: (3, 6)</text>
+
+    <line x1="446" y1="68" x2="484" y2="68" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="484,63 494,68 484,73" fill="var(--ok)"/>
+    <text x="468" y="56" class="label" text-anchor="middle" fill="var(--muted)">v &gt;= 3</text>
+
+    <rect x="498" y="20" width="188" height="96" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="592" y="42" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">FILTERED OUTPUT</text>
+    <text x="592" y="76" class="label" text-anchor="middle" font-weight="700">[[4], [5], [3, 6]]</text>
+    <text x="592" y="102" class="label" text-anchor="middle" fill="var(--ok)">original matrix intact!</text>
+  </svg>
+  <div class="cap"><code>zip(*[[1, 5, 3], [4, 2, 6]])</code> is identical to <code>zip([1, 5, 3], [4, 2, 6])</code> — pairing slot 0 with slot 0, slot 1 with slot 1, and slot 2 with slot 2.</div>
+</div>
+
+<p>Combine that with a 1-line comprehension and <code>transpose_and_filter</code> in <code>py_idioms.py</code> shrinks to two readable lines (and handles empty <code>[]</code> or <code>[[], []]</code> cleanly):</p>
+<pre><code>def transpose_and_filter(matrix, threshold):
+    if not matrix:
+        return []
+    return [[v for v in col if v &gt;= threshold] for col in zip(*matrix)]</code></pre>
+
+<div class="keyidea">Use <code>enumerate</code> for index + item, <code>zip</code> for lockstep traversal, and <code>zip(*matrix)</code> to transpose rows into columns without a single nested index loop.</div>
+
+<div class="check" id="check-zip-transpose">
+  <p class="q">What does <code>list(zip(*[[10, 20], [30, 40], [50, 60]]))</code> return?</p>
+  <div class="opts">
+    <button><code>[(10, 20), (30, 40), (50, 60)]</code> — three pairs matching the original rows</button>
+    <button><code>[10, 20, 30, 40, 50, 60]</code> — a single flattened list of all six numbers</button>
+    <button data-correct><code>[(10, 30, 50), (20, 40, 60)]</code> — two column tuples grouping each slot</button>
+  </div>
+  <div class="fb right"><p>Exact! The <code>*</code> unpacks all three rows as separate arguments — <code>zip([10, 20], [30, 40], [50, 60])</code> — grouping index 0 together as <code>(10, 30, 50)</code> and index 1 together as <code>(20, 40, 60)</code>.</p></div>
+  <div class="fb wrong"><p>Try tracing a smaller 2×3 table first: <code>zip(*[[1, 2, 3], [4, 5, 6]])</code> unpacks into <code>zip([1, 2, 3], [4, 5, 6])</code>, producing three column pairs <code>[(1, 4), (2, 5), (3, 6)]</code>. Flip the shape to 3 rows × 2 columns and <code>zip(*...)</code> produces 2 column triples: <code>[(10, 30, 50), (20, 40, 60)]</code>.</p></div>
+</div>
+
+<p>Notice what Sections 2 and 3 had in common: square brackets <code>[...]</code> always filled the entire batch warehouse upfront. Now watch what happens when your input holds 50 million lines and you only care about the first match — or the running sum.</p>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How do you switch from a warehouse to a conveyor belt with two characters?</h2>
+
+<p>Take any list comprehension and swap the outer square brackets <code>[...]</code> for parentheses <code>(...)</code>. You just turned a batch warehouse into a <b>generator expression</b> — a pull-on-demand conveyor belt! Whenever values flow straight into <code>sum()</code>, <code>any()</code>, <code>all()</code>, <code>min()</code>, <code>max()</code>, or <code>next()</code>, drop the brackets completely:</p>
+
+<pre><code># Generator expressions: constant O(1) extra memory &amp; instant short-circuiting!
+total_bytes = sum(len(line) for line in log_stream)
+has_fatal   = any("FATAL" in line for line in log_stream)
+first_big   = next((x for x in nums if x &gt; 100), None)   # fallback None if none match</code></pre>
+
+<p>Step through the exact difference between <code>any([...])</code> and <code>any(...)</code> on a 6-line log where <code>"FATAL"</code> sits at line index 2 (the 3rd line):</p>
+
+<div class="figure">
+  <div id="viz-gen-vs-list"></div>
+  <div class="cap">Switch the dropdown between the batch warehouse <code>[...]</code> and the conveyor belt <code>(...)</code>. Notice how brackets force Python to finish reading every remaining line before <code>any()</code> even wakes up!</div>
+</div>
+
+<div class="keyidea">Swap <code>[...]</code> for <code>(...)</code> whenever a sequence feeds <code>sum</code>, <code>any</code>, <code>all</code>, <code>min</code>, <code>max</code>, or <code>next</code>. You keep the exact same readability while dropping memory from <code>O(n)</code> to constant <code>O(1)</code> and short-circuiting on the first match.</div>
+
+<div class="check" id="check-gen">
+  <p class="q">A streaming database cursor <code>rows</code> yields 10 million <code>(user_id, bytes_sent)</code> pairs, and you want the first <code>user_id</code> with <code>bytes_sent &gt; 1_000_000</code> (or <code>None</code>). Which expression runs in constant <code>O(1)</code> memory and stops on the first hit?</p>
+  <div class="opts">
+    <button><code>next(iter([u for u, b in rows if b &gt; 1_000_000]), None)</code></button>
+    <button><code>([u for u, b in rows if b &gt; 1_000_000] or [None])[0]</code></button>
+    <button data-correct><code>next((u for u, b in rows if b &gt; 1_000_000), None)</code></button>
+  </div>
+  <div class="fb right"><p>Spot on! The generator expression <code>(u for u, b in rows if b &gt; 1_000_000)</code> pulls one row at a time in constant <code>O(1)</code> memory, and <code>next(..., None)</code> halts the instant the first oversized transfer appears.</p></div>
+  <div class="fb wrong"><p>Trace a 3-row stream <code>[("u1", 50), ("u2", 2_000_000), ("u3", 10)]</code>: square brackets <code>[...]</code> force Python to pull all three rows (and all 10 million in production!) to finish building a list before <code>next(iter(...))</code> or <code>[0]</code> even looks at element 0. Swapping <code>[...]</code> for <code>(...)</code> lets <code>next()</code> return <code>"u2"</code> immediately without ever pulling <code>"u3"</code>.</p></div>
+</div>
+
+<p>Generator expressions handle simple 1-to-1 transforms on a belt. Next question: what when you want to take only the first <code>k</code> items from an endless belt, splice belts together, group runs, or compute running totals without Chapter 10.10's slow list-slicing loops?</p>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>How do prebuilt conveyor stations eliminate slow slicing loops?</h2>
+
+<p>Python's <code>itertools</code> module gives you four C-speed conveyor stations that snap onto any iterator without copying data into temporary lists:</p>
+<ul>
+  <li><b><code>islice(stream, start, stop)</code>:</b> skips ahead and pulls only a slice of a lazy or infinite belt — without allocating a list or exhausting the rest of the stream.</li>
+  <li><b><code>chain.from_iterable(groups)</code>:</b> splices a sequence of lists (one level deep) into one continuous belt in constant <code>O(1)</code> extra memory.</li>
+  <li><b><code>groupby(items, key=...)</code>:</b> bundles <em>consecutive</em> runs sharing the same key (always sort by that key first if matching items aren't already adjacent!).</li>
+  <li><b><code>accumulate(nums, initial=0)</code>:</b> emits running cumulative totals (prefix sums) in one pass: <code>[1, 2, 3, 4] → [0, 1, 3, 6, 10]</code>.</li>
+</ul>
+
+<p>Remember Chapter 10.10 §4's hidden slicing trap? Computing every length-<code>k</code> window sum with <code>sum(nums[i:i+k])</code> copies and adds <code>k</code> items per window — <b>2.5 billion</b> steps for <code>n = 100,000, k = 50,000</code> (<code>O(n·k)</code>). Now align the prefix sums <code>pref</code> against themselves shifted forward by <code>k</code> with <code>islice(pref, k, None)</code> — every window sum pops out in <b>one subtraction</b>:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 720 132" role="img" aria-label="Aligning prefix sum list [0,1,3,6,10,15] with shifted islice(pref, 3, None) [6,10,15] to compute length-3 window sums 6, 9, 12 in one pass">
+    <text x="16" y="22" class="label" fill="var(--muted)" font-weight="700">nums = [1, 2, 3, 4, 5],  k = 3   →   pref = [0, 1, 3, 6, 10, 15]</text>
+    <text x="16" y="54" class="label" fill="var(--accent)" font-weight="700">lo (pref):</text>
+    <rect x="236" y="36" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--accent)"/><text x="262" y="53" class="label" text-anchor="middle">0</text>
+    <rect x="296" y="36" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--accent)"/><text x="322" y="53" class="label" text-anchor="middle">1</text>
+    <rect x="356" y="36" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--accent)"/><text x="382" y="53" class="label" text-anchor="middle">3</text>
+
+    <text x="16" y="88" class="label" fill="var(--warn)" font-weight="700">hi (islice(pref, 3, None)):</text>
+    <rect x="236" y="70" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--warn)"/><text x="262" y="87" class="label" text-anchor="middle">6</text>
+    <rect x="296" y="70" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--warn)"/><text x="322" y="87" class="label" text-anchor="middle">10</text>
+    <rect x="356" y="70" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--warn)"/><text x="382" y="87" class="label" text-anchor="middle">15</text>
+
+    <line x1="418" y1="68" x2="454" y2="68" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="454,63 464,68 454,73" fill="var(--ok)"/>
+    <text x="438" y="56" class="label" text-anchor="middle" fill="var(--muted)">hi - lo</text>
+
+    <rect x="470" y="42" width="236" height="52" rx="8" fill="color-mix(in srgb, var(--ok) 12%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="588" y="64" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">[6 - 0,  10 - 1,  15 - 3]</text>
+    <text x="588" y="84" class="label" text-anchor="middle" font-weight="700">= [6, 9, 12]   (1 pass, O(n)!)</text>
+    <text x="16" y="120" class="label" fill="var(--muted)">Zero repeated slices — works just as fast for k = 50,000 as for k = 3.</text>
+  </svg>
+  <div class="cap"><code>pref[i + k] - pref[i]</code> cancels everything before index <code>i</code>, leaving the exact sum of window <code>nums[i : i + k]</code> in 1 subtraction.</div>
+</div>
+
+<p>That turns <code>window_sums</code> in <code>py_idioms.py</code> into four crystal-clear lines:</p>
 <pre><code>from itertools import accumulate, islice
 
 def window_sums(nums, k):
-    if k &lt;= 0: raise ValueError("k must be positive")
-    if k &gt; len(nums): return []
-    pref = list(accumulate(nums, initial=0))            # pref[i+k] - pref[i] = sum(nums[i:i+k])
-    return [hi - lo for lo, hi in zip(pref, islice(pref, k, None))]  # one pass, no extra slice!</code></pre>
+    if k &lt;= 0:
+        raise ValueError("k must be positive")
+    if k &gt; len(nums):
+        return []
+    pref = list(accumulate(nums, initial=0))
+    return [hi - lo for lo, hi in zip(pref, islice(pref, k, None))]</code></pre>
 
-<div class="check" id="check-gen">
-  <p class="q">You have a 50-million-line log file opened as an iterator <code>lines</code> and want to know whether any line contains <code>"FATAL"</code>. Which expression runs in constant <code>O(1)</code> memory and stops on the first hit?</p>
+<p>Why materialize <code>pref</code> into a <code>list</code> instead of keeping <code>accumulate</code> lazy? Because <code>zip(pref, islice(pref, k, None))</code> reads <em>two</em> different offsets from <code>pref</code> at the same time — passing a single-use iterator to both slots would advance the same belt twice and corrupt every window! And since <code>window_sums</code> already returns an <code>O(n)</code> output list, one <code>O(n)</code> prefix list keeps total memory asymptotic at <code>O(n)</code>.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: O(k) streaming windows and the groupby sub-iterator trap</summary>
+  <p><b>True <code>O(k)</code> memory over an endless stream:</b> if <code>nums</code> arrives as a billion-item stream that doesn't fit in RAM, keep a fixed ring buffer <code>buf = collections.deque(maxlen=k)</code> (covered on Day 3) and a single integer <code>running = 0</code>. Each step, subtract <code>buf[0]</code> if <code>len(buf) == k</code>, append the new item, add it to <code>running</code>, and <code>yield running</code> once full — <code>O(k)</code> RAM and <code>O(1)</code> per item!</p>
+  <p><b>The <code>groupby</code> sub-iterator trap:</b> <code>groupby</code> shares its underlying conveyor belt with every group sub-iterator <code>g</code>. Writing <code>groups = [(k, g) for k, g in groupby(data)]</code> stores <em>exhausted</em> sub-iterators because advancing the outer loop drains earlier groups! Always materialize immediately — <code>[(k, list(g)) for k, g in groupby(data)]</code> — if you need the items later.</p>
+</details>
+
+<div class="keyidea">Reach for <code>itertools</code> before hand-rolling index arithmetic: <code>islice</code> slices any lazy stream, <code>chain.from_iterable</code> flattens one level lazily, <code>groupby</code> groups sorted runs, and <code>accumulate</code> + <code>islice</code> + <code>zip</code> computes sliding-window sums in one linear <code>O(n)</code> pass.</div>
+
+<div class="check" id="check-itertools">
+  <p class="q">You run <code>[k for k, _ in groupby(["cat", "dog", "cat"])]</code> without sorting first. What does it return?</p>
   <div class="opts">
-    <button><code>any(["FATAL" in line for line in lines])</code></button>
-    <button><code>bool([ln for ln in lines if "FATAL" in ln])</code></button>
-    <button data-correct><code>any("FATAL" in line for line in lines)</code></button>
+    <button><code>["cat", "dog"]</code> — <code>groupby</code> hashes every key globally like a dictionary</button>
+    <button data-correct><code>["cat", "dog", "cat"]</code> — <code>groupby</code> only merges adjacent equal keys</button>
+    <button>Raises <code>ValueError</code> because Python refuses unsorted input inside <code>groupby</code></button>
   </div>
-  <div class="fb right"><p>Spot on! The generator expression streams one line at a time in constant <code>O(1)</code> memory and stops reading the file the instant it sees <code>"FATAL"</code>.</p></div>
-  <div class="fb wrong"><p>Check the square brackets <code>[...]</code>: Python always finishes evaluating the inner list comprehension completely — reading all 50 million lines into RAM — <em>before</em> passing that giant list to <code>any()</code> or <code>bool()</code>. Removing the brackets streams lazily and short-circuits on line #1 if it matches.</p></div>
+  <div class="fb right"><p>Spot on! Because <code>groupby</code> is a streaming conveyor station (constant <code>O(1)</code> memory, no global hash table), it only watches the key immediately beside it — splitting non-adjacent <code>"cat"</code> entries into two runs unless you sort first.</p></div>
+  <div class="fb wrong"><p>Walk the belt one item at a time: item 0 starts run <code>"cat"</code>; item 1 switches to run <code>"dog"</code> (closing the first <code>"cat"</code> run!); item 2 sees <code>"cat"</code> again and opens a brand-new <code>"cat"</code> run. That's why <code>groupby</code> never raises an error — and why you sort first (or use <code>defaultdict</code>) when matching items aren't consecutive.</p></div>
 </div>
+
+<p>Prebuilt <code>itertools</code> stations cover flat belts and single-level chains. Now ask the classic Google interview follow-up: what when items rolling down your belt contain <em>nested belts inside nested belts</em> to arbitrary depth — or an infinite stream of nested tuples?</p>
 
 <!-- ============================================================ -->
-<h2 id="s3"><span class="sec-num">3</span>How do lambdas, multi-key sorting, and closures actually work?</h2>
+<h2 id="s6"><span class="sec-num">6</span>How do you build your own pausing station for nested or infinite streams?</h2>
 
-<p>A <code>lambda</code> is a concise one-expression function whose #1 interview job is feeding a custom sort key to <code>sorted()</code>, <code>min()</code>, or <code>max()</code>. Because Python compares tuples left-to-right (slot 0 first, slot 1 on ties, slot 2 next), multi-key sorting is one line — negate numeric fields to flip ascending into descending:</p>
+<p>A one-line generator expression <code>(...)</code> cannot call itself recursively. To build a custom conveyor station with arbitrary logic, write a regular <code>def</code> containing <b><code>yield</code></b>.</p>
 
-<pre><code># py_idioms: rank_candidates — drop None scores, sort score DESC, penalty ASC, name ASC
-valid = [r for r in records if r[1] is not None]        # NOT `if r[1]:` — score 0 is valid!
-ordered = sorted(valid, key=lambda r: (-r[1], r[2], r[0]))
-names = [r[0] for r in ordered]</code></pre>
+<p>The moment Python sees <code>yield</code> inside a function, calling that function runs <b>zero lines of its body</b> — it hands back a paused generator object parked at line 1. Each time the caller pulls with <code>next(gen)</code>, execution advances only to the next <code>yield</code>, freezes every local variable right where it stands, and hands back one item.</p>
 
-<p>Notice that guard <code>if r[1] is not None</code>: writing <code>if r[1]:</code> silently drops every candidate whose score is <code>0</code>! Always test <code>is not None</code> whenever <code>0</code> or <code>""</code> is a legal value.</p>
-
-<h3>The classic trap: late-binding closures inside a loop</h3>
-<p>Suppose you build three multiplier functions in a comprehension: <code>fns = [lambda x: x * f for f in [2, 3, 10]]</code>. You expect <code>[g(5) for g in fns]</code> to return <code>[10, 15, 50]</code>. Instead, <b>all three return <code>50</code></b>!</p>
-
-<p>Why? Apply our sticky-note picture: a Python closure does <em>not</em> copy the number <code>2</code>, <code>3</code>, or <code>10</code> when the <code>lambda</code> is created — it sticks a reference onto the <b>shared loop variable cell <code>f</code></b>. By the time you call any function, the loop has finished and <code>f</code> holds <code>10</code>.</p>
-
-<div class="figure">
-  <div id="viz-closure"></div>
-  <div class="cap">Step through loop creation vs. function calls. Without a snapshot, all three lambdas point to one mutable cell <code>f</code>; binding <code>f=f</code> (or a helper factory) captures each value immediately.</div>
-</div>
-
-<p><b>The two standard fixes</b> (know both — interviewers often ask for the clean non-default-arg version too!):</p>
-<pre><code># Fix 1: default-argument snapshot (evaluates NOW at lambda creation)
-fns = [lambda x, f=f: x * f for f in factors]
-
-# Fix 2: helper factory function (each call creates its own private scope cell!)
-def _make_mul(f):
-    return lambda x: x * f
-fns = [_make_mul(f) for f in factors]          # or functools.partial(operator.mul, f)</code></pre>
-
-<div class="check" id="check-closure">
-  <p class="q">What does <code>[g() for g in [lambda: i for i in [10, 20, 30]]]</code> return?</p>
-  <div class="opts">
-    <button data-correct><code>[30, 30, 30]</code> — all three lambdas read final cell <code>i = 30</code></button>
-    <button><code>[10, 20, 30]</code> — each lambda captures its own copy of <code>i</code></button>
-    <button>Raises <code>NameError</code> because loop variable <code>i</code> left its scope</button>
-  </div>
-  <div class="fb right"><p>Exactly! None of the lambdas execute until the inner comprehension finishes with <code>i = 30</code>, so all three look up that same shared cell.</p></div>
-  <div class="fb wrong"><p>Separate <em>defining</em> a function from <em>calling</em> it: the inner list builds 3 uncalled functions pointing to one variable slot <code>i</code>. The loop ends with <code>i == 30</code> (kept alive in the closure cell, so no <code>NameError</code>!). Only then does the outer loop call <code>g()</code>, reading <code>30</code> three times.</p></div>
-</div>
-
-<!-- ============================================================ -->
-<h2 id="s4"><span class="sec-num">4</span>How do lazy streams pause and resume without blowing memory?</h2>
-
-<p>Google loves lazy iterator questions (<em>"Flatten a nested list iterator"</em>, <em>"Zigzag iterator"</em>, <em>"Merge k sorted streams"</em>). A normal function computes everything and returns once; a function containing <code>yield</code> acts like a <b>bookmark inside a paused book</b> — every <code>next()</code> call runs only until the next <code>yield</code>, pauses its local variables right there, and hands back one value.</p>
-
-<p><code>yield from sub_gen</code> delegates directly to a nested generator without writing a manual <code>for x in sub_gen: yield x</code> loop. Look at recursive flattening (<code>py_idioms.py</code>'s <code>flatten_stream</code>):</p>
+<p>And when a station spots a nested container inside the stream, <b><code>yield from sub_gen</code></b> connects that sub-belt directly to the caller without writing a manual forwarding loop (this is <code>flatten_stream</code> in <code>py_idioms.py</code>):</p>
 
 <pre><code>from collections.abc import Iterable
 
 def flatten_stream(nested):
     for item in nested:
         if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
-            yield from flatten_stream(item)     # delegate lazily to nested container
+            yield from flatten_stream(item)     # wire nested sub-belt straight to caller
         else:
-            yield item                          # pause here until caller pulls next!</code></pre>
+            yield item                          # pause right here until next() pulls!</code></pre>
 
 <div class="figure">
   <div id="viz-yield"></div>
-  <div class="cap">Step through pulling values one by one from <code>flatten_stream([1, (2, "hi"), 3])</code>. Notice how <code>"hi"</code> is treated as an atomic leaf and <code>3</code> isn't even touched until requested.</div>
+  <div class="cap">Step through pulling items one by one from <code>flatten_stream([1, (2, "hi"), 3])</code>. Notice how <code>"hi"</code> stays intact as an atomic leaf and <code>3</code> is never even visited until pull #4.</div>
 </div>
 
-<p><b>Why the <code>not isinstance(item, (str, bytes))</code> guard is mandatory:</b> in Python there is no separate <code>char</code> type — iterating <code>"hi"</code> yields <code>"h"</code> (another <code>str</code>, which is still an <code>Iterable</code>!), and iterating <code>"h"</code> yields <code>"h"</code> forever until <code>RecursionError</code>. Always exclude <code>(str, bytes)</code> before recursing on an <code>Iterable</code>.</p>
+<p><b>Why excluding <code>(str, bytes)</code> is mandatory:</b> Python has no separate <code>char</code> type — iterating <code>"hi"</code> yields <code>"h"</code> (another <code>str</code>, which is still an <code>Iterable</code>!), and iterating <code>"h"</code> yields <code>"h"</code> forever until <code>RecursionError</code>. Always check <code>not isinstance(item, (str, bytes))</code> before recursing on an <code>Iterable</code>.</p>
 
-<div class="keyidea">A generator function returns a lazy iterator object immediately without running its body until the first <code>next()</code>. That lets <code>islice(gen, 6)</code> pull six items from an infinite <code>flatten_stream</code> in <code>O(d)</code> memory for nesting depth <code>d</code> — completely independent of stream length.</div>
+<div class="keyidea">A generator function returns a lazy iterator immediately without running its body until the first <code>next()</code>. That lets <code>islice(gen, 6)</code> pull six items from an infinite <code>flatten_stream</code> using only <code>O(d)</code> memory for nesting depth <code>d</code> — completely independent of stream length.</div>
 
 <details class="aside deeper">
   <summary>Go deeper: flattening inputs nested deeper than Python's recursion limit</summary>
-  <p>Recursive <code>yield from</code> keeps one active generator frame per nesting level (<code>O(d)</code> stack space), so an adversarial input nested more than ~1,000 levels deep hits <code>RecursionError</code>. If an interviewer asks how to handle arbitrary depth, swap recursion for an explicit stack of iterators: push <code>iter(nested)</code>, call <code>next(stack[-1], sentinel)</code>, pop exhausted iterators, and push <code>iter(item)</code> whenever you see a nested non-<code>(str, bytes)</code> iterable — still lazy and still <code>O(d)</code> heap memory, with no recursion limit.</p>
+  <p>Recursive <code>yield from</code> keeps one active generator frame per nesting level (<code>O(d)</code> call-stack space), so an adversarial input nested more than ~1,000 levels deep hits <code>RecursionError</code>. If an interviewer asks how to handle arbitrary depth, swap recursion for an explicit stack of iterators: push <code>iter(nested)</code>, pull with <code>next(stack[-1], sentinel)</code>, pop exhausted iterators, and push <code>iter(item)</code> whenever you hit a nested non-<code>(str, bytes)</code> iterable — still lazy and still <code>O(d)</code> heap memory, with no recursion limit.</p>
 </details>
 
 <div class="check" id="check-yield">
@@ -206,239 +313,83 @@ def flatten_stream(nested):
     <button>It returns only 1 item instead of 5 because lists cannot be sliced lazily</button>
   </div>
   <div class="fb right"><p>Spot on! Building a list eagerly forces Python to walk every element of <code>infinite_nested()</code> before returning — so <code>islice</code> never even gets a chance to stop at 5.</p></div>
-  <div class="fb wrong"><p>Compare eager vs. lazy execution: <code>islice</code> works fine on finite lists, yet <code>flatten_stream(infinite_nested())</code> runs completely <em>before</em> <code>islice</code> is called. With <code>return [...]</code>, that call loops forever building an infinite list; with <code>yield</code>, it pauses after item #5 and stops.</p></div>
+  <div class="fb wrong"><p>Compare warehouse vs. conveyor belt: <code>islice</code> works fine on finite lists, yet Python evaluates <code>flatten_stream(infinite_nested())</code> completely <em>before</em> passing the result into <code>islice</code>. With <code>return [...]</code>, that call loops forever trying to finish an infinite list; with <code>yield</code>, it pauses after item #5 and stops.</p></div>
 </div>
+
+<p>Conveyor belts save hundreds of megabytes of RAM and unlock infinite streams — yet because they pull items one by one instead of storing them on shelves, they break in three ways that surprise engineers mid-interview.</p>
 
 <!-- ============================================================ -->
-<h2 id="s5"><span class="sec-num">5</span>Why do Python variables share surprises — copies, grids, and defaults?</h2>
+<h2 id="s7"><span class="sec-num">7</span>How can lazy pipelines break — and when should you write a plain loop?</h2>
 
-<p>Return to our sticky-note picture: assigning <code>b = a</code> puts two labels on one mutable container. Four infamous bugs come straight from forgetting that rule:</p>
-
-<div class="figure">
-  <svg class="viz" viewBox="0 0 700 150" role="img" aria-label="Comparing [[0]*3]*3 pointing all three rows to one shared list vs list comprehension creating three independent lists">
-    <text x="16" y="22" class="label" fill="var(--bad)" font-weight="700">TRAP: g = [[0] * 3] * 3</text>
-    <rect x="16" y="34" width="66" height="24" rx="5" fill="var(--surface)" stroke="var(--bad)"/><text x="49" y="50" class="label" text-anchor="middle">g[0]</text>
-    <rect x="16" y="64" width="66" height="24" rx="5" fill="var(--surface)" stroke="var(--bad)"/><text x="49" y="80" class="label" text-anchor="middle">g[1]</text>
-    <rect x="16" y="94" width="66" height="24" rx="5" fill="var(--surface)" stroke="var(--bad)"/><text x="49" y="110" class="label" text-anchor="middle">g[2]</text>
-    <line x1="82" y1="46" x2="150" y2="76" stroke="var(--bad)" stroke-width="1.6"/>
-    <line x1="82" y1="76" x2="150" y2="76" stroke="var(--bad)" stroke-width="1.6"/>
-    <line x1="82" y1="106" x2="150" y2="76" stroke="var(--bad)" stroke-width="1.6"/>
-    <rect x="152" y="60" width="174" height="32" rx="6" fill="color-mix(in srgb, var(--bad) 14%, var(--surface))" stroke="var(--bad)"/>
-    <text x="239" y="80" class="label" text-anchor="middle" font-weight="700">[99, 0, 0] (ONE list!)</text>
-    <text x="16" y="140" class="label" fill="var(--muted)">g[0][0] = 99 mutates all 3 rows at once.</text>
-
-    <line x1="348" y1="16" x2="348" y2="144" stroke="var(--border)" stroke-dasharray="4 4"/>
-
-    <text x="372" y="22" class="label" fill="var(--ok)" font-weight="700">SAFE: [[0] * 3 for _ in range(3)]</text>
-    <rect x="372" y="34" width="66" height="24" rx="5" fill="var(--surface)" stroke="var(--ok)"/><text x="405" y="50" class="label" text-anchor="middle">g[0]</text>
-    <rect x="372" y="64" width="66" height="24" rx="5" fill="var(--surface)" stroke="var(--ok)"/><text x="405" y="80" class="label" text-anchor="middle">g[1]</text>
-    <rect x="372" y="94" width="66" height="24" rx="5" fill="var(--surface)" stroke="var(--ok)"/><text x="405" y="110" class="label" text-anchor="middle">g[2]</text>
-    <line x1="438" y1="46" x2="486" y2="46" stroke="var(--ok)" stroke-width="1.6"/>
-    <line x1="438" y1="76" x2="486" y2="76" stroke="var(--ok)" stroke-width="1.6"/>
-    <line x1="438" y1="106" x2="486" y2="106" stroke="var(--ok)" stroke-width="1.6"/>
-    <rect x="488" y="34" width="124" height="24" rx="5" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)"/><text x="550" y="50" class="label" text-anchor="middle">[99, 0, 0]</text>
-    <rect x="488" y="64" width="124" height="24" rx="5" fill="var(--surface)" stroke="var(--border-strong)"/><text x="550" y="80" class="label" text-anchor="middle">[0, 0, 0]</text>
-    <rect x="488" y="94" width="124" height="24" rx="5" fill="var(--surface)" stroke="var(--border-strong)"/><text x="550" y="110" class="label" text-anchor="middle">[0, 0, 0]</text>
-    <text x="372" y="140" class="label" fill="var(--ok)">3 distinct list objects in memory.</text>
-  </svg>
-  <div class="cap"><code>[0] * 3</code> is safe because ints are immutable; multiplying an outer list of lists repeats the reference to one inner list.</div>
-</div>
-
+<p>Keep these three conveyor-belt limits front of mind:</p>
 <ol>
-  <li><b>Aliased 2D grids (<code>py_internals: make_grid</code>):</b> always allocate rows with a comprehension — <code>[[fill] * cols for _ in range(rows)]</code> — never <code>[[fill] * cols] * rows</code>. (And if <code>fill</code> itself could be mutable, construct a fresh copy per cell.)</li>
-  <li><b>Shallow vs. deep copy:</b> <code>b = a[:]</code>, <code>list(a)</code>, and <code>copy.copy(a)</code> build a new <em>outer</em> list whose slots still point to the exact same <em>inner</em> lists! Editing <code>b[0].append(9)</code> still mutates <code>a[0]</code>. For nested mutable structures, use <code>[row[:] for row in grid]</code> (fast 2D copy) or <code>copy.deepcopy(obj)</code> (general nested copy).</li>
-  <li><b>Mutable default arguments (<code>py_internals: append_log</code>):</b> Python evaluates default arguments <em>once</em> when <code>def</code> runs and stores them on the function object (<code>fn.__defaults__</code>). Never write <code>def append_log(entry, bucket=[]):</code> — every call omitting <code>bucket</code> shares that single list! Write <code>bucket=None</code> and allocate <code>if bucket is None: bucket = []</code> inside the function body.</li>
-  <li><b>Hidden <code>O(k)</code> slicing:</b> every slice <code>nums[i:j]</code> allocates a brand-new list and copies <code>j - i</code> references. Slicing <code>nums[1:]</code> inside recursion or <code>sum(nums[i:i+k])</code> inside a loop silently turns <code>O(n)</code> into <b><code>O(n²)</code></b> (for window sums, <code>O(n·k)</code> — hitting <code>O(n²)</code> when <code>k ≈ n/2</code>). Pass integer indices <code>(lo, hi)</code> or use Section 2's cumulative totals instead.</li>
+  <li><b>Single-use exhaustion (the #1 generator bug):</b> once a generator runs to the end — even because you ran a quick debug <code>print(list(gen))</code> or called <code>max(gen)</code> before <code>min(gen)</code> — the belt is <b>empty forever</b>! A second loop over the same generator silently sees zero items. If you need two passes, materialize into a <code>list</code> or <code>tuple</code> once.</li>
+  <li><b>No <code>len()</code> and no random indexing:</b> calling <code>len(gen)</code> or <code>gen[0]</code> raises <code>TypeError</code> because a conveyor belt hasn't pulled future items yet.</li>
+  <li><b>When a plain <code>for</code> loop beats a clever comprehension:</b> if a pipeline needs side effects, multiple accumulators, or more than two nested <code>for</code>/<code>if</code> clauses, write a clean <code>for</code> loop. Interviewers reward readability over code golf.</li>
 </ol>
 
-<div class="check" id="check-shallow-copy">
-  <p class="q">You snapshot a 2D board with <code>snap = grid[:]</code> before backtracking, then run <code>grid[0][1] = "X"</code>. What is <code>snap[0][1]</code>?</p>
-  <div class="opts">
-    <button>Its original value, because slicing allocates an independent copy of every nested row</button>
-    <button data-correct><code>"X"</code>, because <code>grid[:]</code> copies only the outer list and still shares each inner row</button>
-    <button>Raises <code>IndexError</code> because slicing a 2D list flattens the rows into one list</button>
-  </div>
-  <div class="fb right"><p>Sharp catch! <code>grid[:]</code> is a <em>shallow</em> copy — it makes a new outer box whose sticky notes still point to the exact same inner row lists. Use <code>[row[:] for row in grid]</code> or <code>copy.deepcopy(grid)</code> for an independent snapshot.</p></div>
-  <div class="fb wrong"><p>Check two levels on <code>grid = [[0, 0], [0, 0]]</code>: <code>snap = grid[:]</code> creates a new outer list <code>snap is not grid</code>, yet <code>snap[0] is grid[0]</code> is <code>True</code>! Mutating <code>grid[0][1]</code> edits that shared inner list, so <code>snap[0][1]</code> changes to <code>"X"</code> too.</p></div>
-</div>
-
-<!-- ============================================================ -->
-<h2 id="s6"><span class="sec-num">6</span>How do dataclasses, decorators, and context managers cut boilerplate?</h2>
-
-<p>In Anthropic's 4-level practical builds and concurrency rounds, clean Python structure earns strong senior signal. Three built-in tools replace 40 lines of hand-written boilerplate with 5 rock-solid lines (all tested directly in <code>py_internals.py</code>) — including making value objects ready for Python's priority queue (<code>heapq</code>, covered in full on Day 3):</p>
-
-<div class="figure">
-  <svg class="viz" viewBox="0 0 700 176" role="img" aria-label="Three Python structure tools: frozen ordered dataclass, memoize cache decorator, and try-finally context manager">
-    <!-- Panel 1: dataclass -->
-    <rect x="12" y="14" width="214" height="148" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
-    <text x="119" y="36" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">1. @dataclass</text>
-    <text x="119" y="54" class="label" text-anchor="middle" fill="var(--muted)">frozen=True, order=True</text>
-    <rect x="26" y="66" width="186" height="24" rx="5" fill="color-mix(in srgb, var(--accent) 12%, var(--surface))" stroke="var(--accent)"/>
-    <text x="119" y="82" class="label" text-anchor="middle">(priority, seq, name)</text>
-    <text x="119" y="112" class="label" text-anchor="middle" fill="var(--ok)">✓ immutable &amp; hashable</text>
-    <text x="119" y="130" class="label" text-anchor="middle" fill="var(--ok)">✓ compares left → right</text>
-    <text x="119" y="148" class="label" text-anchor="middle" fill="var(--muted)">dict / set / priority queue</text>
-
-    <!-- Panel 2: @memoize -->
-    <rect x="243" y="14" width="214" height="148" rx="8" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/>
-    <text x="350" y="36" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">2. @memoize + @wraps</text>
-    <text x="350" y="54" class="label" text-anchor="middle" fill="var(--muted)">call wrapper(*args)</text>
-    <rect x="259" y="66" width="182" height="24" rx="5" fill="color-mix(in srgb, var(--ok) 12%, var(--surface))" stroke="var(--ok)"/>
-    <text x="350" y="82" class="label" text-anchor="middle">if args in cache?</text>
-    <text x="350" y="112" class="label" text-anchor="middle" fill="var(--ok)">hit → return cache[args]</text>
-    <text x="350" y="130" class="label" text-anchor="middle" fill="var(--warn)">miss → call fn &amp; store</text>
-    <text x="350" y="148" class="label" text-anchor="middle" fill="var(--muted)">caches 0, False, None!</text>
-
-    <!-- Panel 3: @contextmanager -->
-    <rect x="474" y="14" width="214" height="148" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
-    <text x="581" y="36" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">3. @contextmanager</text>
-    <text x="581" y="54" class="label" text-anchor="middle" fill="var(--muted)">guaranteed cleanup</text>
-    <rect x="490" y="64" width="182" height="22" rx="5" fill="var(--surface-2)" stroke="var(--border-strong)"/>
-    <text x="581" y="79" class="label" text-anchor="middle">1. enter → append(v)</text>
-    <rect x="490" y="94" width="182" height="22" rx="5" fill="color-mix(in srgb, var(--warn) 14%, var(--surface))" stroke="var(--warn)"/>
-    <text x="581" y="109" class="label" text-anchor="middle">2. try: yield (with body)</text>
-    <rect x="490" y="124" width="182" height="24" rx="5" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)"/>
-    <text x="581" y="140" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">3. finally: pop() ALWAYS</text>
-  </svg>
-  <div class="cap">Three high-leverage Python building blocks: value objects that sort and hash safely, caching that respects falsy values, and setup/teardown that survives exceptions.</div>
-</div>
-
-<pre><code>from dataclasses import dataclass
-from functools import wraps
-from contextlib import contextmanager
-
-# 1. Immutable, hashable (dict/set keys!) AND priority-queue sortable in 4 lines:
-@dataclass(frozen=True, order=True)
-class PriorityTask:
-    priority: int
-    seq: int
-    name: str
-
-# 2. Custom @memoize decorator (preserves metadata + caches falsy values safely!):
-def memoize(fn):
-    cache = {}
-    @wraps(fn)                              # preserves fn.__name__ and fn.__doc__!
-    def wrapper(*args):
-        if args not in cache:               # NOT `if cache.get(args):` (0/False/""/None!)
-            cache[args] = fn(*args)
-        return cache[args]
-    return wrapper                          # in interviews, stdlib `@functools.cache` does this!
-
-# 3. Exception-safe context manager for backtracking / locks (scoped_append):
-@contextmanager
-def scoped_append(items, value):
-    items.append(value)
-    try:
-        yield items                         # caller's `with` body runs here
-    finally:
-        items.pop()                         # ALWAYS runs, even if body raises!</code></pre>
-
-<div class="keyidea">Three rules to burn into muscle memory: (1) <code>@dataclass(frozen=True, order=True)</code> makes an object immutable, hashable (when its compared fields are hashable), and priority-queue ready in one line; (2) check <code>if args in cache:</code> (never <code>cache.get(args)</code>) so falsy values stay cached; (3) wrap <code>yield</code> in <code>try ... finally</code> inside <code>@contextmanager</code> so exceptions never leak state or locks.</div>
-
-<details class="aside deeper">
-  <summary>Go deeper: field(compare=False), slots=True, and class-based context managers</summary>
-  <p><b>Non-comparable payload fields &amp; shallow immutability:</b> if a dataclass holds an unorderable payload like a <code>dict</code> alongside <code>priority</code> and <code>seq</code>, mark it <code>payload: dict = field(compare=False)</code> so ordering, equality, and hashing ignore it. Remember that <code>frozen=True</code> only blocks rebinding <code>t.payload = ...</code> — it does <em>not</em> freeze mutations inside a mutable <code>dict</code> or <code>list</code> field. Adding <code>slots=True</code> (Python 3.10+) also cuts per-instance memory and speeds attribute lookup.</p>
-  <p><b>When to write a class-based context manager (<code>__enter__</code> / <code>__exit__</code>):</b> <code>@contextmanager</code> is concise for one-off helpers; reach for a class with <code>__enter__</code> and <code>__exit__(self, exc_type, exc, tb)</code> when you need reusable stateful managers (e.g., returning <code>True</code> from <code>__exit__</code> intentionally suppresses an exception — returning <code>None</code>/<code>False</code> lets it propagate).</p>
-</details>
-
-<div class="check" id="check-ctx">
-  <p class="q">Inside <code>@contextmanager</code> <code>scoped_append(path, node)</code>, you forget <code>try ... finally</code> and put <code>path.pop()</code> right after <code>yield path</code>. What happens if the caller's <code>with</code> block raises <code>RuntimeError</code>?</p>
-  <div class="opts">
-    <button>Python automatically runs every line after <code>yield</code> before propagating the error</button>
-    <button>The generator catches and swallows the <code>RuntimeError</code> without calling <code>pop()</code></button>
-    <button data-correct>The error exits at <code>yield</code>, skipping <code>path.pop()</code> and leaving <code>node</code> inside <code>path</code></button>
-  </div>
-  <div class="fb right"><p>Spot on! Python injects any exception from the <code>with</code> body straight into the <code>yield</code> line — only a <code>finally:</code> block guarantees cleanup runs before the exception propagates.</p></div>
-  <div class="fb wrong"><p>Trace <code>path = ["a"]</code> entering <code>with scoped_append(path, "b"):</code> → <code>path</code> becomes <code>["a", "b"]</code>. When the body raises <code>RuntimeError</code>, execution aborts directly at <code>yield</code>: <code>path.pop()</code> never runs, the <code>RuntimeError</code> still propagates out (never swallowed!), and <code>path</code> stays stuck at <code>["a", "b"]</code>.</p></div>
-</div>
-
-<div class="check" id="check-falsy">
-  <p class="q">A recursive helper returns <code>0</code> for dead-end states. Your custom <code>@memoize</code> writes <code>if cache.get(args): return cache[args]</code>. What happens on big inputs?</p>
-  <div class="opts">
-    <button>It raises <code>KeyError</code> the first time any dead-end state is looked up</button>
-    <button data-correct><code>0</code> is falsy, so every cached <code>0</code> counts as a miss and recomputes</button>
-    <button>It caches accurately because integer <code>0</code> is stored distinctly from <code>None</code></button>
-  </div>
-  <div class="fb right"><p>Exact! Testing <code>if args in cache:</code> (or using stdlib <code>@functools.cache</code>) checks key presence, not truthiness — caching <code>0</code>, <code>False</code>, <code>""</code>, and <code>None</code> cleanly.</p></div>
-  <div class="fb wrong"><p>Evaluate <code>bool(cache.get(args))</code> when <code>cache[args] == 0</code>: <code>cache.get(args)</code> returns <code>0</code>, and in Python <code>if 0:</code> is <code>False</code>! So the decorator thinks <code>args</code> wasn't cached, calls <code>fn(*args)</code> again, and destroys memoization.</p></div>
-</div>
-
-<!-- ============================================================ -->
-<h2 id="s7"><span class="sec-num">7</span>How can idiomatic Python break — and how do you use it in interviews?</h2>
-
-<p>Even fluent Python writers hit four subtle traps under interview time pressure:</p>
-<ol>
-  <li><b>Truthiness bugs on valid falsy values:</b> writing <code>if score:</code>, <code>if lo:</code>, or <code>if cache.get(k):</code> breaks whenever <code>0</code>, <code>False</code>, or <code>""</code> is a real value. Write <code>is not None</code> or <code>in cache</code>.</li>
-  <li><b>Mutating a container while iterating over it:</b> removing keys from a <code>dict</code> or <code>set</code> inside <code>for k in d:</code> raises <code>RuntimeError</code>; removing from a <code>list</code> silently skips elements. Iterate over a snapshot (<code>list(d)</code>) or rebuild with a comprehension.</li>
-  <li><b>Priority-queue tuple tie-break crashes:</b> pushing <code>(priority, obj)</code> onto Python's <code>heapq</code> priority queue (<a href="python-toolkit.html#s5">Chapter 10.01</a>) crashes with <code>TypeError</code> when two priorities tie and <code>obj</code> has no <code>&lt;</code>. Fix with <code>(priority, seq, obj)</code> or Section 6's <code>@dataclass(frozen=True, order=True)</code>!</li>
-  <li><b>When a plain loop beats a clever comprehension:</b> if an expression needs side effects, multiple state updates, or more than one nested <code>for</code> + complex <code>if</code>, write a clean <code>for</code> loop. Interviewers score readability over code golf.</li>
-</ol>
-
-<p>Compare how these Day 1–2 idioms clean up noisy interview boilerplate in real bare-editor code:</p>
+<p>See how these Day 1 pipeline idioms simplify real interview code:</p>
 <div class="cols">
   <div style="min-width:0">
-    <p class="small muted"><b>Before: fragile defaults + slow window slice</b></p>
-<pre><code>def add_event(ev, log=[]):
-    log.append(ev)
-    return log
+    <p class="small muted"><b>Before: manual loops + slow window slice</b></p>
+<pre><code>cols = []
+for c in range(len(m[0])):
+    col = []
+    for r in range(len(m)):
+        if m[r][c] &gt;= t: col.append(m[r][c])
+    cols.append(col)
 
 # O(n·k) repeated list slicing
-avgs = [
-    sum(xs[i:i+k]) / k
-    for i in range(len(xs) - k + 1)
-]</code></pre>
+ws = [sum(xs[i:i+k]) for i in range(n-k+1)]</code></pre>
   </div>
   <div style="min-width:0">
-    <p class="small" style="color:var(--ok)"><b>After: safe default + one-pass prefix sums</b></p>
-<pre><code>def add_event(ev, log=None):
-    if log is None: log = []
-    log.append(ev)
-    return log
+    <p class="small" style="color:var(--ok)"><b>After: zip(*m) + accumulate/islice</b></p>
+<pre><code>cols = [
+    [v for v in col if v &gt;= t]
+    for col in zip(*m)
+]
 
-# O(n) single pass via accumulate + islice
+
+# O(n) single pass, zero extra slices
 p = list(accumulate(xs, initial=0))
-avgs = [
-    (b - a) / k
-    for a, b in zip(p, islice(p, k, None))
-]</code></pre>
+ws = [b - a for a, b in zip(p, islice(p, k, None))]</code></pre>
   </div>
 </div>
 
-<div class="check" id="check-mutate-iter">
-  <p class="q">You want to delete every zero-count key from a dictionary <code>counts</code>. Why does calling <code>del counts[k]</code> directly inside a <code>for k in counts:</code> loop fail?</p>
+<div class="check" id="check-exhausted">
+  <p class="q">You create <code>vals = (x * 2 for x in [1, 2, 3])</code>, print <code>sum(vals)</code> (which prints <code>12</code>), and on the very next line print <code>list(vals)</code>. What prints?</p>
   <div class="opts">
-    <button data-correct>Python raises <code>RuntimeError</code> when dict size changes mid-loop</button>
-    <button>It finishes cleanly yet silently skips every second zero-count key</button>
-    <button><code>del counts[k]</code> replaces the value with <code>None</code> instead of deleting it</button>
+    <button><code>[2, 4, 6]</code> — generator expressions rewind automatically after <code>sum()</code></button>
+    <button data-correct><code>[]</code> — <code>sum(vals)</code> already drained the single-use generator to the end</button>
+    <button>Raises <code>StopIteration</code> because calling <code>list()</code> twice on a stream fails</button>
   </div>
-  <div class="fb right"><p>Exact! Loop over <code>list(counts)</code> or build a clean replacement <code>counts = {k: v for k, v in counts.items() if v != 0}</code>.</p></div>
-  <div class="fb wrong"><p>Trace <code>counts = {"a": 0, "b": 1}</code>: on iteration 1, <code>del counts["a"]</code> shrinks the dict from size 2 to 1. On the next step, Python's dict iterator sees the size changed and raises <code>RuntimeError</code> immediately (unlike a <code>list</code>, which silently skips the next element!). Snapshot keys with <code>list(counts)</code> first.</p></div>
+  <div class="fb right"><p>Caught it! Generators are one-way conveyor belts: once <code>sum(vals)</code> pulls all three items, <code>vals</code> is exhausted and every later consumer receives <code>[]</code>. Store <code>vals = [x * 2 for x in ...]</code> if you need multiple passes.</p></div>
+  <div class="fb wrong"><p>Follow the belt position: <code>sum(vals)</code> pulls <code>2</code>, then <code>4</code>, then <code>6</code>, until the generator hits the end and stops. There is no rewind button — so when <code>list(vals)</code> pulls from the same exhausted generator, zero items remain and it quietly returns <code>[]</code> (never raising <code>StopIteration</code>).</p></div>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="s8"><span class="sec-num">8</span>What to say (and check) before Week 1 starts</h2>
+<h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
 
-<p>Before moving to Day 3's standard library toolkit (<a href="python-toolkit.html">Chapter 10.01</a>), make sure you can explain these four ideas aloud in 60 seconds without peeking:</p>
+<p>Before coding <code>py_idioms.py</code> and moving to Day 2's building blocks (<a href="python-building-blocks.html">Chapter 10.12</a>), make sure you can explain these four ideas aloud in 45 seconds:</p>
 <ol>
-  <li><b>Memory &amp; streams:</b> "Generator expressions <code>(...)</code> run in <code>O(1)</code> extra memory and recursive <code>yield</code> / <code>yield from</code> uses <code>O(d)</code> stack for nesting depth <code>d</code> (not <code>O(n)</code>), short-circuiting on <code>any</code>/<code>next</code>/<code>islice</code> — while excluding <code>(str, bytes)</code> prevents infinite recursion when flattening."</li>
-  <li><b>Closures &amp; sorting:</b> "Tuple keys handle multi-rule sorting in one line (negate numbers to reverse). Loop closures capture one shared variable cell, fixed by default-arg binding (<code>lambda x, f=f:</code>) or a helper factory."</li>
-  <li><b>Object model:</b> "Python variables are references to objects, so <code>[[0]*m]*n</code> aliases rows, <code>grid[:]</code> is only a shallow copy, mutable default args persist across calls, and inner-loop slicing quietly adds <code>O(k)</code> copies."</li>
-  <li><b>Clean structure:</b> "<code>@dataclass(frozen=True, order=True)</code> gives hashable priority-queue-safe objects; custom decorators use <code>@wraps</code> and <code>in cache</code> (not truthiness); <code>@contextmanager</code> guards cleanup with <code>try/finally</code>."</li>
+  <li><b>Batches vs. streams:</b> "I'll use a list comprehension when I need random access or sorting, and a generator expression <code>(...)</code> for single-pass reductions like <code>any</code>/<code>sum</code>/<code>next</code> so extra memory stays <code>O(1)</code> and it short-circuits on the first hit."</li>
+  <li><b>Ranking &amp; transposing:</b> "Tuple keys rank by multiple rules in one pass (negate numbers for descending, guard <code>is not None</code> to keep <code>0</code>), and <code>zip(*matrix)</code> transposes rows into columns cleanly."</li>
+  <li><b><code>itertools</code> &amp; sliding windows:</b> "Using <code>accumulate</code> with <code>islice</code> and <code>zip</code> computes every length-<code>k</code> window sum in one <code>O(n)</code> pass instead of <code>O(n·k)</code> repeated slicing."</li>
+  <li><b>Custom generators:</b> "<code>yield</code> and <code>yield from</code> flatten nested streams lazily in <code>O(d)</code> stack space for nesting depth <code>d</code>, excluding <code>(str, bytes)</code> so strings stay atomic leaves."</li>
 </ol>
 
 <!-- ============================================================ -->
 <h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
 <div class="table-wrap"><table>
-  <thead><tr><th>Trap / Need</th><th>Fragile way</th><th>Clean interview way</th></tr></thead>
+  <thead><tr><th>Pipeline need</th><th>Fragile / slow way</th><th>Clean interview way</th></tr></thead>
   <tbody>
-    <tr><td>Streaming <code>sum/any/next</code></td><td><code>any([p(x) for x in xs])</code></td><td><code>any(p(x) for x in xs)</code> (<code>O(1)</code> RAM)</td></tr>
-    <tr><td>Loop closures</td><td><code>[lambda x: x*f for f in fs]</code></td><td><code>[lambda x, f=f: x*f ...]</code> or helper fn</td></tr>
-    <tr><td>2D grid allocation</td><td><code>[[0] * cols] * rows</code></td><td><code>[[0] * cols for _ in range(rows)]</code></td></tr>
-    <tr><td>Default mutable arg</td><td><code>def f(x, buf=[]):</code></td><td><code>buf=None</code> → <code>if buf is None: buf = []</code></td></tr>
-    <tr><td>Window sums / slices</td><td><code>sum(nums[i:i+k])</code> (<code>O(n·k)</code>)</td><td><code>accumulate</code> + <code>islice</code> + <code>zip</code> (<code>O(n)</code>)</td></tr>
-    <tr><td>Cache / None checks</td><td><code>if cache.get(k):</code> / <code>if score:</code></td><td><code>if k in cache:</code> / <code>if score is not None:</code></td></tr>
-    <tr><td>Priority-queue + dict record</td><td>Manual <code>__lt__</code> / <code>__hash__</code></td><td><code>@dataclass(frozen=True, order=True)</code></td></tr>
-    <tr><td>Exception-safe cleanup</td><td>Cleanup line after bare <code>yield</code></td><td><code>try: yield ... finally: cleanup()</code></td></tr>
+    <tr><td>Filter &amp; rank records</td><td><code>if r[1]:</code> + mutating <code>.sort()</code></td><td><code>if r[1] is not None</code> + <code>sorted(..., key=lambda r: (-r[1], ...))</code></td></tr>
+    <tr><td>Transpose 2D matrix</td><td>Nested <code>range(len(...))</code> loops</td><td><code>zip(*matrix)</code> + comprehension</td></tr>
+    <tr><td>Single-pass <code>any/sum/next</code></td><td><code>any([p(x) for x in xs])</code> (<code>O(n)</code> RAM)</td><td><code>any(p(x) for x in xs)</code> (<code>O(1)</code> RAM)</td></tr>
+    <tr><td>Length-<code>k</code> window sums</td><td><code>sum(nums[i:i+k])</code> (<code>O(n·k)</code>)</td><td><code>accumulate</code> + <code>islice</code> + <code>zip</code> (<code>O(n)</code>)</td></tr>
+    <tr><td>Group by key</td><td><code>groupby(unsorted)</code></td><td><code>groupby(sorted(items, key=...))</code></td></tr>
+    <tr><td>Nested / infinite stream</td><td>Eager recursion returning <code>list</code></td><td><code>yield</code> / <code>yield from</code> + skip <code>(str, bytes)</code></td></tr>
+    <tr><td>Multi-pass over results</td><td>Re-iterating one generator</td><td>Materialize once into a <code>list</code></td></tr>
   </tbody>
 </table></div>
 
@@ -446,108 +397,95 @@ avgs = [
 
 <!-- ============================================================ -->
 <h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
-<p>Predict the two warm-ups on paper first, then complete Day 1's <code>py_idioms.py</code> and Day 2's <code>py_internals.py</code> without looking back at this page.</p>
+<p>Predict Warm-ups 1–2 on paper first, then complete all five drills in <a href="../exercises/py_idioms.py">py_idioms.py</a> (you now have every concept from Chapters 10.10 and 10.11!).</p>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
   <h4>1. Predict the exact output (no Python!)</h4>
-  <p>Write what each snippet prints or raises: (a) <code>g = [[0]*2]*2; g[0][1] = 5; print(g)</code>; (b) <code>fns = [lambda: k for k in range(3)]; print([f() for f in fns])</code>; (c) <code>a = [[1, 2]]; b = a[:]; b[0].append(3); print(a)</code>; (d) <code>print(next((x for x in [10, 20, 30] if x &gt; 50), -1))</code>.</p>
+  <p>Write what each snippet prints: (a) <code>print(next((x for x in [10, 20, 30] if x &gt; 50), -1))</code>; (b) <code>g = (x for x in [1, 2]); print(sum(g), sum(g))</code>; (c) <code>print([list(col) for col in zip(*[[1, 2], [3, 4]])])</code>; (d) <code>print([k for k, _ in groupby(["a", "b", "a"])])</code>.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) <code>[[0, 5], [0, 5]]</code> (both rows alias one list). (b) <code>[2, 2, 2]</code> (late binding on shared <code>k</code>). (c) <code>[[1, 2, 3]]</code> (<code>a[:]</code> is a shallow copy sharing inner list <code>a[0]</code>). (d) <code>-1</code> (default returned when generator exhausts).</p>
+    <p>(a) <code>-1</code> (fallback returned when stream exhausts). (b) <code>3 0</code> (first <code>sum(g)</code> drains the single-use generator, so the second sees empty). (c) <code>[[1, 3], [2, 4]]</code> (transposed columns). (d) <code>['a', 'b', 'a']</code> (<code>groupby</code> only merges adjacent equal keys).</p>
   </details>
 </div>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>2. Fix four silent interview bugs</h4>
-  <p>Spot the bug and write the 1-line fix: (a) <code>valid = [r for r in recs if r[1]]</code> when score <code>0</code> is legal; (b) <code>if isinstance(x, Iterable): yield from flat(x)</code> on <code>["hi"]</code>; (c) <code>if cache.get(args): return cache[args]</code> when <code>fn</code> returns <code>False</code>; (d) <code>items.append(v); yield items; items.pop()</code> inside <code>@contextmanager</code>.</p>
+  <h4>2. Fix three pipeline bugs</h4>
+  <p>Name the bug and write the 1-line fix: (a) <code>any([is_bad(x) for x in stream_10m])</code>; (b) <code>if isinstance(x, Iterable): yield from flat(x)</code> on <code>["hi"]</code>; (c) <code>[sum(nums[i:i+k]) for i in range(len(nums) - k + 1)]</code>.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) <code>if r[1] is not None</code>. (b) <code>if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):</code>. (c) <code>if args in cache: return cache[args]</code>. (d) Wrap <code>yield items</code> in <code>try: ... finally: items.pop()</code>.</p>
+    <p>(a) Square brackets materialize all 10M items upfront → drop them: <code>any(is_bad(x) for x in stream_10m)</code>. (b) Iterating <code>"hi"</code> yields <code>"h"</code> forever → add <code>and not isinstance(x, (str, bytes))</code>. (c) <code>O(n·k)</code> repeated slicing → use <code>pref = list(accumulate(nums, initial=0))</code> and <code>[b - a for a, b in zip(pref, islice(pref, k, None))]</code>.</p>
   </details>
 </div>
 
 <div class="exercise">
-  <div class="tier core">Day 1 · Core code</div>
-  <h4>3. Comprehensions, lambdas, closures, lazy streams &amp; window sums</h4>
-  <p>Implement <code>rank_candidates</code>, <code>transpose_and_filter</code>, <code>make_multipliers</code>, <code>flatten_stream</code>, and <code>window_sums</code> in <a href="../exercises/py_idioms.py">py_idioms.py</a>. Tests catch falsy <code>0</code> drops, late-binding closures, eager materialization on infinite streams, and <code>O(n·k)</code> window slicing.</p>
+  <div class="tier core">Day 1 · Core code (all 5 functions)</div>
+  <h4>3. Complete the full idioms &amp; streams suite</h4>
+  <p>Implement <code>rank_candidates</code>, <code>transpose_and_filter</code>, <code>make_multipliers</code> (from Chapter 10.10), <code>flatten_stream</code>, and <code>window_sums</code> in <a href="../exercises/py_idioms.py">py_idioms.py</a>. Tests verify falsy <code>0</code> scores, closure snapshots, deterministic pull caps on infinite streams, and deterministic <code>O(n)</code> read counts on window sums.</p>
+<pre class="plain"><code>python3 -m pytest -k py_idioms</code></pre>
 </div>
 
 <div class="exercise">
-  <div class="tier core">Day 2 · Core code</div>
-  <h4>4. Grids, defaults, frozen dataclasses, memoization &amp; context managers</h4>
-  <p>Implement <code>make_grid</code>, <code>append_log</code>, <code>PriorityTask</code>, <code>memoize</code>, and <code>scoped_append</code> in <a href="../exercises/py_internals.py">py_internals.py</a>. Tests catch aliased rows, shared mutable defaults (including empty caller lists), multi-arg and falsy cache misses, and leaked state on exceptions.</p>
+  <div class="tier stretch">Stretch · iterative flattening</div>
+  <h4>4. Flatten without recursion</h4>
+  <p>After your recursive <code>flatten_stream</code> passes, open the "Go deeper" aside in Section 6 and write an iterative version using an explicit stack of iterators on paper (or in the <a href="../../../practice.html">Practice hub</a> bare editor) that handles 5,000 nested lists without hitting <code>RecursionError</code>.</p>
 </div>
-
-<div class="exercise">
-  <div class="tier core">Day 4 · Bare-editor speed check (45 min)</div>
-  <h4>5. Redo shaky idioms from a blank editor</h4>
-  <p>On Phase 0 Day 4, open the <a href="../../../practice.html">Practice hub</a> bare-editor scratchpad (zero autocomplete) and spend 45 minutes rewriting any shaky function from <code>py_idioms</code>, <code>py_internals</code>, or <code>py_toolkit</code> cleanly from memory, then verify with pytest.</p>
-</div>
-
-<p>Run both suites from the repo root:</p>
-<pre class="plain"><code>python3 -m pytest -k "py_idioms or py_internals"</code></pre>
 
 <nav class="chapter-nav">
-  <a href="../../../index.html"><small>← Back to</small>Your track</a>
-  <a class="next" href="python-toolkit.html"><small>Next →</small>Python standard library toolkit</a>
+  <a href="python-memory-model.html"><small>← Previous</small>How Python holds data in memory</a>
+  <a class="next" href="python-building-blocks.html"><small>Next →</small>Python decorators and clean building blocks</a>
 </nav>
 
 </main>
 
 <script>
 (function () {
-  /* ---- Player 1: Late-binding closure vs default-arg snapshot (section 3) ---- */
+  /* ---- Player 1: Batch warehouse [...] vs Pull conveyor belt (...) (section 4) ---- */
   (function () {
+    const lines = ["OK", "OK", "FATAL", "OK", "OK", "OK"];
     const modes = {
-      bug: {
+      list: {
         frames: [
-          { fCell: "?", fns: [], calls: [], msg: "Buggy code: <code>fns = [lambda x: x * f for f in [2, 3, 10]]</code>. Every lambda links to ONE cell <code>f</code>." },
-          { fCell: 2, fns: ["fns[0]→f"], calls: [], msg: "Loop step 1: <code>f = 2</code>. Created <code>fns[0]</code> pointing to cell <code>f</code> (not copying 2!)." },
-          { fCell: 3, fns: ["fns[0]→f", "fns[1]→f"], calls: [], msg: "Loop step 2: <code>f</code> overwritten with <b>3</b>. Both lambdas now see <code>f = 3</code>." },
-          { fCell: 10, fns: ["fns[0]→f", "fns[1]→f", "fns[2]→f"], calls: [], msg: "Loop ends with <code>f = 10</code>! All three lambdas point to the exact same cell holding <b>10</b>." },
-          { fCell: 10, fns: ["fns[0]→f", "fns[1]→f", "fns[2]→f"], calls: ["5×10=50", "5×10=50", "5×10=50"], bad: true, msg: "Call <code>[g(5) for g in fns]</code> → <b>[50, 50, 50]</b>! All three read <code>f = 10</code>." }
+          { read: -1, buf: [], done: false, msg: "<code>any([\"FATAL\" in ln for ln in lines])</code>: brackets force Python to fill a <b>list buffer</b> first!" },
+          { read: 0, buf: ["F"], msg: "Step 1: reads line 0 (<code>OK</code>) → stores <code>False</code> in list. <code>any()</code> has NOT started yet." },
+          { read: 1, buf: ["F", "F"], msg: "Step 2: reads line 1 (<code>OK</code>) → stores <code>False</code>." },
+          { read: 2, buf: ["F", "F", "T"], msg: "Step 3: sees <code>FATAL</code> at index 2 (3rd line) — yet <b>cannot stop!</b> Brackets force reading the rest." },
+          { read: 5, buf: ["F", "F", "T", "F", "F", "F"], bad: true, msg: "Finished reading ALL 6 lines (50M in prod!) into RAM, and only NOW passes the list to <code>any()</code> → <b>True</b>." }
         ]
       },
-      fix: {
+      gen: {
         frames: [
-          { fCell: "?", fns: [], calls: [], msg: "Fixed code: <code>fns = [lambda x, f=f: x * f for f in [2, 3, 10]]</code>. Default arg <code>f=f</code> snapshots NOW." },
-          { fCell: 2, fns: ["fns[0](f=2)"], calls: [], msg: "Loop step 1: <code>f = 2</code> → default arg captures snapshot <b>2</b> inside <code>fns[0]</code>." },
-          { fCell: 3, fns: ["fns[0](f=2)", "fns[1](f=3)"], calls: [], msg: "Loop step 2: <code>f = 3</code> → <code>fns[1]</code> captures <b>3</b>; <code>fns[0]</code> still holds <b>2</b>!" },
-          { fCell: 10, fns: ["fns[0](f=2)", "fns[1](f=3)", "fns[2](f=10)"], calls: [], msg: "Loop ends: each function carries its own independent value snapshot." },
-          { fCell: 10, fns: ["fns[0](f=2)", "fns[1](f=3)", "fns[2](f=10)"], calls: ["5×2=10", "5×3=15", "5×10=50"], ok: true, msg: "Call <code>[g(5) for g in fns]</code> → <b>[10, 15, 50]</b>! Exact." }
+          { read: -1, buf: [], done: false, msg: "<code>any(\"FATAL\" in ln for ln in lines)</code>: conveyor belt pulls <b>one line at a time</b>." },
+          { read: 0, buf: ["F"], msg: "Pull 1: reads line 0 (<code>OK</code>) → <code>False</code>. Discards it (constant <code>O(1)</code> RAM!)." },
+          { read: 1, buf: ["F"], msg: "Pull 2: reads line 1 (<code>OK</code>) → <code>False</code>. Still holding only 1 item." },
+          { read: 2, buf: ["T"], ok: true, msg: "Pull 3: reads index 2 (3rd line: <code>FATAL</code>) → <b>True!</b> <code>any()</code> halts immediately — lines 3, 4, 5 are NEVER touched!" }
         ]
       }
     };
-    const sel = V.el("select", { "aria-label": "Choose closure mode" },
-      V.el("option", { value: "bug" }, "Bug: late binding (lambda x: x * f)"),
-      V.el("option", { value: "fix" }, "Fix: snapshot (lambda x, f=f: x * f)"));
-    const api = V.player(document.getElementById("viz-closure"), {
-      frames: modes.bug.frames,
+    const sel = V.el("select", { "aria-label": "Choose warehouse or conveyor belt" },
+      V.el("option", { value: "list" }, "Warehouse: any([\"FATAL\" in ln for ln in lines])"),
+      V.el("option", { value: "gen" }, "Conveyor belt: any(\"FATAL\" in ln for ln in lines)"));
+    const api = V.player(document.getElementById("viz-gen-vs-list"), {
+      frames: modes.list.frames,
       speed: 1050,
       extraControls: [sel],
       draw(f, stage) {
-        const varLabel = sel.value === "bug" ? "Shared loop variable cell f" : "Current loop variable f";
-        const cellBox = V.el("div", { style: "margin-bottom:12px" },
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, varLabel),
-          V.cells([String(f.fCell)], { idx: false, cls: () => f.bad ? "bad" : f.ok ? "done" : "hl" }));
-        const fnBox = V.el("div", { style: "margin-bottom:12px;white-space:nowrap" },
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Created functions in fns[]"),
-          f.fns.length
-            ? V.cells(f.fns, { idx: false, cls: () => f.bad ? "bad" : f.ok ? "done" : "warn" })
-            : V.el("div", { class: "small muted", style: "font-family:var(--mono);padding:4px 0" }, "[]"));
-        stage.append(cellBox, fnBox);
-        if (f.calls.length) {
-          const outBox = V.el("div", { style: "white-space:nowrap" },
-            V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Results of [g(5) for g in fns]"),
-            V.cells(f.calls, { idx: false, cls: () => f.bad ? "bad" : "done" }));
-          stage.append(outBox);
-        }
+        const ptrs = f.read >= 0 ? { [f.read]: "read" } : {};
+        const inRow = V.el("div", { style: "margin-bottom:12px" },
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Log lines in file"),
+          V.cells(lines, { ptrs, idx: true, cls: (i) => i === f.read ? (f.ok ? "done" : f.bad ? "bad" : "hl") : (i < f.read ? "dim" : "") }));
+        const memLabel = sel.value === "list" ? "RAM buffer allocated by [...]" : "Single live value in RAM (O(1))";
+        const memRow = V.el("div", {},
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, memLabel),
+          f.buf.length
+            ? V.cells(f.buf, { idx: false, cls: () => f.ok ? "done" : f.bad ? "bad" : "warn" })
+            : V.el("div", { class: "small muted", style: "font-family:var(--mono);padding:4px 0" }, "(empty)"));
+        stage.append(inRow, memRow);
       }
     });
     sel.onchange = () => api.load(modes[sel.value].frames);
   })();
 
-  /* ---- Player 2: Lazy yield / yield from flatten_stream (section 4) ---- */
+  /* ---- Player 2: Lazy yield / yield from flatten_stream (section 6) ---- */
   (function () {
     const tokens = ["1", "(", "2", '"hi"', ")", "3"];
     const frames = [

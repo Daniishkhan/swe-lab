@@ -157,11 +157,15 @@
 
   const editorRefs = h("p", { class: "small muted", style: "margin:10px 0 0" },
     "Phase 0 references: ",
-    h("a", { href: "sections/15-interview-formats/concepts/algorithmic-round.html#s8" }, "Bare-editor playbook & checklist"),
+    h("a", { href: "sections/15-interview-formats/concepts/algorithmic-round.html#s8" }, "Bare-editor playbook"),
     " · ",
-    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-toolkit.html#s7" }, "Python toolkit reference"),
+    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-memory-model.html#summary" }, "Memory model"),
     " · ",
-    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-idioms.html#summary" }, "Python idioms cheat table"));
+    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-idioms.html#summary" }, "Streams & idioms"),
+    " · ",
+    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-building-blocks.html#summary" }, "Decorators & @dataclass"),
+    " · ",
+    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-toolkit.html#s7" }, "Stdlib toolkit"));
 
   panes.editor = h("section", {},
     h("div", { class: "timer-bar" },

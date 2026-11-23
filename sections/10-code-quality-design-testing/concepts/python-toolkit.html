@@ -34,7 +34,7 @@
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Phase 0 Day 3, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Then write your one-page cheat sheet (Exercise 3) and solve <code>py_toolkit.py</code>. We focus on <em>when</em> each tool wins and what it costs; Chapters 1 and 2 open the hood later. Builds on <a href="python-idioms.html">Python idioms, lambdas, generators &amp; gotchas</a>.</p>
+<p class="muted small">How to read this: top to bottom on Phase 0 Day 3, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Then write your one-page cheat sheet (Exercise 3) and solve <code>py_toolkit.py</code>. We focus on <em>when</em> each tool wins and what it costs; Chapters 1 and 2 open the hood later. Builds on <a href="python-memory-model.html">How Python holds data in memory</a>, <a href="python-idioms.html">Transforming and streaming data</a>, and <a href="python-building-blocks.html">Python decorators and clean building blocks</a>.</p>
 
 <!-- ============================================================ -->
 <h2 id="s1"><span class="sec-num">1</span>Why does plain-list Python melt under interview scale?</h2>
@@ -80,7 +80,7 @@
     <rect x="542" y="32" width="124" height="128" rx="8" fill="var(--surface)" stroke="var(--brand)" stroke-width="1.6"/>
     <text x="604" y="52" class="label" text-anchor="middle" fill="var(--brand)" font-weight="700">5. CLEAN GLUE</text>
     <text x="604" y="72" class="label" text-anchor="middle" font-weight="700">enumerate / zip</text>
-    <text x="604" y="88" class="label" text-anchor="middle" font-weight="700">itertools / @cache</text>
+    <text x="604" y="88" class="label" text-anchor="middle" font-weight="700">itertools/@cache</text>
     <text x="604" y="104" class="label" text-anchor="middle" font-weight="700">"".join()</text>
     <text x="604" y="124" class="label" text-anchor="middle" fill="var(--bad)">not s += ch</text>
     <text x="604" y="142" class="label" text-anchor="middle" fill="var(--ok)">fewer bugs</text>
@@ -307,7 +307,7 @@ heapq.heappush(tasks, (priority, next(seq), task_obj))</code></pre>
 <!-- ============================================================ -->
 <h2 id="s6"><span class="sec-num">6</span>How can Python's standard library and math trip you up?</h2>
 
-<p>You already nailed Day 2's object-reference traps — <code>[[0] * 3] * 3</code> grid aliasing, shallow copies, and mutable default arguments (see <a href="python-idioms.html#s5">Chapter 10.10</a> for a quick recap). Add these <b>four Day 3 stdlib and math traps</b> to your cheat sheet:</p>
+<p>You already nailed Day 1's object-reference traps — <code>[[0] * 3] * 3</code> grid aliasing, shallow copies, and mutable default arguments (see <a href="python-memory-model.html#s3">Chapter 10.10</a> for a quick recap). Add these <b>four Day 3 stdlib and math traps</b> to your cheat sheet:</p>
 
 <h3>1. <code>defaultdict</code> mutating on read &amp; <code>Counter</code> zero-count ghosts</h3>
 <p>Looking up a missing key <code>d["ghost"]</code> on a <code>defaultdict(list)</code> silently inserts <code>"ghost": []</code> into the dictionary — inflating <code>len(d)</code> and breaking iteration! And decrementing a <code>Counter</code> down to zero (<code>c[k] -= 1</code>) leaves <code>k: 0</code> inside <code>c</code>, so <code>len(c)</code> and <code>k in c</code> stay truthy until you explicitly delete zero keys:</p>
@@ -335,10 +335,10 @@ heapq.heappush(tasks, (priority, next(seq), task_obj))</code></pre>
 </div>
 
 <h3>2. <code>arr.sort()</code> returns <code>None</code>, <code>bisect.insort</code> is <code>O(n)</code>, and <code>groupby</code> needs sorted input</h3>
-<p><code>a = arr.sort()</code> sets <code>a</code> to <code>None</code> (use <code>sorted(arr)</code> to keep a copy); <code>bisect.insort(a, x)</code> shifts the array in <code>O(n)</code>; and <code>itertools.groupby</code> only merges <em>adjacent</em> equal keys — calling it on unsorted <code>["a", "b", "a"]</code> yields two separate <code>"a"</code> groups!</p>
+<p><code>a = arr.sort()</code> sets <code>a</code> to <code>None</code> (use <code>sorted(arr)</code> to keep a copy); <code>bisect.insort(a, x)</code> shifts the array in <code>O(n)</code>; and as a Day 1 recap (<a href="python-idioms.html#s5">Chapter 10.11</a>), <code>itertools.groupby</code> only merges <em>adjacent</em> equal keys — calling it on unsorted <code>["a", "b", "a"]</code> yields two separate <code>"a"</code> groups!</p>
 
-<h3>3. Mutating a collection while looping over it</h3>
-<p>Removing items from a <code>list</code> inside <code>for x in nums:</code> shifts indices and silently skips neighbors; adding or deleting keys inside <code>for k in d:</code> raises <code>RuntimeError</code>. Build a filtered comprehension (<code>[x for x in nums if keep(x)]</code>) or loop over <code>list(d)</code>.</p>
+<h3>3. Mutating a collection while looping over it (Day 1 recap)</h3>
+<p>As we saw on the workshop bench (<a href="python-memory-model.html#s7">Chapter 10.10</a>), removing items from a <code>list</code> inside <code>for x in nums:</code> shifts indices and silently skips neighbors, and adding or deleting keys inside <code>for k in d:</code> raises <code>RuntimeError</code>. Build a filtered comprehension (<code>[x for x in nums if keep(x)]</code>) or loop over <code>list(d)</code>.</p>
 
 <h3>4. Negative integer division (<code>//</code>) and remainder (<code>%</code>)</h3>
 <p>Python's <code>//</code> rounds toward <b>−∞</b> (floor), NOT toward zero like C++/Java: <code>-7 // 2 == -4</code> (while <code>int(-7 / 2) == -3</code>). Similarly, <code>%</code> always matches the divisor's sign (<code>-7 % 2 == 1</code>) — awesome for circular wrap-around <code>(i - 1) % n</code>, surprising if you expect C++'s <code>-1</code>!</p>
@@ -347,7 +347,7 @@ heapq.heappush(tasks, (priority, next(seq), task_obj))</code></pre>
   <summary>Go deeper: four subtle Python power-user gotchas</summary>
   <p><b>Two-pass stable sort for descending strings:</b> Since you can't negate a string, sort by secondary ascending key first, then sort by primary descending key (<code>reverse=True</code>) — Python's stable sort keeps ties ordered!</p>
   <p><b><code>deque(maxlen=k)</code>:</b> Auto-evicts the oldest item when full — a 1-line fixed ring buffer.</p>
-  <p><b>Shallow <code>.copy()</code>:</b> <code>grid.copy()</code> only copies outer row references (use <code>[r[:] for r in grid]</code> for 2D boards).</p>
+  <p><b>Shallow <code>.copy()</code> (Day 1 recap):</b> <code>grid.copy()</code> only copies outer row references (use <code>[r[:] for r in grid]</code> for 2D boards — see <a href="python-memory-model.html#s4">Chapter 10.10</a>).</p>
   <p><b>Huge integer division via floats:</b> <code>int(a / b)</code> loses float precision above <code>2⁵³</code> — use pure integer floor math if numbers exceed 53 bits.</p>
 </details>
 
@@ -525,7 +525,7 @@ def climb(steps):
 <pre class="plain"><code>python3 -m pytest -k py_toolkit</code></pre>
 
 <nav class="chapter-nav">
-  <a href="python-idioms.html"><small>← Previous</small>Python idioms, lambdas, generators &amp; gotchas</a>
+  <a href="python-building-blocks.html"><small>← Previous</small>Python decorators and clean building blocks</a>
   <a class="next" href="../../15-interview-formats/concepts/algorithmic-round.html"><small>Next →</small>Bare-editor coding playbook</a>
 </nav>
 

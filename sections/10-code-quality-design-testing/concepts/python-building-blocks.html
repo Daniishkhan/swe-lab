@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="10.12">
+  <title>Python decorators and clean building blocks (Dataclasses, @memoize &amp; @contextmanager)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="10" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Phase 0 · Day 2</div>
+  <h1>Python decorators and clean building blocks</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> Phase 0 clean Python structure</span><span>about 16 minutes</span><span>5 quick checks · 4 exercises</span></div>
+</header>
+
+<p>In senior practical builds and multi-part coding rounds, getting the right algorithm is only half the bar — your code has to stay clean when requirements evolve at minute 30. Python's <code>@</code> decorators let you keep your core logic small and clear while snapping on value records, caching, and exception-safe cleanup in a few lines.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain what Python's <code>@</code> syntax actually does at definition time without treating it like magic.</li>
+    <li>Replace 30 lines of boilerplate class methods with a read-only, sortable value record that safely lives in sets and dicts.</li>
+    <li>Write a caching decorator that keeps function names intact and caches falsy results (<code>0</code>, <code>False</code>, <code>""</code>, <code>None</code>) safely.</li>
+    <li>Turn a pausing <code>yield</code> generator into an exception-safe <code>with</code> guard that never leaks state or locks.</li>
+    <li>Spot when frozen dataclasses, caches, or context managers break — and when a plain function is cleaner.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom on Phase 0 Day 2 before solving <code>py_internals.py</code>. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Builds on <a href="python-memory-model.html">How Python holds data in memory</a> and <a href="python-idioms.html">Transforming and streaming data</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>Why does code structure matter as much as Big-O in senior rounds?</h2>
+
+<div class="story">
+  <p>Picture a 90-minute Anthropic 4-level build. At Level 1 you pass raw tuples <code>(2, 1, "send_email")</code> around, mix a manual <code>cache = {}</code> into your recursion, and pair <code>path.append()</code> with <code>path.pop()</code> by hand. By Level 3, an early <code>return</code> skips one <code>pop()</code>, a helper reads <code>task[1]</code> instead of <code>task[2]</code>, and a cached <code>0</code> triggers exponential slowdowns. You lose 25 minutes untangling plumbing instead of shipping Level 4.</p>
+</div>
+
+<p>Think of Python's <code>@</code> decorators as <b>snap-on wrappers</b> around clean core logic. Instead of burying your algorithm inside 40 lines of double-underscore special methods ("dunders" like <code>__eq__</code> and <code>__lt__</code>), manual cache lookups, and fragile cleanup branches, you keep your core code tiny and snap three built-in wrappers onto the edges:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 720 154" role="img" aria-label="Comparing 45 lines of tangled manual boilerplate against three snap-on Python decorators: @dataclass for classes, @memoize for functions, and @contextmanager for pausing generators">
+    <rect x="14" y="16" width="318" height="122" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
+    <text x="28" y="38" class="label" fill="var(--bad)" font-weight="700">HAND-ROLLED PLUMBING (45+ lines)</text>
+    <text x="28" y="62" class="label">• Manual __init__, __eq__, __lt__</text>
+    <text x="28" y="84" class="label">• Cache dict + falsy bugs in core fn</text>
+    <text x="28" y="106" class="label">• append() / pop() skipped on throw</text>
+    <text x="28" y="126" class="label" fill="var(--bad)">Hard to read, brittle on follow-ups.</text>
+
+    <line x1="342" y1="77" x2="366" y2="77" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="366,72 376,77 366,82" fill="var(--ok)"/>
+
+    <rect x="380" y="16" width="326" height="122" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="394" y="38" class="label" fill="var(--ok)" font-weight="700">SNAP-ON @ WRAPPERS (3 targets, 5 lines)</text>
+    <text x="394" y="62" class="label">• Class</text><text x="482" y="62" class="label">→ @dataclass(frozen, order)</text>
+    <text x="394" y="84" class="label">• Function</text><text x="482" y="84" class="label">→ @memoize / @functools.cache</text>
+    <text x="394" y="106" class="label">• Generator</text><text x="482" y="106" class="label">→ @contextmanager (finally)</text>
+    <text x="394" y="126" class="label" fill="var(--ok)">Core logic stays pure and easy to extend.</text>
+  </svg>
+  <div class="cap">All three tools use the exact same <code>@</code> mechanism — applied once to a class, once to a function, and once to a pausing generator.</div>
+</div>
+
+<p>Before snapping any of those three on, let's peel away the mystery of the <code>@</code> symbol itself. Once you see it on Chapter 10.10's workshop bench, it takes ten seconds to understand completely.</p>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>How does Python's @ syntax actually work under the hood?</h2>
+
+<p>Remember Chapter 10.10: in Python, a function or class is an ordinary object sitting on the workshop bench — you can pass it into another function and return a new function back out! Writing <code>@dec</code> directly above <code>def foo(...):</code> does zero compiler magic. It is literally 1-line shorthand for:</p>
+
+<pre><code>@dec                        # Python runs these two lines under the hood:
+def foo(x):                 #   def foo(x): return x + 1
+    return x + 1            #   foo = dec(foo)   &lt;-- runs ONCE at def time!</code></pre>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 132" role="img" aria-label="Showing how @dec calls dec(foo) once at definition time and rebinds the name foo to the returned wrapper carrying @wraps metadata">
+    <rect x="14" y="24" width="160" height="72" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="94" y="48" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">1. ORIGINAL fn</text>
+    <text x="94" y="72" class="label" text-anchor="middle">def foo(x): ...</text>
+
+    <line x1="178" y1="60" x2="216" y2="60" stroke="var(--accent)" stroke-width="2"/>
+    <polygon points="216,55 226,60 216,65" fill="var(--accent)"/>
+    <text x="200" y="48" class="label" text-anchor="middle" fill="var(--muted)">pass in</text>
+
+    <rect x="230" y="24" width="186" height="72" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="323" y="48" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">2. dec(foo) RUNS ONCE</text>
+    <text x="323" y="72" class="label" text-anchor="middle">builds wrapper + @wraps</text>
+
+    <line x1="420" y1="60" x2="458" y2="60" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="458,55 468,60 458,65" fill="var(--ok)"/>
+    <text x="442" y="48" class="label" text-anchor="middle" fill="var(--muted)">rebind</text>
+
+    <rect x="472" y="24" width="214" height="72" rx="8" fill="color-mix(in srgb, var(--ok) 12%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="579" y="48" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">3. NEW foo = wrapper</text>
+    <text x="579" y="72" class="label" text-anchor="middle">runs on every foo(x) call</text>
+
+    <text x="16" y="118" class="label" fill="var(--muted)">Without @wraps(fn), foo.__name__ becomes "wrapper" and foo.__doc__ becomes None!</text>
+  </svg>
+  <div class="cap"><code>@dec</code> runs <code>dec(foo)</code> <em>once</em> when Python defines <code>foo</code>, then moves sticky note <code>foo</code> onto the returned <code>wrapper</code>.</div>
+</div>
+
+<p>Look at a tiny 6-line wrapper that counts how many times a function is called — and notice <code>@functools.wraps(fn)</code>, which copies <code>fn.__name__</code> and <code>fn.__doc__</code> onto <code>wrapper</code> so stack traces, help text, and test suites still see the original name:</p>
+
+<pre><code>from functools import wraps
+
+def count_calls(fn):
+    calls = 0                       # private closure cell on the bench (Chapter 10.10!)
+    @wraps(fn)                      # preserves fn.__name__ and fn.__doc__
+    def wrapper(*args):
+        nonlocal calls              # rebind outer `calls` sticky note (int is immutable!)
+        calls += 1
+        return fn(*args)
+    return wrapper</code></pre>
+
+<p>Two quick details unlock every decorator you'll see below: <code>nonlocal calls</code> is required because <code>calls</code> points to an immutable <code>int</code> stone in the outer scope — without it, <code>calls += 1</code> would look for a local variable inside <code>wrapper</code>. And when a decorator accepts options in parentheses (like <code>@wraps(fn)</code> or <code>@dataclass(frozen=True)</code>), Python runs a two-step call: <code>factory(opts)</code> returns a decorator, which immediately wraps the target (<code>target = factory(opts)(target)</code>).</p>
+
+<p><em>Where the snap-on wrapper picture needs care:</em> the outer decorator <code>count_calls(fn)</code> executes <b>once</b> when Python loads the <code>def</code> statement, setting up its closure state (like <code>calls = 0</code> or a cache dict). From then on, only the inner <code>wrapper</code> runs each time you call the function.</p>
+
+<div class="keyidea">A decorator is an ordinary function that takes a class or function at definition time and returns an upgraded version (<code>@factory(opts)</code> just calls <code>factory(opts)</code> first to obtain that decorator). Always put <code>@functools.wraps(fn)</code> on the inner <code>wrapper</code> so <code>__name__</code> and <code>__doc__</code> survive.</div>
+
+<div class="check" id="check-decorator-basic">
+  <p class="q">You decorate the function below with a custom wrapper, yet forget <code>@wraps(fn)</code> inside the decorator. What happens when a test checks <code>compute.__name__</code> and <code>compute.__doc__</code>?</p>
+<pre><code>@count_calls
+def compute(x):
+    """Double x."""
+    return x * 2</code></pre>
+  <div class="opts">
+    <button>Python raises <code>AttributeError</code> because decorated functions drop both attributes</button>
+    <button>They still return <code>"compute"</code> and <code>"Double x."</code> because Python auto-copies both</button>
+    <button data-correct>They return <code>"wrapper"</code> and <code>None</code> because <code>compute</code> now points to <code>wrapper</code></button>
+  </div>
+  <div class="fb right"><p>Spot on! Rebinding <code>compute = count_calls(compute)</code> moves sticky note <code>compute</code> onto the inner <code>wrapper</code> object — so unless you decorate <code>wrapper</code> with <code>@wraps(fn)</code>, Python inspects <code>wrapper</code>'s own name and missing docstring.</p></div>
+  <div class="fb wrong"><p>Try tracing a second example: suppose you write <code>def square(n):</code> with docstring <code>"""Square n."""</code> and wrap it with an undecorated inner <code>def wrapper(*args):</code>. After <code>square = dec(square)</code>, sticky note <code>square</code> is stuck onto <code>wrapper</code> — so <code>square.__name__</code> reads <code>"wrapper"</code> and <code>square.__doc__</code> reads <code>None</code> until you add <code>@wraps(fn)</code>.</p></div>
+</div>
+
+<p>Now that <code>@</code> is completely transparent — just <code>target = dec(target)</code> — let's snap it onto our three targets in order: first a <b>class</b> (§3), next a <b>function</b> (§4), and finally a <b>pausing generator</b> (§5).</p>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>How do you wrap a class into a safe, sortable value record?</h2>
+
+<p>Raw tuples like <code>(2, 1, "send_email")</code> work fine inside a 3-line sort (Chapter 10.11), yet once you pass tasks across functions, store them in sets/dicts, or push them into Python's priority queue (<code>heapq</code>, covered on Day 3), raw tuples get cryptic fast — and plain custom classes crash on comparisons (<code>&lt;</code>) and sets (<code>hash()</code>) unless you hand-write 30 lines of dunder methods.</p>
+
+<p>Snap <b><code>@dataclass(frozen=True, order=True)</code></b> onto a 4-line class definition instead (this is <code>PriorityTask</code> in <code>py_internals.py</code>):</p>
+
+<pre><code>from dataclasses import dataclass
+
+@dataclass(frozen=True, order=True)
+class PriorityTask:
+    priority: int       # compared 1st (lower number = higher urgency)
+    seq: int            # compared 2nd (breaks priority ties cleanly!)
+    name: str           # compared 3rd (breaks any remaining ties)</code></pre>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 704 144" role="img" aria-label="Anatomy of @dataclass(frozen=True, order=True) showing field order (priority, seq, name) generating __init__, __repr__, __eq__, __hash__, and left-to-right ordering">
+    <rect x="14" y="18" width="206" height="108" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="117" y="40" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">YOUR 4-LINE CLASS</text>
+    <text x="117" y="64" class="label" text-anchor="middle">priority: int</text>
+    <text x="117" y="84" class="label" text-anchor="middle">seq: int</text>
+    <text x="117" y="104" class="label" text-anchor="middle">name: str</text>
+
+    <line x1="226" y1="72" x2="288" y2="72" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="288,67 298,72 288,77" fill="var(--ok)"/>
+    <text x="261" y="58" class="label" text-anchor="middle" fill="var(--muted)">@dataclass</text>
+
+    <rect x="302" y="18" width="388" height="108" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="496" y="40" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">GENERATED AT CLASS DEFINITION TIME</text>
+    <text x="316" y="64" class="label">• __init__, __repr__, __eq__ from fields</text>
+    <text x="316" y="84" class="label">• frozen=True → blocks writes &amp; adds __hash__</text>
+    <text x="316" y="104" class="label">• order=True → compares (priority, seq, name)</text>
+  </svg>
+  <div class="cap">Field declaration order IS your comparison order — put the primary sort key first and tie-breakers right underneath.</div>
+</div>
+
+<p>Connect <code>frozen=True</code> straight back to Chapter 10.10's sealed stones: being <b>hashable</b> means an object has a stable numeric fingerprint (<code>hash(obj)</code>) that never changes over its lifetime so Python's <code>dict</code> and <code>set</code> always find the same bucket. Because <code>frozen=True</code> blocks attribute rebinding (<code>t.priority = 99</code> raises <code>FrozenInstanceError</code>, a subclass of <code>AttributeError</code>), Python safely generates <code>__hash__</code> (as long as every compared field is itself hashable!), letting <code>PriorityTask</code> live inside sets, dictionary keys, and priority queues cleanly.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: field(compare=False), shallow immutability, and slots=True</summary>
+  <p><b>Non-comparable payload fields:</b> if a task carries an unorderable payload like a <code>dict</code> alongside <code>priority</code> and <code>seq</code>, mark it <code>payload: dict = field(compare=False)</code> so ordering, equality, and hashing ignore it — preventing <code>TypeError: unhashable type: 'dict'</code>.</p>
+  <p><b>Shallow immutability:</b> remember Chapter 10.10 §2's tuple footnote! <code>frozen=True</code> blocks rebinding <code>t.payload = {}</code>, yet it does <em>not</em> freeze mutations inside an open mutable box like <code>t.payload["k"] = 1</code>. Adding <code>slots=True</code> (Python 3.10+) also cuts per-instance memory and speeds attribute lookup.</p>
+</details>
+
+<div class="keyidea"><code>@dataclass(frozen=True, order=True)</code> turns a 4-line field list into an immutable, hashable (when compared fields are hashable), priority-queue-sortable value object — with zero hand-written boilerplate.</div>
+
+<div class="check" id="check-dataclass">
+  <p class="q">You define <code>PriorityTask</code> with <code>@dataclass(order=True)</code> — forgetting <code>frozen=True</code> — and try to put tasks into a Python <code>set</code>. What happens?</p>
+  <div class="opts">
+    <button data-correct>Raises <code>TypeError: unhashable type</code> because mutable dataclasses disable <code>__hash__</code></button>
+    <button>Works cleanly because <code>order=True</code> automatically generates a stable <code>__hash__</code> method</button>
+    <button>Stores tasks in the set, yet silently overwrites earlier tasks with the same priority</button>
+  </div>
+  <div class="fb right"><p>Exact! Adding <code>__eq__</code> on a mutable class makes Python set <code>__hash__ = None</code> to protect hash tables from keys that mutate after insertion. Adding <code>frozen=True</code> seals attribute rebinding and unlocks <code>__hash__</code>.</p></div>
+  <div class="fb wrong"><p>Check what happens if a mutable object were allowed in a <code>set</code>: changing <code>t.priority</code> later would change its hash and strand it in the wrong bucket! So Python automatically disables <code>__hash__</code> whenever a dataclass is mutable — raising <code>TypeError: unhashable type: 'PriorityTask'</code> until you pass <code>frozen=True</code>.</p></div>
+</div>
+
+<p>That's wrapping a class. Now apply the exact same <code>@</code> wrapper mechanism to a recursive function — snapping on caching without touching a single line of the algorithm inside.</p>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How do you wrap a function with a cache safely?</h2>
+
+<p>Recursive problems (Fibonacci, grid paths, dynamic programming) often recompute the exact same subproblem millions of times. Instead of cluttering your recursion with manual lookups, snap a caching wrapper — called <b>memoization</b> (<code>@memoize</code>, remembering past return values by input arguments) — onto it (this is <code>memoize</code> in <code>py_internals.py</code>):</p>
+
+<pre><code>from functools import wraps
+
+def memoize(fn):
+    cache = {}                              # isolated dict box per decorated function!
+    @wraps(fn)                              # keep fn.__name__ and fn.__doc__
+    def wrapper(*args):
+        if args not in cache:               # NOT `if cache.get(args):`!
+            cache[args] = fn(*args)
+        return cache[args]
+    return wrapper</code></pre>
+
+<p>Look how three ideas from earlier chapters lock together here:</p>
+<ol>
+  <li><b>Isolated closure box (Chapter 10.10 §6):</b> each call to <code>memoize(fn)</code> creates its own fresh <code>cache = {}</code> box on the bench — so decorating <code>add</code> and <code>mul</code> never collides their caches!</li>
+  <li><b>Positional tuple key <code>args</code>:</b> <code>*args</code> packs 0 arguments into <code>()</code>, 1 argument into <code>(n,)</code>, and 2 arguments into <code>(a, b)</code> — all immutable tuples (as long as the argument values themselves are hashable!).</li>
+  <li><b>Membership check vs. truthiness (Chapter 10.10 §7):</b> writing <code>if cache.get(args):</code> looks clever — and breaks catastrophically whenever <code>fn</code> legally returns a falsy value (<code>0</code>, <code>False</code>, <code>""</code>, or <code>None</code>)! Step through both versions below:</li>
+</ol>
+
+<div class="figure">
+  <div id="viz-memoize"></div>
+  <div class="cap">Switch the dropdown between safe <code>args not in cache</code> and buggy <code>cache.get(args)</code> when <code>ways(2)</code> legally returns <code>0</code> (zero paths from a dead-end state).</div>
+</div>
+
+<p class="small muted"><b>In real interviews and production:</b> Python's standard library ships this exact decorator as <code>@functools.cache</code> (unbounded — ideal for interview DP) and <code>@functools.lru_cache(maxsize=1024)</code> (bounded — mandatory in long-lived production services so an unbounded cache never grows until out-of-memory!). Writing <code>memoize</code> once by hand makes sure you never trip over <code>@wraps</code> or falsy values when asked to build a custom cache, rate-limiter, or retry wrapper.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: keyword arguments (**kwargs) and thread safety in custom caches</summary>
+  <p><b>Supporting keyword arguments:</b> our compact <code>wrapper(*args)</code> only caches positional arguments. If callers pass keyword arguments like <code>fn(a=1, b=2)</code>, combine them into a deterministic hashable key — <code>key = (args, tuple(sorted(kwargs.items())))</code> — or reach directly for <code>@functools.lru_cache</code>, which handles both positional and keyword arguments.</p>
+  <p><b>Thread safety:</b> in multi-threaded servers, two threads missing the cache simultaneously will both run <code>fn(*args)</code> and race on writes. <code>functools.lru_cache</code> uses an internal lock to keep its LRU structure consistent; in custom multi-threaded caches, guard cache state with a <code>threading.Lock</code> (or a single-flight pattern in Week 4's concurrency chapter).</p>
+</details>
+
+<div class="keyidea">Inside any caching decorator, allocate <code>cache = {}</code> inside the outer decorator (one isolated cache per function), preserve metadata with <code>@wraps(fn)</code>, and check key membership (<code>if args not in cache:</code>) — never truthiness (<code>if cache.get(args):</code>).</div>
+
+<div class="check" id="check-falsy">
+  <p class="q">A recursive helper returns <code>0</code> for dead-end states. Your custom <code>@memoize</code> writes <code>if cache.get(args): return cache[args]</code>. What happens on big inputs?</p>
+  <div class="opts">
+    <button>It raises <code>KeyError</code> the first time any dead-end state is looked up</button>
+    <button data-correct><code>0</code> is falsy, so every cached <code>0</code> counts as a miss and recomputes</button>
+    <button>It caches accurately because integer <code>0</code> is stored distinctly from <code>None</code></button>
+  </div>
+  <div class="fb right"><p>Exact! Testing <code>if args not in cache:</code> checks whether the key exists in the dict — caching <code>0</code>, <code>False</code>, <code>""</code>, and <code>None</code> cleanly.</p></div>
+  <div class="fb wrong"><p>Trace <code>cache = {(2,): 0}</code>: calling <code>cache.get((2,))</code> returns <code>0</code>, and Python evaluates <code>if 0:</code> as <code>False</code>! So the wrapper treats the cached dead-end as a cache miss, calls <code>fn(2)</code> all over again, and destroys your memoization speedup.</p></div>
+</div>
+
+<p>We've snapped <code>@</code> onto a class (<code>@dataclass</code>) and onto a regular function (<code>@memoize</code>). One target remains — and it plugs straight into Chapter 10.11's pausing <code>yield</code> generators!</p>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>How do you wrap a pausing generator for exception-safe cleanup?</h2>
+
+<p>In backtracking, graph DFS, locks, and file I/O, you constantly pair a setup step with a mandatory teardown step: <code>path.append(node)</code> before exploring, and <code>path.pop()</code> afterward. Write those two lines manually around a multi-branch body and one early <code>return</code> or unexpected exception skips <code>path.pop()</code> — corrupting state for every branch that follows.</p>
+
+<p>Remember Chapter 10.11 §6: a generator function pauses at <code>yield</code> and resumes right there later! Snap <b><code>@contextlib.contextmanager</code></b> onto a single-<code>yield</code> generator and Python turns it into a bulletproof <code>with</code> guard (this is <code>scoped_append</code> in <code>py_internals.py</code>):</p>
+
+<pre><code>from contextlib import contextmanager
+
+@contextmanager
+def scoped_append(items, value):
+    items.append(value)         # 1. runs on entering `with`
+    try:
+        yield items             # 2. pauses here while caller's `with` body runs!
+    finally:
+        items.pop()             # 3. ALWAYS runs on exit — even if body raises!</code></pre>
+
+<p><b>Why <code>try ... finally</code> around <code>yield</code> is non-negotiable:</b> if the caller's indented <code>with</code> block raises an exception like <code>RuntimeError</code>, Python injects that exception straight back into the paused <code>yield</code> line! Without <code>finally:</code>, the generator aborts right at <code>yield</code>, skipping <code>items.pop()</code> completely. Notice also why <code>items.append(value)</code> sits <em>above</em> <code>try:</code>: if setup itself fails (say, opening a missing file or failing to acquire a lock), entering <code>finally:</code> must not pop or release something that was never acquired! Step through both versions below:</p>
+
+<div class="figure">
+  <div id="viz-ctx"></div>
+  <div class="cap">Switch between safe <code>try ... finally</code> and bare <code>yield</code> when the <code>with</code> body raises <code>RuntimeError</code>. Notice how <code>finally:</code> pops <code>"boom"</code> cleanly AND still lets <code>RuntimeError</code> propagate to the caller!</div>
+</div>
+
+<details class="aside deeper">
+  <summary>Go deeper: class-based context managers (__enter__ and __exit__)</summary>
+  <p><code>@contextmanager</code> is concise for one-off helpers. Reach for a class defining <code>__enter__(self)</code> and <code>__exit__(self, exc_type, exc, tb)</code> when you need a reusable stateful guard (like a transaction manager or timer object). Returning <code>False</code> or <code>None</code> from <code>__exit__</code> lets any exception propagate (the safe default); returning <code>True</code> intentionally suppresses it.</p>
+</details>
+
+<div class="keyidea">Inside <code>@contextmanager</code>, setup runs above <code>try:</code>, the <code>with</code> body runs at <code>yield</code>, and cleanup MUST live inside <code>finally:</code> so exceptions never skip teardown or leak corrupted state.</div>
+
+<div class="check" id="check-ctx">
+  <p class="q">Inside <code>@contextmanager</code> <code>scoped_append(path, node)</code>, you forget <code>try ... finally</code> and put <code>path.pop()</code> right after <code>yield path</code>. What happens if the caller's <code>with</code> block raises <code>RuntimeError</code>?</p>
+  <div class="opts">
+    <button data-correct>The error exits at <code>yield</code>, skipping <code>path.pop()</code> and leaving <code>node</code> inside <code>path</code></button>
+    <button>Python automatically runs every remaining line after <code>yield</code> before raising the error</button>
+    <button>The generator catches and swallows the <code>RuntimeError</code> without calling <code>path.pop()</code></button>
+  </div>
+  <div class="fb right"><p>Spot on! Python throws any exception from the <code>with</code> body straight into the <code>yield</code> line — only a <code>finally:</code> block guarantees <code>path.pop()</code> executes before the exception propagates out.</p></div>
+  <div class="fb wrong"><p>Trace <code>path = ["a"]</code> entering <code>with scoped_append(path, "b"):</code> → <code>path</code> becomes <code>["a", "b"]</code>. When the body raises <code>RuntimeError</code>, execution aborts directly at <code>yield</code>: <code>path.pop()</code> never runs, the <code>RuntimeError</code> still propagates out (never swallowed!), and <code>path</code> stays stuck at <code>["a", "b"]</code>.</p></div>
+</div>
+
+<p>Those three <code>@</code> wrappers replace dozens of error-prone lines — yet four subtle traps still catch engineers who use them on autopilot.</p>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>How can these building blocks break — and when are they overkill?</h2>
+
+<p>Watch out for these three runtime traps — plus one design rule:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 720 144" role="img" aria-label="Three common decorator pitfalls: mutable field in frozen dataclass failing hash(), unhashable list argument in @memoize, and reusing a single-use @contextmanager object twice">
+    <rect x="12" y="14" width="220" height="116" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
+    <text x="122" y="36" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">1. MUTABLE FIELD IN FROZEN</text>
+    <text x="122" y="60" class="label" text-anchor="middle">tags: list inside frozen</text>
+    <text x="122" y="82" class="label" text-anchor="middle" fill="var(--bad)">→ TypeError on hash()</text>
+    <text x="122" y="108" class="label" text-anchor="middle" fill="var(--ok)">Fix: tuple or compare=False</text>
+
+    <rect x="250" y="14" width="220" height="116" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="360" y="36" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">2. LIST ARG TO @memoize</text>
+    <text x="360" y="60" class="label" text-anchor="middle">dp([1, 2, 3])</text>
+    <text x="360" y="82" class="label" text-anchor="middle" fill="var(--bad)">→ unhashable dict key!</text>
+    <text x="360" y="108" class="label" text-anchor="middle" fill="var(--ok)">Fix: pass indices or tuple</text>
+
+    <rect x="488" y="14" width="220" height="116" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
+    <text x="598" y="36" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">3. REUSING A WITH GUARD</text>
+    <text x="598" y="60" class="label" text-anchor="middle">cm = scoped_append(p, 1)</text>
+    <text x="598" y="82" class="label" text-anchor="middle" fill="var(--bad)">→ 2nd with: crashes!</text>
+    <text x="598" y="108" class="label" text-anchor="middle" fill="var(--ok)">Fix: call fresh each with</text>
+  </svg>
+  <div class="cap">Every failure traces back to earlier rules: Chapter 10.10's immutability rules (1 &amp; 2) or Chapter 10.11's single-use generator rule (3) — entering the same <code>cm</code> twice fails (<code>AttributeError</code> in Python 3.12+, or <code>RuntimeError</code> in Python 3.11 and earlier) because the single-use generator is already spent.</div>
+</div>
+
+<p><b>When decorators and dataclasses are the wrong tool:</b> if a script parses one tiny pair inside a 5-line function, a plain tuple <code>(dist, node)</code> is cleaner than defining a class; and don't invent custom decorator factories for logic used only once. Use each building block when it removes real repetition or enforces an invariant (immutability, caching, guaranteed teardown).</p>
+
+<div class="check" id="check-frozen-mutable">
+  <p class="q">You define the frozen dataclass below and try to add a <code>Job</code> instance to a Python <code>set</code>. What happens?</p>
+<pre><code>@dataclass(frozen=True)
+class Job:
+    id: int
+    meta: dict</code></pre>
+  <div class="opts">
+    <button>It hashes cleanly because <code>frozen=True</code> deeply freezes every field inside <code>Job</code></button>
+    <button>Python converts <code>meta</code> into a sorted tuple automatically before hashing</button>
+    <button data-correct>Raises <code>TypeError: unhashable type: 'dict'</code> because <code>meta</code> is mutable and compared</button>
+  </div>
+  <div class="fb right"><p>Sharp catch! Hashing a frozen dataclass hashes a tuple of its compared fields — so an open <code>dict</code> field still breaks <code>hash()</code>! Use immutable fields (like <code>tuple</code>) or exclude non-identity payloads with <code>field(compare=False)</code>.</p></div>
+  <div class="fb wrong"><p>Recall Chapter 10.10 §2's sealed-tray rule: <code>frozen=True</code> prevents rebinding <code>job.meta = ...</code>, yet it never converts or freezes the <code>dict</code> inside! When <code>hash(job)</code> runs, Python hashes <code>(job.id, job.meta)</code> and immediately crashes with <code>TypeError: unhashable type: 'dict'</code>.</p></div>
+</div>
+
+<p>Now let's watch all three <code>@</code> wrappers work together on one realistic interview problem — comparing hand-rolled plumbing side by side against the decorated version.</p>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>How you use all three together in an interview</h2>
+
+<p>Compare both versions of the exact same priority-ordered search step (priority queue + memoized node cost + backtracking path guard) — notice how every fragile piece of manual plumbing on the left maps to one clean <code>@</code> invariant on the right:</p>
+
+<div class="cols">
+  <div style="min-width:0">
+    <p class="small muted"><b>Before: raw tuples + manual cache &amp; pop</b></p>
+<pre><code># Cryptic index item[2], falsy cache bug, leaky pop!
+memo = {}
+heapq.heappush(pq, (cost, seq, node))
+item = heapq.heappop(pq)
+u = item[2]                  # what is slot 2?!
+
+def best_cost(n):
+    if memo.get(n):          # 0 = cache miss!
+        return memo[n]
+    memo[n] = eval_node(n)
+    return memo[n]
+
+path.append(u)
+if u == goal:
+    path.pop()               # easy to forget!
+    return best_cost(u)
+explore(u, path)             # error leaks u!
+path.pop()</code></pre>
+  </div>
+  <div style="min-width:0">
+    <p class="small" style="color:var(--ok)"><b>After: clean @ wrappers guarding invariants</b></p>
+<pre><code>@dataclass(frozen=True, order=True)
+class Step:
+    cost: int
+    seq: int
+    node: str
+
+heapq.heappush(pq, Step(cost, seq, node))
+u = heapq.heappop(pq).node   # self-documenting!
+
+@memoize                     # or @functools.cache
+def best_cost(n):
+    return eval_node(n)      # caches 0 safely!
+
+with scoped_append(path, u):
+    if u == goal:
+        return best_cost(u)  # pops on return!
+    explore(u, path)         # pops on error!</code></pre>
+  </div>
+</div>
+
+<p>Once you can spot those three wrappers in code, practice speaking each trade-off concisely before writing a single line.</p>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
+
+<p>Before coding <code>py_internals.py</code> and moving to Day 3's standard library toolkit (<a href="python-toolkit.html">Chapter 10.01</a>), make sure you can speak these four points aloud in under 45 seconds:</p>
+<ol>
+  <li><b>How <code>@</code> works:</b> "A decorator runs once at definition time (<code>fn = dec(fn)</code>), wrapping the target; I always include <code>@functools.wraps(fn)</code> so metadata like <code>__name__</code> and docstrings survive."</li>
+  <li><b>Value objects:</b> "I'll use <code>@dataclass(frozen=True, order=True)</code> so records have named fields, hash safely for dicts/sets when compared fields are immutable, and break priority-queue ties left to right."</li>
+  <li><b>Memoization:</b> "In interviews I reach for <code>@functools.cache</code> on hashable args — and in a custom <code>@memoize</code> I always test <code>args not in cache</code> rather than truthiness so cached <code>0</code>, <code>False</code>, or <code>None</code> stay hits."</li>
+  <li><b>Guaranteed cleanup:</b> "Wrapping a <code>yield</code> inside <code>try ... finally</code> with <code>@contextmanager</code> guarantees <code>pop()</code> or lock release runs even on early returns or exceptions."</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Building block</th><th>Fragile / noisy way</th><th>Clean interview way</th></tr></thead>
+  <tbody>
+    <tr><td>Decorator metadata</td><td>Bare <code>def wrapper(*args):</code></td><td>Add <code>@functools.wraps(fn)</code></td></tr>
+    <tr><td>Sortable, hashable record</td><td>Manual <code>__init__</code>/<code>__lt__</code>/<code>__hash__</code></td><td><code>@dataclass(frozen=True, order=True)</code></td></tr>
+    <tr><td>Unhashable payload field</td><td><code>payload: dict</code> in frozen dataclass</td><td><code>payload: dict = field(compare=False)</code></td></tr>
+    <tr><td>Caching falsy results</td><td><code>if cache.get(args):</code></td><td><code>if args not in cache:</code> (or <code>@functools.cache</code>)</td></tr>
+    <tr><td>Scoped setup &amp; teardown</td><td>Manual <code>append()</code> / <code>pop()</code></td><td><code>@contextmanager</code> with <code>yield</code> inside <code>try</code> / <code>finally</code></td></tr>
+  </tbody>
+</table></div>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Complete Warm-ups 1–2 on paper first, then finish all five drills in <a href="../exercises/py_internals.py">py_internals.py</a> (Chapters 10.10 and 10.12 cover every single one).</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Predict what happens (no Python!)</h4>
+  <p>State what each snippet prints or raises: (a) <code>t = PriorityTask(1, 0, "a"); t.seq = 2</code>; (b) <code>PriorityTask(1, 2, "a") &lt; PriorityTask(1, 1, "z")</code>; (c) calling a <code>@memoize</code>-wrapped function twice when it returns <code>None</code> if the wrapper uses <code>if cache.get(args):</code>; (d) <code>with scoped_append(p, "x"): raise ValueError</code> when <code>scoped_append</code> puts <code>yield p</code> inside a <code>try</code> block and <code>p.pop()</code> inside <code>finally:</code>.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Raises <code>FrozenInstanceError</code> (subclass of <code>AttributeError</code>) because <code>frozen=True</code> blocks attribute assignment. (b) <code>False</code> (<code>priority</code> ties at <code>1</code>, then <code>seq</code> compares <code>2 &lt; 1 → False</code>). (c) Calls the underlying function <em>twice</em> because <code>None</code> is falsy. (d) Removes <code>"x"</code> from <code>p</code> inside <code>finally:</code> and propagates <code>ValueError</code> to the caller.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Fix three decorator bugs</h4>
+  <p>Spot the bug and write the fix: (a) a <code>memoize(fn)</code> decorator that returns an undecorated inner <code>wrapper</code> function, causing <code>assert fib.__name__ == "fib"</code> to fail; (b) <code>if cache.get(args): return cache[args]</code> recomputing <code>False</code>; (c) a <code>@contextmanager</code> helper that runs <code>items.append(v)</code>, a bare <code>yield items</code>, and <code>items.pop()</code>, leaking <code>v</code> on exceptions.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Decorate <code>wrapper</code> with <code>@functools.wraps(fn)</code>. (b) Replace with <code>if args in cache: return cache[args]</code>. (c) Wrap <code>yield items</code> inside a <code>try:</code> block with <code>items.pop()</code> inside its <code>finally:</code> clause.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Day 2 · Core code (all 5 drills)</div>
+  <h4>3. Complete the full internals &amp; building blocks suite</h4>
+  <p>Implement <code>make_grid</code> and <code>append_log</code> (from Chapter 10.10) alongside <code>PriorityTask</code>, <code>memoize</code>, and <code>scoped_append</code> in <a href="../exercises/py_internals.py">py_internals.py</a>. Tests verify row independence, empty caller lists, hashability/immutability/ordering, multi-arg + 0-arg + falsy caching, and nested exception-safe backtracking.</p>
+<pre class="plain"><code>python3 -m pytest -k py_internals</code></pre>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Day 4 · Bare-editor speed check (45 min)</div>
+  <h4>4. Redo shaky idioms from a blank editor</h4>
+  <p>On Phase 0 Day 4, open the <a href="../../../practice.html">Practice hub</a> bare-editor scratchpad (zero autocomplete) and spend 45 minutes rewriting any shaky function from <code>py_idioms</code>, <code>py_internals</code>, or <code>py_toolkit</code> cleanly from memory, then verify with pytest.</p>
+</div>
+
+<nav class="chapter-nav">
+  <a href="python-idioms.html"><small>← Previous</small>Transforming and streaming data</a>
+  <a class="next" href="python-toolkit.html"><small>Next →</small>Python standard library toolkit</a>
+</nav>
+
+</main>
+
+<script>
+(function () {
+  /* ---- Player 1: @memoize safe `in cache` vs buggy `cache.get()` on falsy 0 (section 4) ---- */
+  (function () {
+    const modes = {
+      safe: {
+        frames: [
+          { call: "ways(2)", cache: ["(empty)"], hits: 0, runs: 0, msg: "Safe check: <code>if args not in cache:</code>. Cache starts empty." },
+          { call: "ways(2) → miss", cache: ["(2,): 0"], hits: 0, runs: 1, msg: "1st call <code>ways(2)</code>: key <code>(2,)</code> not in cache → runs <code>fn(2)</code> (returns <b>0</b>) and stores <code>(2,): 0</code>." },
+          { call: "ways(2) → HIT!", cache: ["(2,): 0"], hits: 1, runs: 1, ok: true, msg: "2nd call <code>ways(2)</code>: <code>(2,) in cache</code> is <b>True</b>! Returns cached <b>0</b> without recomputing (<code>runs = 1</code>)!" },
+          { call: "ways(2) → HIT!", cache: ["(2,): 0"], hits: 2, runs: 1, ok: true, msg: "3rd call <code>ways(2)</code>: instant hit again! Falsy values <code>0</code>, <code>False</code>, <code>\"\"</code>, <code>None</code> all stay cached." }
+        ]
+      },
+      bug: {
+        frames: [
+          { call: "ways(2)", cache: ["(empty)"], hits: 0, runs: 0, msg: "Buggy check: <code>if cache.get(args): return cache[args]</code>. Cache starts empty." },
+          { call: "ways(2) → miss", cache: ["(2,): 0"], hits: 0, runs: 1, msg: "1st call <code>ways(2)</code>: <code>cache.get((2,))</code> is <code>None</code> (falsy) → runs <code>fn(2)</code> and stores <code>(2,): 0</code>." },
+          { call: "ways(2) → MISS!", cache: ["(2,): 0"], hits: 0, runs: 2, bad: true, msg: "2nd call <code>ways(2)</code>: <code>cache.get((2,))</code> returns <b>0</b> → <code>if 0:</code> is <b>False</b>! Recomputes <code>fn(2)</code>!" },
+          { call: "ways(2) → MISS!", cache: ["(2,): 0"], hits: 0, runs: 3, bad: true, msg: "3rd call <code>ways(2)</code>: misses AGAIN (<code>runs = 3</code>)! Exponential blowup on dead-end states." }
+        ]
+      }
+    };
+    const sel = V.el("select", { "aria-label": "Choose memoize check mode" },
+      V.el("option", { value: "safe" }, "Safe: if args not in cache:"),
+      V.el("option", { value: "bug" }, "Bug: if cache.get(args):"));
+    const api = V.player(document.getElementById("viz-memoize"), {
+      frames: modes.safe.frames,
+      speed: 1100,
+      extraControls: [sel],
+      draw(f, stage) {
+        const statusRow = V.el("div", { style: "margin-bottom:12px" },
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Current lookup & counters"),
+          V.el("div", { style: "white-space:nowrap" }, V.cells([f.call, `fn runs: ${f.runs}`, `cache hits: ${f.hits}`], { idx: false, cls: (i) => i === 0 ? (f.ok ? "done" : f.bad ? "bad" : "hl") : (f.bad && i === 1 ? "bad" : f.ok && i === 2 ? "done" : "") })));
+        const cacheRow = V.el("div", {},
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Private cache dict inside closure"),
+          V.el("div", { style: "white-space:nowrap" }, V.cells(f.cache, { idx: false, cls: () => f.ok ? "done" : f.bad ? "warn" : "hl" })));
+        stage.append(statusRow, cacheRow);
+      }
+    });
+    sel.onchange = () => api.load(modes[sel.value].frames);
+  })();
+
+  /* ---- Player 2: @contextmanager try/finally vs bare yield on exception (section 5) ---- */
+  (function () {
+    const modes = {
+      safe: {
+        frames: [
+          { step: "1. enter: append('boom')", path: ["root", "boom"], cls: ["done", "hl"], msg: "Enter <code>with scoped_append(path, 'boom'):</code> → appends <code>'boom'</code> and enters <code>try:</code>." },
+          { step: "2. body raises RuntimeError!", path: ["root", "boom"], cls: ["done", "warn"], msg: "Inside <code>with</code>: caller raises <code>RuntimeError</code> — Python throws it straight into the paused <code>yield</code>!" },
+          { step: "3. finally: path.pop()", path: ["root"], cls: ["done"], ok: true, msg: "<b>finally: ALWAYS runs!</b> Pops <code>'boom'</code>, restores <code>path = ['root']</code>, and propagates <code>RuntimeError</code> cleanly." }
+        ]
+      },
+      bug: {
+        frames: [
+          { step: "1. enter: append('boom')", path: ["root", "boom"], cls: ["done", "hl"], msg: "Enter <code>with</code> (bare <code>yield</code>, NO <code>try/finally</code>): appends <code>'boom'</code> and yields." },
+          { step: "2. body raises RuntimeError!", path: ["root", "boom"], cls: ["done", "warn"], msg: "Inside <code>with</code>: caller raises <code>RuntimeError</code> — thrown directly at the paused <code>yield</code> line." },
+          { step: "3. pop() SKIPPED! Leaked!", path: ["root", "boom"], cls: ["done", "bad"], bad: true, msg: "Generator aborts at <code>yield</code> and <b>never reaches <code>path.pop()</code>!</b> <code>'boom'</code> stays leaked inside <code>path</code>." }
+        ]
+      }
+    };
+    const sel = V.el("select", { "aria-label": "Choose context manager mode" },
+      V.el("option", { value: "safe" }, "Safe: try / yield / finally: pop()"),
+      V.el("option", { value: "bug" }, "Bug: bare yield + pop()"));
+    const api = V.player(document.getElementById("viz-ctx"), {
+      frames: modes.safe.frames,
+      speed: 1150,
+      extraControls: [sel],
+      draw(f, stage) {
+        const stepRow = V.el("div", { style: "margin-bottom:12px" },
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Execution point"),
+          V.el("div", { style: "white-space:nowrap" }, V.cells([f.step], { idx: false, cls: () => f.ok ? "done" : f.bad ? "bad" : "hl" })));
+        const pathRow = V.el("div", {},
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Backtracking path list"),
+          V.el("div", { style: "white-space:nowrap" }, V.cells(f.path, { idx: false, cls: (i) => f.cls[i] || "" })));
+        stage.append(stepRow, pathRow);
+      }
+    });
+    sel.onchange = () => api.load(modes[sel.value].frames);
+  })();
+})();
+</script>
+</body>
+</html>
