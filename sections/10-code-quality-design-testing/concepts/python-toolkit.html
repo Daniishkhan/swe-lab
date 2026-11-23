@@ -16,7 +16,7 @@
 <main class="content book">
 
 <header class="chapter-head">
-  <div class="eyebrow">Chapter 10 · Part 1</div>
+  <div class="eyebrow">Phase 0 · Day 3</div>
   <h1>Python for interview speed</h1>
   <div class="meta"><span><span class="badge P0">P0</span> turns 25 bug-prone lines into 5 fast ones</span><span>about 17 minutes</span><span>6 quick checks · 8 exercises</span></div>
 </header>
@@ -29,12 +29,12 @@
     <li>Pick the right Python standard-library tool for counting, grouping, queuing, range counting, and tracking top-k items.</li>
     <li>Spot why a plain <code>list</code> melts at scale when used as a front-popping queue or lookup table.</li>
     <li>Write custom multi-rule sorting keys, range counts, and streaming top-k trackers cleanly.</li>
-    <li>Dodge the four famous Python traps (shared grid rows, shared default lists, mutating while looping, and negative integer division).</li>
+    <li>Dodge the four Day 3 stdlib &amp; math traps (<code>Counter</code> zero counts &amp; <code>defaultdict</code> read insertion, <code>sort()</code> returning <code>None</code> / unsorted <code>groupby</code>, mutating while looping, and negative floor division).</li>
     <li>Build a one-page cheat sheet to keep beside you through every coding drill.</li>
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Days 1–2, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Then write your one-page cheat sheet (Exercise 3) and solve <code>py_toolkit.py</code>. We focus on <em>when</em> each tool wins and what it costs; Chapters 1 and 2 open the hood later. Builds on <a href="python-idioms.html">Python idioms, lambdas, generators &amp; gotchas</a>.</p>
+<p class="muted small">How to read this: top to bottom on Phase 0 Day 3, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Then write your one-page cheat sheet (Exercise 3) and solve <code>py_toolkit.py</code>. We focus on <em>when</em> each tool wins and what it costs; Chapters 1 and 2 open the hood later. Builds on <a href="python-idioms.html">Python idioms, lambdas, generators &amp; gotchas</a>.</p>
 
 <!-- ============================================================ -->
 <h2 id="s1"><span class="sec-num">1</span>Why does plain-list Python melt under interview scale?</h2>
@@ -79,10 +79,11 @@
 
     <rect x="542" y="32" width="124" height="128" rx="8" fill="var(--surface)" stroke="var(--brand)" stroke-width="1.6"/>
     <text x="604" y="52" class="label" text-anchor="middle" fill="var(--brand)" font-weight="700">5. CLEAN GLUE</text>
-    <text x="604" y="74" class="label" text-anchor="middle" font-weight="700">enumerate / zip</text>
-    <text x="604" y="90" class="label" text-anchor="middle" font-weight="700">"".join()</text>
-    <text x="604" y="118" class="label" text-anchor="middle" fill="var(--bad)">not s += ch</text>
-    <text x="604" y="140" class="label" text-anchor="middle" fill="var(--ok)">fewer bugs</text>
+    <text x="604" y="72" class="label" text-anchor="middle" font-weight="700">enumerate / zip</text>
+    <text x="604" y="88" class="label" text-anchor="middle" font-weight="700">itertools / @cache</text>
+    <text x="604" y="104" class="label" text-anchor="middle" font-weight="700">"".join()</text>
+    <text x="604" y="124" class="label" text-anchor="middle" fill="var(--bad)">not s += ch</text>
+    <text x="604" y="142" class="label" text-anchor="middle" fill="var(--ok)">fewer bugs</text>
   </svg>
   <div class="cap">Five bays cover 90% of coding rounds. Know the bay, the import, and the cost before you code.</div>
 </div>
@@ -190,10 +191,18 @@ for w in ["eat", "tea", "tan", "ate"]:
 
 <p><b>Bay 3</b> gives you two tools for ordering and range queries — without mutating your caller's list:</p>
 
-<h3>1. Multi-rule sorting with tuple keys</h3>
-<p><code>sorted(items, key=...)</code> returns a fresh sorted list in <b><code>O(n log n)</code></b> time (leaving input untouched; watch out: <code>items.sort()</code> sorts in place and returns <b><code>None</code></b>, so <code>a = items.sort()</code> is a classic bug!). Python's sort is <b>stable</b> (equal keys keep their original order). To sort by multiple rules — highest count first, then word alphabetically — pass a <b><code>lambda</code></b> (a one-line unnamed function) returning a tuple:</p>
-<pre><code># Tuple compares element 0 first (-count), then element 1 (word) on ties:
-ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))</code></pre>
+<h3>1. Multi-rule sorting with tuple keys &amp; <code>cmp_to_key</code></h3>
+<p><code>sorted(items, key=...)</code> returns a fresh sorted list in <b><code>O(n log n)</code></b> time (leaving input untouched; watch out: <code>items.sort()</code> sorts in place and returns <b><code>None</code></b>, so <code>a = items.sort()</code> is a classic bug!). Python's sort is <b>stable</b> (equal keys keep their original order). Pass a tuple-returning <code>lambda</code> for multi-rule sorting, or wrap a pairwise comparator with <code>functools.cmp_to_key</code> when two items can only be ranked side-by-side (like <em>Largest Number</em>):</p>
+<pre><code>from functools import cmp_to_key
+
+# 1. Tuple compares slot 0 first (-count), then slot 1 (word) on ties:
+ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+
+# 2. Pairwise comparator (return -1 if a precedes b, 1 if b precedes a, 0 if tied):
+def better_concat(a, b):
+    return -1 if a + b &gt; b + a else (1 if a + b &lt; b + a else 0)
+largest = "".join(sorted(map(str, nums), key=cmp_to_key(better_concat)))
+if largest.startswith("0"): largest = "0"  # guard [0, 0] -&gt; "0"</code></pre>
 
 <h3>2. Counting ranges with <code>bisect</code> (the calibrated ruler)</h3>
 <p>Picture laying your values out in sorted order along a ruler: <code>[1, 5, 5, 5, 9]</code>. To measure how many items lie inside <code>[lo, hi]</code> without walking all 100,000 values per query (<code>O(n · q)</code>!), sort a copy <b>once</b> (<code>O(n log n)</code>), then snap two binary-search markers onto the ruler in <b><code>O(log n)</code></b> each:</p>
@@ -224,7 +233,7 @@ def count_range(lo, hi):
   <div class="cap">Slide <code>lo</code> and <code>hi</code> on sorted <code>[1, 5, 5, 5, 9]</code> (<code>L = bisect_left</code>, <code>R = bisect_right</code>). Watch <code>L</code> hug the left edge of duplicates while <code>R</code> hugs the right edge!</div>
 </div>
 
-<div class="keyidea">Use tuple keys in <code>sorted()</code> for multi-rule ordering (never <code>x = arr.sort()</code>!), and <code>bisect_right(a, hi) - bisect_left(a, lo)</code> on a sorted copy to answer range counts in <code>O(log n)</code>.</div>
+<div class="keyidea">Use tuple keys in <code>sorted()</code> for multi-rule ordering (or <code>cmp_to_key</code> for pairwise order, never <code>x = arr.sort()</code>!), and <code>bisect_right(a, hi) - bisect_left(a, lo)</code> on a sorted copy to answer range counts in <code>O(log n)</code>.</div>
 
 <div class="check" id="check-bisect">
   <p class="q">On sorted list <code>a = [1, 5, 5, 9]</code>, you accidentally write <code>bisect_left(a, 5) - bisect_left(a, 1)</code> to count values in <code>[1, 5]</code>. What goes wrong?</p>
@@ -277,10 +286,9 @@ seq = itertools.count()
 heapq.heappush(tasks, (priority, next(seq), task_obj))</code></pre>
 
 <details class="aside deeper">
-  <summary>Go deeper: streams (heapq.merge &amp; generators), lazy heap deletion, itertools, and @cache</summary>
-  <p><b>Streaming &amp; out-of-RAM merges:</b> <code>heapq.merge(*sorted_streams)</code> merges <code>k</code> sorted iterables lazily in <code>O(k)</code> memory; use generator expressions <code>(x*x for x in big)</code> instead of list comprehensions <code>[...]</code> when you only iterate once.</p>
+  <summary>Go deeper: streaming merges with heapq.merge and lazy heap deletion</summary>
+  <p><b>Streaming &amp; out-of-RAM merges:</b> <code>heapq.merge(*sorted_streams)</code> merges <code>k</code> sorted iterables lazily in <code>O(k)</code> memory without loading all items into RAM.</p>
   <p><b>Lazy deletion (no decrease-key):</b> Python's <code>heapq</code> can't delete or reprioritize an arbitrary item in <code>O(log n)</code>. Standard fix: push the updated entry, track active/stale states in a dict/set, and skip stale entries when they reach <code>heappop()</code>.</p>
-  <p><b><code>itertools</code> &amp; <code>functools</code>:</b> <code>accumulate(nums)</code> (prefix sums), <code>combinations</code>/<code>permutations</code> (tiny <code>n</code>), <code>groupby</code> (groups <em>consecutive</em> runs only — sort first!), and <code>@functools.cache</code> / <code>@lru_cache(maxsize=None)</code> (one-line memoization for hashable recursion args).</p>
 </details>
 
 <div class="keyidea">Use <code>heapq.nsmallest</code> for batch top-<code>k</code>, a bounded size-<code>k</code> heap for live streams, negated numbers for max-heaps, and a shared <code>seq = itertools.count()</code> whenever tuple elements aren't comparable.</div>
@@ -297,77 +305,63 @@ heapq.heappush(tasks, (priority, next(seq), task_obj))</code></pre>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="s6"><span class="sec-num">6</span>How can Python trip you up?</h2>
+<h2 id="s6"><span class="sec-num">6</span>How can Python's standard library and math trip you up?</h2>
 
-<p>Every tool bay has safety catches. These <b>four Python traps</b> silently break otherwise-right interview solutions:</p>
+<p>You already nailed Day 2's object-reference traps — <code>[[0] * 3] * 3</code> grid aliasing, shallow copies, and mutable default arguments (see <a href="python-idioms.html#s5">Chapter 10.10</a> for a quick recap). Add these <b>four Day 3 stdlib and math traps</b> to your cheat sheet:</p>
 
-<h3>1. Shared grid rows: <code>[[0] * 3] * 3</code></h3>
-<p>Multiplying integers (<code>[0] * 3</code>) is safe because ints are immutable. Multiplying a list <em>of lists</em> copies the <b>same inner-list reference</b> three times — so editing one cell edits every row at once!</p>
+<h3>1. <code>defaultdict</code> mutating on read &amp; <code>Counter</code> zero-count ghosts</h3>
+<p>Looking up a missing key <code>d["ghost"]</code> on a <code>defaultdict(list)</code> silently inserts <code>"ghost": []</code> into the dictionary — inflating <code>len(d)</code> and breaking iteration! And decrementing a <code>Counter</code> down to zero (<code>c[k] -= 1</code>) leaves <code>k: 0</code> inside <code>c</code>, so <code>len(c)</code> and <code>k in c</code> stay truthy until you explicitly delete zero keys:</p>
 
 <div class="figure">
-  <svg class="viz" viewBox="0 0 680 150" role="img" aria-label="Comparing [[0]*3]*3 where all three rows point to the same list versus list comprehension creating three independent rows">
-    <text x="14" y="20" class="label" fill="var(--bad)" font-weight="700">BUG: g = [[0] * 3] * 3  (1 shared row!)</text>
-    <rect x="14" y="34" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--bad)"/><text x="47" y="50" class="label" text-anchor="middle">g[0]</text>
-    <rect x="14" y="64" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--bad)"/><text x="47" y="80" class="label" text-anchor="middle">g[1]</text>
-    <rect x="14" y="94" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--bad)"/><text x="47" y="110" class="label" text-anchor="middle">g[2]</text>
-    <line x1="80" y1="46" x2="156" y2="76" stroke="var(--bad)" stroke-width="1.6"/>
-    <line x1="80" y1="76" x2="156" y2="76" stroke="var(--bad)" stroke-width="1.6"/>
-    <line x1="80" y1="106" x2="156" y2="76" stroke="var(--bad)" stroke-width="1.6"/>
-    <rect x="158" y="58" width="132" height="36" rx="6" fill="var(--bad-soft)" stroke="var(--bad)" stroke-width="1.8"/>
-    <text x="224" y="81" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">[ 0,  9,  0 ]</text>
-    <text x="166" y="138" class="label" text-anchor="middle" fill="var(--bad)">g[0][1] = 9 mutates ALL 3 rows!</text>
+  <svg class="viz" viewBox="0 0 680 144" role="img" aria-label="Comparing silent Counter zero-count ghosts and defaultdict read-insertion traps against safe del and get patterns">
+    <rect x="14" y="16" width="312" height="112" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
+    <text x="28" y="38" class="label" fill="var(--bad)" font-weight="700">SILENT STDLIB TRAPS</text>
+    <text x="28" y="62" class="label">• c = Counter("a"); c["a"] -= 1</text>
+    <text x="28" y="80" class="label" fill="var(--bad)">  → c is {"a": 0}, len(c) == 1!</text>
+    <text x="28" y="102" class="label">• d = defaultdict(list); bool(d["x"])</text>
+    <text x="28" y="120" class="label" fill="var(--bad)">  → inserts "x": [] into d!</text>
 
-    <line x1="334" y1="14" x2="334" y2="142" stroke="var(--border)" stroke-dasharray="4 4"/>
+    <line x1="336" y1="72" x2="358" y2="72" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="358,67 368,72 358,77" fill="var(--ok)"/>
 
-    <text x="352" y="20" class="label" fill="var(--ok)" font-weight="700">FIX: g = [[0] * 3 for _ in range(3)]</text>
-    <rect x="352" y="34" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="385" y="50" class="label" text-anchor="middle">g[0]</text>
-    <rect x="352" y="64" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="385" y="80" class="label" text-anchor="middle">g[1]</text>
-    <rect x="352" y="94" width="66" height="24" rx="4" fill="var(--surface)" stroke="var(--ok)"/><text x="385" y="110" class="label" text-anchor="middle">g[2]</text>
-    <line x1="418" y1="46" x2="464" y2="46" stroke="var(--ok)" stroke-width="1.6"/>
-    <line x1="418" y1="76" x2="464" y2="76" stroke="var(--ok)" stroke-width="1.6"/>
-    <line x1="418" y1="106" x2="464" y2="106" stroke="var(--ok)" stroke-width="1.6"/>
-    <rect x="466" y="34" width="132" height="24" rx="4" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="532" y="50" class="label" text-anchor="middle" font-weight="700">[ 0,  9,  0 ]</text>
-    <rect x="466" y="64" width="132" height="24" rx="4" fill="var(--surface)" stroke="var(--border-strong)"/><text x="532" y="80" class="label" text-anchor="middle">[ 0,  0,  0 ]</text>
-    <rect x="466" y="94" width="132" height="24" rx="4" fill="var(--surface)" stroke="var(--border-strong)"/><text x="532" y="110" class="label" text-anchor="middle">[ 0,  0,  0 ]</text>
-    <text x="532" y="138" class="label" text-anchor="middle" fill="var(--ok)">3 independent lists!</text>
+    <rect x="372" y="16" width="294" height="112" rx="8" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text x="386" y="38" class="label" fill="var(--ok)" font-weight="700">CLEAN INTERVIEW FIXES</text>
+    <text x="386" y="62" class="label">• if c[k] == 0: del c[k]</text>
+    <text x="386" y="80" class="label" fill="var(--ok)">  → len(c) tracks active keys!</text>
+    <text x="386" y="102" class="label">• if "x" in d:  /  d.get("x")</text>
+    <text x="386" y="120" class="label" fill="var(--ok)">  → reads without mutating d!</text>
   </svg>
-  <div class="cap">Every 2D grid or neighbor list (adjacency list) needs a comprehension (<code>[[] for _ in range(n)]</code>) so each row gets its own list.</div>
+  <div class="cap">In sliding-window problems that check <code>len(window_counts) == k</code>, forgetting <code>del c[k]</code> when a count hits 0 is one of the most common off-by-one bugs.</div>
 </div>
 
-<h3>2. Shared mutable default arguments</h3>
-<p>In <code>def add(x, bag=[]):</code>, Python builds the default list <b>once when <code>def</code> runs</b> — not per call — so every call leaks into the same list! Always write <code>bag=None</code> and <code>if bag is None: bag = []</code>.</p>
+<h3>2. <code>arr.sort()</code> returns <code>None</code>, <code>bisect.insort</code> is <code>O(n)</code>, and <code>groupby</code> needs sorted input</h3>
+<p><code>a = arr.sort()</code> sets <code>a</code> to <code>None</code> (use <code>sorted(arr)</code> to keep a copy); <code>bisect.insort(a, x)</code> shifts the array in <code>O(n)</code>; and <code>itertools.groupby</code> only merges <em>adjacent</em> equal keys — calling it on unsorted <code>["a", "b", "a"]</code> yields two separate <code>"a"</code> groups!</p>
 
 <h3>3. Mutating a collection while looping over it</h3>
-<p>Removing items from a <code>list</code> inside <code>for x in nums:</code> shifts indices and silently skips neighbors; adding/deleting keys inside <code>for k in d:</code> raises <code>RuntimeError</code>. Build a filtered comprehension (<code>[x for x in nums if keep(x)]</code>) or loop over <code>list(d)</code>.</p>
+<p>Removing items from a <code>list</code> inside <code>for x in nums:</code> shifts indices and silently skips neighbors; adding or deleting keys inside <code>for k in d:</code> raises <code>RuntimeError</code>. Build a filtered comprehension (<code>[x for x in nums if keep(x)]</code>) or loop over <code>list(d)</code>.</p>
 
 <h3>4. Negative integer division (<code>//</code>) and remainder (<code>%</code>)</h3>
 <p>Python's <code>//</code> rounds toward <b>−∞</b> (floor), NOT toward zero like C++/Java: <code>-7 // 2 == -4</code> (while <code>int(-7 / 2) == -3</code>). Similarly, <code>%</code> always matches the divisor's sign (<code>-7 % 2 == 1</code>) — awesome for circular wrap-around <code>(i - 1) % n</code>, surprising if you expect C++'s <code>-1</code>!</p>
 
 <details class="aside deeper">
-  <summary>Go deeper: five subtle Python power-user gotchas</summary>
+  <summary>Go deeper: four subtle Python power-user gotchas</summary>
   <p><b>Two-pass stable sort for descending strings:</b> Since you can't negate a string, sort by secondary ascending key first, then sort by primary descending key (<code>reverse=True</code>) — Python's stable sort keeps ties ordered!</p>
-  <p><b><code>Counter</code> zero counts:</b> Decrementing <code>c[k] -= 1</code> leaves <code>k: 0</code> in the dict, so <code>len(c)</code> and <code>bool(c)</code> stay non-zero! Delete with <code>if c[k] == 0: del c[k]</code> when tracking distinct counts in windows.</p>
   <p><b><code>deque(maxlen=k)</code>:</b> Auto-evicts the oldest item when full — a 1-line fixed ring buffer.</p>
-  <p><b>Shallow <code>.copy()</code> &amp; huge floats:</b> <code>grid.copy()</code> only copies outer row references (use <code>[r[:] for r in grid]</code>); and <code>int(a / b)</code> loses float precision above <code>2⁵³</code> (use integer floor math for huge numbers).</p>
+  <p><b>Shallow <code>.copy()</code>:</b> <code>grid.copy()</code> only copies outer row references (use <code>[r[:] for r in grid]</code> for 2D boards).</p>
+  <p><b>Huge integer division via floats:</b> <code>int(a / b)</code> loses float precision above <code>2⁵³</code> — use pure integer floor math if numbers exceed 53 bits.</p>
 </details>
 
-<div class="keyidea">Never multiply mutable lists (<code>[[]] * n</code>), never use a mutable default parameter, never mutate while iterating, and watch floor division <code>//</code> on negatives.</div>
+<div class="keyidea">Delete zero counts in <code>Counter</code>, read <code>defaultdict</code> with <code>in</code>/<code>.get()</code>, remember <code>sort()</code> returns <code>None</code> &amp; <code>groupby</code> needs sorted input, never mutate while iterating, and watch floor division <code>//</code> on negatives.</div>
 
 <div class="check" id="check-traps">
-  <p class="q">What does this snippet print?</p>
-<pre><code>def record(val, log=[]):
-    log.append(val)
-    return log
-
-print(record("a"))
-print(record("b"))</code></pre>
+  <p class="q">In a sliding window you track active characters with <code>win = Counter("ab")</code>, then run <code>win["a"] -= 1</code> as <code>"a"</code> leaves the window. What does <code>len(win)</code> return?</p>
   <div class="opts">
-    <button><code>['a']</code> then <code>['b']</code> — each function call starts with a fresh empty list</button>
-    <button>It raises a <code>SyntaxError</code> because mutable lists aren't allowed as default values</button>
-    <button data-correct><code>['a']</code> then <code>['a', 'b']</code> — both calls mutate the single default list created at <code>def</code> time</button>
+    <button><code>1</code> — <code>Counter</code> automatically removes keys the moment their count hits zero</button>
+    <button>It raises <code>KeyError</code> because decrementing to zero invalidates the counter entry</button>
+    <button data-correct><code>2</code> — <code>"a": 0</code> remains in the dict until you explicitly run <code>del win["a"]</code></button>
   </div>
-  <div class="fb right"><p>Caught it! Default values evaluate once when <code>def</code> runs, so <code>log</code> survives across calls. Write <code>log=None</code> and create <code>[]</code> inside the body.</p></div>
-  <div class="fb wrong"><p>Python silently accepts <code>log=[]</code> — and evaluates it <em>once</em> when the function is defined, not when called! Call #1 appends <code>'a'</code> into that one shared list, and call #2 appends <code>'b'</code> into the very same list, printing <code>['a', 'b']</code>.</p></div>
+  <div class="fb right"><p>Spot on! <code>Counter</code> is a <code>dict</code> subclass and allows zero or negative counts, so <code>win</code> holds <code>{"a": 0, "b": 1}</code> with <code>len(win) == 2</code>. Always delete zeroed keys when <code>len(win)</code> tracks distinct active items.</p></div>
+  <div class="fb wrong"><p>Check what <code>win</code> actually contains after <code>win["a"] -= 1</code>: Python stores <code>{"a": 0, "b": 1}</code> without auto-pruning zeroes! So <code>len(win)</code> is still <b>2</b> (and <code>"a" in win</code> is still <code>True</code>) until you explicitly run <code>if win["a"] == 0: del win["a"]</code>.</p></div>
 </div>
 
 <!-- ============================================================ -->
@@ -418,19 +412,32 @@ out = ",".join(parts)</code></pre>
   </div>
 </div>
 
+<p>Round out Bay 5 with two standard-library workhorses you'll reach for constantly — <code>itertools</code> (lazy building blocks) and <code>@functools.cache</code> (one-line memoization for recursive DP, provided all arguments are hashable):</p>
+<pre><code>from functools import cache
+from itertools import accumulate, groupby, islice
+
+prefix = list(accumulate(nums, initial=0))            # running sums in O(n)
+first5 = list(islice(huge_stream, 5))                 # lazy slice in O(1) extra RAM
+runs   = [(k, len(list(g))) for k, g in groupby(sorted(tags))]  # sort first!
+
+@cache                                                # O(1) avg cache hit; args must be hashable
+def climb(steps):
+    return 1 if steps &lt;= 1 else climb(steps - 1) + climb(steps - 2)</code></pre>
+
 <p>Use this reference table to verify your Exercise 3 cheat sheet (<code>len()</code> is <code>O(1)</code> on all built-ins):</p>
 <div class="table-wrap"><table>
   <thead><tr><th>Tool</th><th>Import</th><th>Fast ops</th><th>Watch out (worst case / trap)</th></tr></thead>
   <tbody>
-    <tr><td><code>list</code></td><td><em>built-in</em></td><td><code>arr[i]</code>, <code>append</code>, <code>pop()</code> → <code>O(1)</code>*</td><td><code>pop(0)</code>, <code>insert(0)</code>, <code>x in arr</code>, slice → <code>O(n)</code></td></tr>
+    <tr><td><code>list</code></td><td><em>built-in</em></td><td><code>arr[i]</code>, <code>append</code>, <code>pop()</code> → <code>O(1)</code>*</td><td><code>pop(0)</code>, <code>insert(0)</code>, <code>x in arr</code> → <code>O(n)</code>; slice <code>arr[i:j]</code> → <code>O(k)</code> (up to <code>O(n)</code>)</td></tr>
     <tr><td><code>dict</code> / <code>set</code></td><td><em>built-in</em></td><td><code>in</code>, <code>d[k]</code>, <code>del d[k]</code>, <code>s.add</code>/<code>discard</code> → <code>O(1)</code> avg</td><td><code>O(n)</code> worst on hash collisions; keys must be hashable (<code>O(k)</code> for length-<code>k</code> strings)</td></tr>
-    <tr><td><code>Counter</code> / <code>defaultdict</code></td><td><code>from collections import Counter, defaultdict</code></td><td>Build <code>O(n)</code> avg; ops <code>O(1)</code> avg; <code>O(m)</code> space</td><td><code>most_common</code> ties aren't alphabetical; reading missing key in <code>defaultdict</code> inserts it</td></tr>
+    <tr><td><code>Counter</code> / <code>defaultdict</code></td><td><code>from collections import Counter, defaultdict</code></td><td>Build <code>O(n)</code> avg; ops <code>O(1)</code> avg; <code>O(m)</code> space</td><td><code>most_common</code> ties aren't alphabetical; reading missing key in <code>defaultdict</code> inserts it; <code>Counter</code> keeps zero counts</td></tr>
     <tr><td><code>deque</code></td><td><code>from collections import deque</code></td><td><code>append</code>, <code>appendleft</code>, <code>pop</code>, <code>popleft</code> → <code>O(1)</code></td><td>Middle index <code>d[i]</code> → <code>O(n)</code>; no slicing</td></tr>
     <tr><td><code>heapq</code></td><td><code>import heapq</code></td><td><code>heappush</code>/<code>pop</code> → <code>O(log n)</code>; <code>heapify</code> → <code>O(n)</code></td><td>Min-heap only (negate for max); tie-break objects with <code>itertools.count()</code></td></tr>
     <tr><td><code>sorted</code> / <code>bisect</code></td><td><em>built-in</em> / <code>import bisect</code></td><td><code>sorted</code> → <code>O(n log n)</code> (<code>O(n)</code> space); <code>bisect_left/right</code> → <code>O(log n)</code></td><td><code>arr.sort()</code> returns <code>None</code>; <code>bisect</code> fails silently on unsorted lists; <code>insort</code> is <code>O(n)</code></td></tr>
+    <tr><td><code>itertools</code> / <code>functools</code></td><td><code>import itertools, functools</code></td><td><code>accumulate</code>, <code>groupby</code>, <code>count</code> (lazy <code>O(1)</code> mem); <code>@cache</code> → <code>O(1)</code> avg hit; <code>cmp_to_key</code></td><td><code>groupby</code> only groups <em>consecutive</em> equal keys (sort first!); <code>@cache</code> requires hashable arguments</td></tr>
   </tbody>
 </table></div>
-<p class="small muted">*<code>list.append</code> and <code>list.pop()</code> are <code>O(1)</code> amortized (see <a href="../../02-algorithms/concepts/complexity.html">Chapter 2.1</a>); <code>sorted()</code> is <code>O(n)</code> best-case on already-sorted input.</p>
+<p class="small muted">*<code>list.append</code> and <code>list.pop()</code> are <code>O(1)</code> amortized (see <a href="../../02-algorithms/concepts/complexity.html">Chapter 02.01</a>); <code>sorted()</code> is <code>O(n)</code> best-case on already-sorted input.</p>
 
 <!-- ============================================================ -->
 <h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
@@ -446,19 +453,19 @@ out = ",".join(parts)</code></pre>
 <!-- ============================================================ -->
 <h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
 <ol>
-  <li>Match the job to the pegboard bay: <code>Counter</code>/<code>defaultdict</code> (count/group), <code>deque</code> (both ends), <code>sorted</code>/<code>bisect</code> (order/ranges), <code>heapq</code> (min/max/top-k), <code>enumerate</code>/<code>zip</code>/<code>join</code> (clean glue).</li>
-  <li><code>Counter.most_common(k)</code> keeps arrival order on ties — use tuple key <code>(-count, word)</code> for alphabetical ties; avoid reading missing keys directly on <code>defaultdict</code>.</li>
+  <li>Match the job to the pegboard bay: <code>Counter</code>/<code>defaultdict</code> (count/group), <code>deque</code> (both ends), <code>sorted</code>/<code>bisect</code> (order/ranges), <code>heapq</code> (min/max/top-k), <code>enumerate</code>/<code>zip</code>/<code>itertools</code>/<code>functools</code> (clean glue).</li>
+  <li><code>Counter.most_common(k)</code> keeps arrival order on ties — use tuple key <code>(-count, word)</code> for alphabetical ties; avoid reading missing keys directly on <code>defaultdict</code> and delete zero counts in <code>Counter</code>.</li>
   <li><code>deque</code> gives <code>O(1)</code> <code>popleft()</code>/<code>append()</code>, but <code>O(n)</code> middle indexing — keep <code>list</code> for random access.</li>
   <li>Count items in <code>[lo, hi]</code> on a sorted copy with <code>bisect_right(a, hi) - bisect_left(a, lo)</code> (guard <code>lo &gt; hi</code>; never assume <code>insort</code> is <code>O(log n)</code>).</li>
   <li><code>heapq</code> is a min-heap: negate priorities for max-heaps, keep a bounded size-<code>k</code> heap for live streams, and add <code>itertools.count()</code> before uncomparable objects.</li>
-  <li>Dodge the four traps: <code>[[0]*3]*3</code>, mutable default args, mutating while looping, and negative floor division <code>//</code>.</li>
+  <li>Dodge the Day 3 stdlib &amp; math traps: <code>Counter</code> zero counts, <code>defaultdict</code> read insertion, <code>arr.sort()</code> returning <code>None</code> / unsorted <code>groupby</code>, mutating while looping, and negative floor division <code>//</code>.</li>
 </ol>
 
 <div class="review" id="review"></div>
 
 <!-- ============================================================ -->
 <h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
-<p>Complete Warm-ups 1–2 and build your one-page cheat sheet (Exercise 3) before coding Exercises 4–7 in <code>exercises/py_toolkit.py</code>. Those tests run on 100k–670k items under a 5-second cap so slow plain-list code times out.</p>
+<p>Complete Warm-ups 1–2 and build your one-page cheat sheet (Exercise 3) before coding Exercises 4–7 in <a href="../exercises/py_toolkit.py">py_toolkit.py</a>. Those tests run on 100k–670k items under a 5-second cap so slow plain-list code times out.</p>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
@@ -471,41 +478,41 @@ out = ",".join(parts)</code></pre>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>2. Fix the four traps</h4>
-  <p>Each line hits one of section 6's four Python traps. Name the bug and write the fix: (a) <code>neighbors = [[]] * n</code>; (b) <code>def visit(node, seen=set()):</code>; (c) <code>for k in d: if d[k] == 0: del d[k]</code>; (d) <code>mid = -7 // 2</code> when you need truncation toward zero (<code>-3</code>).</p>
+  <h4>2. Fix the four Day 3 stdlib &amp; math traps</h4>
+  <p>Each line hits one of section 6's four traps. Name the bug and write the fix: (a) checking <code>if adj[node]:</code> on a <code>defaultdict(list)</code> (or decrementing <code>win[ch] -= 1</code> without pruning zero); (b) <code>ordered = nums.sort()</code> and calling <code>groupby(["a", "b", "a"])</code> expecting two groups; (c) calling <code>del d[k]</code> inside a <code>for k in d:</code> loop; (d) <code>mid = -7 // 2</code> when you need truncation toward zero (<code>-3</code>).</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) All <code>n</code> slots share one inner list → <code>neighbors = [[] for _ in range(n)]</code>. (b) Mutable default set shared across calls → <code>seen=None</code>, then <code>if seen is None: seen = set()</code>. (c) Deleting keys while iterating dict raises <code>RuntimeError</code> → loop over <code>list(d)</code> or rebuild with a dict comprehension. (d) <code>//</code> floors toward −∞ (giving <code>-4</code>) → use <code>int(-7 / 2)</code> for small ints (giving <code>-3</code>).</p>
+    <p>(a) <code>adj[node]</code> silently inserts <code>node: []</code> → check <code>if node in adj:</code> (and run <code>if win[ch] == 0: del win[ch]</code> on <code>Counter</code>). (b) <code>nums.sort()</code> returns <code>None</code> → use <code>sorted(nums)</code>; <code>groupby</code> needs sorted input → <code>groupby(sorted(items))</code>. (c) Deleting keys while iterating dict raises <code>RuntimeError</code> → loop over <code>list(d)</code> or rebuild with a dict comprehension. (d) <code>//</code> floors toward −∞ (giving <code>-4</code>) → use <code>int(-7 / 2)</code> for small ints (giving <code>-3</code>).</p>
   </details>
 </div>
 
 <div class="exercise">
-  <div class="tier core">Core · pen and paper (keep this next to you all week!)</div>
+  <div class="tier core">Core · pen and paper (keep this next to you across Weeks 1–10!)</div>
   <h4>3. Write your one-page Python interview cheat sheet</h4>
-  <p>On a single sheet of paper (or one markdown note), write from memory — without peeking — the import line, main methods, Big-O cost, and #1 gotcha for: <code>list</code>, <code>dict</code>/<code>set</code>, <code>Counter</code>, <code>defaultdict</code>, <code>deque</code>, <code>heapq</code>, <code>sorted</code>, and <code>bisect</code>, plus the 4 traps from section 6. Check the tools against section 7 and the traps against section 6, then keep it beside you for every Week 1 drill.</p>
+  <p>On a single sheet of paper (or one markdown note), write from memory — without peeking — the import line, main methods, Big-O cost, and #1 gotcha for: <code>list</code>, <code>dict</code>/<code>set</code>, <code>Counter</code>, <code>defaultdict</code>, <code>deque</code>, <code>heapq</code>, <code>sorted</code>, <code>bisect</code>, <code>itertools</code>, and <code>functools</code> (<code>@cache</code>, <code>cmp_to_key</code>), plus the 4 traps from section 6. Check the tools against section 7 and the traps against section 6, then keep it beside you for every timed drill.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>4. <code>top_k_frequent(words, k)</code></h4>
-  <p>In <code>exercises/py_toolkit.py</code>, return the <code>k</code> most common <code>(word, count)</code> pairs with equal counts sorted alphabetically (return <code>[]</code> when <code>k &lt;= 0</code>, or all distinct words if fewer than <code>k</code>). Tests run on &gt;600,000 words under a 5-second cap so <code>list.count</code> fails.</p>
+  <p>In <a href="../exercises/py_toolkit.py">py_toolkit.py</a>, return the <code>k</code> most common <code>(word, count)</code> pairs with equal counts sorted alphabetically (return <code>[]</code> when <code>k &lt;= 0</code>, or all distinct words if fewer than <code>k</code>). Tests run on &gt;600,000 words under a 5-second cap so <code>list.count</code> fails.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>5. <code>group_anagrams(words)</code></h4>
-  <p>In <code>exercises/py_toolkit.py</code>, group anagrams preserving first-word group order and input order inside each group. Tests run on 120,000 words under a 5-second cap so pairwise comparison fails.</p>
+  <p>In <a href="../exercises/py_toolkit.py">py_toolkit.py</a>, group anagrams preserving first-word group order and input order inside each group. Tests run on 120,000 words under a 5-second cap so pairwise comparison fails.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>6. <code>round_robin(jobs, quantum)</code></h4>
-  <p>In <code>exercises/py_toolkit.py</code>, simulate round-robin scheduling without mutating <code>jobs</code> (raising <code>ValueError</code> if <code>quantum &lt; 1</code>). Tests run on 300,000 jobs under a 5-second cap so <code>list.pop(0)</code> times out.</p>
+  <p>In <a href="../exercises/py_toolkit.py">py_toolkit.py</a>, simulate round-robin scheduling without mutating <code>jobs</code> (raising <code>ValueError</code> if <code>quantum &lt; 1</code>). Tests run on 300,000 jobs under a 5-second cap so <code>list.pop(0)</code> times out.</p>
 </div>
 
 <div class="exercise">
   <div class="tier core">Core · code</div>
   <h4>7. <code>count_in_ranges(values, queries)</code></h4>
-  <p>In <code>exercises/py_toolkit.py</code>, count values in each inclusive <code>(lo, hi)</code> without mutating <code>values</code> (<code>lo &gt; hi</code> returns <code>0</code>). Tests run 100,000 queries over 100,000 values under a 5-second cap.</p>
+  <p>In <a href="../exercises/py_toolkit.py">py_toolkit.py</a>, count values in each inclusive <code>(lo, hi)</code> without mutating <code>values</code> (<code>lo &gt; hi</code> returns <code>0</code>). Tests run 100,000 queries over 100,000 values under a 5-second cap.</p>
 </div>
 
 <div class="exercise">
@@ -518,8 +525,8 @@ out = ",".join(parts)</code></pre>
 <pre class="plain"><code>python3 -m pytest -k py_toolkit</code></pre>
 
 <nav class="chapter-nav">
-  <a href="../index.html"><small>← Back to</small>Chapter 10 overview</a>
-  <a class="next" href="../index.html#t-10.02"><small>Next →</small>Designing for change (OOP &amp; SOLID)</a>
+  <a href="python-idioms.html"><small>← Previous</small>Python idioms, lambdas, generators &amp; gotchas</a>
+  <a class="next" href="../../15-interview-formats/concepts/algorithmic-round.html"><small>Next →</small>Bare-editor coding playbook</a>
 </nav>
 
 </main>

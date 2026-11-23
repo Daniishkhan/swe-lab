@@ -1,6 +1,7 @@
 """
 Python idioms: comprehensions, lambdas, closures, generators and itertools
 Topic: 10.10  |  Priority: P0
+Chapter: sections/10-code-quality-design-testing/concepts/python-idioms.html
 
 Five interview-essential Python fluency drills. Practice writing clean,
 readable Python without fighting syntax or falling into closure / O(n^2) traps.
@@ -26,7 +27,10 @@ transpose_and_filter(matrix, threshold) -> list[list[int]]
     transpose_and_filter([[1, 5, 3], [4, 2, 6]], 3) == [[4], [5], [3, 6]]
 
 make_multipliers(factors) -> list[Callable[[int], int]]
-    Return a list of functions f_i where f_i(x) == x * factors[i].
+    factors may be any iterable of numbers (list, generator, etc.). Return a
+    list of functions where each function multiplies its argument by the
+    corresponding factor value captured at creation time (unaffected by later
+    mutations to factors).
     Watch out for Python's late-binding closure trap in loops/comprehensions!
     fns = make_multipliers([2, 3, 10])
     [f(5) for f in fns] == [10, 15, 50]

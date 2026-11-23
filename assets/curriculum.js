@@ -4171,7 +4171,7 @@ window.CURRICULUM = {
     {
      "file": "python-idioms.html",
      "topic": "10.10",
-     "title": "Python fluency: idioms, lambdas, generators & gotchas",
+     "title": "Write clean Python without fighting the language (Python idioms & gotchas)",
      "status": "complete"
     },
     {
@@ -4673,5 +4673,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 18:35"
+ "generated": "2026-11-23 14:45"
 };

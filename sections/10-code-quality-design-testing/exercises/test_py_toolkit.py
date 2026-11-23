@@ -36,6 +36,9 @@ def test_top_k_example():
 def test_top_k_ties_alphabetical():
     words = ["pear", "fig", "apple", "fig", "pear", "apple", "kiwi"]
     assert top_k_frequent(words, 3) == [("apple", 2), ("fig", 2), ("pear", 2)]
+    # k splits the 3-way tie — catches buggy `sorted(Counter(words).most_common(k), ...)`!
+    assert top_k_frequent(words, 2) == [("apple", 2), ("fig", 2)]
+    assert top_k_frequent(words, 1) == [("apple", 2)]
 
 
 def test_top_k_small_cases():
@@ -55,10 +58,16 @@ def test_top_k_670k_words():
     for i in range(60_000):
         words += [f"rare{i:05d}"] * rng.randint(1, 20)
     rng.shuffle(words)
+    # Ensure "top3b" first appears before "top3" so k=4 exposes arrival-order cutoffs.
+    i3, i3b = words.index("top3"), words.index("top3b")
+    if i3 < i3b:
+        words[i3], words[i3b] = words[i3b], words[i3]
     assert len(words) > 600_000
     with cap(5, "is something scanning all the words once per distinct word (list.count)?"):
         got = top_k_frequent(words, 5)
+        got4 = top_k_frequent(words, 4)
     assert got == [("top0", 5000), ("top1", 4700), ("top2", 4400), ("top3", 4100), ("top3b", 4100)]
+    assert got4 == [("top0", 5000), ("top1", 4700), ("top2", 4400), ("top3", 4100)]
 
 
 # ---------------------------------------------------------------- group_anagrams
@@ -111,6 +120,10 @@ def test_round_robin_edges():
     assert round_robin([("a", 4), ("b", 1), ("c", 4)], 1) == ["b", "a", "c"]
     with pytest.raises(ValueError):
         round_robin([("a", 1)], 0)
+    with pytest.raises(ValueError):
+        round_robin([("a", 1)], -1)
+    with pytest.raises(ValueError):
+        round_robin([], 0)
 
 
 def test_round_robin_does_not_change_input():

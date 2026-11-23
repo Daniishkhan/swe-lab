@@ -16,12 +16,12 @@
 <main class="content book">
 
 <header class="chapter-head">
-  <div class="eyebrow">Chapter 15 · Part 1</div>
+  <div class="eyebrow">Phase 0 · Day 3</div>
   <h1>How to run an algorithmic coding round</h1>
   <div class="meta"><span><span class="badge Format">Format</span> the method for every drill and mock</span><span>about 15 minutes</span><span>7 quick checks · 5 exercises</span></div>
 </header>
 
-<p>Strong senior engineers fail 45-minute coding rounds every week — not because they can't code, but because they improvise under a ticking clock. This chapter gives you a repeatable 45-minute playbook you will run on every timed drill and mock from Day 1 onward.</p>
+<p>Strong senior engineers fail 45-minute coding rounds every week — not because they can't code, but because they improvise under a ticking clock. This chapter gives you a repeatable 45-minute playbook you will run on every timed drill and mock from Week 1 onward.</p>
 
 <div class="learn-list">
   <h4>By the end you'll be able to</h4>
@@ -29,12 +29,12 @@
     <li>Budget a 45-minute coding round into five clear phases so you never panic at minute zero.</li>
     <li>Ask only high-signal clarifying questions and lock in three tiny examples before designing.</li>
     <li>Turn a brute-force idea into an agreed optimal plan without going silent.</li>
-    <li>Catch your own off-by-one and edge-case bugs with a literal trace table before pressing Run.</li>
+    <li>Catch your own off-by-one and edge-case bugs with a literal trace table in a bare editor (before any Run button).</li>
     <li>Recover calmly when you get stuck, receive a hint, or hit a broken invariant mid-code.</li>
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Day 1, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Reread section 8 the morning of every mock or screen. Phase 0 playbook — read once before Week 1, and open <a href="../../../practice.html">Practice hub</a> whenever you run a timed bare-editor drill or mock.</p>
+<p class="muted small">How to read this: top to bottom on Phase 0 Day 3, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Reread section 8 the morning of every mock or screen, and open the <a href="../../../practice.html">Practice hub</a> whenever you run a timed bare-editor drill or mock. Builds on no prior chapters.</p>
 
 <!-- ============================================================ -->
 <h2 id="s1"><span class="sec-num">1</span>Why do strong engineers still fail coding rounds?</h2>
@@ -145,7 +145,7 @@
 <p>Prompts are intentionally underspecified — just like real engineering tickets. At <b>minute 0</b>, confirm the round shape in one breath (<em>"One problem with follow-ups, or two problems? Will we run code or dry-run only?"</em>), then run a <b>5-point pre-flight check</b> in under three minutes:</p>
 
 <ol>
-  <li><b>Scale (<code>n</code>):</b> "How large can the input be?" Sets your Big-O target from <a href="../../02-algorithms/concepts/complexity.html">Chapter 2.1</a>.</li>
+  <li><b>Scale (<code>n</code>):</b> "How large can the input be?" Sets your Big-O target (which you'll formalize in Week 1's <a href="../../02-algorithms/concepts/complexity.html">Chapter 02.01</a>).</li>
   <li><b>Order &amp; values:</b> "Is the input already sorted? Can items be negative, strings, or duplicated?"</li>
   <li><b>Empty / tiny cases:</b> "What should empty or 1-item input return?" (<code>-1</code>, <code>0</code>, <code>None</code>?)</li>
   <li><b>Ties &amp; output definition:</b> "What exact metric do we return — index gap <code>j - i</code> (adjacent = 1) or items between (adjacent = 0)?"</li>
@@ -183,7 +183,7 @@
     <button data-correct>Is the list already sorted (and are values distinct), and how large is <code>n</code>?</button>
     <button>Can the input list contain the integer zero among its elements?</button>
   </div>
-  <div class="fb right"><p>Bullseye! Just as you saw in Chapter 2.1, a sorted distinct list unlocks inward two pointers in <code>O(n)</code> time and <b><code>O(1)</code></b> extra space — whereas an unsorted list forces sorting or <code>O(n)</code> extra memory. Negative or zero values don't change the algorithm at all.</p></div>
+  <div class="fb right"><p>Bullseye! A sorted distinct list unlocks inward two pointers in <code>O(n)</code> time and <b><code>O(1)</code></b> extra space (which you'll formalize in Week 1's Chapter 02.01) — whereas an unsorted list forces sorting or <code>O(n)</code> extra memory. Negative or zero values don't change the algorithm at all.</p></div>
   <div class="fb wrong"><p>Use the flip test: "If the answer flips from Yes to No, do I choose a different algorithm?" Adding two numbers works identically whether values or target are negative or zero. Knowing whether the list is sorted and how large <code>n</code> is directly picks between <code>O(n²)</code> pairs, <code>O(n)</code> space, and <code>O(1)</code>-space two pointers.</p></div>
 </div>
 
@@ -318,9 +318,9 @@ time, O(n) space. Sound good to code?"</code></pre>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="s6"><span class="sec-num">6</span>How do you catch your own bugs before hitting Run?</h2>
+<h2 id="s6"><span class="sec-num">6</span>How do you catch your own bugs in a bare editor?</h2>
 
-<p>When you finish typing the last line, <b>do not say "I'm done" and do not press Run yet.</b> Run the landing checklist: draw a tiny <b>trace table</b> and execute your code <em>literally</em> — acting like a dumb computer obeying only the exact tokens on screen.</p>
+<p>When you finish typing the last line, <b>do not say "I'm done" — and in a bare editor with no Run button, your literal trace table IS your compiler</b> (on platforms that do offer Run, finish this trace before clicking it). Draw a tiny <b>trace table</b> and execute your code <em>literally</em> — acting like a dumb computer obeying only the exact tokens on screen.</p>
 
 <p>Watch how a literal trace immediately catches setting <code>best = 0</code> instead of <code>float("inf")</code> on <code>[4, 1, 4]</code>:</p>
 
@@ -355,12 +355,12 @@ time, O(n) space. Sound good to code?"</code></pre>
     <text x="380" y="140" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">min(0, 2 - 0) = 0  ← BUG!</text>
     <text x="562" y="140" class="label" text-anchor="middle">{4: 2, 1: 1}</text>
 
-    <text x="14" y="170" class="label" fill="var(--ok)" font-weight="700">Caught before Run! Fix: initialize best = float("inf"), then re-trace → min(inf, 2) = 2.</text>
+    <text x="14" y="170" class="label" fill="var(--ok)" font-weight="700">Caught by hand! Fix: initialize best = float("inf"), then re-trace → min(inf, 2) = 2.</text>
   </svg>
   <div class="cap">Execute the literal tokens on screen (<code>min(0, 2)</code>), never what you <em>meant</em> to write. Then check your 3 edge cases (<code>[]</code>, <code>[1, 2]</code>, <code>[5, 1, 5, 5]</code>).</div>
 </div>
 
-<div class="keyidea">Walk 1 normal input through a literal variable table plus 3 edge cases (empty/1-item, no-match, tricky) <em>before</em> hitting Run. Self-caught bugs raise your Testing score.</div>
+<div class="keyidea">Walk 1 normal input through a literal variable table plus 3 edge cases (empty/1-item, no-match, tricky) in your bare editor — before saying "done" or touching Run. Self-caught bugs raise your Testing score.</div>
 
 <div class="check" id="check-trace">
   <p class="q">What bug does a literal trace on <code>[4, 1, 4]</code> catch immediately in this version of <code>min_duplicate_gap</code>?</p>
@@ -396,11 +396,11 @@ time, O(n) space. Sound good to code?"</code></pre>
   </tbody>
 </table></div>
 
-<p><b>When this 5-phase clock isn't the right fit:</b> In a <b>2-problem 45-minute screen</b> (like Week 3's milestone mock), split the clock into ~20 minutes per problem (2m clarify / 5m plan / 9m code / 4m trace). And in <b>practical multi-level coding</b> (<code>15.02</code>) or <b>debugging rounds</b> (<code>15.03</code>), run tests continuously after every small step instead of waiting until Phase 4.</p>
+<p><b>When this 5-phase clock isn't the right fit:</b> In a <b>2-problem 45-minute screen</b> (such as Meta-style two-problem screens when an interviewer announces two problems at minute 0), split the clock into ~20 minutes per problem (2m clarify / 5m plan / 9m code / 4m trace). And in <b>practical multi-level coding</b> (<code>15.02</code>) or <b>debugging rounds</b> (<code>15.03</code>), run tests continuously after every small step instead of waiting until Phase 4.</p>
 
 <details class="aside deeper">
-  <summary>Go deeper: no-Run whiteboards, "why not sorting?", and production testing</summary>
-  <p><b>No execution environment:</b> Many screens disable Run completely — making Section 6's literal trace table your only compiler.</p>
+  <summary>Go deeper: runnable editors, "why not sorting?", and production testing</summary>
+  <p><b>Runnable vs. bare editors:</b> Google screens disable code execution completely — making Section 6's literal trace table your only compiler. On platforms that do provide a Run button, still complete the literal trace first so your very first run comes back green.</p>
   <p><b>"Why a dict instead of sorting?"</b> Be ready for the obvious alternative: sorting <code>(val, idx)</code> pairs costs <code>O(n log n)</code> time AND still takes <code>O(n)</code> space to keep original indices, so the dict wins on time without losing on space (sorting only beats hashing on guaranteed worst-case <code>O(n log n)</code> if adversarial hash collisions are a threat).</p>
   <p><b>"How would you test this in production?"</b> Name four distinct buckets beyond a quick dry run: happy path, boundaries (empty, 1 item, adjacent/3+ repeats), invalid/malformed types, and scale/stress tests.</p>
 </details>
@@ -431,7 +431,7 @@ time, O(n) space. Sound good to code?"</code></pre>
   <li><b>Minute 0–5 (Clarify):</b> "Quick format check: one problem or two, and will we run code? Before designing, let me check max <code>n</code>, sortedness, duplicates/negatives, empty-input return, and mutation — then verify three tiny examples."</li>
   <li><b>Minute 5–15 (Plan):</b> "The brute force is [X] in O(…) time and O(…) space. The repeated work is [Y]. If I maintain [Z], it drops to O(…) time and O(…) space. Does that look good before I code?"</li>
   <li><b>Minute 15–32 (Code):</b> Name variables for their invariant; narrate intent per block; announce 30-second boundary checks openly.</li>
-  <li><b>Minute 32–40 (Verify):</b> "Before running, let me walk <code>[normal example]</code> through a literal trace table, then check empty, 1-item, and boundary cases."</li>
+  <li><b>Minute 32–40 (Verify):</b> "Let me walk <code>[normal example]</code> through a literal trace table by hand, then verify empty, 1-item, and boundary cases."</li>
   <li><b>Minute 40–45 (Wrap):</b> "Final cost is O(…) time and O(…) auxiliary space (including recursion stack). Happy to explain why this beats [obvious alternative] or walk through scale follow-ups."</li>
 </ol>
 
@@ -442,7 +442,7 @@ time, O(n) space. Sound good to code?"</code></pre>
   <li>Run the 5-phase flight plan every time: Clarify (5m) → Plan &amp; Sign-off (10m) → Code (17m) → Trace &amp; Test (8m) → Wrap (5m).</li>
   <li>Check minute-0 format (1 vs 2 problems, runnable?) and only high-signal constraints (<code>n</code>, sortedness, value range, empty behavior, mutation) + 3 tiny examples.</li>
   <li>State brute force + Big-O in 30 seconds, pinpoint the repeated work, propose the improvement, and get ATC sign-off before typing.</li>
-  <li>Narrate intent, not keystrokes; verify with a literal trace table + 3 edge cases before clicking Run.</li>
+  <li>Narrate intent, not keystrokes; verify with a literal trace table + 3 edge cases in your bare editor before wrapping up (or running code).</li>
   <li>Absorb hints immediately, pause cleanly if an invariant breaks, and shrink any late bug to a 2–3 item trace instead of guess-editing.</li>
 </ol>
 
@@ -450,7 +450,7 @@ time, O(n) space. Sound good to code?"</code></pre>
 
 <!-- ============================================================ -->
 <h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
-<p>Do Warm-ups 1 and 2 on paper on Day 1 before your first timed drill — they build the exact reflexes you'll use all week.</p>
+<p>Do Warm-ups 1 and 2 on paper on Phase 0 Day 3 before your first Week 1 timed drill — they build the exact reflexes you'll use across every coding round.</p>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
@@ -483,7 +483,7 @@ time, O(n) space. Sound good to code?"</code></pre>
 <div class="exercise">
   <div class="tier core">Core · timed rehearsal</div>
   <h4>3. Run your first 25-minute drill by the flight plan</h4>
-  <p>Pick an Easy/Medium Week 1 drill (e.g., <em>Contains Duplicate</em> or <em>Group Anagrams</em>). Set a 25-minute timer: 3m clarify + examples, 6m brute force → improved plan aloud, 10m clean code, 5m literal trace table + edge cases before running. Log one honest row in <code>sections/15-interview-formats/notes.md</code> (or <code>mock-log.md</code> marked <code>self N / solo</code>).</p>
+  <p>Pick an Easy/Medium Week 1 drill (e.g., <em>Contains Duplicate</em> or <em>Group Anagrams</em>) and open the <a href="../../../practice.html">Practice hub</a> bare-editor scratchpad. Set its 25-minute timer: 3m clarify + examples, 6m brute force → improved plan aloud, 10m clean code, 5m literal trace table + edge cases by hand. Log one honest row in the Practice hub Mock &amp; drill log (or <code>sections/15-interview-formats/mock-log.md</code> leaving the mock score blank).</p>
 </div>
 
 <div class="exercise">
@@ -494,13 +494,13 @@ time, O(n) space. Sound good to code?"</code></pre>
 
 <div class="exercise">
   <div class="tier stretch">Stretch · full mock</div>
-  <h4>5. Day 7 Milestone Mock (45 minutes, bare editor)</h4>
+  <h4>5. Week 1 Day 7 Milestone Mock (45 minutes, bare editor)</h4>
   <p>Skim section 8, then ask: <em>"mock interview, coding (Google L5 bare-editor style, 1 medium + follow-up), 45 minutes."</em> Hand-trace before running, self-score 1–4 on all four rubric axes before reading feedback, and log the delta in <code>sections/15-interview-formats/mock-log.md</code>.</p>
 </div>
 
 <nav class="chapter-nav">
-  <a href="../index.html"><small>← Back to</small>Chapter 15 overview</a>
-  <a class="next" href="../index.html#t-15.02"><small>Next →</small>Practical coding round</a>
+  <a href="../../10-code-quality-design-testing/concepts/python-toolkit.html"><small>← Previous</small>Python standard library toolkit</a>
+  <a class="next" href="../../14-behavioral-leadership/concepts/project-deep-dive.html"><small>Next →</small>Flagship project &amp; 60-sec intro</a>
 </nav>
 
 </main>
@@ -535,14 +535,14 @@ time, O(n) space. Sound good to code?"</code></pre>
       {
         phase: "4. Literal Trace & Edge Cases", clock: "Sample run: 28:00 – 38:00",
         scores: { ps: 3, code: 4, ver: 4, com: 4 },
-        say: "\"Before clicking Run, let me trace [4, 1, 7, 4] literally: idx=0→{4:0}, idx=1→{4:0,1:1}, idx=2→{...,7:2}, idx=3→gap=3, best=3. Edge cases: [] → -1, [5] → -1, [5,1,5,5] → 2 then 1.\"",
-        note: "Verified every branch by hand, then ran tests — green on the very first Run!",
+        say: "\"Let me trace [4, 1, 7, 4] literally line by line: idx=0→{4:0}, idx=1→{4:0,1:1}, idx=2→{...,7:2}, idx=3→gap=3, best=3. Edge cases: [] → -1, [5] → -1, [5,1,5,5] → 2 then 1.\"",
+        note: "Verified every branch and edge case by hand — ready for follow-ups without needing a compiler!",
         msg: "<b>Phase 4 (budget: 32–40 min):</b> Landing checklist done. Testing & Edge Cases signal jumps to 4.",
       },
       {
         phase: "5. Complexity & Senior Follow-up", clock: "Sample run: 38:00 – 45:00",
         scores: { ps: 4, code: 4, ver: 4, com: 4 },
-        say: "\"Final cost: O(n) avg time for int IDs, O(U) space for U ≤ n distinct IDs. If IDs stream forever and we only care about gaps ≤ k, we can pair the dict with a k-slot queue (evicting the element leaving the window in O(1)) to bound memory to O(k).\"",
+        say: "\"Final cost: O(n) avg time for int IDs, O(U) space for U ≤ n distinct IDs. If IDs stream forever and we only care about gaps ≤ k, we can pair the dict with a k-slot queue — evicting the departing ID in O(1), only deleting from the dict if its stored index matches the departing slot — to bound memory to O(k).\"",
         note: "Strong Hire (4/4) across Problem Solving, Code Quality, Testing & Edge Cases, and Communication.",
         msg: "<b>Phase 5 (budget: 40–45 min):</b> Debrief & scale-up. Five calm minutes of follow-up seals the senior bar.",
       },

@@ -49,7 +49,7 @@ One real incident or wrong call: what happened, how you found it, the fix, and w
 Two things, each with why it's better and what it would cost.
 
 ## The follow-up ladder
-For each box, the answers five rungs deep: How does it scale 10×? What fails first? How was it tested? How was it deployed and rolled back? How was it monitored? Who disagreed, and how was it settled?
+For each box, the answers six rungs deep: How does it scale 10×? What fails first? How was it tested? How was it deployed and rolled back? How was it monitored? Who disagreed, and how was it settled?
 
 | Box | 10× traffic | First failure | Testing | Rollout | Monitoring | Who disagreed |
 |---|---|---|---|---|---|---|

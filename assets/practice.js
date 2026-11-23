@@ -2,7 +2,7 @@
  * Interactive offline Practice Hub (practice.html):
  *   1. Bare-editor scratchpad (line numbers, 4-space Tab, zero autocomplete) + multi-mode phase timer
  *   2. Timed Mock & Drill Log (1-4 senior scores, averages, Markdown export)
- *   3. STAR Story Bank Matrix (8 senior dimensions + live gap detector + Markdown export)
+ *   3. STAR Story Bank Matrix (9 senior dimensions + live gap detector + Markdown export)
  */
 (function () {
   const h = window.SWEh;
@@ -37,8 +37,8 @@
   // Tab 1: Bare-Editor Scratchpad + Multi-Mode Phase Timer
   // =========================================================================
   const MODES = {
-    drill25: { label: "25m Drill", total: 25 * 60, fmt: "Google Coding", phases: [[3, "Clarify constraints & edge cases"], [10, "Brute force → Optimal"], [21, "Clean code (no execution)"], [25, "Manual dry-run"]] },
-    google45: { label: "45m Google Coding", total: 45 * 60, fmt: "Google Coding", phases: [[5, "Clarify bounds & example"], [15, "Brute force → Optimal + buy-in"], [30, "Clean code (no run)"], [35, "Line-by-line dry-run"], [45, "Escalating follow-ups"]] },
+    drill25: { label: "25m Drill", total: 25 * 60, fmt: "Google Coding", phases: [[3, "Clarify constraints & examples"], [9, "Brute force → Optimal + sign-off"], [19, "Clean code (no execution)"], [24, "Literal trace table & edges"], [25, "Log this run"]] },
+    google45: { label: "45m Google Coding", total: 45 * 60, fmt: "Google Coding", phases: [[5, "Clarify bounds & 3 examples"], [15, "Brute force → Optimal + sign-off"], [32, "Clean code (no run)"], [40, "Literal trace table & edges"], [45, "Wrap & escalating follow-ups"]] },
     design45: { label: "45m System Design", total: 45 * 60, fmt: "System Design", phases: [[5, "Requirements & scope cuts"], [10, "Back-of-envelope math"], [18, "API & data model"], [26, "High-level architecture"], [38, "Black-box deep dive"], [45, "Failures, SLOs & rollout"]] },
     conc60: { label: "60m Concurrency", total: 60 * 60, fmt: "Concurrency", phases: [[6, "Clarify thread-safety & limits"], [16, "Locking / async architecture"], [42, "Implementation + no lock during I/O"], [52, "Race-catching tests"], [60, "Deadlock & starvation proof"]] },
     levels90: { label: "90m 4-Level Build", total: 90 * 60, fmt: "Practical 4-Level", phases: [[15, "Level 1 + modular skeleton + tests"], [35, "Level 2 without rewriting L1"], [65, "Level 3 (TTL / scan / quota)"], [90, "Level 4 (transactions / rollback)"]] },
@@ -106,7 +106,7 @@
     if (!e.shiftKey) {
       editor.value = v.slice(0, s) + "    " + v.slice(end);
       editor.selectionStart = editor.selectionEnd = s + 4;
-    } else if (v.slice(Math.max(0, s - 4), s) === "    ") {
+    } else if (s === end && v.slice(Math.max(0, s - 4), s) === "    ") {
       editor.value = v.slice(0, s - 4) + v.slice(end);
       editor.selectionStart = editor.selectionEnd = s - 4;
     }
@@ -155,6 +155,14 @@
     logPrompt.focus();
   });
 
+  const editorRefs = h("p", { class: "small muted", style: "margin:10px 0 0" },
+    "Phase 0 references: ",
+    h("a", { href: "sections/15-interview-formats/concepts/algorithmic-round.html#s8" }, "Bare-editor playbook & checklist"),
+    " · ",
+    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-toolkit.html#s7" }, "Python toolkit reference"),
+    " · ",
+    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-idioms.html#summary" }, "Python idioms cheat table"));
+
   panes.editor = h("section", {},
     h("div", { class: "timer-bar" },
       h("div", {}, phaseEl, clockEl),
@@ -162,7 +170,8 @@
       presetWrap),
     h("div", { class: "bare-wrap" }, gutter, editor),
     h("div", { class: "bare-foot" }, statsEl, h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }, copyCodeBtn, clearBtn, logRunBtn)),
-    checklist);
+    checklist,
+    editorRefs);
 
   // =========================================================================
   // Tab 2: Mock & Drill Log
@@ -251,7 +260,7 @@
   // =========================================================================
   // Tab 3: STAR Story Bank Matrix (Parallel Behavioral Track)
   // =========================================================================
-  const DIMS = ["Ownership", "Conflict", "Failure", "Influence", "Mentoring", "Prioritization", "Deep dive", "Humility / Safety"];
+  const DIMS = ["Ownership", "Conflict", "Failure", "Influence", "Mentoring", "Prioritization", "Deep dive", "Ambiguity", "Humility / Safety"];
   let stories = store.get("starStories", []);
   const stTitle = h("input", { type: "text", placeholder: "e.g. Zero-downtime payments shard migration" });
   const stHook = h("input", { type: "text", placeholder: "10-sec hook + headline metric (e.g. cut p99 65%)" });
@@ -300,6 +309,10 @@
     copyText([header, ...rows].join("\n"), exportStoryBtn);
   });
 
+  const storyRefs = h("p", { class: "small muted", style: "margin:10px 0 0" },
+    "Phase 0 reference: ",
+    h("a", { href: "sections/14-behavioral-leadership/concepts/project-deep-dive.html" }, "Flagship project deep dive & 60-sec intro (14.01)"));
+
   panes.stories = h("section", {},
     h("div", { class: "hub-form" },
       h("label", {}, "Story title", stTitle),
@@ -308,7 +321,8 @@
       h("div", { class: "span-all" }, h("div", { class: "small muted" }, "Maps to Google G&L / Anthropic dimensions:"), dimWrap),
       h("div", { class: "span-all", style: "display:flex;gap:8px;flex-wrap:wrap" }, addStoryBtn, exportStoryBtn)),
     covHost,
-    storyHost);
+    storyHost,
+    storyRefs);
   renderStories();
 
   // =========================================================================

@@ -1,6 +1,7 @@
 """
 Python in-depth: data model, classic gotchas, decorators and context managers
 Topic: 10.10  |  Priority: P0
+Chapter: sections/10-code-quality-design-testing/concepts/python-idioms.html
 
 Five drills targeting the exact Python subtleties that cause silent bugs in
 DP tables, recursion, priority queues, memoization and resource cleanup.

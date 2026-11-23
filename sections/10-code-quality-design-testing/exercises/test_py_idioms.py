@@ -81,27 +81,38 @@ def test_make_multipliers_avoids_late_binding():
 
 def test_make_multipliers_edges():
     assert make_multipliers([]) == []
-    fns = make_multipliers([0, -1, 1])
+    factors = [0, -1, 1]
+    fns = make_multipliers(factors)
+    factors[0] = 999  # mutating caller list after creation must not affect closures
     assert [f(9) for f in fns] == [0, -9, 9]
+    gen_fns = make_multipliers(x for x in [4, 5])
+    assert [f(3) for f in gen_fns] == [12, 15]
 
 
 # ---------------------------------------------------------------- flatten_stream
 
 def test_flatten_stream_nested_and_atomic_strings():
-    data = [1, (2, [3, "hello", b"xy"]), [], [[4], (5,)]]
+    data = [1, (2, [3, "hello", b"xy", "", b""]), [], [[4], (x for x in [5, 6])]]
     gen = flatten_stream(data)
     assert iter(gen) is gen, "flatten_stream should return a lazy iterator/generator"
-    assert list(gen) == [1, 2, 3, "hello", b"xy", 4, 5]
+    assert list(gen) == [1, 2, 3, "hello", b"xy", "", b"", 4, 5, 6]
 
 
 def test_flatten_stream_is_lazy_on_infinite_input():
+    pulled = 0
+
     def infinite_nested():
+        nonlocal pulled
         for n in itertools.count(1):
+            pulled += 1
+            if pulled > 10:
+                raise AssertionError("flatten_stream pulled past item 10 — not lazy!")
             yield [n, (n * 10,)]
 
     with cap(2, "flatten_stream materialized the whole iterable instead of yielding lazily"):
         first_six = list(itertools.islice(flatten_stream(infinite_nested()), 6))
     assert first_six == [1, 10, 2, 20, 3, 30]
+    assert pulled <= 4
 
 
 def test_flatten_stream_empty():
@@ -112,7 +123,9 @@ def test_flatten_stream_empty():
 # ---------------------------------------------------------------- window_sums
 
 def test_window_sums_example_and_edges():
-    assert window_sums([1, 2, 3, 4, 5], 3) == [6, 9, 12]
+    nums = [1, 2, 3, 4, 5]
+    assert window_sums(nums, 3) == [6, 9, 12]
+    assert nums == [1, 2, 3, 4, 5]
     assert window_sums([1, 2, 3], 1) == [1, 2, 3]
     assert window_sums([1, 2, 3], 3) == [6]
     assert window_sums([1, 2], 3) == []
@@ -124,8 +137,48 @@ def test_window_sums_example_and_edges():
         window_sums([1, 2, 3], -2)
 
 
+def test_window_sums_random_matches_brute_force():
+    import random
+    rng = random.Random(1010)
+    for _ in range(30):
+        n = rng.randint(0, 40)
+        nums = [rng.randint(-50, 50) for _ in range(n)]
+        k = rng.randint(1, max(1, n + 2))
+        expected = [sum(nums[i:i + k]) for i in range(n - k + 1)] if k <= n else []
+        assert window_sums(nums, k) == expected
+
+
 def test_window_sums_linear_time():
-    # n = 100,000 and k = 50,000 => ~50,000 windows of size 50,000 (~2.5e9 ops if sliced!)
+    # 1. Deterministic work check on a counted sequence (cross-platform, catches O(n*k) slicing!)
+    class CountedSeq:
+        def __init__(self, data):
+            self._data = data
+            self.reads = 0
+
+        def __len__(self):
+            return len(self._data)
+
+        def __iter__(self):
+            for x in self._data:
+                self.reads += 1
+                yield x
+
+        def __getitem__(self, idx):
+            if isinstance(idx, slice):
+                out = self._data[idx]
+                self.reads += len(out)
+                return out
+            self.reads += 1
+            return self._data[idx]
+
+    small = CountedSeq([1] * 2_000)
+    got_small = window_sums(small, 1_000)
+    assert len(got_small) == 1_001 and got_small[0] == 1_000
+    assert small.reads <= 6 * len(small), (
+        f"window_sums made {small.reads} element reads for n={len(small)} (expected O(n), not O(n*k))"
+    )
+
+    # 2. Scale check: n = 100,000 and k = 50,000 (~2.5e9 ops if sliced!)
     n = 100_000
     k = 50_000
     nums = [1] * n
