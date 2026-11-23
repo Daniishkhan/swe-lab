@@ -330,7 +330,7 @@ body.sidebar-hidden .sidebar { transform: translateX(-100%); opacity: 0; pointer
 .sec.open > .sec-row .chev svg.i { transform: rotate(90deg); }
 .sec-row a { flex: 1; display: flex; align-items: baseline; gap: 8px; padding: 6px 10px 6px 2px; line-height: 1.35; color: var(--text); min-width: 0; }
 .sec-row a:hover { color: var(--text-strong); }
-.sec-row .no { font: 500 0.74rem var(--mono); color: var(--faint); flex: none; width: 1.6em; }
+.sec-row .no { font: 500 0.74rem var(--mono); color: var(--faint); flex: none; width: 2.2em; }
 .sec-row .title { flex: 1; min-width: 0; }
 .sec-row .count { font: 500 0.72rem var(--mono); color: var(--faint); flex: none; }
 .sec.empty-sec .sec-row a { color: var(--muted); }

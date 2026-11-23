@@ -11,7 +11,7 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 - [ ] `06.03` **[P0]** SQL fluency: joins, aggregation, window functions, reading an EXPLAIN plan
 - [ ] `06.04` **[P0]** Data modeling: normalization vs denormalization, access-pattern-driven design
 - [ ] `06.05` **[P1]** MVCC, optimistic vs pessimistic locking
-- [ ] `06.06` **[P1]** Partitioning: hash vs range, hot keys, rebalancing, secondary indexes across shards
+- [ ] `06.06` **[P0]** Partitioning: hash vs range, hot keys, rebalancing, secondary indexes across shards
 - [ ] `06.07` **[P1]** Batch vs stream processing; Lambda vs Kappa architecture
 - [ ] `06.08` **[P1]** Stream concepts: windowing, watermarks, late data, exactly-once processing
 - [ ] `06.09` **[P1]** Schema evolution and serialization (Protobuf, Avro, backward/forward compatibility)

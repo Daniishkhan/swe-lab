@@ -7,7 +7,7 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 - [ ] `10.01` **[P0]** Clean, idiomatic code in your primary language; deep knowledge of its standard library
 - [ ] `10.02` **[P0]** Object-oriented and functional design; composition over inheritance; SOLID as trade-offs, not rules
 - [ ] `10.03` **[P0]** Testing strategy: unit, integration, end-to-end, contract; what to mock and what not to
-- [ ] `10.04` **[P1]** Low-level design exercises: parking lot, elevator, in-memory file system, LRU cache, key-value store with transactions, spreadsheet engine, text editor buffer
+- [ ] `10.04` **[P1]** Low-level design exercises: in-memory KV store with transactions, in-memory file system, banking ledger, LRU cache, spreadsheet engine
 - [ ] `10.05` **[P1]** API and interface design: naming, error handling, extensibility, backward compatibility
 - [ ] `10.06` **[P1]** Common design patterns and when they are overkill
 - [ ] `10.07` **[P1]** Refactoring legacy code safely; characterization tests

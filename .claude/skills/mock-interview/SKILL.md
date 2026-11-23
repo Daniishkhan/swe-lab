@@ -32,14 +32,20 @@ real thing teaches the wrong lesson.
 
 Per format:
 
-- **Algorithmic coding (15.01):** Danish writes the code in a scratch file
-  outside the repo or in chat. Don't run it until the end. Ask for a hand
-  trace on a small input.
-- **Practical coding (15.02, 15.07):** a small component with tests, in
-  stages. Add a new requirement each time the current one works (persistence,
-  concurrency, a limit, an API change). Judge whether the code survives the
-  changes.
-- **AI-assisted coding (15.09):** Danish uses their own AI assistant, types
+- **Algorithmic coding (15.01 — Google L5 bar):** Danish writes code in a bare
+  scratch file or plain chat without syntax execution or autocomplete. Do NOT
+  run it until the end. Start with a slightly underspecified Medium–Hard prompt
+  so Danish must clarify constraints, state a brute force + complexity, then
+  optimize. Ask for a line-by-line hand trace on a tricky edge case. Once the
+  base solution works, push with **1 to 3 escalating follow-ups** (e.g., 100×
+  scale, streaming/bounded RAM, dynamic updates, or concurrency).
+- **Practical coding (15.02, 15.07 — Anthropic bar):** a small component with
+  tests, in stages (4-level CodeSignal style for 15.02, or concurrent component
+  such as crawler/rate-limiter/single-flight cache for 15.07). Add a new
+  requirement each time the current one works (TTL, transactions, concurrency,
+  per-host limits, graceful shutdown). Judge whether the code survives change
+  without a rewrite and whether tests catch real races/edge cases.
+- **AI-assisted coding (15.09 — recruiter-triggered):** Danish uses their own AI assistant, types
   into the chat what they'd say out loud, and pastes each prompt, each diff
   and each check's output as they go. Give a small component (60 minutes by
   default) with one tricky edge case, and change a requirement halfway. Score
@@ -47,23 +53,28 @@ Per format:
   any code, the checks chosen and run before trusting a diff, and each accept,
   push-back or "I'll type this myself", with its reason. Point at any accepted
   line and ask what it does; "the assistant wrote it" isn't an answer. If a
-  wrong suggestion gets accepted unchecked, say nothing until the end. The
-  evidence to look for is the checklist in exercise 8 of the coding-with-AI
-  chapter (`13.06`).
+  wrong suggestion gets accepted unchecked, say nothing until the end.
 - **Debugging and code review (15.03, 15.04):** hand over a short broken
   program or diff you wrote for the mock. Watch for hypotheses, narrowing down
   (reproduce, bisect, logs) and prevention, not only the fix.
-- **System design (15.05, 15.06):** requirements → estimates → API → data model
-  → high-level design → a deep dive on the hardest part → bottlenecks and
-  failures. Change one requirement in the second half.
+- **System design (15.05, 15.06 — Google L5 / Anthropic bar):** requirements →
+  estimates → API → data model → high-level design → deep dive on the hardest
+  part → bottlenecks, failures, SLOs & rollout. At L5, **open the black boxes**
+  (consensus/quorums, hot keys, cross-shard indexes, locking/isolation, retry
+  storms, GPU batching/KV cache for AI infra). Change one requirement around
+  minute 25. Surface-level buzzwords = L4 down-level signal.
 - **Behavioral and deep dive (15.10–15.12):** one question, then follow-ups
   until the story's depth or gaps show: "What did *you* do?", "What was the
-  measured result?", "What would you do differently?". The senior bar is
-  scope, ambiguity, influence without authority, conflict and owned mistakes.
-- **Full loop (the onsite stage's rehearsal):** coding, system design and
-  behavioral back to back, one prompt each, short breaks, no feedback in
-  between. Score each round with its own signals, then make the overall call a
-  hiring committee would.
+  measured result?", "What would you do differently?". At Google L5 (G&L), also
+  include **2 hypothetical leadership scenarios** (ambiguity, cross-team
+  deadlock, scope vs tech debt). At Anthropic, probe **epistemic humility,
+  safety mindset, and mission alignment**.
+- **Full loop (the onsite stage's rehearsal):** match the target company's loop
+  back to back with short breaks and no feedback in between (Google L5: 2×
+  bare-editor coding + 1× L5 system design + 1× G&L; Anthropic: 1× practical or
+  concurrency + 1× AI-infra system design + 1× values/deep dive; or custom).
+  Score each round with its own signals, then make the overall hire & level
+  call a hiring committee would.
 
 ## Score
 

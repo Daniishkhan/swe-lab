@@ -1,9 +1,12 @@
 # swe-lab: how to work in this repo
 
-A local study book for senior software engineer interviews (Netflix / Anthropic
-bar). Danish reads the chapters and writes every exercise solution. Claude
-writes chapters, teaches, coaches and runs mock interviews. Plain HTML/CSS/JS,
-opened straight from disk (`file://`), no build step except `tools/build.py`.
+A local study book for senior software engineer interviews — anchored to the
+**Google L5 (gold standard)** and **Anthropic Senior SWE** hiring bars, with
+broad transferability across top engineering loops. Danish reads chapters,
+runs Socratic `teach` sessions, and writes every exercise solution. Claude
+writes high-ROI chapters, teaches, coaches and runs mock interviews. Plain
+HTML/CSS/JS, opened straight from disk (`file://`), no build step except
+`tools/build.py`.
 
 ## How we teach (every chapter, every explanation)
 
@@ -44,6 +47,19 @@ Write in a warm, direct mentor voice (never dry textbook prose). Short
 sentences, every term defined the first time, the most words on the hardest
 ideas. The full method is the `teach` skill. Chapters apply it through
 `write-chapter`, `visuals-and-layout`, and `review-chapter`.
+
+## Chapter authoring policy (avoid the textbook trap)
+
+Only write full `hash-maps.html`-grade book chapters for the **~15 highest-ROI
+core mental models** where bespoke visuals genuinely accelerate mastery (e.g.,
+`01.01` Hash maps [done], `01.02` Linear/monotonic, `01.03` Trees, `01.04`
+Heaps, `01.06` Tries, `01.07` Union-Find, `01.09` Intervals, `02.03` Binary
+search, `02.04` Sliding window, `02.05` Graphs BFS/DFS/topo, `02.07` Dynamic
+programming, `02.08` Shortest paths, `03.02`/`03.03` Concurrency races & locks,
+`01.13` B-tree & LSM storage, `05.04` Raft consensus, `13.02` LLM inference
+serving & KV cache). Never block studying or timed drills on authoring HTML:
+for all other topics, learn via interactive `teach` sessions, exercises, and
+timed worksheets.
 
 ## Hard rules
 
@@ -92,11 +108,12 @@ node tools/check_page.js <page.html> [--shots DIR]  # console errors, offline, 3
 
 ## Layout
 
-- `curriculum.json`: source of truth. `track` is the learning order (weekly
-  stages with steps and a milestone mock each, then an onsite stage and company
-  packs that start when an onsite is booked; topics left off it are deferred).
-  `sections` hold the topics (ids like `02.02`, tags P0/P1/P2, `requires`,
-  timed `drills`).
+- `curriculum.json`: source of truth. `track` is the learning order (10-week
+  main spine at ~5h/day — 4 weeks to technical-screen readiness, 8 to 12 weeks
+  to full onsite mastery — with a milestone mock each week, followed by
+  pickable `Onsite`, `Google`, `Anthropic`, and `Consumer` packs; topics left
+  off it are deferred). `sections` hold the topics (ids like `02.02`, tags
+  P0/P1/P2, `requires`, timed `drills`).
 - `sections/NN-slug/concepts/*.html`: chapters, each with
   `<meta name="topic" content="NN.MM">`.
 - `sections/NN-slug/exercises/name.py` + `test_name.py`: stub and tests. The

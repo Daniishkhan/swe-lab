@@ -1,9 +1,12 @@
 # swe/prep
 
-A local study lab for senior software engineer interviews (Netflix / Anthropic
-hiring bar). Concepts are explained from first principles, with an analogy and
-an interactive visualization, in plain HTML/CSS/JS that runs straight from disk.
-Exercises are Python stubs with tests: you write the solutions.
+A local study lab for senior software engineer interviews — built to the
+**Google L5 (gold standard)** and **Anthropic Senior SWE** hiring bars, with
+transferable depth across top engineering loops. High-ROI concepts are built
+from first principles with an analogy and interactive visualization in plain
+HTML/CSS/JS that runs straight from disk; remaining topics use Socratic `teach`
+sessions and timed worksheets. Exercises are Python stubs with work-measuring
+tests: you write the solutions.
 
 ## Quick start
 
@@ -51,36 +54,42 @@ swe-prep/
 
 ## What's written so far
 
-| Chapter | Concept pages | Exercises |
+| Chapter | Book chapters (`concepts/*.html`) | Exercises (stubs + work-measuring tests) |
 |---|---|---|
-| §01 Data structures | All 14 topics: hash maps · linear structures · trees · heaps · graphs · tries · union-find · LRU/LFU caches · intervals · segment and Fenwick trees · skip lists · probabilistic structures · storage structures · concurrent structures | 37 exercises, from hash_map and lru_cache to bloom_filter, lsm_store and mpmc_queue |
-| §02 Algorithms | All 16 topics: complexity · sorting · binary search · two pointers/sliding window · BFS/DFS · backtracking · dynamic programming · shortest paths · minimum spanning trees · greedy · bit manipulation · string algorithms · streaming and external · rate limiting · consistent hashing · probability and estimation | 36 exercises, from sorts and graphs to dijkstra, kruskal_mst, huffman_code, kmp_search, external_sort, token_bucket, consistent_hash and capacity_estimate |
-| §03–§15 | scaffold only | none yet |
+| §01 Data structures | `hash-maps.html` (`01.01`) written; other high-ROI core chapters authored as needed (see `CLAUDE.md`) | 37 exercises, from `hash_map` and `lru_cache` to `bloom_filter`, `lsm_store` and `mpmc_queue` |
+| §02 Algorithms | Learned via targeted chapters + `teach` sessions | 36 exercises, from `sorts` and `graphs` to `dijkstra`, `kruskal_mst`, `kmp_search`, `external_sort`, `token_bucket`, `consistent_hash` and `capacity_estimate` |
+| §10 Code quality & §13 AI/ML | Learned via `teach` sessions + worksheets | 4 exercises (`py_toolkit`, `differential`, `delta_debug`, `bisect_skip`) |
+| §03–§09, §11–§12, §14–§15 | Learned via `teach` sessions, worksheets & mocks | Scaffolded with chapter dashboards and templates |
 
 ## Priority key
 
-- **P0**: asked almost everywhere. Do these first.
-- **P1**: common at senior level.
+- **P0**: asked almost everywhere (Google L5 + Anthropic + broad senior bar). Do these first.
+- **P1**: common at senior level or decisive for leveling.
 - **P2**: differentiator or role-specific.
 
 ## The track
 
-The home page shows one ordered track instead of fifteen chapters to pick from.
-It's built for interview speed: data structures and coding patterns first,
-because technical screens come first, then practical coding and system design
-from week 2, and behavioral stories throughout.
+The home page shows one ordered 10-week track (~5 hours/day, designed to run in
+**8 to 12 weeks** including onsite & company packs). Because resumes go out on
+day 1 and screens typically land 4 to 6 weeks later, **Weeks 1 to 4 make you
+technical-screen ready** across Google (bare-editor DSA), Anthropic (4-level
+practical + concurrency), and general senior loops, while **Weeks 5 to 10**
+build Google L5 system design, AI-infra depth, and senior behavioral leveling.
 
 | Stage | Focus | Milestone |
 |---|---|---|
-| Week 1 | Complexity, hash maps, stacks and queues, trees, heaps, sorting; Python for speed; project deep dive, company research | Mock 1: algorithmic coding |
-| Week 2 | Binary search, two pointers, graphs, BFS/DFS; testing, designing for change, rate limiting, builds in levels; requirements and estimation | Mock 2: practical screen |
-| Week 3 | Backtracking, dynamic programming, bits, LRU cache, intervals; latency, networking; debugging, coding with AI | Mock 3: algorithmic screen (with Mock 2, you're screen-ready) |
-| Week 4 | Stateless services, load balancing, APIs, caching; SQL, storage engines, data modeling, indexes, transactions, choosing a database; URL shortener | Mock 4: AI-assisted coding |
-| Week 5 | Consistent hashing, replication and sharding, consistency, CAP, queues, delivery guarantees, SLOs; news feed; Dijkstra, greedy | Mock 5: system design |
-| Week 6 | Real-time delivery, clocks, quorums, failure modes, tries; chat, key-value store, typeahead | Mock 6: behavioral |
-| Week 7 | Processes and threads, races, locks, deadlock, thread pools; timeouts, retries, load shedding; rate limiter, notifications, job scheduler, web crawler | Mock 7: concurrency coding |
-| Onsite | Once an onsite is booked, wherever you are: reading code, stack traces, finding bugs, and only the round formats on your list | Full loop rehearsal |
-| Packs | Netflix or Anthropic, once that onsite is booked | |
+| Week 1 | Complexity, bare-editor protocol, Python stdlib, hash maps, linear/monotonic, trees, heaps, sorting; flagship project deep dive (`14.01`) | Mock 1: Google coding #1 (bare editor, 1 medium + follow-up) |
+| Week 2 | Binary search on answer, sliding window, graphs, BFS/DFS/topo, **Union-Find**, **tries**, **intervals**, **Dijkstra**; ownership stories | Mock 2: Google coding #2 (Medium-Hard graph/interval/trie + 2 follow-ups) |
+| Week 3 | Backtracking, DP, **greedy**, LRU/TTL cache, rate limiters; testing, designing for change, 4-level builds (`10.04`); past-project deep dive (`15.10`) | Mock 3: Practical 4-level screen (Anthropic CodeSignal style, 90m) |
+| Week 4 | **Concurrency** (processes, threads, GIL/`asyncio`, races, locks, deadlock, thread pools, async I/O, bounded buffer, single-flight); debugging, code reading, AI verification (`13.06`) | Mock 4: Concurrency coding (crawler / single-flight cache) — **technical-screen ready** |
+| Week 5 | System design foundations: scoping, capacity/p99 math, TCP/HTTP/TLS/DNS, stateless services, load balancing, APIs, caching, **CDNs/object storage**, SLOs; conflict stories | Mock 5: Google coding #3 (Medium-Hard + scale follow-up) |
+| Week 6 | Probabilistic DS, storage engines (B-tree/LSM/WAL), SQL/EXPLAIN, modeling, indexes, ACID, **MVCC**, choosing a DB, **AuthN/AuthZ & multi-tenancy**; URL shortener; failure stories | Mock 6: System Design #1 (storage & foundations) |
+| Week 7 | **Google L5 distributed systems deep dive**: consistent hashing, replication/sharding, **hot keys & cross-shard indexes**, consistency/CAP/PACELC, **Raft/Paxos consensus**, clocks, quorums, **distributed locks/leases**, queues/idempotency, **sagas/outbox/2PC**, failure modes & overload protection; rate limiter & distributed KV store | Mock 7: System Design #2 (Google L5 hard distributed system + black-box grilling) |
+| Week 8 | **Multi-region**, **deployment safety & zero-downtime migrations**, real-time (WS/SSE/pub-sub), **search & inverted index**, **batch & stream processing**; job scheduler, payment ledger, chat, typeahead, web crawler; influence stories | Mock 8: System Design #3 (real-time, search or streaming + minute-25 shift) |
+| Week 9 | **Core AI systems (Anthropic & 2026 Google)**: transformers at systems level, **LLM inference serving** (continuous batching, KV cache, TTFT vs throughput), LLM APIs, **evals**, **LLM security**; inference API & token rate limiter; mentoring & prioritization stories | Mock 9: System Design #4 (Anthropic AI-infra: inference gateway + token quotas) |
+| Week 10 | **Google L5 follow-up finishers**: **streaming & external algorithms**, Fenwick/BIT, bits, rolling hash; **Google G&L + Anthropic Values (`14.09`)**; hiring manager round (`15.12`) | Mock 10: Senior Behavioral (Google G&L hypotheticals + Anthropic Values) |
+| Onsite | Triggered the day *any* onsite is booked: stack traces, optional debugging / code review / LLD / AI-assisted coding (`15.09`) per recruiter round list | Mock 11: Full-loop rehearsal (back-to-back) |
+| Packs | Pickable company packs: **Google** (Drive, Docs/CRDT, Geo/S2, landmark papers), **Anthropic** (RAG, Agents/Sandboxing, Containers, Evals, Safety, GPUs), **Consumer** (Meta/Netflix/Uber: Feed, Notifications, Flash-Sale, Video, Chaos, Recs, A/B) | |
 
 Everything else (the P2s and the deeper P1s) is listed as **Deferred** at the
 bottom of the home page. Pull one forward only when a company is known to ask

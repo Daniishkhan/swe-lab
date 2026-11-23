@@ -11,7 +11,7 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 - [ ] `12.05` **[P1]** Multi-tenant isolation and data access boundaries
 - [ ] `12.06` **[P2]** Threat modeling a design
 - [ ] `12.07` **[P2]** Supply chain security and dependency risk
-- [ ] `12.08` **[P2]** LLM-specific risks: prompt injection, data exfiltration through tools, sandbox escape
+- [ ] `12.08` **[P1]** LLM-specific risks: prompt injection, data exfiltration through tools, sandbox escape
 
 ## Layout
 

@@ -168,7 +168,7 @@
       list.append(box);
     }
     root.append(h("div", { class: "section-head" }, h("h2", { id: "track" }, "Your track"),
-      h("span", { class: "aside-note" }, "Seven weeks, plus onsite prep once an onsite is booked. Each step builds only on the steps before it.")), list);
+      h("span", { class: "aside-note" }, `${mainStages.length} weeks (~5h/day, Google L5 gold standard + Anthropic & broad transferability), plus onsite and company packs. Each step builds only on the steps before it.`)), list);
 
     // Everything left off the track
     const groups = T.deferred();

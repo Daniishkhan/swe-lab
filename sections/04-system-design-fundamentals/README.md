@@ -1,5 +1,7 @@
 # §04 System Design Fundamentals
 
+> At Google L5, system design is often the make-or-break leveling round. Drive the room, quantify constraints, and be ready when the interviewer opens any black box.
+
 Open `index.html` in this folder for the interactive chapter view (status tracking, links to concept pages and exercises).
 
 ## Topics
@@ -13,14 +15,14 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 - [ ] `04.07` **[P0]** Replication (leader-follower, multi-leader, leaderless) and sharding/partitioning strategies
 - [ ] `04.08` **[P0]** Message queues and event streams (Kafka, SQS, RabbitMQ): ordering, delivery guarantees
 - [ ] `04.09` **[P0]** API design: REST, gRPC, GraphQL; pagination, versioning, idempotency keys
-- [ ] `04.10` **[P1]** CDNs, edge caching, object storage
+- [ ] `04.10` **[P0]** CDNs, edge caching, object storage
 - [ ] `04.11` **[P1]** Stateless services, session handling, horizontal scaling
-- [ ] `04.12` **[P1]** Rate limiting, load shedding, circuit breakers, retries with jitter, timeouts, bulkheads
+- [ ] `04.12` **[P0]** Rate limiting, load shedding, circuit breakers, retries with jitter, timeouts, bulkheads
 - [ ] `04.13` **[P1]** Multi-region design: active-active vs active-passive, failover, data residency
 - [ ] `04.14` **[P1]** Real-time delivery: WebSockets, SSE, long polling, pub/sub fan-out
-- [ ] `04.15` **[P1]** Search and indexing: inverted index, ranking basics
+- [ ] `04.15` **[P1]** Search and indexing: inverted index, scatter-gather, ranking basics
 - [ ] `04.16` **[P2]** Cost as a design constraint; build vs buy
-- [ ] `04.17` **[P2]** Migration strategy: dual writes, backfills, shadow traffic, strangler pattern
+- [ ] `04.17` **[P1]** Migration strategy: dual writes, backfills, shadow traffic, strangler pattern
 
 ## Layout
 

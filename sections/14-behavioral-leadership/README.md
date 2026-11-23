@@ -1,6 +1,6 @@
 # §14 Senior-Level Behavioral and Leadership
 
-> At senior level this carries as much weight as the technical rounds. Prep method: write 8 to 10 stories in STAR format and map each to several question types.
+> At Google L5 (G&L) and Anthropic (Values), behavioral rounds carry as much weight as technical rounds and directly decide leveling. Build 8 to 10 STAR stories and rehearse Google-style hypotheticals.
 
 Open `index.html` in this folder for the interactive chapter view (status tracking, links to concept pages and exercises).
 
@@ -10,11 +10,11 @@ Open `index.html` in this folder for the interactive chapter view (status tracki
 - [ ] `14.02` **[P0]** Ownership stories: driving ambiguous work from problem to shipped result
 - [ ] `14.03` **[P0]** Conflict and disagreement: disagree-and-commit, pushing back with data
 - [ ] `14.04` **[P0]** Failure stories: a real mistake, its impact, what changed afterward
-- [ ] `14.05` **[P1]** Technical influence without authority; aligning multiple teams
+- [ ] `14.05` **[P0]** Technical influence without authority; aligning multiple teams
 - [ ] `14.06` **[P1]** Mentoring and raising the bar for others
 - [ ] `14.07` **[P1]** Prioritization and saying no; trading scope, quality, and time
 - [ ] `14.08` **[P1]** Writing: design docs, RFCs, postmortems
-- [ ] `14.09` **[P1]** Company specifics: Netflix culture memo (freedom and responsibility, candor, context not control); Anthropic's mission, values, and views on AI safety
+- [ ] `14.09` **[P0]** Company calibration: Google Googleyness & Leadership (ambiguity, leadership without authority, hypotheticals); Anthropic mission, AI safety, RSP and epistemic humility
 - [ ] `14.10` **[P2]** Product sense: why are we building this, how would we measure it?
 
 ## Layout

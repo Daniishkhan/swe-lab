@@ -48,10 +48,11 @@ HTML page in this folder) and link it here.
 ## 6. Deep dive
 Pick the 1-2 hardest parts and go deep:
 
-## 7. Bottlenecks, failure modes, trade-offs
+## 7. Bottlenecks, failure modes, trade-offs, ops
 - What breaks first at 10x?
 - What happens when <dependency> is down?
 - Consistency choices and what they cost:
+- Two SLOs, one symptom alert to page on, and rollout/migration plan:
 
 ## Review (after)
 - What I missed vs a reference solution:

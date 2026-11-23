@@ -6,51 +6,47 @@ window.CURRICULUM = {
    {
     "id": "w1",
     "label": "Week 1",
-    "title": "Data structures first",
-    "goal": "Hash maps, stacks, queues, trees and heaps feel routine at medium level, and you know what every operation costs.",
-    "daily": "Two timed problems a day from the chapters you have read, 25 minutes each, by the method in the algorithmic round chapter: say the brute force and its cost first, then improve it, then test it by hand before you run it. Log each one.",
+    "title": "Core data structures, complexity and bare-editor habits",
+    "goal": "Hash maps, stacks, queues, trees and heaps feel routine, you hand-trace every solution in a plain editor before running it, and your 60-second intro and flagship project map are ready for early recruiter calls.",
+    "daily": "Two timed problems a day from the chapters you have read, 25 to 30 minutes each, in a plain editor without running code until after you hand-trace it (the Google bare-editor method in 15.01). Log each one.",
     "steps": [
      {
       "topic": "02.01"
      },
      {
       "topic": "15.01",
-      "do": "Read it on day 1, before your first timed drill: it's the method for every drill and mock. Reread it the day before each coding mock."
-     },
-     {
-      "topic": "14.01",
-      "do": "Write your project deep dive, plus a 60-second answer to “tell me about yourself”. Recruiter and hiring manager screens open with these."
+      "do": "Read it on day 1, before your first timed drill: clarify, state brute force and cost, optimize, hand-trace edge cases in a bare editor with no execution, then handle follow-ups."
      },
      {
       "topic": "10.01",
-      "do": "Read it, make the one-page cheat sheet in exercise 3, then do py_toolkit. Keep the cheat sheet next to you for every drill this week."
+      "do": "Learn Python's interview stdlib (collections, heapq, bisect, itertools, functools), write a one-page cheat sheet, then do py_toolkit."
      },
      {
       "topic": "01.01",
-      "do": "Read it and answer each quick check, then do the exercises. Save subarray_sum_count for week 2, after the two-pointers chapter: it needs prefix sums."
+      "do": "Read hash-maps.html and answer every quick check, then do hash_map and hash_patterns (all three functions). probing_map is a stretch."
      },
      {
-      "topic": "01.02"
+      "topic": "01.02",
+      "do": "Learn linear structures and monotonic stack/queue, then do linked_lists and monotonic. ring_deque is a stretch."
      },
      {
-      "topic": "01.03"
+      "topic": "01.03",
+      "do": "Learn trees, BST invariants, traversals and LCA, then do tree_traversals. bst (full delete) is a stretch."
      },
      {
-      "topic": "01.04"
+      "topic": "01.04",
+      "do": "Learn heaps and priority queues, then do min_heap and heap_patterns."
      },
      {
-      "topic": "02.02"
+      "topic": "02.02",
+      "do": "Focus on stability, custom sort keys, merge/quickselect and when O(n) bucket/counting sort beats O(n log n). Code merge_sort and quickselect in sorts; the rest is a stretch."
      },
      {
-      "topic": "14.09",
-      "do": "Read the Netflix culture memo, and Anthropic's mission, Core Views on AI Safety and Responsible Scaling Policy. Write a 90-second “why Netflix” and “why Anthropic”, each tying two of their values to something you did. In every recruiter call, ask for the screen's format and the onsite round list."
-     },
-     {
-      "topic": "15.10",
-      "do": "Ask Claude: “mock interview, past-project deep dive, 45 minutes”. Expect a follow-up on every choice: why this design, what broke, what you'd change."
+      "topic": "14.01",
+      "do": "Draft your 60-second 'tell me about yourself' and your flagship project deep-dive worksheet (python3 tools/new.py deepdive \"Project\") so early recruiter and hiring manager calls don't catch you cold."
      }
     ],
-    "dayNote": "About 33 hours. Times include each drill (25 minutes plus logging). Stretch exercises are optional this week. If a day runs long, move a drill to the next day rather than skip testing by hand. If you finish early, redo any drill you needed a hint for.",
+    "dayNote": "About 29 hours (~4.5 to 5 hours/day for 6 days, plus a lighter mock + review day on Sunday). Stretch exercises are optional. Never skip hand-tracing before running code.",
     "days": [
      {
       "label": "Day 1 · Monday",
@@ -58,22 +54,22 @@ window.CURRICULUM = {
        {
         "t": "1h 15m",
         "topic": "02.01",
-        "do": "Read it and answer every quick check"
+        "do": "Learn complexity & amortized analysis (ask Claude 'teach me complexity and amortized analysis')"
        },
        {
-        "t": "1h 30m",
+        "t": "1h 15m",
         "topic": "02.01",
-        "do": "Warm-ups 1 to 3 on paper, then complexity_drills"
-       },
-       {
-        "t": "50m",
-        "topic": "15.01",
-        "do": "Read it, then warm-ups 1 and 2 on paper: it's how you'll run every drill"
+        "do": "complexity_drills"
        },
        {
         "t": "45m",
-        "topic": "14.01",
-        "do": "Read it, then score three projects (exercise 1)"
+        "topic": "15.01",
+        "do": "Learn the Google bare-editor coding loop (clarify, brute force, optimize, hand-trace, follow-ups)"
+       },
+       {
+        "t": "1h 15m",
+        "topic": "10.01",
+        "do": "Make your Python stdlib one-page cheat sheet and start py_toolkit"
        }
       ],
       "drills": []
@@ -82,57 +78,43 @@ window.CURRICULUM = {
       "label": "Day 2 · Tuesday",
       "plan": [
        {
-        "t": "1h",
+        "t": "45m",
         "topic": "10.01",
-        "do": "Read it and write your one-page cheat sheet (exercise 3)"
+        "do": "Finish py_toolkit"
        },
        {
-        "t": "1h",
-        "topic": "10.01",
-        "do": "py_toolkit"
-       },
-       {
-        "t": "1h 30m",
+        "t": "1h 15m",
         "topic": "01.01",
-        "do": "Read it and answer every quick check"
+        "do": "Read hash-maps.html and answer every quick check"
+       },
+       {
+        "t": "1h 45m",
+        "topic": "01.01",
+        "do": "Warm-ups, then hash_map and hash_patterns (probing_map is stretch)"
        }
       ],
       "drills": [
-       "Contains Duplicate",
-       "Group Anagrams"
+       "Group Anagrams",
+       "Longest Consecutive Sequence"
       ]
      },
      {
       "label": "Day 3 · Wednesday",
       "plan": [
        {
-        "t": "2h 15m",
-        "topic": "01.01",
-        "do": "Warm-ups, then hash_map, probing_map and hash_patterns (leave subarray_sum_count for week 2)"
+        "t": "1h 15m",
+        "topic": "01.02",
+        "do": "Learn linked lists, stacks, queues, deques and monotonic stack/queue"
        },
        {
-        "t": "1h 30m",
+        "t": "2h",
         "topic": "01.02",
-        "do": "Read it and answer every quick check"
-       }
-      ],
-      "drills": [
-       "Longest Consecutive Sequence",
-       "Valid Parentheses"
-      ]
-     },
-     {
-      "label": "Day 4 · Thursday",
-      "plan": [
-       {
-        "t": "2h 15m",
-        "topic": "01.02",
-        "do": "Warm-ups, then linked_lists, ring_deque and monotonic"
+        "do": "linked_lists and monotonic (ring_deque is stretch)"
        },
        {
-        "t": "1h 30m",
-        "topic": "01.03",
-        "do": "Read it and answer every quick check"
+        "t": "45m",
+        "topic": "14.01",
+        "do": "Score three past projects, pick your flagship, and draft your 60-second intro"
        }
       ],
       "drills": [
@@ -141,392 +123,224 @@ window.CURRICULUM = {
       ]
      },
      {
-      "label": "Day 5 · Friday",
+      "label": "Day 4 · Thursday",
       "plan": [
        {
-        "t": "2h",
-        "topic": "01.03",
-        "do": "Warm-ups, then bst and tree_traversals"
-       },
-       {
         "t": "1h 15m",
-        "topic": "01.04",
-        "do": "Read it and answer every quick check"
+        "topic": "01.03",
+        "do": "Learn BSTs, balanced trees (conceptual), traversals and LCA"
        },
        {
-        "t": "45m",
+        "t": "1h 45m",
+        "topic": "01.03",
+        "do": "tree_traversals (bst delete is stretch)"
+       },
+       {
+        "t": "1h",
         "topic": "14.01",
-        "do": "Tell me about yourself (exercise 3), then start your deep dive worksheet (exercise 4)"
+        "do": "Draft your flagship deep-dive map, scale numbers and rejected alternatives"
        }
       ],
       "drills": [
        "Validate Binary Search Tree",
-       "Binary Tree Level Order Traversal"
+       "Lowest Common Ancestor of a Binary Tree"
+      ]
+     },
+     {
+      "label": "Day 5 · Friday",
+      "plan": [
+       {
+        "t": "1h 15m",
+        "topic": "01.04",
+        "do": "Learn binary heaps, top-k, k-way merge and two-heap medians"
+       },
+       {
+        "t": "1h 45m",
+        "topic": "01.04",
+        "do": "min_heap and heap_patterns"
+       },
+       {
+        "t": "1h",
+        "topic": "02.02",
+        "do": "Learn sorting trade-offs, stability, Timsort and quickselect"
+       }
+      ],
+      "drills": [
+       "Kth Largest Element in an Array",
+       "Find Median from Data Stream"
       ]
      },
      {
       "label": "Day 6 · Saturday",
       "plan": [
        {
-        "t": "1h 45m",
-        "topic": "01.04",
-        "do": "Warm-ups, then min_heap and heap_patterns"
+        "t": "1h 30m",
+        "topic": "02.02",
+        "do": "sorts (merge sort and quickselect; remaining sorts are stretch)"
        },
        {
         "t": "1h 15m",
-        "topic": "02.02",
-        "do": "Read it and answer every quick check"
-       },
-       {
-        "t": "1h",
         "topic": "14.01",
-        "do": "Finish the worksheet, then the timed 5-minute map and two ladders (exercise 5)"
+        "do": "Finish your deep-dive worksheet and practice the 5-minute map out loud"
        },
        {
         "t": "1h",
-        "topic": "14.09",
-        "do": "Read it and the four sources (exercise 1)"
+        "topic": "01.02",
+        "do": "Redo the hardest drill from Days 2 to 5 from a blank editor"
        }
       ],
-      "drills": []
+      "drills": [
+       "Merge k Sorted Lists",
+       "Sliding Window Maximum"
+      ]
      },
      {
       "label": "Day 7 · Sunday",
       "plan": [
        {
-        "t": "1h 30m",
-        "topic": "02.02",
-        "do": "Warm-ups, then sorts"
-       },
-       {
-        "t": "1h",
-        "topic": "14.09",
-        "do": "Write and say both answers (exercises 2 to 4)"
-       },
-       {
-        "t": "1h",
-        "topic": "15.10",
-        "do": "45 minutes plus feedback, with your worksheet closed"
+        "t": "20m",
+        "topic": "15.01",
+        "do": "Review your bare-editor checklist and common edge cases"
        },
        {
         "t": "1h",
         "topic": "m1",
-        "do": "Skim the algorithmic round chapter's section 10, then 45 minutes plus feedback"
+        "do": "45-minute bare-editor mock plus feedback and logging"
+       },
+       {
+        "t": "1h",
+        "topic": "01.01",
+        "do": "Light review of weakest topic from Week 1"
        }
       ],
-      "drills": [
-       "Kth Largest Element in an Array"
-      ]
+      "drills": []
      }
     ],
     "milestone": {
      "id": "m1",
      "format": "15.01",
-     "title": "Mock 1: algorithmic coding",
-     "bar": "One medium solved, tested by hand and explained in 45 minutes, with a 3 or better on problem solving and communication.",
-     "ask": "mock interview, coding, 45 minutes"
+     "title": "Mock 1: Google-style algorithmic coding (bare editor)",
+     "bar": "One Medium solved in a plain editor with no execution until the end, hand-traced with edge cases, plus one constraint follow-up in 45 minutes. Score 3+ on problem solving and communication.",
+     "ask": "mock interview, coding (Google L5 bare-editor style, 1 medium + follow-up), 45 minutes"
     }
    },
    {
     "id": "w2",
     "label": "Week 2",
-    "title": "Search, graphs and code built in levels; design starts",
-    "goal": "Binary search, two pointers and graph traversals are routine, you can build a component in levels with tests first, and you can size a system on paper.",
-    "daily": "Two timed problems a day, mixing this week's patterns with last week's. Once you've read the estimation chapter, add one back-of-envelope estimate a day: users, then requests per second, then storage.",
+    "title": "The Google DSA core: search, graphs, Union-Find, tries, intervals and shortest paths",
+    "goal": "Google's highest-frequency algorithmic families—binary search on the answer, sliding windows, graphs, Union-Find, tries, intervals and Dijkstra—are routine even when constraints shift.",
+    "daily": "Two timed bare-editor problems a day (one from today's topic, one mixed from Week 1). After solving, spend 2 minutes asking: 'What if the input is 100x bigger, dynamic, or a stream?'",
     "steps": [
      {
-      "topic": "02.03"
+      "topic": "02.03",
+      "do": "Learn binary search invariants and 'search on the answer', then do binary_search and timed drills."
      },
      {
-      "topic": "02.04"
+      "topic": "02.04",
+      "do": "Learn two pointers, sliding window and prefix sums, then do sliding_window and timed drills."
      },
      {
-      "topic": "01.05"
+      "topic": "01.05",
+      "do": "Learn graph representations (adjacency list vs matrix, implicit grids, directed/weighted), then do graph_basics and clone_graph."
      },
      {
-      "topic": "02.05"
+      "topic": "02.05",
+      "do": "Learn BFS, DFS, multi-source BFS, topological sort and cycle detection, then do graphs and timed drills."
      },
      {
-      "topic": "10.03",
-      "do": "Ask Claude: “teach me testing for interviews” (45 minutes): which cases to write first, edge cases, and when a fake beats a mock. From now on, write three tests before you run any solution."
+      "topic": "01.07",
+      "do": "Google staple: learn Union-Find with path compression and union by rank, then do union_find and union_find_patterns."
      },
      {
-      "topic": "10.02",
-      "do": "Ask Claude: “teach me designing for change” (45 minutes): small classes with one job, composition over inheritance, and adding a requirement without a rewrite."
+      "topic": "01.06",
+      "do": "Google staple: learn tries and prefix trees, then do trie and trie_patterns (skip max-XOR until Week 10). radix_tree is a stretch."
      },
      {
-      "topic": "02.14",
-      "do": "Read it, then do token_bucket and rate_window_counter, the two an interviewer expects. The other two exercises are a stretch."
+      "topic": "01.09",
+      "do": "Google staple: learn interval merge, sweep line and sorted booking structures (bisect), then do interval_merge and interval_sweep. interval_tree is a stretch."
      },
      {
-      "topic": "10.04",
-      "do": "Two builds in levels, 90 minutes each, tests first: a key-value store with TTL and transactions, then an in-memory file system with sizes. Skip parking lot and elevator."
-     },
-     {
-      "topic": "04.01",
-      "do": "Ask Claude: “teach me requirements gathering” (30 minutes). Then open every design the same way: the features, the scale numbers, and what you will leave out."
-     },
-     {
-      "topic": "02.16"
+      "topic": "02.08",
+      "do": "Google staple: learn Dijkstra and 0-1 BFS, then do dijkstra and timed drills. Bellman-Ford and A* are stretch."
      },
      {
       "topic": "14.02"
-     },
-     {
-      "topic": "15.12",
-      "do": "Ask Claude: “mock interview, hiring manager round, 45 minutes”. Bring your deep dive, an ownership story and your “why this company”."
      }
     ],
     "milestone": {
      "id": "m2",
-     "format": "15.02",
-     "title": "Mock 2: practical screen",
-     "bar": "A problem in four levels in 90 minutes, each level adding a requirement. Levels 1 to 3 pass your own tests, no level forces a rewrite of the one before, and you score a 3 or better on code quality and on testing.",
-     "ask": "mock interview, practical coding, 4 levels, 90 minutes"
+     "format": "15.01",
+     "title": "Mock 2: Google-style Medium-Hard (graphs, intervals or tries)",
+     "bar": "One unseen Medium-Hard graph, interval or trie problem in 45 minutes in a bare editor, with two escalating follow-ups and a clean hand trace. Score 3+ on all four coding signals.",
+     "ask": "mock interview, coding (Google L5 bare-editor style, 1 medium-hard graph/interval/trie + 2 follow-ups), 45 minutes"
     }
    },
    {
     "id": "w3",
     "label": "Week 3",
-    "title": "Recursion and DP; how a request travels; coding with AI",
-    "goal": "Dynamic programming stops feeling like magic, you can trace a request from DNS to response and say what each hop costs, and you can steer an AI assistant and check its work.",
-    "daily": "Two timed problems a day, one of them from an earlier week, plus the daily estimate. Review beats new material once a pattern has faded.",
+    "title": "DP, greedy and practical 4-level builds (Anthropic OA ready)",
+    "goal": "Dynamic programming and greedy proofs stop feeling like guesswork, you can architect a component across 4 escalating requirements with tests first, and your past-project deep dive holds up under grilling.",
+    "daily": "One timed bare-editor algorithmic problem (mixing Weeks 1 to 3) plus one practical build slice or timed DP/greedy drill.",
     "steps": [
      {
-      "topic": "02.06"
+      "topic": "02.06",
+      "do": "Learn recursion trees, backtracking and pruning, then do backtracking and timed drills."
      },
      {
-      "topic": "02.07"
+      "topic": "02.07",
+      "do": "Learn state definition, transitions and memoization vs tabulation across 1D/2D, knapsack, LIS, LCS/edit distance and DAG DP, then do dp and timed drills."
      },
      {
-      "topic": "02.11",
-      "do": "Read it, then do bit_tricks. The other two exercises are a stretch. Tries, sketches and consistent hashing use its shifts and masks later."
+      "topic": "02.10",
+      "do": "Learn greedy choice and exchange arguments, then do greedy_intervals, gas_station and job_scheduling. huffman_code is a stretch."
      },
      {
       "topic": "01.08",
-      "do": "Read it, then do lru_cache and ttl_cache. lfu_cache is a stretch. Section 11 previews week 7's locks, so skim it."
+      "do": "Learn LRU/TTL/LFU cache construction, then do lru_cache and ttl_cache. lfu_cache is a stretch (you'll make caches thread-safe next week)."
      },
      {
-      "topic": "01.09",
-      "do": "Read it, then do interval_merge and interval_sweep. Skip interval_tree for now."
+      "topic": "02.14",
+      "do": "Learn rate limiting algorithms, then do token_bucket and rate_window_counter. The other two exercises are a stretch."
      },
      {
-      "topic": "04.03",
-      "do": "Sections 5, 9 and 10 of the estimation chapter cover most of it. Ask Claude to quiz you on the numbers, then explain p99 under fan-out back."
+      "topic": "10.03",
+      "do": "Ask Claude: “teach me testing for interviews” (45 minutes): which cases to write first, edge cases, and when a fake beats a mock. Write three tests before running any practical build."
      },
      {
-      "topic": "04.02",
-      "do": "Sections 3 and 4 of the estimation chapter are the method. Ask Claude for three prompts and size each one out loud in under five minutes."
+      "topic": "10.02",
+      "do": "Ask Claude: “teach me designing for change” (45 minutes): small classes with one job, composition over inheritance, and adding requirements without a rewrite."
      },
      {
-      "topic": "09.04",
-      "do": "Ask Claude: “teach me TCP, HTTP, TLS and DNS”, one 60-minute session for this step and the next: handshakes and what they cost, keep-alive and connection reuse, HTTP/2 multiplexing, TLS termination. Skip congestion-control internals."
+      "topic": "10.04",
+      "do": "Anthropic CodeSignal prep — two 90-minute 4-level builds, tests first: (1) an in-memory key-value store with TTL, prefix scan and transactions; (2) an in-memory file system with quotas (or banking ledger). Skip parking lot and elevator."
      },
      {
-      "topic": "09.03",
-      "do": "Covered in the same session as TCP vs UDP. Then explain back, hop by hop, what happens when a browser loads a page."
-     },
-     {
-      "topic": "08.01",
-      "do": "Ask Claude: “teach me systematic debugging” (30 minutes): reproduce, shrink the input, test one hypothesis at a time, bisect, and prove the fix with a test."
-     },
-     {
-      "topic": "13.06"
-     },
-     {
-      "topic": "14.03"
+      "topic": "15.10",
+      "do": "Ask Claude: “mock interview, past-project deep dive, 45 minutes” with your worksheet closed. Expect follow-ups on every trade-off, failure and metric."
      }
     ],
     "milestone": {
      "id": "m3",
-     "format": "15.01",
-     "title": "Mock 3: algorithmic screen",
-     "bar": "Two mediums in 45 minutes, both tested by hand, with a 3 or better on all four coding signals. Pass this and Mock 2, and you are ready for technical screens.",
-     "ask": "mock interview, coding, phone screen with two mediums, 45 minutes"
+     "format": "15.02",
+     "title": "Mock 3: practical 4-level screen (Anthropic CodeSignal style)",
+     "bar": "A 4-level progressive build in 90 minutes, tests first. Levels 1 to 3 pass cleanly without rewriting earlier code, Level 4 is cleanly scoped, and you score 3+ on code quality and testing.",
+     "ask": "mock interview, practical coding, 4 levels, 90 minutes"
     }
    },
    {
     "id": "w4",
     "label": "Week 4",
-    "title": "Load balancers, APIs, caches and databases; the first design",
-    "goal": "You can put a load balancer, an API and a cache in front of a database you chose and can defend, and you've done one design under time.",
-    "daily": "One timed problem a day, alternating between an algorithmic problem and one level of a practical build. Do each design as a 45-minute timed run, out loud, on the worksheet.",
-    "steps": [
-     {
-      "topic": "04.11",
-      "do": "Ask Claude: “teach me stateless services and load balancing”, one session for this step and the next: where session state lives and why that lets you add servers, then L4 vs L7, the balancing algorithms and health checks."
-     },
-     {
-      "topic": "04.04",
-      "do": "Covered in the same session as stateless services. Then explain back when you'd pick L4, when L7, and why sticky sessions hurt."
-     },
-     {
-      "topic": "04.09"
-     },
-     {
-      "topic": "04.05"
-     },
-     {
-      "topic": "06.03",
-      "do": "Ask Claude: “teach me SQL for interviews” (45 minutes). Then write five queries by hand: two joins, a GROUP BY with HAVING, a window function, and read one EXPLAIN."
-     },
-     {
-      "topic": "01.12",
-      "do": "Read it. Skip the three builds until after onsites."
-     },
-     {
-      "topic": "01.13",
-      "do": "Read it through “B-tree or LSM tree?”. Skip bplus_tree, lsm_store and wal_log until after onsites."
-     },
-     {
-      "topic": "06.04",
-      "do": "Ask Claude: “teach me data modeling and indexes”, one session for this step and the next: normalize first, denormalize for a query you can name, then which index serves which query."
-     },
-     {
-      "topic": "06.01",
-      "do": "Covered in the same session as data modeling. Then explain back how to order a composite index's columns, and when a covering index never touches the table."
-     },
-     {
-      "topic": "06.02"
-     },
-     {
-      "topic": "04.06",
-      "do": "Ask Claude: “teach me choosing a database” (30 minutes). Make a one-page table: relational, document, key-value, wide-column and search, each with the access pattern it fits and the reason you'd reject it."
-     },
-     {
-      "topic": "07.01"
-     }
-    ],
-    "milestone": {
-     "id": "m4",
-     "format": "15.09",
-     "title": "Mock 4: AI-assisted coding",
-     "bar": "A small component built with an AI assistant in 60 minutes while you narrate: context first, small steps, tests before trusting any output. You catch at least one wrong suggestion and say how you caught it.",
-     "ask": "mock interview, AI-assisted coding round, 60 minutes"
-    }
-   },
-   {
-    "id": "w5",
-    "label": "Week 5",
-    "title": "Sharding, replication and queues",
-    "goal": "You can shard and replicate without hand-waving, say what consistency each read gets, and use a queue without losing or doubling messages.",
-    "daily": "One timed problem a day, alternating algorithmic and practical, plus one design run every other day.",
-    "steps": [
-     {
-      "topic": "02.15",
-      "do": "Read it, then do consistent_hash. Jump and rendezvous hashing are a stretch."
-     },
-     {
-      "topic": "04.07"
-     },
-     {
-      "topic": "05.02",
-      "do": "Ask Claude: “teach me consistency models and CAP”, one session for this step and the next."
-     },
-     {
-      "topic": "05.01",
-      "do": "Covered in the same session as consistency models. Then explain back what PACELC adds to CAP, with one real database on each side."
-     },
-     {
-      "topic": "04.08",
-      "do": "Ask Claude: “teach me message queues and delivery guarantees”, one session for this step and the next."
-     },
-     {
-      "topic": "05.03",
-      "do": "Covered in the same session as message queues. Then explain back how an idempotency key turns at-least-once delivery into effectively-once."
-     },
-     {
-      "topic": "11.01",
-      "do": "Ask Claude: “teach me SLIs, SLOs and error budgets” (45 minutes). From now on, end every design with your two SLOs and the one alert you'd page on."
-     },
-     {
-      "topic": "07.03"
-     },
-     {
-      "topic": "02.08",
-      "do": "Read it, then do dijkstra and its drills. Bellman-Ford and A* can wait."
-     },
-     {
-      "topic": "02.10",
-      "do": "Read it, then do greedy_intervals, gas_station and job_scheduling. Skip huffman_code."
-     },
-     {
-      "topic": "14.04"
-     },
-     {
-      "topic": "14.05"
-     }
-    ],
-    "milestone": {
-     "id": "m5",
-     "format": "15.05",
-     "title": "Mock 5: system design",
-     "bar": "A 3 or better on scoping and on the trade-offs in the deep dive, and a 2 or better on scale, failure and operations.",
-     "ask": "mock interview, system design, 45 minutes"
-    }
-   },
-   {
-    "id": "w6",
-    "label": "Week 6",
-    "title": "Real-time delivery, ordering and the key-value store",
-    "goal": "Push delivery, clocks and quorums feel familiar, you know how systems fail, and the chat, key-value store and typeahead designs are done under time.",
-    "daily": "One timed problem a day, alternating algorithmic and practical, plus one design run every other day.",
-    "steps": [
-     {
-      "topic": "04.14"
-     },
-     {
-      "topic": "07.04",
-      "do": "Run this one as a scored mock. Ask Claude: “mock interview, system design, chat, 45 minutes”. Bar: a 3 or better on all four design signals, with one requirement changed at minute 25."
-     },
-     {
-      "topic": "05.06"
-     },
-     {
-      "topic": "05.05"
-     },
-     {
-      "topic": "07.08"
-     },
-     {
-      "topic": "05.08"
-     },
-     {
-      "topic": "01.06",
-      "do": "Read it, then do trie and trie_patterns. radix_tree is a stretch."
-     },
-     {
-      "topic": "07.06"
-     },
-     {
-      "topic": "14.06"
-     },
-     {
-      "topic": "14.07"
-     }
-    ],
-    "milestone": {
-     "id": "m6",
-     "format": "15.11",
-     "title": "Mock 6: behavioral",
-     "bar": "Every answer names your own actions and a measured result, with a 3 or better on ownership and on conflict. Include a story about candid feedback given and received (Netflix), and a specific answer on why Anthropic's mission matters to you.",
-     "ask": "mock interview, behavioral, 45 minutes"
-    }
-   },
-   {
-    "id": "w7",
-    "label": "Week 7",
-    "title": "Concurrency, overload and the last designs",
-    "goal": "You can write thread-safe code and say why it is safe, you can keep a service up under overload, and the remaining classic designs are done.",
-    "daily": "One timed problem a day, every other one a concurrency problem, plus one design run every other day.",
+    "title": "Concurrency, debugging and AI verification (technical-screen ready)",
+    "goal": "You can write thread-safe and asyncio Python code and prove why it is race- and deadlock-free, read unfamiliar code quickly, and systematically verify or debug AI-generated code.",
+    "daily": "One timed problem a day, alternating a Google bare-editor algorithmic drill and a concurrency coding drill.",
     "steps": [
      {
       "topic": "09.01",
-      "do": "Ask Claude: “teach me processes, threads and scheduling” (30 minutes): what a context switch costs, and what threads share that processes don't."
+      "do": "Ask Claude: “teach me processes, threads and scheduling” (30 minutes): context switch cost, shared vs private memory, kernel vs user space."
      },
      {
       "topic": "03.01",
-      "do": "Ask Claude: “teach me threads, processes and asyncio” (60 minutes): the GIL, the event loop, gather, and a Semaphore to cap concurrency."
+      "do": "Ask Claude: “teach me threads, processes and asyncio in Python” (60 minutes): the GIL, I/O vs CPU-bound work, event loop, asyncio.gather and Semaphore."
      },
      {
       "topic": "03.02"
@@ -538,145 +352,343 @@ window.CURRICULUM = {
       "topic": "03.04"
      },
      {
-      "topic": "01.14",
-      "optional": true,
-      "do": "Practice for Mock 7: read it, then do striped_hash_map. The two lock-free exercises are a stretch."
-     },
-     {
       "topic": "03.05"
      },
      {
-      "topic": "04.12"
+      "topic": "03.06",
+      "do": "Ask Claude: “teach me async I/O, event loops and cancellation” (45 minutes): epoll/kqueue intuition, non-blocking sockets, structured concurrency, timeouts and avoiding blocking the loop."
+     },
+     {
+      "topic": "03.07",
+      "do": "Anthropic staple — code and explain two classics: a bounded producer-consumer queue with graceful shutdown, and a thread-safe LRU cache with single-flight (coalescing concurrent misses for the same key)."
+     },
+     {
+      "topic": "01.14",
+      "optional": true,
+      "do": "Practice lock granularity: implement striped_hash_map. The lock-free ring buffer and MPMC queue are a stretch."
+     },
+     {
+      "topic": "08.01",
+      "do": "Ask Claude: “teach me systematic debugging” (30 minutes): reproduce, shrink the input, test one hypothesis at a time, bisect, and prove the fix with a regression test."
+     },
+     {
+      "topic": "08.03",
+      "do": "Ask Claude: “teach me reading unfamiliar code quickly” (30 minutes): entry points, state & data flow, invariants. Practice for 30 minutes on an unfamiliar Python module."
+     },
+     {
+      "topic": "08.04",
+      "do": "Practice spotting subtle bugs in given code: races, off-by-ones, mutating during iteration, resource leaks and boundary conditions."
+     },
+     {
+      "topic": "13.06",
+      "do": "Modern engineering & Gemini-pilot prep: practice giving crisp invariants/context, reviewing diffs skeptically, catching subtle bugs, and writing differential tests (do differential; delta_debug and bisect_skip are stretch). Note: Anthropic and most Google L5 live loops are still no-AI."
+     }
+    ],
+    "milestone": {
+     "id": "m4",
+     "format": "15.07",
+     "title": "Mock 4: concurrency coding (Anthropic bar)",
+     "bar": "Build a concurrent web crawler with per-host rate limiting (or a thread-safe single-flight cache) in 45 to 60 minutes, with a race-catching test and a clear proof of thread safety and deadlock freedom. Pass M2, M3 and M4 and you are ready for technical screens.",
+     "ask": "mock interview, concurrency coding: a concurrent web crawler with per-host rate limiting, 60 minutes"
+    }
+   },
+   {
+    "id": "w5",
+    "label": "Week 5",
+    "title": "System design foundations: scoping, math, networking, APIs and caching",
+    "goal": "You can scope an ambiguous prompt, compute QPS/storage/p99 in under 5 minutes, trace a request hop by hop over TCP/HTTP/TLS/DNS, and put a load balancer, clean API, CDN and cache in front of a service.",
+    "daily": "One timed bare-editor algorithmic problem (staying sharp as phone screens start landing) plus one 5-minute back-of-envelope estimation drill.",
+    "steps": [
+     {
+      "topic": "04.01",
+      "do": "Ask Claude: “teach me requirements gathering for L5 system design” (30 minutes): functional vs non-functional, scale constraints, explicit scope cuts and driving the room."
+     },
+     {
+      "topic": "02.16",
+      "do": "Learn capacity math and tail-latency fan-out, then do capacity_estimate and fanout_latency. birthday_bound is a stretch."
+     },
+     {
+      "topic": "04.03",
+      "do": "Ask Claude to quiz you on latency numbers (L1, RAM, SSD, cross-AZ, cross-continent) and explain p99 amplification under fan-out back."
+     },
+     {
+      "topic": "04.02",
+      "do": "Ask Claude for three system prompts and size QPS, peak QPS, storage, bandwidth and hot-set memory out loud in under 5 minutes each."
+     },
+     {
+      "topic": "09.04",
+      "do": "Ask Claude: “teach me TCP, UDP, HTTP, TLS and DNS” (60 minutes for this step and 09.03): handshakes, RTT cost, keep-alive, connection pooling, HTTP/2 multiplexing, HTTP/3/QUIC, TLS termination."
+     },
+     {
+      "topic": "09.03",
+      "do": "Covered with 09.04. Explain back, hop by hop, what happens when a client calls an HTTPS API and where latency hides."
+     },
+     {
+      "topic": "04.11",
+      "do": "Ask Claude: “teach me stateless services and load balancing” (45 minutes for this step and 04.04): session externalization, horizontal scaling, L4 vs L7, health checks and why sticky sessions hurt."
+     },
+     {
+      "topic": "04.04",
+      "do": "Covered with 04.11. Explain back when you pick L4 vs L7 and how draining works during deploys."
+     },
+     {
+      "topic": "04.09"
+     },
+     {
+      "topic": "04.05"
+     },
+     {
+      "topic": "04.10"
+     },
+     {
+      "topic": "11.01",
+      "do": "Ask Claude: “teach me SLIs, SLOs and error budgets” (45 minutes). From now on, end every system design with two concrete SLOs and the one symptom alert you'd page on."
+     },
+     {
+      "topic": "14.03"
+     }
+    ],
+    "milestone": {
+     "id": "m5",
+     "format": "15.01",
+     "title": "Mock 5: Google-style Medium-Hard + scale follow-up",
+     "bar": "One unseen Medium-Hard in 45 minutes in a bare editor with zero hints, clean dry-run, and a crisp verbal answer to a 100x-scale or streaming follow-up. Keeps your coding sharp while screens roll in.",
+     "ask": "mock interview, coding (Google L5 bare-editor style, 1 medium-hard + scale follow-up), 45 minutes"
+    }
+   },
+   {
+    "id": "w6",
+    "label": "Week 6",
+    "title": "Storage engines, databases, security basics and your first design",
+    "goal": "You can explain B-trees vs LSM trees, design schemas and composite indexes, reason about ACID anomalies and MVCC, defend a database choice with auth/tenant boundaries, and run a full 45-minute design under time.",
+    "daily": "One timed coding problem (alternating Google bare-editor DSA and concurrency/practical) plus one 15-minute data-modeling or schema-tradeoff drill.",
+    "steps": [
+     {
+      "topic": "01.12",
+      "do": "Learn Bloom filters, Count-Min Sketch and HyperLogLog conceptually (where they save RAM/disk I/O). Skip the three Python builds until after onsites."
+     },
+     {
+      "topic": "01.13",
+      "do": "Learn B-tree/B+tree, LSM tree, SSTable, compaction and write-ahead log (WAL) conceptually: read vs write amplification and when each wins. Skip the three builds until after onsites."
+     },
+     {
+      "topic": "06.03",
+      "do": "Ask Claude: “teach me SQL and EXPLAIN plans for senior interviews” (45 minutes): joins, GROUP BY/HAVING, window functions, seq scan vs index scan."
+     },
+     {
+      "topic": "06.04",
+      "do": "Ask Claude: “teach me data modeling and indexing” (60 minutes for this step and 06.01): normalize first, denormalize only for a named query, composite index column order, covering indexes and write overhead."
+     },
+     {
+      "topic": "06.01",
+      "do": "Covered with 06.04. Explain back left-prefix rules for composite indexes and when an index hurts write throughput."
+     },
+     {
+      "topic": "06.02"
+     },
+     {
+      "topic": "06.05",
+      "do": "Ask Claude: “teach me MVCC, optimistic and pessimistic locking” (45 minutes): snapshot reads, SELECT FOR UPDATE, version columns/CAS and hot-row contention."
+     },
+     {
+      "topic": "04.06",
+      "do": "Ask Claude: “teach me choosing a database” (30 minutes). Build a one-page table: relational, document, key-value, wide-column, time-series and search — the access pattern each fits and when to reject it."
+     },
+     {
+      "topic": "12.01",
+      "do": "Ask Claude: “teach me AuthN/AuthZ and multi-tenant isolation for system design” (45 minutes for this step and 12.05): OAuth 2.0/OIDC, JWT vs opaque sessions, RBAC/ABAC, tenant boundaries and noisy-neighbor isolation."
+     },
+     {
+      "topic": "12.05",
+      "do": "Covered with 12.01. Explain back how you prevent cross-tenant data leaks and noisy-neighbor exhaustion in a shared service."
+     },
+     {
+      "topic": "07.01",
+      "do": "Warm-up design (30 to 45 min, timed, out loud): URL shortener / pastebin, including custom aliases, analytics, cache stampede and key generation."
+     },
+     {
+      "topic": "14.04"
+     }
+    ],
+    "milestone": {
+     "id": "m6",
+     "format": "15.05",
+     "title": "Mock 6: System Design #1 (storage & foundations)",
+     "bar": "45-minute timed design (e.g., multi-tenant blob/pastebin service or URL shortener with analytics). Score 3+ on scoping, data modeling and storage trade-offs, and 2+ on scale, failure modes and SLOs.",
+     "ask": "mock interview, system design (foundations & storage), 45 minutes"
+    }
+   },
+   {
+    "id": "w7",
+    "label": "Week 7",
+    "title": "Distributed systems deep dive (the Google L5 leveling bar)",
+    "goal": "When an interviewer opens any black box—sharding, hot keys, cross-shard indexes, replication, consistency, Raft/Paxos consensus, clocks, distributed locks, sagas or failure cascades—you reason from first principles.",
+    "daily": "One timed bare-editor coding problem a day, plus one 45-minute timed design run every other day.",
+    "steps": [
+     {
+      "topic": "02.15",
+      "do": "Learn consistent and rendezvous hashing, then do consistent_hash (virtual nodes and replicas). Jump and rendezvous hashing are a stretch."
+     },
+     {
+      "topic": "04.07"
+     },
+     {
+      "topic": "06.06",
+      "do": "Google L5 essential — ask Claude: “teach me partitioning, hot keys and secondary indexes across shards” (45 minutes): hash vs range sharding, key salting, local vs global secondary indexes and scatter-gather cost."
+     },
+     {
+      "topic": "05.02",
+      "do": "Ask Claude: “teach me consistency models and CAP/PACELC” (60 minutes for this step and 05.01): linearizable, sequential, causal, read-your-writes and eventual consistency with real examples."
+     },
+     {
+      "topic": "05.01",
+      "do": "Covered with 05.02. Explain back what PACELC adds to CAP and place Spanner, DynamoDB, Cassandra and Postgres on it."
+     },
+     {
+      "topic": "05.04",
+      "do": "Google L5 essential — ask Claude: “teach me Raft consensus and leader election” (60 minutes): terms, quorum votes, log replication, safety under partitions, and how Paxos relates conceptually."
+     },
+     {
+      "topic": "05.06"
+     },
+     {
+      "topic": "05.05"
+     },
+     {
+      "topic": "05.09",
+      "do": "Ask Claude: “teach me distributed locks, leases and fencing tokens” (45 minutes): why TTL locks alone fail under GC pauses, and how monotonic fencing tokens protect storage."
+     },
+     {
+      "topic": "04.08",
+      "do": "Ask Claude: “teach me message queues, event logs and delivery guarantees” (60 minutes for this step and 05.03): Kafka partitions/consumer groups vs SQS, ordering, DLQs and idempotency keys."
+     },
+     {
+      "topic": "05.03",
+      "do": "Covered with 04.08. Explain back how an idempotency key turns at-least-once delivery into effectively-once."
+     },
+     {
+      "topic": "05.07",
+      "do": "Ask Claude: “teach me distributed transactions: 2PC, sagas, outbox and CDC” (45 minutes): why 2PC blocks, transactional outbox for DB+queue atomicity, and compensating actions in sagas."
+     },
+     {
+      "topic": "05.08",
+      "do": "Ask Claude: “teach me distributed failure modes and overload protection” (60 minutes for this step and 04.12): split brain, gray failure, thundering herd, retry storms, timeouts, jitter, circuit breakers, load shedding and bulkheads."
+     },
+     {
+      "topic": "04.12",
+      "do": "Covered with 05.08. Explain back how retries amplify outages and how token buckets + jitter + load shedding stop a cascade."
      },
      {
       "topic": "07.02"
      },
      {
-      "topic": "07.05"
+      "topic": "07.08"
+     }
+    ],
+    "milestone": {
+     "id": "m7",
+     "format": "15.05",
+     "title": "Mock 7: System Design #2 (Google L5 hard distributed system)",
+     "bar": "45-minute timed design (e.g., distributed key-value store or global rate limiter) with deep black-box grilling on sharding, consensus/quorums and failure modes, plus a requirement change at minute 25. Score 3+ on all four design signals.",
+     "ask": "mock interview, system design (Google L5 bar, deep distributed systems grilling + minute-25 change), 45 minutes"
+    }
+   },
+   {
+    "id": "w8",
+    "label": "Week 8",
+    "title": "Real-time delivery, search, stream processing and production rollouts",
+    "goal": "You can architect real-time push systems, distributed search/typeahead, high-throughput streaming pipelines, multi-region failovers and zero-downtime migrations—the full Google L5 system design breadth.",
+    "daily": "One timed coding problem a day (alternating Google bare-editor Medium-Hard and concurrency) plus one 45-minute design run every other day.",
+    "steps": [
+     {
+      "topic": "04.13",
+      "do": "Ask Claude: “teach me multi-region architecture” (45 minutes): active-active vs active-passive, RPO/RTO, cross-region replication latency, failover and data residency."
+     },
+     {
+      "topic": "11.02",
+      "do": "Ask Claude: “teach me deployment safety and zero-downtime migrations” (45 minutes for this step and 04.17): canary rollouts, feature flags, automated rollback, expand-contract, dual writes, backfills and shadow traffic."
+     },
+     {
+      "topic": "04.17",
+      "do": "Covered with 11.02. Explain back how to migrate a live high-QPS table to a new schema or database with zero downtime."
+     },
+     {
+      "topic": "04.14"
+     },
+     {
+      "topic": "04.15",
+      "do": "Google essential — ask Claude: “teach me search engines and inverted indexes” (45 minutes): tokenization, posting lists, document vs term sharding, scatter-gather and ranking basics."
+     },
+     {
+      "topic": "06.07",
+      "do": "Ask Claude: “teach me batch and stream processing” (60 minutes for this step and 06.08): event time vs processing time, tumbling/sliding windows, watermarks, late data and checkpointing."
+     },
+     {
+      "topic": "06.08",
+      "do": "Covered with 06.07. Explain back why event time differs from processing time and how watermarks bound state."
      },
      {
       "topic": "07.10"
      },
      {
+      "topic": "07.14"
+     },
+     {
+      "topic": "07.04"
+     },
+     {
+      "topic": "07.06"
+     },
+     {
       "topic": "07.07",
-      "do": "Design it on a worksheet first (python3 tools/new.py case \"Web crawler\"), 45 minutes. Then code a small version: a pool of workers, a visited set and a per-host rate limit. Mock 7 is a variation of it."
-     }
-    ],
-    "milestone": {
-     "id": "m7",
-     "format": "15.07",
-     "title": "Mock 7: concurrency coding",
-     "bar": "A concurrent web crawler with a per-host rate limit in 45 minutes, with a test that would catch a race and a clear account of why it is safe.",
-     "ask": "mock interview, concurrency coding: a concurrent web crawler with a per-host rate limit, 45 minutes"
-    }
-   },
-   {
-    "id": "onsite",
-    "label": "Onsite",
-    "title": "Every round on your list, before the day",
-    "pick": true,
-    "goal": "Start the day your first onsite is booked, wherever you are on the track. Ask the recruiter for the round list, rehearse only those formats, write any story you're missing, and run the full loop three or four days before.",
-    "daily": "One timed problem a day, and one mock every other day in the format you are weakest at.",
-    "steps": [
-     {
-      "topic": "08.03",
-      "do": "Ask Claude: “teach me reading unfamiliar code” (30 minutes): find the entry point, follow one request through, and write down the invariants. Then practice on a small open-source repository."
+      "do": "Design the distributed web crawler on a worksheet (45 min), connecting frontier sharding, politeness, Bloom dedup and failure recovery back to your Week 4 concurrent crawler."
      },
      {
-      "topic": "08.02"
-     },
-     {
-      "topic": "08.04"
-     },
-     {
-      "topic": "15.03",
-      "optional": true,
-      "do": "Only if your round list has a debugging round. Ask Claude: “mock interview, debugging round, 45 minutes”."
-     },
-     {
-      "topic": "08.13",
-      "optional": true,
-      "do": "Only if your round list has a code review round. Ask Claude: “teach me reviewing a pull request” (30 minutes)."
-     },
-     {
-      "topic": "15.04",
-      "optional": true,
-      "do": "Only if your round list has a code review round. Ask Claude: “mock interview, code review round, 45 minutes”."
-     },
-     {
-      "topic": "15.06",
-      "optional": true,
-      "do": "Only if your round list has a low-level design round. Ask Claude: “mock interview, object-oriented design, 45 minutes”."
-     },
-     {
-      "topic": "01.07",
+      "topic": "07.17",
       "optional": true
      },
      {
-      "topic": "02.12",
+      "topic": "07.19",
       "optional": true
      },
      {
-      "topic": "02.09",
-      "optional": true
+      "topic": "14.05"
      }
     ],
     "milestone": {
      "id": "m8",
-     "format": null,
-     "title": "Full loop rehearsal",
-     "bar": "Coding, system design and behavioral back to back in one afternoon, each a 3 or better. Run it three or four days before the onsite.",
-     "ask": "mock interview, full loop: coding, system design, behavioral"
+     "format": "15.05",
+     "title": "Mock 8: System Design #3 (real-time, search or streaming — Google L5)",
+     "bar": "45-minute timed design (e.g., global chat, distributed job scheduler, payment ledger or metrics pipeline) with a minute-25 requirement change. Score 3+ on all four signals, closing with SLOs and rollout plan.",
+     "ask": "mock interview, system design (Google L5 bar: real-time, search, or streaming + minute-25 shift), 45 minutes"
     }
    },
    {
-    "id": "netflix",
-    "label": "Netflix",
-    "title": "Netflix pack",
-    "pick": true,
-    "goal": "Start once a Netflix onsite is booked: their scale problems, their resilience habits and their culture. These designs build on replication and queues (week 5) and on failure handling (weeks 6 and 7). If the onsite is sooner, do those steps first, in track order.",
+    "id": "w9",
+    "label": "Week 9",
+    "title": "AI systems and inference infrastructure (Anthropic & 2026 Google core)",
+    "goal": "You understand transformers and LLM inference from a systems perspective—prefill vs decode, continuous batching, KV cache memory, token quotas, evals and LLM security—and can design production AI infrastructure.",
+    "daily": "One timed coding problem a day (alternating Google bare-editor Hard and Anthropic practical/concurrency) plus one AI-infra design every other day.",
     "steps": [
      {
-      "topic": "04.10"
+      "topic": "13.01",
+      "do": "Ask Claude: “teach me transformers at a systems level” (45 minutes): tokenization, context window, quadratic attention cost, compute-bound prefill vs memory-bandwidth-bound decode."
      },
      {
-      "topic": "04.13"
+      "topic": "13.02",
+      "do": "Ask Claude: “teach me LLM inference serving” (60 minutes): static vs dynamic vs continuous batching, KV cache sizing and PagedAttention, SSE token streaming, TTFT vs inter-token latency vs throughput."
      },
      {
-      "topic": "07.20"
+      "topic": "13.03",
+      "do": "Ask Claude: “teach me building reliable systems on LLM APIs” (45 minutes): tool calling loops, structured outputs, fallback routing, latency/cost budgets and prompt versioning."
      },
      {
-      "topic": "07.24"
+      "topic": "13.05",
+      "do": "Ask Claude: “teach me LLM evaluation systems” (45 minutes): golden datasets, deterministic vs model-based graders, regression gating and offline vs online metrics."
      },
      {
-      "topic": "11.02",
-      "do": "Ask Claude: “teach me deployment safety” (30 minutes): canary releases, feature flags and automatic rollback. Netflix asks how you ship safely, not only how you design."
-     },
-     {
-      "topic": "07.21",
-      "optional": true
-     },
-     {
-      "topic": "07.22",
-      "optional": true
-     }
-    ]
-   },
-   {
-    "id": "anthropic",
-    "label": "Anthropic",
-    "title": "Anthropic pack",
-    "pick": true,
-    "goal": "Start once an Anthropic onsite is booked: serving models and building on them. These designs build on real-time delivery (week 6) and on retries, load shedding and the rate limiter (week 7). If the onsite is sooner, do those steps first, in track order.",
-    "steps": [
-     {
-      "topic": "13.01"
-     },
-     {
-      "topic": "13.02"
-     },
-     {
-      "topic": "13.03"
+      "topic": "12.08",
+      "do": "Ask Claude: “teach me LLM security” (30 minutes): prompt injection, indirect injection via tool outputs, data exfiltration, least-privilege tools and execution sandboxing."
      },
      {
       "topic": "07.25"
@@ -689,15 +701,214 @@ window.CURRICULUM = {
       "optional": true
      },
      {
+      "topic": "14.06"
+     },
+     {
+      "topic": "14.07"
+     }
+    ],
+    "milestone": {
+     "id": "m9",
+     "format": "15.05",
+     "title": "Mock 9: System Design #4 (AI infrastructure — Anthropic bar)",
+     "bar": "45-minute timed design of a multi-tenant LLM inference gateway with streaming, continuous batching, token-based rate limiting and graceful degradation under GPU failure. Score 3+ on all four design signals.",
+     "ask": "mock interview, system design (Anthropic bar: multi-tenant LLM inference gateway with token quotas and streaming), 45 minutes"
+    }
+   },
+   {
+    "id": "w10",
+    "label": "Week 10",
+    "title": "Google L5 follow-up finishers and senior behavioral leveling",
+    "goal": "You handle Google's signature scale follow-ups (streaming, 100TB external data, range queries, rolling hashes), your 8 to 10 STAR stories map cleanly to L5 scope, and you can ace both Google G&L and Anthropic Values rounds.",
+    "daily": "Two timed bare-editor Google Medium-Hard problems a day (explicitly rehearsing streaming/memory follow-ups) plus 30 minutes of timed spoken story rehearsal.",
+    "steps": [
+     {
+      "topic": "02.13",
+      "do": "Google L5 follow-up weapon: learn reservoir sampling, external k-way merge sort and streaming heavy hitters, then do reservoir_sample and external_sort. misra_gries is a stretch."
+     },
+     {
+      "topic": "01.10",
+      "do": "Learn Fenwick tree (BIT — 15 lines, great for dynamic prefix sums) and conceptual segment trees; do fenwick_tree. segment_tree and range_query_patterns are stretch."
+     },
+     {
+      "topic": "02.11",
+      "do": "Light pass on bit tricks, masks and XOR cancellation: do bit_tricks. bitset and bitmask_subsets are stretch."
+     },
+     {
+      "topic": "02.12",
+      "do": "Learn rolling hash (Rabin-Karp) and conceptual KMP: do rabin_karp. kmp_search and longest_dup_substring are stretch."
+     },
+     {
+      "topic": "14.09",
+      "do": "Calibrate for your top targets: (1) Google G&L — prepare 8 to 10 L5-scope STAR stories PLUS practice 4 hypothetical leadership scenarios ('PM pushes to ship with tech debt', 'two senior engineers deadlocked'); (2) Anthropic Values — study Anthropic's mission, Core Views on AI Safety and Responsible Scaling Policy, and prepare honest stories on epistemic humility and safety trade-offs. For any other company, run a 30-minute values & round-format check before recruiter screens."
+     },
+     {
+      "topic": "15.12",
+      "do": "Ask Claude: “mock interview, hiring manager round, 45 minutes”. Bring your flagship project deep dive, an ownership-under-ambiguity story, and three sharp questions about the team's hardest technical problems."
+     }
+    ],
+    "milestone": {
+     "id": "m10",
+     "format": "15.11",
+     "title": "Mock 10: Senior behavioral (Google G&L + Anthropic Values)",
+     "bar": "45 minutes: three L5-scope STAR stories (ambiguity/ownership, cross-team influence/conflict, owned failure), two Google-style leadership hypotheticals, and an Anthropic mission/epistemic-humility probe. Score 3+ on all four behavioral signals.",
+     "ask": "mock interview, behavioral (Google L5 G&L with hypotheticals + Anthropic values), 45 minutes"
+    }
+   },
+   {
+    "id": "onsite",
+    "label": "Onsite",
+    "title": "Any-company onsite calibration and full-loop rehearsal",
+    "pick": true,
+    "goal": "Start the day ANY onsite is booked, wherever you are on the track. Ask the recruiter for the exact round list, rehearse only the extra formats on your list, and run a full back-to-back loop 3 to 4 days before.",
+    "daily": "One timed coding problem a day matching your target company's format, and one mock every other day in your weakest round.",
+    "steps": [
+     {
+      "topic": "08.02"
+     },
+     {
+      "topic": "08.09",
+      "optional": true,
+      "do": "Only if your loop includes an operational or production triage round. Ask Claude: “teach me production incident triage” (30 minutes)."
+     },
+     {
+      "topic": "15.03",
+      "optional": true,
+      "do": "Only if your round list has a debugging round. Ask Claude: “mock interview, debugging round, 45 minutes”."
+     },
+     {
+      "topic": "08.13",
+      "optional": true,
+      "do": "Only if your round list has a code review round. Ask Claude: “teach me reviewing a pull request live” (30 minutes)."
+     },
+     {
+      "topic": "15.04",
+      "optional": true,
+      "do": "Only if your round list has a code review round. Ask Claude: “mock interview, code review round, 45 minutes”."
+     },
+     {
+      "topic": "15.06",
+      "optional": true,
+      "do": "Only if your round list has a dedicated low-level / OOP design round. Ask Claude: “mock interview, object-oriented design, 45 minutes”."
+     },
+     {
+      "topic": "15.09",
+      "optional": true,
+      "do": "Only if your recruiter confirms an AI-assisted coding round (e.g., Google Gemini-assisted pilot or Meta/Stripe AI round). Ask Claude: “mock interview, AI-assisted coding round, 60 minutes”."
+     },
+     {
+      "topic": "02.09",
+      "optional": true
+     }
+    ],
+    "milestone": {
+     "id": "m11",
+     "format": null,
+     "title": "Full-loop rehearsal",
+     "bar": "Back-to-back afternoon matching your target onsite (Google L5: 2x bare-editor coding + 1x L5 system design + 1x G&L; Anthropic: 1x practical/concurrency + 1x AI-infra design + 1x values/deep dive). Each round 3+. Run 3 to 4 days before the onsite.",
+     "ask": "mock interview, full loop (tell Claude Google L5, Anthropic, or custom round list)"
+    }
+   },
+   {
+    "id": "google",
+    "label": "Google",
+    "title": "Google L5 onsite pack (gold standard)",
+    "pick": true,
+    "goal": "Start once a Google onsite is booked (or in Weeks 11 to 12 as your gold-standard stretch): planetary-scale storage, real-time collaboration, geospatial indexing and landmark distributed systems papers.",
+    "steps": [
+     {
+      "topic": "07.12"
+     },
+     {
+      "topic": "05.10",
+      "do": "Ask Claude: “teach me OT vs CRDTs for collaborative editing” (45 minutes): state-based vs op-based CRDTs, convergence and trade-offs vs central OT."
+     },
+     {
+      "topic": "07.16"
+     },
+     {
+      "topic": "07.13"
+     },
+     {
+      "topic": "07.18",
+      "optional": true
+     },
+     {
+      "topic": "05.12",
+      "optional": true,
+      "do": "Ask Claude to walk through the core design takeaways of Bigtable, Spanner (TrueTime + Paxos), GFS and MapReduce in 60 minutes—huge credibility when Google interviewers probe storage/consistency."
+     }
+    ]
+   },
+   {
+    "id": "anthropic",
+    "label": "Anthropic",
+    "title": "Anthropic deep-dive onsite pack",
+    "pick": true,
+    "goal": "Start once an Anthropic onsite is booked (core LLM serving, token rate limiting, evals and LLM security are already in Week 9). Covers RAG, sandboxed agent execution, containers, safety filtering and training infrastructure.",
+    "steps": [
+     {
+      "topic": "13.04"
+     },
+     {
+      "topic": "07.28"
+     },
+     {
       "topic": "09.08",
+      "do": "Ask Claude: “teach me Linux containers, namespaces, cgroups and microVM sandboxing” (45 minutes): how untrusted code/tool execution is isolated safely."
+     },
+     {
+      "topic": "13.09"
+     },
+     {
+      "topic": "07.29"
+     },
+     {
+      "topic": "07.30",
       "optional": true
      },
      {
-      "topic": "12.08",
+      "topic": "07.32",
       "optional": true
      },
      {
-      "topic": "07.29",
+      "topic": "13.08",
+      "optional": true
+     },
+     {
+      "topic": "07.31",
+      "optional": true
+     }
+    ]
+   },
+   {
+    "id": "consumer",
+    "label": "Consumer",
+    "title": "Consumer scale pack (Meta, Netflix, Uber, Stripe)",
+    "pick": true,
+    "goal": "Start if you book an onsite at a high-scale consumer, social, streaming or commerce company (Meta, Netflix, Uber, Airbnb, DoorDash). Builds directly on Weeks 5 to 8.",
+    "steps": [
+     {
+      "topic": "07.03"
+     },
+     {
+      "topic": "07.05"
+     },
+     {
+      "topic": "07.15"
+     },
+     {
+      "topic": "07.20"
+     },
+     {
+      "topic": "07.24"
+     },
+     {
+      "topic": "07.21",
+      "optional": true
+     },
+     {
+      "topic": "07.22",
       "optional": true
      }
     ]
@@ -818,6 +1029,10 @@ window.CURRICULUM = {
       [
        "Serialize and Deserialize Binary Tree",
        "H"
+      ],
+      [
+       "Binary Tree Maximum Path Sum",
+       "H"
       ]
      ]
     },
@@ -873,14 +1088,12 @@ window.CURRICULUM = {
     },
     {
      "id": "01.06",
-     "tag": "P1",
+     "tag": "P0",
      "text": "Tries, prefix/radix trees (autocomplete, routing tables)",
      "requires": [
       "01.01",
       "01.03",
-      "02.03",
-      "02.05",
-      "02.11"
+      "02.05"
      ],
      "drills": [
       [
@@ -903,7 +1116,7 @@ window.CURRICULUM = {
     },
     {
      "id": "01.07",
-     "tag": "P1",
+     "tag": "P0",
      "text": "Union-find (disjoint sets) with path compression",
      "requires": [
       "01.05",
@@ -927,6 +1140,10 @@ window.CURRICULUM = {
       [
        "Satisfiability of Equality Equations",
        "M"
+      ],
+      [
+       "Number of Islands II",
+       "H"
       ]
      ]
     },
@@ -952,7 +1169,7 @@ window.CURRICULUM = {
     },
     {
      "id": "01.09",
-     "tag": "P1",
+     "tag": "P0",
      "text": "Interval structures: merge, sweep line, interval tree basics",
      "requires": [
       "02.02",
@@ -985,16 +1202,34 @@ window.CURRICULUM = {
       [
        "My Calendar I",
        "M"
+      ],
+      [
+       "Employee Free Time",
+       "H"
+      ],
+      [
+       "Range Module",
+       "H"
       ]
      ]
     },
     {
      "id": "01.10",
-     "tag": "P2",
-     "text": "Segment trees, Fenwick trees",
+     "tag": "P1",
+     "text": "Segment trees, Fenwick trees (BIT)",
      "requires": [
       "01.03",
       "01.04"
+     ],
+     "drills": [
+      [
+       "Range Sum Query - Mutable",
+       "M"
+      ],
+      [
+       "Count of Smaller Numbers After Self",
+       "H"
+      ]
      ]
     },
     {
@@ -1012,8 +1247,7 @@ window.CURRICULUM = {
      "text": "Probabilistic structures: Bloom filter, Count-Min Sketch, HyperLogLog",
      "requires": [
       "01.01",
-      "01.04",
-      "02.11"
+      "01.04"
      ]
     },
     {
@@ -1386,7 +1620,7 @@ window.CURRICULUM = {
    "slug": "02-algorithms",
    "title": "Algorithms",
    "notes": [
-    "Talk through the brute force first, state complexity, then improve it. Senior candidates are judged on clarity, testing their own code, and handling edge cases, not on speed alone."
+    "Google L5 bar: clarify ambiguity first, state brute force and complexity, optimize, write clean bug-resistant code in a bare editor without executing, hand-trace edge cases, and expect 2 to 3 escalating follow-ups."
    ],
    "topics": [
     {
@@ -1453,6 +1687,10 @@ window.CURRICULUM = {
        "M"
       ],
       [
+       "Split Array Largest Sum",
+       "H"
+      ],
+      [
        "Median of Two Sorted Arrays",
        "H"
       ]
@@ -1465,7 +1703,6 @@ window.CURRICULUM = {
      "requires": [
       "02.01",
       "02.02",
-      "02.03",
       "01.01"
      ],
      "drills": [
@@ -1531,6 +1768,10 @@ window.CURRICULUM = {
        "M"
       ],
       [
+       "Alien Dictionary",
+       "H"
+      ],
+      [
        "Word Ladder",
        "H"
       ]
@@ -1574,7 +1815,7 @@ window.CURRICULUM = {
     {
      "id": "02.07",
      "tag": "P0",
-     "text": "Dynamic programming: 1D/2D, knapsack family, LIS, edit distance, interval DP",
+     "text": "Dynamic programming: 1D/2D, knapsack family, LIS, edit distance, interval and DAG DP",
      "requires": [
       "02.01",
       "02.03",
@@ -1608,17 +1849,24 @@ window.CURRICULUM = {
       [
        "Edit Distance",
        "M"
+      ],
+      [
+       "Longest Increasing Path in a Matrix",
+       "H"
+      ],
+      [
+       "Burst Balloons",
+       "H"
       ]
      ]
     },
     {
      "id": "02.08",
-     "tag": "P1",
-     "text": "Shortest paths: Dijkstra, Bellman-Ford, A* basics",
+     "tag": "P0",
+     "text": "Shortest paths: Dijkstra, 0-1 BFS, Bellman-Ford, A* basics",
      "requires": [
       "02.05",
-      "01.04",
-      "02.07"
+      "01.04"
      ],
      "drills": [
       [
@@ -1635,6 +1883,10 @@ window.CURRICULUM = {
       ],
       [
        "Swim in Rising Water",
+       "H"
+      ],
+      [
+       "Shortest Path in a Grid with Obstacles Elimination",
        "H"
       ]
      ]
@@ -1744,8 +1996,8 @@ window.CURRICULUM = {
     },
     {
      "id": "02.13",
-     "tag": "P2",
-     "text": "Streaming and external algorithms: reservoir sampling, external merge sort",
+     "tag": "P1",
+     "text": "Streaming and external algorithms: reservoir sampling, external merge sort, heavy hitters",
      "requires": [
       "02.02",
       "01.04"
@@ -1767,8 +2019,7 @@ window.CURRICULUM = {
      "text": "Consistent hashing, rendezvous hashing",
      "requires": [
       "01.01",
-      "02.03",
-      "02.11"
+      "02.03"
      ]
     },
     {
@@ -2114,7 +2365,9 @@ window.CURRICULUM = {
    "id": "03",
    "slug": "03-concurrency",
    "title": "Concurrency and Parallelism",
-   "notes": [],
+   "notes": [
+    "Core pillar for Anthropic (can appear as early as technical screens) and a strong senior differentiator in Google coding follow-ups and system design."
+   ],
    "topics": [
     {
      "id": "03.01",
@@ -2161,13 +2414,23 @@ window.CURRICULUM = {
     },
     {
      "id": "03.06",
-     "tag": "P1",
-     "text": "Async I/O and event loops (epoll/kqueue model, async/await semantics)"
+     "tag": "P0",
+     "text": "Async I/O and event loops (epoll/kqueue model, async/await semantics, cancellation)",
+     "short": "Async I/O and event loops",
+     "requires": [
+      "03.01"
+     ]
     },
     {
      "id": "03.07",
-     "tag": "P1",
-     "text": "Producer-consumer, bounded buffer, reader-writer, dining philosophers"
+     "tag": "P0",
+     "text": "Classic concurrency patterns: producer-consumer, bounded buffer, thread-safe LRU, single-flight coalescing",
+     "short": "Bounded buffer, thread-safe LRU and single-flight",
+     "requires": [
+      "03.03",
+      "03.05",
+      "01.08"
+     ]
     },
     {
      "id": "03.08",
@@ -2213,7 +2476,9 @@ window.CURRICULUM = {
    "id": "04",
    "slug": "04-system-design-fundamentals",
    "title": "System Design Fundamentals",
-   "notes": [],
+   "notes": [
+    "At Google L5, system design is often the make-or-break leveling round. Drive the room, quantify constraints, and be ready when the interviewer opens any black box."
+   ],
    "topics": [
     {
      "id": "04.01",
@@ -2302,7 +2567,7 @@ window.CURRICULUM = {
     },
     {
      "id": "04.10",
-     "tag": "P1",
+     "tag": "P0",
      "text": "CDNs, edge caching, object storage",
      "short": "CDNs and object storage",
      "requires": [
@@ -2321,7 +2586,7 @@ window.CURRICULUM = {
     },
     {
      "id": "04.12",
-     "tag": "P1",
+     "tag": "P0",
      "text": "Rate limiting, load shedding, circuit breakers, retries with jitter, timeouts, bulkheads",
      "short": "Timeouts, retries, circuit breakers, load shedding",
      "requires": [
@@ -2359,7 +2624,13 @@ window.CURRICULUM = {
     {
      "id": "04.15",
      "tag": "P1",
-     "text": "Search and indexing: inverted index, ranking basics"
+     "text": "Search and indexing: inverted index, scatter-gather, ranking basics",
+     "short": "Search and inverted indexes",
+     "requires": [
+      "01.01",
+      "04.07",
+      "06.06"
+     ]
     },
     {
      "id": "04.16",
@@ -2368,8 +2639,13 @@ window.CURRICULUM = {
     },
     {
      "id": "04.17",
-     "tag": "P2",
-     "text": "Migration strategy: dual writes, backfills, shadow traffic, strangler pattern"
+     "tag": "P1",
+     "text": "Migration strategy: dual writes, backfills, shadow traffic, strangler pattern",
+     "short": "Zero-downtime migrations",
+     "requires": [
+      "04.07",
+      "11.02"
+     ]
     }
    ],
    "concepts": [],
@@ -2411,8 +2687,13 @@ window.CURRICULUM = {
     },
     {
      "id": "05.04",
-     "tag": "P1",
-     "text": "Consensus: Raft in detail, Paxos at a conceptual level; leader election"
+     "tag": "P0",
+     "text": "Consensus: Raft in detail, Paxos at a conceptual level; leader election",
+     "short": "Consensus: Raft, Paxos and leader election",
+     "requires": [
+      "05.02",
+      "05.01"
+     ]
     },
     {
      "id": "05.05",
@@ -2428,7 +2709,8 @@ window.CURRICULUM = {
     {
      "id": "05.06",
      "tag": "P1",
-     "text": "Time and ordering: clock skew, Lamport clocks, vector clocks, hybrid logical clocks",
+     "text": "Time and ordering: clock skew, Lamport clocks, vector clocks, hybrid logical clocks, TrueTime intuition",
+     "short": "Time, clocks and ordering",
      "requires": [
       "05.02"
      ]
@@ -2436,7 +2718,13 @@ window.CURRICULUM = {
     {
      "id": "05.07",
      "tag": "P1",
-     "text": "Distributed transactions: 2PC, sagas, outbox pattern, change data capture"
+     "text": "Distributed transactions: 2PC, sagas, outbox pattern, change data capture",
+     "short": "Distributed transactions: 2PC, sagas and outbox",
+     "requires": [
+      "06.02",
+      "04.08",
+      "05.03"
+     ]
     },
     {
      "id": "05.08",
@@ -2449,13 +2737,22 @@ window.CURRICULUM = {
     },
     {
      "id": "05.09",
-     "tag": "P2",
-     "text": "Distributed locks, fencing tokens, leases"
+     "tag": "P1",
+     "text": "Distributed locks, fencing tokens, leases",
+     "short": "Distributed locks, leases and fencing tokens",
+     "requires": [
+      "05.04",
+      "05.06"
+     ]
     },
     {
      "id": "05.10",
      "tag": "P2",
-     "text": "CRDTs and conflict resolution"
+     "text": "CRDTs and conflict resolution",
+     "requires": [
+      "05.02",
+      "05.06"
+     ]
     },
     {
      "id": "05.11",
@@ -2465,7 +2762,13 @@ window.CURRICULUM = {
     {
      "id": "05.12",
      "tag": "P2",
-     "text": "Landmark papers: Dynamo, Bigtable, Spanner, GFS, MapReduce, Kafka, Raft"
+     "text": "Landmark papers: Bigtable, Spanner, GFS, MapReduce, Dynamo, Kafka, Raft",
+     "short": "Landmark distributed systems papers",
+     "requires": [
+      "01.13",
+      "05.04",
+      "05.05"
+     ]
     }
    ],
    "concepts": [],
@@ -2521,22 +2824,39 @@ window.CURRICULUM = {
     {
      "id": "06.05",
      "tag": "P1",
-     "text": "MVCC, optimistic vs pessimistic locking"
+     "text": "MVCC, optimistic vs pessimistic locking",
+     "requires": [
+      "06.02"
+     ]
     },
     {
      "id": "06.06",
-     "tag": "P1",
-     "text": "Partitioning: hash vs range, hot keys, rebalancing, secondary indexes across shards"
+     "tag": "P0",
+     "text": "Partitioning: hash vs range, hot keys, rebalancing, secondary indexes across shards",
+     "short": "Partitioning, hot keys and cross-shard indexes",
+     "requires": [
+      "04.07",
+      "06.01"
+     ]
     },
     {
      "id": "06.07",
      "tag": "P1",
-     "text": "Batch vs stream processing; Lambda vs Kappa architecture"
+     "text": "Batch vs stream processing; Lambda vs Kappa architecture",
+     "short": "Batch vs stream processing",
+     "requires": [
+      "04.08"
+     ]
     },
     {
      "id": "06.08",
      "tag": "P1",
-     "text": "Stream concepts: windowing, watermarks, late data, exactly-once processing"
+     "text": "Stream concepts: windowing, watermarks, late data, exactly-once processing",
+     "short": "Streaming: windowing, watermarks and late data",
+     "requires": [
+      "06.07",
+      "05.03"
+     ]
     },
     {
      "id": "06.09",
@@ -2573,7 +2893,7 @@ window.CURRICULUM = {
    "slug": "07-system-design-cases",
    "title": "System Design Case Studies",
    "notes": [
-    "Practice each as a 45-minute exercise: requirements, estimates, API, data model, high-level design, deep dive, bottlenecks, trade-offs."
+    "Practice each as a 45-minute exercise: requirements, estimates, API, data model, high-level design, deep dive, bottlenecks, trade-offs, SLOs and rollout."
    ],
    "topics": [
     {
@@ -2602,7 +2922,7 @@ window.CURRICULUM = {
     },
     {
      "id": "07.03",
-     "tag": "Classic",
+     "tag": "Consumer",
      "text": "News feed / timeline (fan-out on write vs read)",
      "short": "News feed",
      "requires": [
@@ -2624,7 +2944,7 @@ window.CURRICULUM = {
     },
     {
      "id": "07.05",
-     "tag": "Classic",
+     "tag": "Consumer",
      "text": "Notification system (multi-channel, dedup, preferences)",
      "requires": [
       "04.08",
@@ -2684,7 +3004,8 @@ window.CURRICULUM = {
       "05.03",
       "01.04",
       "06.02",
-      "03.05"
+      "03.05",
+      "05.09"
      ]
     },
     {
@@ -2694,47 +3015,96 @@ window.CURRICULUM = {
     },
     {
      "id": "07.12",
-     "tag": "Classic",
-     "text": "File sync and storage (Dropbox-style)"
+     "tag": "Google",
+     "text": "File sync and storage (Google Drive / Dropbox-style)",
+     "short": "File sync and storage (Drive)",
+     "requires": [
+      "04.10",
+      "04.07",
+      "05.03"
+     ]
     },
     {
      "id": "07.13",
-     "tag": "Classic",
-     "text": "Ride matching / geospatial proximity (geohash, quadtree, S2)"
+     "tag": "Google",
+     "text": "Geospatial proximity and ride matching (S2, quadtree, geohash)",
+     "short": "Geospatial proximity (S2 / quadtree)",
+     "requires": [
+      "04.07",
+      "04.14",
+      "06.06"
+     ]
     },
     {
      "id": "07.14",
      "tag": "Classic",
-     "text": "Payment system and ledger (idempotency, reconciliation, double-entry)"
+     "text": "Payment system and ledger (idempotency, reconciliation, double-entry)",
+     "short": "Payment system and ledger",
+     "requires": [
+      "06.02",
+      "05.03",
+      "05.07"
+     ]
     },
     {
      "id": "07.15",
-     "tag": "Classic",
-     "text": "Ticketing / inventory with contention (flash sale)"
+     "tag": "Consumer",
+     "text": "Ticketing / inventory with contention (flash sale)",
+     "short": "Flash-sale inventory with contention",
+     "requires": [
+      "06.05",
+      "05.09",
+      "04.05"
+     ]
     },
     {
      "id": "07.16",
-     "tag": "Classic",
-     "text": "Collaborative editor (OT vs CRDT)"
+     "tag": "Google",
+     "text": "Collaborative editor (Google Docs — OT vs CRDT)",
+     "short": "Collaborative editor (Docs)",
+     "requires": [
+      "04.14",
+      "05.06",
+      "05.10"
+     ]
     },
     {
      "id": "07.17",
      "tag": "Classic",
-     "text": "Metrics, monitoring, and alerting pipeline"
+     "text": "Metrics, monitoring, and alerting pipeline",
+     "short": "Metrics and alerting pipeline",
+     "requires": [
+      "04.08",
+      "06.07",
+      "06.08",
+      "11.01"
+     ]
     },
     {
      "id": "07.18",
-     "tag": "Classic",
-     "text": "Log aggregation and search"
+     "tag": "Google",
+     "text": "Log aggregation and distributed search",
+     "short": "Log aggregation and search",
+     "requires": [
+      "04.08",
+      "04.15",
+      "06.07"
+     ]
     },
     {
      "id": "07.19",
      "tag": "Classic",
-     "text": "Ad click aggregation; top-k / leaderboard"
+     "text": "Ad click aggregation; real-time top-k / leaderboard",
+     "short": "Ad click aggregation and top-k",
+     "requires": [
+      "04.08",
+      "06.08",
+      "01.12"
+     ]
     },
     {
      "id": "07.20",
-     "tag": "Netflix",
+     "tag": "Consumer",
      "text": "Video streaming: ingest, transcoding pipeline, adaptive bitrate, CDN placement",
      "requires": [
       "04.10",
@@ -2743,7 +3113,7 @@ window.CURRICULUM = {
     },
     {
      "id": "07.21",
-     "tag": "Netflix",
+     "tag": "Consumer",
      "text": "Recommendation system serving and feature pipelines",
      "short": "Recommendation serving",
      "requires": [
@@ -2753,7 +3123,7 @@ window.CURRICULUM = {
     },
     {
      "id": "07.22",
-     "tag": "Netflix",
+     "tag": "Consumer",
      "text": "A/B testing and experimentation platform",
      "short": "A/B testing platform",
      "requires": [
@@ -2764,12 +3134,12 @@ window.CURRICULUM = {
     },
     {
      "id": "07.23",
-     "tag": "Netflix",
-     "text": "Playback telemetry at scale"
+     "tag": "Consumer",
+     "text": "Playback and client telemetry at scale"
     },
     {
      "id": "07.24",
-     "tag": "Netflix",
+     "tag": "Consumer",
      "text": "Resilience design: chaos engineering, regional evacuation, graceful degradation",
      "requires": [
       "04.12",
@@ -2780,7 +3150,7 @@ window.CURRICULUM = {
     {
      "id": "07.25",
      "tag": "Anthropic",
-     "text": "LLM inference API: request routing, batching, streaming tokens, GPU scheduling",
+     "text": "LLM inference API: request routing, continuous batching, streaming tokens, GPU scheduling",
      "requires": [
       "13.02",
       "04.04",
@@ -2813,7 +3183,12 @@ window.CURRICULUM = {
     {
      "id": "07.28",
      "tag": "Anthropic",
-     "text": "RAG system: ingestion, chunking, embedding, retrieval, reranking, freshness"
+     "text": "RAG system: ingestion, chunking, embedding, retrieval, reranking, freshness",
+     "short": "RAG system end-to-end",
+     "requires": [
+      "13.04",
+      "04.08"
+     ]
     },
     {
      "id": "07.29",
@@ -2821,6 +3196,7 @@ window.CURRICULUM = {
      "text": "Agent execution platform: sandboxing, tool calls, long-running tasks, checkpointing",
      "requires": [
       "13.03",
+      "13.09",
       "04.08",
       "07.10",
       "09.08",
@@ -2830,17 +3206,34 @@ window.CURRICULUM = {
     {
      "id": "07.30",
      "tag": "Anthropic",
-     "text": "Evaluation platform: datasets, graders, regression tracking"
+     "text": "Evaluation platform: datasets, graders, regression tracking",
+     "short": "LLM evaluation platform",
+     "requires": [
+      "13.05",
+      "04.08"
+     ]
     },
     {
      "id": "07.31",
      "tag": "Anthropic",
-     "text": "Training data pipeline and distributed job orchestration"
+     "text": "Training data pipeline and distributed job orchestration",
+     "short": "Training data & job orchestration",
+     "requires": [
+      "06.07",
+      "07.10",
+      "13.08"
+     ]
     },
     {
      "id": "07.32",
      "tag": "Anthropic",
-     "text": "Abuse detection and safety filtering in the request path"
+     "text": "Abuse detection and safety filtering in the request path",
+     "short": "Abuse detection and safety filtering",
+     "requires": [
+      "13.02",
+      "12.08",
+      "04.12"
+     ]
     }
    ],
    "concepts": [],
@@ -2905,7 +3298,9 @@ window.CURRICULUM = {
     {
      "id": "08.09",
      "tag": "P1",
-     "text": "Production triage: is it the deploy, the dependency, the data, or the load?"
+     "text": "Production triage: is it the deploy, the dependency, the data, or the load?",
+     "short": "Production incident triage",
+     "requires": []
     },
     {
      "id": "08.10",
@@ -2990,7 +3385,11 @@ window.CURRICULUM = {
     {
      "id": "09.08",
      "tag": "P1",
-     "text": "Containers: namespaces, cgroups, images; Kubernetes scheduling basics"
+     "text": "Containers: namespaces, cgroups, images; Kubernetes scheduling basics",
+     "short": "Containers, sandboxing and K8s basics",
+     "requires": [
+      "09.01"
+     ]
     },
     {
      "id": "09.09",
@@ -3040,7 +3439,8 @@ window.CURRICULUM = {
     {
      "id": "10.04",
      "tag": "P1",
-     "text": "Low-level design exercises: parking lot, elevator, in-memory file system, LRU cache, key-value store with transactions, spreadsheet engine, text editor buffer",
+     "text": "Low-level design exercises: in-memory KV store with transactions, in-memory file system, banking ledger, LRU cache, spreadsheet engine",
+     "short": "Progressive 4-level builds and LLD",
      "requires": [
       "01.01",
       "01.04",
@@ -3154,7 +3554,11 @@ window.CURRICULUM = {
     {
      "id": "12.01",
      "tag": "P0",
-     "text": "Authentication vs authorization; sessions, JWT, OAuth 2.0, OIDC"
+     "text": "Authentication vs authorization; sessions, JWT, OAuth 2.0, OIDC",
+     "short": "AuthN, AuthZ, OAuth 2.0 and JWT",
+     "requires": [
+      "09.03"
+     ]
     },
     {
      "id": "12.02",
@@ -3174,7 +3578,11 @@ window.CURRICULUM = {
     {
      "id": "12.05",
      "tag": "P1",
-     "text": "Multi-tenant isolation and data access boundaries"
+     "text": "Multi-tenant isolation and data access boundaries",
+     "requires": [
+      "12.01",
+      "04.06"
+     ]
     },
     {
      "id": "12.06",
@@ -3188,8 +3596,13 @@ window.CURRICULUM = {
     },
     {
      "id": "12.08",
-     "tag": "P2",
-     "text": "LLM-specific risks: prompt injection, data exfiltration through tools, sandbox escape"
+     "tag": "P1",
+     "text": "LLM-specific risks: prompt injection, data exfiltration through tools, sandbox escape",
+     "short": "LLM security and tool sandboxing",
+     "requires": [
+      "13.03",
+      "12.05"
+     ]
     }
    ],
    "concepts": [],
@@ -3201,19 +3614,19 @@ window.CURRICULUM = {
    "slug": "13-ai-ml-systems",
    "title": "AI and ML Systems",
    "notes": [
-    "Required at AI labs, increasingly asked elsewhere."
+    "Core for Anthropic and increasingly expected in 2026 Google and senior SWE loops."
    ],
    "topics": [
     {
      "id": "13.01",
-     "tag": "P1",
-     "text": "How transformers work at a systems level: tokens, context window, attention cost",
+     "tag": "P0",
+     "text": "How transformers work at a systems level: tokens, context window, attention cost, prefill vs decode",
      "short": "Transformers at a systems level",
      "requires": []
     },
     {
      "id": "13.02",
-     "tag": "P1",
+     "tag": "P0",
      "text": "Inference serving: batching (static, dynamic, continuous), KV cache, streaming, time-to-first-token vs throughput",
      "short": "Inference serving: batching and the KV cache",
      "requires": [
@@ -3235,27 +3648,31 @@ window.CURRICULUM = {
     {
      "id": "13.04",
      "tag": "P1",
-     "text": "RAG design and its failure modes"
+     "text": "RAG design and its failure modes",
+     "requires": [
+      "13.01",
+      "13.03",
+      "04.15"
+     ]
     },
     {
      "id": "13.05",
      "tag": "P1",
-     "text": "Evaluation: building eval sets, graders, regression detection, offline vs online metrics"
+     "text": "Evaluation: building eval sets, graders, regression detection, offline vs online metrics",
+     "requires": [
+      "13.03"
+     ]
     },
     {
      "id": "13.06",
-     "tag": "P0",
-     "text": "Coding with AI: give it context (diagrams, data flow, invariants), split work into checkable steps, write the tests first, verify every change; debug, refactor and review AI-written code; know when not to use it",
-     "short": "Coding with AI: write, debug, refactor",
+     "tag": "P1",
+     "text": "Coding with AI and verification: give invariants/context, split into checkable steps, write tests first, review diffs and verify with differential testing; know when not to use it",
+     "short": "Coding with AI: verify, debug, review",
      "requires": [
-      "02.01",
-      "01.01",
-      "02.02",
-      "01.04",
-      "02.03",
-      "01.08",
-      "10.01",
-      "02.16"
+      "08.01",
+      "08.03",
+      "08.04",
+      "10.03"
      ]
     },
     {
@@ -3266,12 +3683,20 @@ window.CURRICULUM = {
     {
      "id": "13.08",
      "tag": "P2",
-     "text": "GPU fundamentals: memory hierarchy, utilization, multi-GPU and multi-node serving"
+     "text": "GPU fundamentals: memory hierarchy, utilization, multi-GPU and multi-node serving",
+     "requires": [
+      "13.02"
+     ]
     },
     {
      "id": "13.09",
-     "tag": "P2",
-     "text": "Agent architecture: planning loops, memory, tool permissions, sandboxing"
+     "tag": "P1",
+     "text": "Agent architecture: planning loops, memory, tool permissions, sandboxing",
+     "requires": [
+      "13.03",
+      "09.08",
+      "12.08"
+     ]
     },
     {
      "id": "13.10",
@@ -3321,7 +3746,7 @@ window.CURRICULUM = {
    "slug": "14-behavioral-leadership",
    "title": "Senior-Level Behavioral and Leadership",
    "notes": [
-    "At senior level this carries as much weight as the technical rounds. Prep method: write 8 to 10 stories in STAR format and map each to several question types."
+    "At Google L5 (G&L) and Anthropic (Values), behavioral rounds carry as much weight as technical rounds and directly decide leveling. Build 8 to 10 STAR stories and rehearse Google-style hypotheticals."
    ],
    "topics": [
     {
@@ -3346,7 +3771,7 @@ window.CURRICULUM = {
     },
     {
      "id": "14.05",
-     "tag": "P1",
+     "tag": "P0",
      "text": "Technical influence without authority; aligning multiple teams",
      "short": "Influence without authority"
     },
@@ -3368,9 +3793,9 @@ window.CURRICULUM = {
     },
     {
      "id": "14.09",
-     "tag": "P1",
-     "text": "Company specifics: Netflix culture memo (freedom and responsibility, candor, context not control); Anthropic's mission, values, and views on AI safety",
-     "short": "Company culture: Netflix and Anthropic",
+     "tag": "P0",
+     "text": "Company calibration: Google Googleyness & Leadership (ambiguity, leadership without authority, hypotheticals); Anthropic mission, AI safety, RSP and epistemic humility",
+     "short": "Company calibration: Google G&L and Anthropic Values",
      "requires": [
       "14.01"
      ]
@@ -3394,7 +3819,7 @@ window.CURRICULUM = {
     {
      "id": "15.01",
      "tag": "Format",
-     "text": "Algorithmic coding (45 to 60 min, one or two problems)",
+     "text": "Algorithmic coding (45 min, bare editor, no execution, 1 problem + escalating follow-ups)",
      "requires": [
       "02.01"
      ]
@@ -3427,7 +3852,7 @@ window.CURRICULUM = {
     {
      "id": "15.05",
      "tag": "Format",
-     "text": "System design (high-level architecture)"
+     "text": "System design (high-level architecture + black-box deep dives)"
     },
     {
      "id": "15.06",
@@ -3467,7 +3892,7 @@ window.CURRICULUM = {
     {
      "id": "15.11",
      "tag": "Format",
-     "text": "Behavioral and values round"
+     "text": "Behavioral, Googleyness & Leadership, and values round"
     },
     {
      "id": "15.12",
@@ -3486,5 +3911,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 13:51"
+ "generated": "2026-11-23 14:39"
 };
