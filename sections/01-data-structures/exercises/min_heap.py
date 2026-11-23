@@ -4,7 +4,7 @@ Topic: 01.04  |  Priority: P0
 
 Problem
 -------
-Build sections 3 to 6 of the chapter: a min-heap stored in a plain Python
+Build sections 3 to 5 of the chapter: a min-heap stored in a plain Python
 list, where the children of index i are 2i + 1 and 2i + 2 and its parent is
 (i - 1) // 2.
 

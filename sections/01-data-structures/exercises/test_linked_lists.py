@@ -138,21 +138,32 @@ def test_has_cycle_small():
     assert has_cycle(one[0]) is False
     one[0]._next = one[0]
     assert has_cycle(one[0]) is True  # a node pointing to itself
+    assert one[0].val == 1 and one[0]._next is one[0]
+    # Duplicate values must not fool a cycle check comparing .val instead of node identity (`is`)
+    for vals in ([5, 5], [1, 1, 1, 1], [2, 3, 2, 3, 2]):
+        dup = build(vals)
+        assert has_cycle(dup[0]) is False
+        assert_unchanged(dup, None, vals)
     for size in range(2, 10):
         for back_to in range(size):
-            nodes = build(range(size))
+            vals = list(range(size))
+            nodes = build(vals)
             N.reads = 0
             assert has_cycle(nodes[0]) is False
             nodes[-1]._next = nodes[back_to]
             assert has_cycle(nodes[0]) is True, f"missed a loop from node {size - 1} back to node {back_to}"
             assert N.reads <= 12 * size + 10, f"{N.reads} reads of .next for two {size}-node lists: is it walking a fixed number of steps?"
-            assert_unchanged(nodes, back_to)
+            assert_unchanged(nodes, back_to, vals)
 
 
-def assert_unchanged(nodes, back_to):
+def assert_unchanged(nodes, back_to, expected_vals=None):
     for i, node in enumerate(nodes[:-1]):
         assert node._next is nodes[i + 1], "has_cycle must not change the list"
+        if expected_vals is not None:
+            assert node.val == expected_vals[i], "has_cycle must not mutate node values"
     assert nodes[-1]._next is (None if back_to is None else nodes[back_to]), "has_cycle must not change the list"
+    if expected_vals is not None:
+        assert nodes[-1].val == expected_vals[-1], "has_cycle must not mutate node values"
 
 
 @pytest.mark.parametrize("back_to", [None, 0, 100_000, 199_999])
@@ -165,14 +176,15 @@ def test_has_cycle_big_constant_memory(back_to):
     assert found is (back_to is not None)
     assert reads <= 6 * n, f"{reads:,} reads of .next for {n:,} nodes: is something walking the list more than a few times?"
     assert peak <= SMALL, f"has_cycle allocated {peak:,} bytes: a set of seen nodes is O(n) memory"
-    assert_unchanged(nodes, back_to)
+    assert_unchanged(nodes, back_to, range(n))
 
 
 def test_has_cycle_random_shapes():
     rng = random.Random(4)
     for _ in range(200):
         size = rng.randint(1, 40)
-        nodes = build(range(size))
+        vals = list(range(size))
+        nodes = build(vals)
         loop = rng.random() < 0.5
         if loop:
             nodes[-1]._next = nodes[rng.randrange(size)]
@@ -182,4 +194,4 @@ def test_has_cycle_random_shapes():
         N.reads = 0
         assert has_cycle(nodes[0]) is loop
         assert N.reads <= 6 * size + 10
-        assert_unchanged(nodes, back_to)
+        assert_unchanged(nodes, back_to, vals)

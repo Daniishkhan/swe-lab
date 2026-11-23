@@ -90,6 +90,37 @@ def test_empty_raises():
     h.pop()
     with pytest.raises(IndexError):
         h.pop()
+    with pytest.raises(IndexError):
+        h.peek()
+
+
+def test_small_and_equal_shapes():
+    for data in ([42], [2, 1], [1, 2], [7, 7, 7, 7]):
+        h = MinHeap()
+        for x in data:
+            h.push(x)
+        assert h.peek() == min(data)
+        assert drain(h) == sorted(data)
+        assert drain(MinHeap.from_list(data)) == sorted(data)
+
+
+def test_only_requires_less_than():
+    class LtOnly:
+        __slots__ = ("v",)
+
+        def __init__(self, v):
+            self.v = v
+
+        def __lt__(self, other):
+            return self.v < other.v
+
+    vals = [5, 1, 4, 1, 3, 2]
+    h = MinHeap()
+    for v in vals:
+        h.push(LtOnly(v))
+    assert h.peek().v == 1
+    assert [x.v for x in drain(h)] == sorted(vals)
+    assert [x.v for x in drain(MinHeap.from_list([LtOnly(v) for v in vals]))] == sorted(vals)
 
 
 def test_from_list():
@@ -159,6 +190,9 @@ def test_from_list_is_linear(shape):
     built = C.cmps
     assert len(h) == n
     assert built < 3 * n, f"{built:,} comparisons to build a heap of {n:,} ({built / n:.1f} per item): heapify bottom-up is under 2 per item"
+    C.cmps = 0
+    assert h.peek().v == min(vals)
+    assert C.cmps == 0, f"peek() made {C.cmps:,} comparisons: peek must return the root in O(1) with 0 comparisons"
     assert h.pop().v == min(vals)
     assert [h.pop().v for _ in range(100)] == sorted(vals)[1:101]
 

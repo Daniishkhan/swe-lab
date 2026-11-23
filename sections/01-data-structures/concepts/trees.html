@@ -4,8 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="topic" content="01.03">
-  <meta name="status" content="outline">
-  <title>Trees, BSTs &amp; traversals</title>
+  <title>Split the search in half at every branch (Trees, BSTs &amp; LCA)</title>
   <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
   <link rel="stylesheet" href="../../../assets/style.css">
   <script src="../../../assets/curriculum.js"></script>
@@ -17,66 +16,729 @@
 <main class="content book">
 
 <header class="chapter-head">
-  <div class="eyebrow">Week 1 · Data Structures</div>
-  <h1>Trees, BSTs &amp; traversals</h1>
-  <div class="meta"><span><span class="kind k-outline">Outline</span> ready to author</span><span>Builds on: Complexity &amp;amp; amortized cost, Hash maps &amp;amp; sets, Linked lists, stacks, queues &amp;amp; monotonic stacks.</span></div>
+  <div class="eyebrow">Chapter 1 · Part 3</div>
+  <h1>Split the search in half at every branch</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> core Google &amp; Anthropic round</span><span>about 18 minutes</span><span>7 quick checks · 6 exercises</span></div>
 </header>
 
-<p>Trees: BST, balanced trees (red-black, AVL at a conceptual level), traversal orders.</p>
+<p>Hash maps jump straight to an exact match, and flat lists preserve arrival order. Neither answers <em>"give me every event between 2:00 and 2:05, sorted"</em> while new events keep arriving every millisecond. A branching tree turns a straight line into a chain of forks so each yes-or-no choice cuts the remaining search space in half.</p>
 
-<div class="outline-banner">
-  <div>
-    <b>Chapter skeleton ready.</b> Study this interactively right now via <code>teach</code>, or author the full visual chapter later (remove <code>status="outline"</code> once written).
-  </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <button class="btn primary" type="button" data-copy="teach me trees, BSTs &amp; traversals">Copy teach prompt</button>
-    <button class="btn" type="button" data-copy="write the chapter for 01.03 (Trees, BSTs &amp; traversals) following write-chapter, visuals-and-layout, and review-chapter">Copy write-chapter prompt</button>
-  </div>
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>State the exact search-tree rule — and catch the classic validation trap that breaks local checks.</li>
+    <li>Walk one path from top to bottom to search, insert, find the next higher value, scan a range, or delete a node.</li>
+    <li>Visit every node in all four standard orders without crashing Python on deep, lopsided shapes.</li>
+    <li>Find where two branches first meet, spot when a tree degrades into a chain, and build a short balanced tree fast.</li>
+    <li>Apply the core tree interview patterns — and know when to pick a hash map, sorted list, or tree.</li>
+  </ol>
 </div>
 
-<h2 id="s1"><span class="sec-num">1</span>Planned chapter arc</h2>
+<p class="muted small">How to read this: top to bottom. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass (sections 3, 7, and 8 prepare core <code>tree_traversals.py</code>; sections 3–6 prepare stretch <code>bst.py</code>). Builds on <a href="../../02-algorithms/concepts/complexity.html">How fast is your code?</a>, <a href="hash-maps.html">Find anything in one step</a>, and <a href="linear-structures.html">Lines, chains, and waiting lists</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>Why isn't a hash map or sorted list enough?</h2>
+
+<div class="story">
+  <p>You are building a live leaderboard for <b>1,000,000</b> players. Scores change every second, and every page load asks: <em>"Who sits right above player X?"</em> and <em>"List all players between 4,200 and 4,500."</em></p>
+  <p>A hash map scatters keys across buckets, so finding who sits above 4,200 scans all million players. A sorted list answers ranges fast, yet every score update shifts ~500,000 entries.</p>
+</div>
+
+<p>To keep sorted order while data keeps changing, arrange keys as a <b>branching signpost directory</b>: every signpost splits all remaining keys into "smaller goes left" and "larger goes right".</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 184" role="img" aria-label="Comparing hash map, sorted array, and balanced search tree on lookup, insert, and range query">
+    <text x="16" y="22" class="label" fill="var(--accent)" font-weight="700">WHY TREES EXIST — keeping sorted order while data keeps changing</text>
+
+    <rect x="16" y="36" width="206" height="132" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="119" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">Hash map (dict)</text>
+    <text x="119" y="82" class="label" text-anchor="middle" fill="var(--ok)">exact lookup: O(1) avg</text>
+    <text x="119" y="102" class="label" text-anchor="middle" fill="var(--ok)">insert/del: O(1) amort.</text>
+    <text x="119" y="122" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">successor / range: O(n)</text>
+    <text x="119" y="150" class="label" text-anchor="middle" fill="var(--muted)">keys scattered by hash</text>
+
+    <rect x="247" y="36" width="206" height="132" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="350" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">Sorted array (list)</text>
+    <text x="350" y="82" class="label" text-anchor="middle" fill="var(--ok)">exact lookup: O(log n)</text>
+    <text x="350" y="102" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">insert / delete: O(n)</text>
+    <text x="350" y="122" class="label" text-anchor="middle" fill="var(--ok)">range(lo, hi): O(log n + k)</text>
+    <text x="350" y="150" class="label" text-anchor="middle" fill="var(--muted)">shifts half the array</text>
+
+    <rect x="478" y="36" width="206" height="132" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="581" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">Balanced BST</text>
+    <text x="581" y="82" class="label" text-anchor="middle" fill="var(--ok)">exact lookup: O(log n)</text>
+    <text x="581" y="102" class="label" text-anchor="middle" fill="var(--ok)">insert / delete: O(log n)</text>
+    <text x="581" y="122" class="label" text-anchor="middle" fill="var(--ok)">range(lo, hi): O(log n + k)</text>
+    <text x="581" y="150" class="label" text-anchor="middle" fill="var(--text-strong)">20 steps for 1M keys!</text>
+  </svg>
+  <div class="cap">Balanced trees bridge hash maps and flat arrays whenever sorted order must survive continuous inserts and deletes.</div>
+</div>
+
+<p>That branching shape shows up across four everyday engineering problems:</p>
+<ul>
+  <li><b>Ordered indexes &amp; ranges:</b> database B-trees, time-window queries, and live leaderboards.</li>
+  <li><b>Hierarchies:</b> file systems, HTML DOM trees, and JSON/syntax trees.</li>
+  <li><b>Shared ancestry:</b> git merge bases and Lowest Common Ancestor (LCA) routing.</li>
+  <li><b>Fast ordered statistics:</b> k-th smallest item, predecessor, and successor under churn.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>How does a branching tree think recursively?</h2>
+
+<p>In a <b>binary tree</b>, one <b>root</b> signpost sits at the top, and every <b>node</b> links to at most two children: <code>left</code> and <code>right</code>. A node with zero children is a <b>leaf</b>. A node's <b>depth</b> is its distance from the root; the tree's <b>height</b> in this chapter is the number of <b>levels</b> (empty tree = <code>0</code>, single root = <code>1</code>). <em>Interview tip:</em> some textbooks count <em>edges</em> instead (empty = <code>−1</code>, single = <code>0</code>), so always clarify height convention aloud.</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 170" role="img" aria-label="Binary tree anatomy showing root at depth 0, left subtree, right child, leaves at depth 2, and total height of 3 levels">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">BINARY TREE ANATOMY — every child is the root of its own smaller subtree</text>
+
+    <!-- Left subtree highlight -->
+    <rect x="64" y="68" width="166" height="90" rx="10" fill="color-mix(in srgb, var(--accent-2) 8%, transparent)" stroke="var(--accent-2)" stroke-width="1.4" stroke-dasharray="5 4"/>
+    <text x="147" y="152" class="label" text-anchor="middle" fill="var(--accent-2)" font-weight="700">left subtree of 8</text>
+
+    <!-- Edges -->
+    <line x1="230" y1="48" x2="147" y2="90" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="230" y1="48" x2="313" y2="90" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="147" y1="90" x2="105" y2="128" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="147" y1="90" x2="189" y2="128" stroke="var(--border-strong)" stroke-width="1.8"/>
+
+    <!-- Nodes -->
+    <circle cx="230" cy="48" r="15" fill="color-mix(in srgb, var(--accent) 14%, var(--surface))" stroke="var(--accent)" stroke-width="2"/><text x="230" y="52" class="label" text-anchor="middle" font-weight="700">8</text>
+    <circle cx="147" cy="90" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/><text x="147" y="94" class="label" text-anchor="middle" font-weight="700">3</text>
+    <circle cx="313" cy="90" r="15" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/><text x="313" y="94" class="label" text-anchor="middle" font-weight="700">10</text>
+    <circle cx="105" cy="128" r="15" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/><text x="105" y="132" class="label" text-anchor="middle" font-weight="700">1</text>
+    <circle cx="189" cy="128" r="15" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/><text x="189" y="132" class="label" text-anchor="middle" font-weight="700">6</text>
+
+    <!-- Annotations on right -->
+    <text x="255" y="52" class="label" fill="var(--accent)" font-weight="700">← root (depth 0)</text>
+    <text x="338" y="90" class="label" fill="var(--ok)" font-weight="700">← leaf</text>
+    <text x="348" y="106" class="label" fill="var(--muted)">(0 kids)</text>
+    <rect x="442" y="42" width="242" height="114" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.4"/>
+    <text x="563" y="64" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">Three standard shapes</text>
+    <text x="456" y="88" class="label"><tspan font-weight="700" fill="var(--accent)">Full:</tspan> every node has 0 or 2 kids</text>
+    <text x="456" y="110" class="label"><tspan font-weight="700" fill="var(--ok)">Complete:</tspan> filled top-down, L→R</text>
+    <text x="456" y="132" class="label"><tspan font-weight="700" fill="var(--warn)">Perfect:</tspan> all levels full (2ʰ − 1)</text>
+    <text x="456" y="150" class="label" fill="var(--muted)">Here: height = 3 levels (2 edges)</text>
+  </svg>
+  <div class="cap">Because every child heads a smaller binary tree, recursive solutions handle any tree by solving left and right subtrees first.</div>
+</div>
+
+<div class="keyidea"><b>Ask left, ask right, combine.</b> To solve a question for <code>node</code> (height, size, LCA), assume the recursive call already gives the right answer for <code>node.left</code> and <code>node.right</code>, handle <code>None</code>, and combine at <code>node</code>.</div>
+
+<p>For example, tree height is two lines: return <code>0</code> if <code>node is None</code>, else <code>1 + max(height(node.left), height(node.right))</code>. Each recursive call pauses its local variables on the <b>call stack</b> (a stack of active parent calls waiting for children to return), so visiting all <code>n</code> nodes takes <code>O(n)</code> time and <code>O(height)</code> stack memory.</p>
+
+<p><em>Where the signpost directory picture breaks:</em> a well-designed highway directory stays shallow (3–4 forks for a whole country). A plain binary tree has no built-in balance rule — insert sorted keys and every signpost points right, collapsing the directory into a million-sign straight road.</p>
+
+<div class="check" id="check-tree-shape">
+  <p class="q">A <b>perfect</b> binary tree holds 1,048,575 nodes (<code>2²⁰ − 1</code>). How many levels tall is it, and how deep does a recursive walk's call stack grow?</p>
+  <div class="opts">
+    <button>About 1,000 levels; <code>O(√n)</code> active calls on the stack</button>
+    <button data-correct>20 levels; <code>O(log n)</code> active calls on the stack</button>
+    <button>20 levels; <code>O(n)</code> active calls, one per visited node</button>
+  </div>
+  <div class="fb right"><p>Exact! Visiting all <code>n</code> nodes takes <code>O(n)</code> time, yet peak stack depth equals the height — only ancestors along the current root-to-leaf path wait simultaneously.</p></div>
+  <div class="fb wrong"><p>Trace a tiny 7-node perfect tree (height 3): you dive <code>root → left → leaf</code> (3 frames), pop back to <code>left</code> before diving right, and pop back to <code>root</code> before touching the right half. Peak frames = height = <code>20</code> (<code>O(log n)</code>), never <code>n</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>What filing rule turns a tree into a fast search?</h2>
+
+<p>A <b>Binary Search Tree (BST)</b> adds one global signpost rule at every node:</p>
+<ul>
+  <li><b>Every</b> key in <code>node.left</code>'s entire subtree is strictly <code>&lt; node.val</code>.</li>
+  <li><b>Every</b> key in <code>node.right</code>'s entire subtree is strictly <code>&gt; node.val</code>.</li>
+</ul>
+
+<p>Checking only direct children (<code>node.left.val &lt; node.val &lt; node.right.val</code>) is the #1 interview bug on <em>Validate Binary Search Tree</em>. Below, every parent-child pair passes locally while the tree is broken:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 198" role="img" aria-label="Broken BST where 45 sits as right child of 20 inside 40's left subtree, failing the open range (20, 40)">
+    <text x="16" y="20" class="label" fill="var(--bad)" font-weight="700">THE CLASSIC TRAP — local checks pass, global BST rule fails</text>
+
+    <line x1="170" y1="54" x2="105" y2="112" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="170" y1="54" x2="235" y2="112" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="105" y1="112" x2="150" y2="168" stroke="var(--bad)" stroke-width="2.2"/>
+
+    <circle cx="170" cy="54" r="18" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <text x="170" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">40</text>
+    <text x="198" y="50" class="label" fill="var(--muted)">(-∞, +∞)</text>
+
+    <circle cx="105" cy="112" r="18" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <text x="105" y="116" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">20</text>
+    <text x="48" y="116" class="label" text-anchor="middle" fill="var(--muted)">(-∞, 40)</text>
+
+    <circle cx="235" cy="112" r="18" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <text x="235" y="116" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">60</text>
+    <text x="292" y="116" class="label" text-anchor="middle" fill="var(--muted)">(40, +∞)</text>
+
+    <circle cx="150" cy="168" r="18" fill="color-mix(in srgb, var(--bad) 16%, var(--surface))" stroke="var(--bad)" stroke-width="2.2"/>
+    <text x="150" y="172" class="label" text-anchor="middle" font-weight="700" fill="var(--bad)">45</text>
+    <text x="178" y="172" class="label" fill="var(--bad)" font-weight="700">must be in (20, 40)!</text>
+
+    <rect x="378" y="38" width="306" height="142" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="531" y="60" class="label" text-anchor="middle" font-weight="700" fill="var(--text-strong)">How to validate in O(n) time</text>
+    <text x="396" y="84" class="label" fill="var(--text-strong)">Carry an open range (lo, hi) down:</text>
+    <text x="396" y="106" class="label" fill="var(--accent)">• go left  → tighten hi = node.val</text>
+    <text x="396" y="126" class="label" fill="var(--accent)">• go right → tighten lo = node.val</text>
+    <text x="396" y="148" class="label" fill="var(--ok)">• valid iff lo &lt; node.val &lt; hi</text>
+    <text x="396" y="168" class="label" fill="var(--muted)">Use an explicit stack for deep chains!</text>
+  </svg>
+  <div class="cap"><code>45 &gt; 20</code> passes locally, yet searching for <code>45</code> from root <code>40</code> turns <em>right</em> toward <code>60</code> and misses it. Carrying <code>(lo, hi)</code> bounds catches every violation in one <code>O(n)</code> pass.</div>
+</div>
+
+<p>Using an explicit stack avoids Python's recursion limit on 100,000-node chains, and checking <code>is not None</code> avoids confusing a real value <code>0</code> with "no bound":</p>
+
+<pre><code>def is_valid_bst(root):
+    if root is None: return True
+    st = [(root, None, None)]           # (node, strict lo, strict hi)
+    while st:
+        n, lo, hi = st.pop()
+        if (lo is not None and n.val &lt;= lo) or (hi is not None and n.val &gt;= hi):
+            return False
+        if n.right is not None: st.append((n.right, n.val, hi))
+        if n.left is not None:  st.append((n.left, lo, n.val))
+    return True</code></pre>
+
+<details class="aside deeper">
+  <summary>Go deeper: what if an interviewer allows duplicate keys in a BST?</summary>
+  <p>The cleanest design stores a <code>count</code> field on each node — every search, successor, and delete rule stays strictly unique. Putting duplicates on the left (<code>&lt;=</code>) or right (<code>&gt;=</code>) works for basic search, yet subtly breaks Case 3 delete (promoting a duplicate to the wrong side) and complicates successor.</p>
+</details>
+
+<div class="check" id="check-bst-bounds">
+  <p class="q">You write <code>if lo and n.val &lt;= lo: return False</code> using <code>lo = None</code> for unbounded. Which input silently fails?</p>
+  <div class="opts">
+    <button>A tree containing negative numbers like <code>-5</code> and <code>-1</code></button>
+    <button>An empty tree where <code>root is None</code></button>
+    <button data-correct>A tree with root <code>0</code> and invalid right child <code>-1</code></button>
+  </div>
+  <div class="fb right"><p>Classic Python bare-editor bug! <code>bool(0)</code> is <code>False</code>, so <code>if lo:</code> skips the lower-bound check when <code>lo == 0</code>. Always write <code>lo is not None</code>.</p></div>
+  <div class="fb wrong"><p>Step into the right child <code>-1</code> of root <code>0</code>: we push <code>(-1, lo=0, hi=None)</code>. Now evaluate <code>if lo and -1 &lt;= 0:</code> in Python — because <code>0</code> is falsy, the <code>and</code> short-circuits to <code>False</code>, accepting an invalid BST!</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How do search, insert, min, and max stay on one path?</h2>
+
+<p>Because every signpost eliminates the entire opposite branch, four operations walk <b>one root-to-leaf path</b> in <code>O(height)</code> time with zero backtracking:</p>
+
+<ul>
+  <li><b>Search (<code>contains</code>):</b> at <code>cur</code>, stop if <code>key == cur.val</code>; step <code>cur.left</code> if smaller, <code>cur.right</code> if larger. Reaching <code>None</code> proves absence.</li>
+  <li><b>Insert:</b> follow the exact search path to an empty child slot and attach the new leaf (returning <code>False</code> if an equal key is already present).</li>
+  <li><b>Min / Max:</b> walk <code>cur = cur.left</code> until <code>cur.left is None</code> for <code>min()</code> (zero key comparisons!); walk right for <code>max()</code>.</li>
+</ul>
+
+<div class="figure">
+  <div id="viz-bst-walk"></div>
+  <div class="cap">Step through searching for <code>6</code> and finding <code>successor(7)</code> on a BST. Each fork discards the entire opposite subtree untouched.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>How do you find the next higher key or a range fast?</h2>
+
+<p><b>Successor (smallest key strictly greater than <code>key</code>):</b> walk down from the root remembering one candidate <code>best = None</code> — no parent pointers needed, and <code>key</code> doesn't have to be in the tree:</p>
+<ul>
+  <li>If <code>key &lt; cur.val</code>: <code>cur.val</code> beats <code>key</code> → update <code>best = cur.val</code> and step <b>left</b> to search for a tighter candidate.</li>
+  <li>If <code>key &gt;= cur.val</code>: discard <code>cur</code> and its left subtree → step <b>right</b> without changing <code>best</code>.</li>
+</ul>
+<p>When <code>cur</code> reaches <code>None</code>, <code>best</code> is the exact successor in <code>O(height)</code> (~1 comparison per level).</p>
+
+<p><b>Range query <code>range(lo, hi)</code> (sorted keys with <code>lo &lt;= k &lt; hi</code>):</b> walk in-order, pruning dead subtrees before entering them (and returning <code>[]</code> right away if <code>not (lo &lt; hi)</code>):</p>
+<ul>
+  <li>Descend into <code>node.left</code> only if <code>lo &lt; node.val</code> (otherwise everything left is <code>&lt; lo</code>).</li>
+  <li>Append <code>node.val</code> if <code>lo &lt;= node.val &lt; hi</code>.</li>
+  <li>Descend into <code>node.right</code> only if <code>node.val &lt; hi</code> (if <code>node.val &gt;= hi</code>, every key on the right is strictly <code>&gt; hi</code> and outside <code>[lo, hi)</code>).</li>
+</ul>
+<p>Total work visits only the two boundary paths plus the <code>k</code> reported keys: <b><code>O(height + k)</code></b>.</p>
+
+<div class="check" id="check-bst-successor">
+  <p class="q">In the BST built by inserting <code>[50, 30, 70, 20, 40, 60, 80]</code>, you call <code>successor(40)</code>. Which path runs?</p>
+  <div class="opts">
+    <button data-correct><code>50 → 30 → 40 → None</code>; saves <code>best = 50</code> at the root and returns <code>50</code></button>
+    <button><code>50 → 30 → 40 → None</code>; sees empty <code>40.right</code> and returns <code>None</code></button>
+    <button>In-order walk visits <code>20, 30, 40, 50</code> and stops at <code>50</code></button>
+  </div>
+  <div class="fb right"><p>Spot on! Turning left at <code>50</code> bookmarked <code>best = 50</code>; turning right at <code>30</code> and <code>40</code> never overwrote it, so hitting <code>None</code> returns <code>50</code> in 3 steps.</p></div>
+  <div class="fb wrong"><p>Check why remembering the last <em>left turn</em> matters: <code>40</code> has no right child, so its successor lives <em>above</em> it — specifically the deepest ancestor where you turned left (<code>50</code>). Only saving <code>best = cur.val</code> on every left turn captures it in one downward pass.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>How do you delete a node that has two children?</h2>
+
+<p>Walk down in <code>O(height)</code> tracking <code>(parent, cur)</code> to locate the target node <code>x</code>. Then handle one of three cases:</p>
 <ol>
-  <li><b>Why do we even need this?</b> — Concrete pain story with real numbers + early before/after visual + immediate payoff.</li>
-  <li><b>Running physical analogy &amp; rebuild</b> — One everyday mental model carried through <code>Question → Naive attempt → Break → Fix</code>.</li>
-  <li><b>Interactive visualization</b> — Step-through or live playground built with <code>assets/viz.js</code>.</li>
-  <li><b>How can this break?</b> — Core gotchas, worst-case bounds, and when this is the wrong tool.</li>
-  <li><b>How you use this in interviews</b> — 3 to 5 concrete before/after patterns (plus Google L5 scale follow-ups).</li>
-  <li><b>What to say in the interview</b> — 2-minute spoken summary + 5 to 8 intuition quick checks.</li>
+  <li><b>Leaf (0 children):</b> point <code>parent</code>'s child link to <code>None</code> (or update <code>self.root</code> if <code>parent is None</code>).</li>
+  <li><b>One child:</b> splice <code>x</code> out by connecting <code>parent</code> straight to <code>x</code>'s single child.</li>
+  <li><b>Two children:</b> find <code>x</code>'s <b>in-order successor</b> <code>s</code> — the leftmost node of <code>x.right</code> (walking <code>s.left</code> uses zero comparisons!). Copy <code>s.val</code> into <code>x.val</code>, then splice out <code>s</code>. Because <code>s</code> is leftmost, <code>s.left</code> is guaranteed to be <code>None</code>, so removing <code>s</code> always reduces to Case 1 or Case 2!</li>
 </ol>
 
-<h2 id="exercises"><span class="sec-num">✎</span>Linked exercises &amp; drills</h2>
+<p>Watch two classic bare-editor bugs in the code below: deleting the <b>root</b> (<code>parent is None</code>), and Case 3 when <b><code>s</code> is <code>x.right</code> itself</b> (so <code>sp is x</code>, and splicing updates <code>sp.right</code>, NOT <code>sp.left</code>!):</p>
+
+<pre><code>if cur.left is not None and cur.right is not None:   # Case 3: two children
+    sp, s = cur, cur.right
+    while s.left is not None:
+        sp, s = s, s.left
+    cur.val = s.val                  # promote successor's key
+    parent, cur = sp, s              # now unlink s (has at most 1 child!)
+child = cur.left if cur.left is not None else cur.right
+if parent is None:       self.root = child           # deleted root!
+elif parent.left is cur: parent.left = child
+else:                    parent.right = child        # handles s is x.right!</code></pre>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 175" role="img" aria-label="BST two-children delete: deleting 50 finds leftmost node 60 in its right subtree, copies 60 to the root, and splices out 60's old node">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">CASE 3 DELETE (TWO CHILDREN) — promote leftmost node of right subtree</text>
+
+    <text x="120" y="42" class="label" text-anchor="middle" fill="var(--muted)">Before: delete(50)</text>
+    <line x1="120" y1="68" x2="66" y2="112" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <line x1="120" y1="68" x2="174" y2="112" stroke="var(--accent)" stroke-width="2"/>
+    <line x1="174" y1="112" x2="142" y2="152" stroke="var(--ok)" stroke-width="2"/>
+    <line x1="174" y1="112" x2="208" y2="152" stroke="var(--border-strong)" stroke-width="1.6"/>
+
+    <circle cx="120" cy="68" r="16" fill="color-mix(in srgb, var(--bad) 14%, var(--surface))" stroke="var(--bad)" stroke-width="2"/>
+    <text x="120" y="72" class="label" text-anchor="middle" font-weight="700" fill="var(--bad)">50</text>
+    <circle cx="66" cy="112" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="66" y="116" class="label" text-anchor="middle" font-weight="700">30</text>
+    <circle cx="174" cy="112" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="174" y="116" class="label" text-anchor="middle" font-weight="700">70</text>
+    <circle cx="142" cy="152" r="16" fill="color-mix(in srgb, var(--ok) 15%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="142" y="156" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">60</text>
+    <circle cx="208" cy="152" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="208" y="156" class="label" text-anchor="middle" font-weight="700">80</text>
+
+    <line x1="258" y1="108" x2="360" y2="108" stroke="var(--ok)" stroke-width="2.2"/>
+    <polygon points="360,102 372,108 360,114" fill="var(--ok)"/>
+    <text x="312" y="96" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">copy 60 up</text>
+    <text x="312" y="126" class="label" text-anchor="middle" fill="var(--muted)">unlink old 60</text>
+
+    <text x="490" y="42" class="label" text-anchor="middle" fill="var(--ok)">After: BST rule intact</text>
+    <line x1="490" y1="68" x2="436" y2="112" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <line x1="490" y1="68" x2="544" y2="112" stroke="var(--border-strong)" stroke-width="1.6"/>
+    <line x1="544" y1="112" x2="578" y2="152" stroke="var(--border-strong)" stroke-width="1.6"/>
+
+    <circle cx="490" cy="68" r="16" fill="color-mix(in srgb, var(--ok) 15%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="490" y="72" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">60</text>
+    <circle cx="436" cy="112" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="436" y="116" class="label" text-anchor="middle" font-weight="700">30</text>
+    <circle cx="544" cy="112" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="544" y="116" class="label" text-anchor="middle" font-weight="700">70</text>
+    <circle cx="578" cy="152" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="578" y="156" class="label" text-anchor="middle" font-weight="700">80</text>
+    <text x="646" y="112" class="label" text-anchor="middle" fill="var(--muted)">60.left was</text>
+    <text x="646" y="129" class="label" text-anchor="middle" fill="var(--muted)">always None!</text>
+  </svg>
+  <div class="cap"><code>60</code> is greater than everything left of <code>50</code> and smaller than everything remaining on the right.</div>
+</div>
+
+<div class="check" id="check-bst-delete">
+  <p class="q">In the tree above, suppose node <code>60</code> also has a right child <code>65</code>. After <code>delete(50)</code> promotes <code>60</code> to the root, where does <code>65</code> attach?</p>
+  <div class="opts">
+    <button><code>65</code> becomes the right child of the new root <code>60</code></button>
+    <button data-correct><code>65</code> becomes <code>70.left</code>, replacing <code>60</code>'s old slot</button>
+    <button><code>65</code> must be re-inserted from the root via <code>insert(65)</code></button>
+  </div>
+  <div class="fb right"><p>Exact! Unlinking <code>60</code> from <code>70.left</code> is Case 2 (one child): <code>parent.left = cur.right</code> connects <code>70.left</code> straight to <code>65</code>, keeping <code>60 &lt; 65 &lt; 70</code> intact!</p></div>
+  <div class="fb wrong"><p>Check the inequality: <code>65</code> is larger than <code>60</code> and smaller than <code>70</code>, so it must stay in <code>70</code>'s left subtree! Splicing <code>60</code> out of <code>70.left</code> hands <code>60</code>'s only child (<code>65</code>) straight up to <code>70.left</code> in one pointer write.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>How do you walk every node without crashing Python's stack?</h2>
+
+<p>Four orders visit every node: three <b>Depth-First Search (DFS)</b> orders and one <b>Breadth-First Search (BFS)</b> level order. Read all three DFS orders straight off any drawing with the <b>finger-pass trick</b>: trace your finger snugly around the outline of the tree — it passes each node three times:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 176" role="img" aria-label="Finger-pass outline around tree 8, 3, 10, 1, 6 showing left dot for pre-order, bottom dot for in-order, and right dot for post-order">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">THE THREE FINGER PASSES — left = pre-order, bottom = in-order, right = post-order</text>
+
+    <!-- Outline curve around tree -->
+    <path d="M 155 40 C 120 40, 88 78, 56 120 C 40 144, 66 164, 88 148 C 102 138, 114 114, 122 114 C 130 114, 140 138, 152 148 C 174 164, 198 144, 184 120 C 172 100, 166 78, 178 78 C 192 78, 212 108, 232 118 C 254 128, 274 106, 256 84 C 234 56, 206 40, 195 40" fill="none" stroke="var(--border-strong)" stroke-width="1.5" stroke-dasharray="4 4"/>
+
+    <!-- Edges -->
+    <line x1="175" y1="54" x2="122" y2="96" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="175" y1="54" x2="232" y2="96" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="122" y1="96" x2="78" y2="136" stroke="var(--border-strong)" stroke-width="1.8"/>
+    <line x1="122" y1="96" x2="164" y2="136" stroke="var(--border-strong)" stroke-width="1.8"/>
+
+    <!-- Nodes + 3 colored pass dots on root 8 and node 3 -->
+    <circle cx="175" cy="54" r="15" fill="var(--surface)" stroke="var(--text-strong)" stroke-width="1.6"/><text x="175" y="58" class="label" text-anchor="middle" font-weight="700">8</text>
+    <circle cx="156" cy="54" r="4" fill="var(--accent)"/><circle cx="175" cy="73" r="4" fill="var(--ok)"/><circle cx="194" cy="54" r="4" fill="var(--warn)"/>
+
+    <circle cx="122" cy="96" r="15" fill="var(--surface)" stroke="var(--text-strong)" stroke-width="1.6"/><text x="122" y="100" class="label" text-anchor="middle" font-weight="700">3</text>
+    <circle cx="103" cy="96" r="4" fill="var(--accent)"/><circle cx="122" cy="115" r="4" fill="var(--ok)"/><circle cx="141" cy="96" r="4" fill="var(--warn)"/>
+
+    <circle cx="232" cy="96" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/><text x="232" y="100" class="label" text-anchor="middle" font-weight="700">10</text>
+    <circle cx="78" cy="136" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/><text x="78" y="140" class="label" text-anchor="middle" font-weight="700">1</text>
+    <circle cx="164" cy="136" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.6"/><text x="164" y="140" class="label" text-anchor="middle" font-weight="700">6</text>
+
+    <!-- Legend box -->
+    <rect x="314" y="38" width="370" height="122" rx="8" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.4"/>
+    <circle cx="332" cy="60" r="4.5" fill="var(--accent)"/>
+    <text x="346" y="64" class="label"><tspan font-weight="700" fill="var(--accent)">Pre-order (left):</tspan>  [8, 3, 1, 6, 10]  (node, L, R)</text>
+    <circle cx="332" cy="88" r="4.5" fill="var(--ok)"/>
+    <text x="346" y="92" class="label"><tspan font-weight="700" fill="var(--ok)">In-order (bottom):</tspan> [1, 3, 6, 8, 10]  (sorted BST!)</text>
+    <circle cx="332" cy="116" r="4.5" fill="var(--warn)"/>
+    <text x="346" y="120" class="label"><tspan font-weight="700" fill="var(--warn)">Post-order (right):</tspan> [1, 6, 3, 10, 8] (L, R, node)</text>
+    <text x="328" y="146" class="label" fill="var(--muted)">Level-order (BFS deque): [[8], [3, 10], [1, 6]]</text>
+  </svg>
+  <div class="cap">Trace counterclockwise around the dashed outline: hit the left dot for pre-order, bottom dot for in-order, and right dot for post-order.</div>
+</div>
+
+<div class="figure">
+  <div id="viz-traversals"></div>
+  <div class="cap">Step through all four traversal orders on the BST from <code>tree_traversals.py</code> (inserted as <code>[8, 3, 10, 1, 6]</code>).</div>
+</div>
+
+<p><b>Iterative templates (safe on 100,000-node chains):</b> recursion crashes around depth 1,000 in Python. Keeping your own Python <code>list</code> stack in normal program memory — and a <code>collections.deque</code> for BFS (never <code>list.pop(0)</code>: a <code>524,287</code>-node tree has <code>262,144</code> nodes on its bottom level alone!) — keeps every traversal <code>O(n)</code>:</p>
+
+<pre><code>def preorder(root):                     # push right first so LIFO pops left first
+    if root is None: return []
+    out, st = [], [root]
+    while st:
+        n = st.pop(); out.append(n.val)
+        if n.right is not None: st.append(n.right)
+        if n.left is not None:  st.append(n.left)
+    return out                          # postorder: push left then right, then out.reverse()
+
+def inorder(root):                      # dive left, pop &amp; emit, step right
+    out, st, cur = [], [], root
+    while cur is not None or st:
+        while cur is not None:
+            st.append(cur); cur = cur.left
+        n = st.pop(); out.append(n.val)
+        cur = n.right
+    return out
+
+from collections import deque
+def level_order(root):                  # freeze len(q) once per floor
+    if root is None: return []
+    out, q = [], deque([root])
+    while q:
+        lvl = []
+        for _ in range(len(q)):
+            n = q.popleft(); lvl.append(n.val)
+            if n.left is not None:  q.append(n.left)
+            if n.right is not None: q.append(n.right)
+        out.append(lvl)
+    return out</code></pre>
+
+<details class="aside deeper">
+  <summary>Go deeper: when the post-order reverse trick isn't enough</summary>
+  <p>Running <code>node, right, left</code> and reversing produces the exact post-order <em>values</em> in <code>O(n)</code>. However, if you need to <b>compute</b> bottom-up results iteratively (like subtree heights or freeing child nodes before parents), children must genuinely finish <em>before</em> you process the parent — track <code>(node, visited)</code> pairs on the stack (or a <code>prev</code> pointer) so you only evaluate <code>node</code> on its second pop.</p>
+</details>
+
+<div class="check" id="check-traversal-order">
+  <p class="q">In iterative <code>preorder(root)</code> above, what happens if you accidentally push <code>n.left</code> <em>before</em> <code>n.right</code>?</p>
+  <div class="opts">
+    <button>It turns into an in-order traversal (sorted on a BST)</button>
+    <button>It crashes with an infinite loop on leaf nodes</button>
+    <button data-correct>It visits <code>node, right, left</code> instead of <code>node, left, right</code></button>
+  </div>
+  <div class="fb right"><p>Exact! Because a stack is LIFO, whichever child you push <em>last</em> gets popped <em>first</em> — which is also why reversing that exact output gives post-order (<code>left, right, node</code>)!</p></div>
+  <div class="fb wrong"><p>Trace on root <code>8</code> with left <code>3</code> and right <code>10</code>: pop <code>8</code>, push <code>3</code> then push <code>10</code> → stack is <code>[3, 10]</code>. Next pop grabs the top (<code>10</code>, the right child!) before ever touching <code>3</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>How can trees break — and how do they stay balanced?</h2>
+
+<p>Insert sorted numbers <code>1, 2, 3, …, 500</code> into a plain BST and every key hangs on the right: height hits <b>500</b> instead of <b>9</b>, turning every search into <code>O(n)</code>.</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 180" role="img" aria-label="Comparing a skewed 5-node BST chain of height 5 against a balanced 7-node BST of height 3">
+    <text x="16" y="20" class="label" fill="var(--bad)" font-weight="700">SKEWED (1..5): height = n → O(n)</text>
+    <line x1="50" y1="48" x2="96" y2="74" stroke="var(--bad)" stroke-width="1.8"/>
+    <line x1="96" y1="74" x2="142" y2="100" stroke="var(--bad)" stroke-width="1.8"/>
+    <line x1="142" y1="100" x2="188" y2="126" stroke="var(--bad)" stroke-width="1.8"/>
+    <line x1="188" y1="126" x2="234" y2="152" stroke="var(--bad)" stroke-width="1.8"/>
+    <circle cx="50" cy="48" r="14" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.8"/><text x="50" y="52" class="label" text-anchor="middle" font-weight="700">1</text>
+    <circle cx="96" cy="74" r="14" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.8"/><text x="96" y="78" class="label" text-anchor="middle" font-weight="700">2</text>
+    <circle cx="142" cy="100" r="14" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.8"/><text x="142" y="104" class="label" text-anchor="middle" font-weight="700">3</text>
+    <circle cx="188" cy="126" r="14" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.8"/><text x="188" y="130" class="label" text-anchor="middle" font-weight="700">4</text>
+    <circle cx="234" cy="152" r="14" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.8"/><text x="234" y="156" class="label" text-anchor="middle" font-weight="700">5</text>
+
+    <line x1="330" y1="30" x2="330" y2="168" stroke="var(--border)" stroke-dasharray="4 4"/>
+
+    <text x="352" y="20" class="label" fill="var(--ok)" font-weight="700">BALANCED (mid root): height = ⌈log₂(n+1)⌉</text>
+    <line x1="518" y1="52" x2="438" y2="100" stroke="var(--ok)" stroke-width="1.8"/>
+    <line x1="518" y1="52" x2="598" y2="100" stroke="var(--ok)" stroke-width="1.8"/>
+    <line x1="438" y1="100" x2="398" y2="148" stroke="var(--ok)" stroke-width="1.8"/>
+    <line x1="438" y1="100" x2="478" y2="148" stroke="var(--ok)" stroke-width="1.8"/>
+    <line x1="598" y1="100" x2="558" y2="148" stroke="var(--ok)" stroke-width="1.8"/>
+    <line x1="598" y1="100" x2="638" y2="148" stroke="var(--ok)" stroke-width="1.8"/>
+    <circle cx="518" cy="52" r="15" fill="color-mix(in srgb, var(--ok) 14%, var(--surface))" stroke="var(--ok)" stroke-width="2"/><text x="518" y="56" class="label" text-anchor="middle" font-weight="700">4</text>
+    <circle cx="438" cy="100" r="15" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/><text x="438" y="104" class="label" text-anchor="middle" font-weight="700">2</text>
+    <circle cx="598" cy="100" r="15" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/><text x="598" y="104" class="label" text-anchor="middle" font-weight="700">6</text>
+    <circle cx="398" cy="148" r="15" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/><text x="398" y="152" class="label" text-anchor="middle" font-weight="700">1</text>
+    <circle cx="478" cy="148" r="15" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/><text x="478" y="152" class="label" text-anchor="middle" font-weight="700">3</text>
+    <circle cx="558" cy="148" r="15" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/><text x="558" y="152" class="label" text-anchor="middle" font-weight="700">5</text>
+    <circle cx="638" cy="148" r="15" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/><text x="638" y="152" class="label" text-anchor="middle" font-weight="700">7</text>
+  </svg>
+  <div class="cap">Same sorted keys, completely different height. Picking the middle element at every split packs <code>n</code> keys into <code>n.bit_length()</code> levels.</div>
+</div>
+
+<p><b>Building a minimum-height BST from sorted data in <code>O(n)</code>:</b> pass index bounds <code>(lo, hi)</code> — never slice <code>vals[:m]</code>! Across all calls at each recursion level, slicing copies <code>O(n)</code> items, and across <code>log₂ n</code> levels that explodes to <code>O(n log n)</code> extra copies:</p>
+
+<pre><code>def build_balanced(vals):
+    def build(lo, hi):
+        if lo &gt; hi: return None
+        m = (lo + hi) // 2              # middle splits remaining keys evenly
+        return TreeNode(vals[m], build(lo, m - 1), build(m + 1, hi))
+    return build(0, len(vals) - 1)      # depth is ~log2 n, so recursion is safe</code></pre>
+
+<p><b>When a BST is the wrong tool (and Python's stdlib gap):</b></p>
 <ul>
-  <li><code>bst.py</code> — Binary search tree with delete, successor and range queries</li>
-  <li><code>tree_traversals.py</code> — Tree traversals, BST validation and building a balanced tree</li>
-</ul>
-<pre class="plain"><code>python3 -m pytest -k "bst or tree_traversals"</code></pre>
-<h3>Timed drills (bare editor)</h3>
-<ul style="list-style:none;padding:0;display:grid;gap:4px">
-  <li><span class="lvl E">E</span> Maximum Depth of Binary Tree</li>
-  <li><span class="lvl E">E</span> Invert Binary Tree</li>
-  <li><span class="lvl M">M</span> Validate Binary Search Tree</li>
-  <li><span class="lvl M">M</span> Binary Tree Level Order Traversal</li>
-  <li><span class="lvl M">M</span> Lowest Common Ancestor of a Binary Tree</li>
-  <li><span class="lvl M">M</span> Kth Smallest Element in a BST</li>
-  <li><span class="lvl H">H</span> Serialize and Deserialize Binary Tree</li>
-  <li><span class="lvl H">H</span> Binary Tree Maximum Path Sum</li>
+  <li>Need only exact lookups? A hash map beats a BST at <code>O(1)</code> average with smaller constants.</li>
+  <li>Static sorted data with zero updates? A sorted list + binary search is smaller and faster in CPU cache.</li>
+  <li>Only need the minimum or maximum? Use a binary heap (<a href="heaps.html">Chapter 1.4</a>).</li>
+  <li><b>Python note:</b> Python's standard library has <em>no</em> built-in balanced BST (unlike Java's <code>TreeMap</code> or C++'s <code>std::map</code>). In Python interviews, mention <code>SortedList</code> or <code>SortedDict</code> (from <code>sortedcontainers</code>) for production, <code>bisect</code> for small/read-heavy lists, or <code>heapq</code> + lazy deletion when only extremes matter.</li>
 </ul>
 
+<details class="aside deeper">
+  <summary>Go deeper: AVL trees, Red-Black trees, and database B-trees</summary>
+  <p><b>AVL trees</b> keep left/right subtree heights within 1 using local pointer swaps (<b>rotations</b>) — shortest trees (fastest reads), slightly more rotations on writes. <b>Red-Black trees</b> bound the longest root-to-leaf path to ≤ 2× the shortest using at most 2–3 rotations per write — powering C++ <code>std::map</code>, Java <code>TreeMap</code>, and Linux's CFS scheduler. <b>B+ trees</b> widen each node to hundreds of sorted keys per 4–16 KB disk page so billions of rows fit in 3–4 levels.</p>
+</details>
+
+<div class="check" id="check-balanced-slice">
+  <p class="q">You implement <code>build_balanced(vals)</code> by slicing <code>build_balanced(vals[:m])</code> and <code>build_balanced(vals[m+1:])</code> on 100,000 items. What is the total work?</p>
+  <div class="opts">
+    <button><code>O(n)</code> — each item is copied at most once</button>
+    <button data-correct><code>O(n log n)</code> — each of the ~17 levels copies all remaining items</button>
+    <button><code>O(n²)</code> — slicing inside recursion always squares the input size</button>
+  </div>
+  <div class="fb right"><p>Spot on! Level 1 slices ~<code>n</code> items, level 2 slices two halves totaling ~<code>n</code> items, and so on across <code>log₂ n</code> levels → <code>O(n log n)</code> copies. Passing integer bounds <code>(lo, hi)</code> reads each item once in <code>O(n)</code>.</p></div>
+  <div class="fb wrong"><p>Count copies on 8 items: level 1 creates slices of size 3 and 4 (~7 copies), level 2 creates slices totaling ~4 copies, level 3 ~2 copies. Every level sums to <code>O(n)</code>, and a balanced tree has <code>log₂ n</code> levels → <code>O(n log n)</code> total instead of <code>O(n)</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>How you use this in interviews (LCA, patterns &amp; what to say)</h2>
+
+<p>Four high-frequency interview patterns build directly on Sections 2–8:</p>
+
+<ul>
+  <li><b>1. Lowest Common Ancestor (LCA):</b> given nodes <code>p</code> and <code>q</code> (<em>assuming both exist in the tree</em>), find the deepest node containing both in its subtree (a node counts as its own ancestor). In a <b>BST</b>, walk down from the root in <code>O(height)</code> time and <code>O(1)</code> space: go left if both are smaller, right if both are larger, and stop at the first split. In a <b>general binary tree</b>, ask left and right bottom-up in <code>O(n)</code>:</li>
+</ul>
+
+<pre><code>def lca(node, p, q):
+    if node is None or node is p or node is q:
+        return node
+    left = lca(node.left, p, q)
+    right = lca(node.right, p, q)
+    return node if (left and right) else (left or right)</code></pre>
+
+<ul>
+  <li><b>2. Kth Smallest in a BST:</b> run Section 7's iterative <code>inorder</code> and stop immediately on the <code>k</code>-th pop — <code>O(height + k)</code> time, never scanning the rest of the tree!</li>
+  <li><b>3. Serialize &amp; Deserialize Binary Tree:</b> emit pre-order values with a null marker <code>"#"</code> for every <code>None</code> child (e.g., <code>8,3,1,#,#,6,#,#,10,#,#</code>); decoding consumes tokens from an iterator in the exact same pre-order in <code>O(n)</code>.</li>
+  <li><b>4. Binary Tree Maximum Path Sum:</b> the classic twist on "ask left, ask right, combine" — a path bending through <code>node</code> can use <em>both</em> branches (<code>node.val + max(0, L) + max(0, R)</code>, updating a global <code>best</code> initialized to <code>float("-inf")</code> so all-negative trees work, with <code>0</code> returned on <code>None</code>), while the value <em>returned</em> to <code>node</code>'s parent can only continue down <em>one</em> branch (<code>node.val + max(0, L, R)</code>)!</li>
+</ul>
+
+<details class="aside deeper">
+  <summary>Go deeper: augmented order-statistics BST for dynamic k-th smallest</summary>
+  <p>If an interviewer follows up <em>Kth Smallest in a BST</em> with <em>"Now keys are inserted and deleted constantly, and <code>kth(k)</code> is called a million times!"</em>, augment every node with its subtree <code>size</code> (updated along the root-to-leaf path on every insert/delete). At any node, compare <code>k</code> against <code>size(node.left)</code> to step straight left, stop, or step right with <code>k - size(node.left) - 1</code> in <code>O(log n)</code>!</p>
+</details>
+
+<div class="check" id="check-lca">
+  <p class="q">In <code>lca(node, p, q)</code> above (assuming both exist in the tree), suppose <code>p</code> is an ancestor of <code>q</code>. Why does returning <code>node</code> immediately on <code>node is p</code> still work?</p>
+  <div class="opts">
+    <button data-correct>Because every other branch returns <code>None</code>, so <code>p</code> bubbles up untouched</button>
+    <button>Because <code>q</code> is guaranteed to sit inside the sibling subtree of <code>p</code></button>
+    <button>Because <code>left and right</code> are both non-null right at the root</button>
+  </div>
+  <div class="fb right"><p>Sharp! Since <code>q</code> lives underneath <code>p</code>, nothing outside <code>p</code>'s subtree can match <code>q</code>, so <code>p</code> bubbles all the way up. (Follow-up: if <code>p</code> or <code>q</code> might be <em>missing</em> from the tree, you must traverse both subtrees completely and verify both were found!)</p></div>
+  <div class="fb wrong"><p>Trace a tiny tree <code>root=1 → left=p → left=q</code> and <code>right=4</code>: calling <code>lca(1, p, q)</code> gets <code>left = p</code> (returned immediately) and <code>right = None</code> (<code>4</code> matches neither). Then <code>left or right</code> returns <code>p</code> — the exact LCA!</p></div>
+</div>
+
+<p><b>What to say in the interview (4 beats, ~90 seconds):</b></p>
+<ol>
+  <li><b>Why BSTs exist:</b> "When data mutates dynamically and we need ordered operations — successor, k-th smallest, or <code>range(lo, hi)</code> — hash maps lose order and sorted arrays pay <code>O(n)</code> shifts. A balanced BST keeps search, insert, delete, and successor in <code>O(log n)</code> and ranges in <code>O(log n + k)</code>."</li>
+  <li><b>Global invariant:</b> "Every key in the left subtree is strictly smaller than the node, and every key in the right subtree is strictly larger — so validating a BST passes <code>(lo, hi)</code> bounds downward rather than checking direct children."</li>
+  <li><b>Traversals &amp; safety:</b> "In-order emits a BST sorted; pre-order serializes with null markers; post-order combines child results; BFS uses a <code>deque</code> for level-order. Explicit stacks avoid Python's recursion limit on skewed trees."</li>
+  <li><b>Balance &amp; LCA:</b> "Plain BSTs degrade to <code>O(n)</code> on sorted input, so self-balancing trees (AVL / Red-Black) use rotations to lock height at <code>O(log n)</code>. General binary tree LCA bubbles matches bottom-up in <code>O(n)</code>; BST LCA walks down to the first split in <code>O(height)</code>."</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Operation</th><th>Balanced BST</th><th>Skewed BST</th><th>Extra Space</th></tr></thead>
+  <tbody>
+    <tr><td>Search / insert / delete / successor / BST LCA</td><td><b>O(log n)</b></td><td>O(n)</td><td>O(1) iterative</td></tr>
+    <tr><td>Range query <code>[lo, hi)</code></td><td><b>O(log n + k)</b></td><td>O(n)</td><td>O(height + k)</td></tr>
+    <tr><td>DFS traversals / Validate / General LCA</td><td>O(n)</td><td>O(n)</td><td>O(height)</td></tr>
+    <tr><td>BFS level-order (<code>deque</code>)</td><td>O(n)</td><td>O(n)</td><td>O(width) ≤ O(n)</td></tr>
+    <tr><td><code>build_balanced</code> from sorted list</td><td><b>O(n)</b> (using <code>lo, hi</code>)</td><td>—</td><td>O(log n) stack</td></tr>
+  </tbody>
+</table></div>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do the pen-and-paper traces first, then make the core tests pass without peeking at solutions.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Trace finger passes, bounds &amp; root delete</h4>
+  <p>Insert <code>[8, 3, 10, 1, 6, 14, 4, 7, 13]</code> into an empty BST. (a) Trace your finger around its outline to write pre-order, in-order, post-order, and level-order. (b) Write the valid open interval <code>(lo, hi)</code> at nodes <code>4</code> and <code>13</code>. (c) Which node replaces <code>8</code> on <code>delete(8)</code>?</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Pre: <code>[8, 3, 1, 6, 4, 7, 10, 14, 13]</code>; In: <code>[1, 3, 4, 6, 7, 8, 10, 13, 14]</code>; Post: <code>[1, 4, 7, 6, 3, 13, 14, 10, 8]</code>; Level: <code>[[8], [3, 10], [1, 6, 14], [4, 7, 13]]</code>. (b) Node <code>4</code>: <code>(3, 6)</code>; Node <code>13</code>: <code>(10, 14)</code>. (c) <code>10</code> (leftmost in <code>8.right</code> — notice <code>10</code> IS <code>8.right</code>, so <code>8.right</code> adopts <code>14</code>!).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code</div>
+  <h4>2. Iterative traversals, BST validation &amp; balanced build</h4>
+  <p>Implement iterative <code>preorder</code>, <code>inorder</code>, <code>postorder</code>, <code>level_order</code>, <code>is_valid_bst</code>, and <code>O(n)</code> <code>build_balanced</code> (Sections 3, 7, 8) in <a href="../exercises/tree_traversals.py">tree_traversals.py</a>. Tests run 100,000-node chains, non-BST trees with duplicates, a 524,287-node wide tree, and a read-counting list.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · code</div>
+  <h4>3. Build a full BST from scratch</h4>
+  <p>Implement <code>BST</code> (Sections 3–6: <code>insert</code>, <code>contains</code>, <code>delete</code> with all 3 cases, <code>min</code>, <code>max</code>, <code>successor</code>, <code>range</code>, <code>height</code>, <code>__iter__</code>) in <a href="../exercises/bst.py">bst.py</a>. Tests count every key comparison to reject full-tree scans.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · timed bare-editor drills</div>
+  <h4>4. Week 1 Day 4 interview drills</h4>
+  <p>Pick two from <em>Validate Binary Search Tree</em>, <em>Lowest Common Ancestor of a Binary Tree</em>, <em>Binary Tree Level Order Traversal</em>, <em>Kth Smallest Element in a BST</em>, <em>Serialize and Deserialize Binary Tree</em>, or <em>Binary Tree Maximum Path Sum</em>. Hand-trace <code>None</code>, 1 node, skewed chain, negatives, and root = <code>0</code> before running.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · follow-up &amp; explain</div>
+  <h4>5. Missing-node LCA follow-up</h4>
+  <p>Modify Section 9's general binary-tree <code>lca</code> on paper so it returns <code>None</code> if either <code>p</code> or <code>q</code> is absent from the tree (hint: you can no longer stop early when you hit <code>p</code>!).</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · say it out loud</div>
+  <h4>6. 2-minute interview explanation</h4>
+  <p>Explain without notes: (a) why checking direct children fails BST validation, (b) why the successor in Case 3 delete never has two children, and (c) what you reach for in Python when you need an ordered map.</p>
+</div>
+
+<p>Run the coding exercises from the repo root:</p>
+<pre class="plain"><code>pytest -k "tree_traversals or bst"</code></pre>
+
 <nav class="chapter-nav">
-  <a href="../index.html"><small>← Subject</small>Data Structures</a>
-  <a class="next" href="../../../index.html"><small>Back to →</small>Your track</a>
+  <a href="linear-structures.html"><small>← Previous</small>Lines, chains, and waiting lists</a>
+  <a class="next" href="heaps.html"><small>Next →</small>Always grab the smallest next</a>
 </nav>
 
 </main>
+
 <script>
-document.querySelectorAll("[data-copy]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const txt = btn.getAttribute("data-copy");
-    const done = () => { const o = btn.textContent; btn.textContent = "Copied"; setTimeout(() => (btn.textContent = o), 1400); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done);
-    else { const ta = document.createElement("textarea"); ta.value = txt; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); done(); }
-  });
-});
+(function () {
+  function N(val, left = null, right = null) { return { val, left, right }; }
+
+  /* ---- Player 1: BST search & successor walk (section 4) ---- */
+  (function () {
+    const root = N(8, N(3, N(1), N(6, N(4), N(7))), N(10, null, N(14, N(13), null)));
+    const scenarios = {
+      search6: {
+        frames: [
+          { cur: 8, seen: [], pruned: [], msg: "Start at root <b>8</b>. Compare <code>6 &lt; 8</code> → discard the entire right subtree (10, 14, 13) and turn <b>left</b>." },
+          { cur: 3, seen: [8], pruned: [10, 14, 13], msg: "At <b>3</b>. Compare <code>6 &gt; 3</code> → discard the left subtree (1) and turn <b>right</b>." },
+          { cur: null, seen: [8, 3], pruned: [10, 14, 13, 1], found: 6, msg: "At <b>6</b>. <code>6 == 6</code> — <b>found in 3 comparisons</b> out of 9 nodes!" }
+        ]
+      },
+      succ7: {
+        frames: [
+          { cur: 8, seen: [], pruned: [], best: 8, msg: "At root <b>8</b>: <code>7 &lt; 8</code>, so bookmark <b>best = 8</b> (amber) and turn <b>left</b> to look for a tighter candidate." },
+          { cur: 3, seen: [8], pruned: [10, 14, 13], best: 8, msg: "At <b>3</b>: <code>7 &gt;= 3</code> (too small) → keep <b>best = 8</b> and turn <b>right</b>." },
+          { cur: 6, seen: [8, 3], pruned: [10, 14, 13, 1], best: 8, msg: "At <b>6</b>: <code>7 &gt;= 6</code> → keep <b>best = 8</b> and turn <b>right</b>." },
+          { cur: 7, seen: [8, 3, 6], pruned: [10, 14, 13, 1, 4], best: 8, msg: "At <b>7</b>: <code>7 &gt;= 7</code> (need strictly greater) → turn <b>right</b> into <code>None</code>." },
+          { cur: null, seen: [8, 3, 6, 7], pruned: [10, 14, 13, 1, 4], found: 8, best: 8, msg: "Hit <code>None</code>. Return <b>best = 8</b> — the exact successor of 7 without parent pointers!" }
+        ]
+      }
+    };
+
+    const sel = V.el("select", { "aria-label": "Choose BST walk" },
+      V.el("option", { value: "search6" }, "Search for 6"),
+      V.el("option", { value: "succ7" }, "Successor of 7"));
+
+    const api = V.player(document.getElementById("viz-bst-walk"), {
+      frames: scenarios.search6.frames,
+      speed: 1100,
+      extraControls: [sel],
+      draw(f, stage) {
+        const svg = V.s("svg", { class: "viz" });
+        const seen = new Set(f.seen), pruned = new Set(f.pruned);
+        V.binaryTree(svg, root, {
+          dx: 44, dy: 52, r: 16,
+          cls(n) {
+            if (f.found === n.val) return "done";
+            if (f.cur === n.val && f.best === n.val) return "warn";
+            if (f.cur === n.val) return "hl";
+            if (f.best === n.val) return "warn";
+            if (pruned.has(n.val)) return "dim";
+            return "";
+          },
+          edgeCls(a, b) {
+            return (seen.has(a.val) && (seen.has(b.val) || f.cur === b.val || f.found === b.val)) ? "hl" : "";
+          }
+        });
+        stage.append(svg);
+      }
+    });
+    sel.onchange = () => api.load(scenarios[sel.value].frames);
+  })();
+
+  /* ---- Player 2: Four traversal orders on [8, 3, 10, 1, 6] (section 7) ---- */
+  (function () {
+    const root = N(8, N(3, N(1), N(6)), N(10));
+    const orders = {
+      preorder: { seq: [8, 3, 1, 6, 10], note: "Pre-order (left pass): node → left → right." },
+      inorder: { seq: [1, 3, 6, 8, 10], note: "In-order (bottom pass): left → node → right — sorted on a BST!" },
+      postorder: { seq: [1, 6, 3, 10, 8], note: "Post-order (right pass): left → right → node — children finish before parent." },
+      level: { seq: [8, 3, 10, 1, 6], levels: [[8], [3, 10], [1, 6]], note: "Level-order (BFS deque): floor by floor — [[8], [3, 10], [1, 6]]." }
+    };
+
+    function makeFrames(key) {
+      const { seq, levels, note } = orders[key];
+      const frames = [{ cur: null, done: [], isLevel: Boolean(levels), msg: `Ready. ${note}` }];
+      seq.forEach((v, idx) => {
+        const done = seq.slice(0, idx + 1);
+        let fmt = `[${done.join(", ")}]`;
+        if (levels) {
+          const grouped = [];
+          let rem = done.length;
+          for (const lv of levels) {
+            if (rem <= 0) break;
+            grouped.push("[" + lv.slice(0, rem).join(", ") + "]");
+            rem -= lv.length;
+          }
+          fmt = `[${grouped.join(", ")}]`;
+        }
+        frames.push({ cur: v, done, isLevel: Boolean(levels), fmt, msg: `Step ${idx + 1}: visit <b>${v}</b>. Output so far: <code>${fmt}</code>.` });
+      });
+      return frames;
+    }
+
+    const sel = V.el("select", { "aria-label": "Choose traversal order" },
+      V.el("option", { value: "inorder" }, "In-order (sorted BST)"),
+      V.el("option", { value: "preorder" }, "Pre-order (node, L, R)"),
+      V.el("option", { value: "postorder" }, "Post-order (L, R, node)"),
+      V.el("option", { value: "level" }, "Level-order (BFS deque)"));
+
+    const api = V.player(document.getElementById("viz-traversals"), {
+      frames: makeFrames("inorder"),
+      speed: 950,
+      extraControls: [sel],
+      draw(f, stage) {
+        const svg = V.s("svg", { class: "viz" });
+        const doneSet = new Set(f.done);
+        V.binaryTree(svg, root, {
+          dx: 54, dy: 56, r: 17,
+          cls(n) {
+            if (n.val === f.cur) return "hl";
+            if (doneSet.has(n.val)) return "done";
+            return "";
+          }
+        });
+        const out = V.el("div", { style: "margin-top:12px" },
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, f.isLevel ? "Emitted levels" : "Emitted order"),
+          f.done.length
+            ? V.cells(f.done, { idx: false, cls: (i) => i === f.done.length - 1 ? "hl" : "done" })
+            : V.el("div", { class: "small muted", style: "font-family:var(--mono);padding:6px 0" }, "[]"));
+        stage.append(svg, out);
+      }
+    });
+    sel.onchange = () => api.load(makeFrames(sel.value));
+  })();
+})();
 </script>
 </body>
 </html>

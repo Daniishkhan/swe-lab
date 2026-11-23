@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="topic" content="02.02">
+  <title>Put chaos in order — and pick the right tool (Sorting &amp; quickselect)</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="../../../assets/style.css">
+  <script src="../../../assets/curriculum.js"></script>
+  <script src="../../../assets/viz.js"></script>
+  <script src="../../../assets/shell.js"></script>
+  <script src="../../../assets/book.js"></script>
+</head>
+<body data-root="../../.." data-section="02" data-page="concept">
+<main class="content book">
+
+<header class="chapter-head">
+  <div class="eyebrow">Chapter 2 · Part 2</div>
+  <h1>Put chaos in order — and pick the right tool</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> core algorithmic foundation</span><span>about 18 minutes</span><span>7 quick checks · 9 exercises</span></div>
+</header>
+
+<p>You will almost never implement a sorting algorithm from scratch in production — Python's built-in sort is written in tuned C and beats hand-rolled code by an order of magnitude. Yet interviews still test sorting constantly: not because they want memorized textbook code, but because <b>splitting, partitioning, preserving tie order, and picking a single rank without sorting everything</b> show up inside dozens of harder problems.</p>
+
+<div class="learn-list">
+  <h4>By the end you'll be able to</h4>
+  <ol>
+    <li>Explain why comparing pairs hits a hard speed limit — and when counting skips past that limit altogether.</li>
+    <li>Keep tied items in their original order, and spot when a tiny operator flip silently destroys tie order.</li>
+    <li>Build split-and-merge sorting and three-way partitioning, and reuse partitioning to grab the k-th smallest item without full sorting.</li>
+    <li>Compare every major sort on speed, memory, tie order, and worst-case inputs — including how Python's built-in sort works.</li>
+    <li>Apply custom sort keys, interval merging, and three-way partitioning cleanly in bare-editor interviews.</li>
+  </ol>
+</div>
+
+<p class="muted small">How to read this: top to bottom. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass (open section 4's box for the Lomuto failure proof and worst-case selection follow-up before coding <code>sorts.py</code>). Builds on <a href="complexity.html">How fast is your code?</a> and <a href="../../01-data-structures/concepts/heaps.html">Always grab the smallest next</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s1"><span class="sec-num">1</span>Why does sorting unlock so many problems?</h2>
+
+<div class="story">
+  <p>Your billing dashboard loads <b>500,000</b> invoices and sorts them by date. A teammate writes a quick hand-rolled insertion loop (sliding each invoice left into place). On 200 test invoices it finishes in under a millisecond.</p>
+  <p>In production on 500,000 reverse-ordered invoices, every new invoice slides past every earlier one — roughly <b>125 billion</b> comparisons, freezing the page for minutes. Switching to a split-and-merge sort cuts those 125 billion comparisons down to ~<b>9.5 million</b> (~0.1 seconds).</p>
+</div>
+
+<p>Picture <b>sorting a shuffled stack of exam papers by hand</b>. Two completely different strategies emerge: sliding each paper one by one into a growing sorted pile (<b>insertion sort</b>, fast when the stack is tiny or nearly sorted, <code>O(n²)</code> when reversed), versus repeatedly splitting the stack in half and combining sorted halves (<b><code>O(n log n)</code></b>).</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 176" role="img" aria-label="Comparing O(n squared) insertion sort at 125 billion comparisons against O(n log n) merge sort at 9.5 million comparisons and O(n + k) counting sort at 0 comparisons for 500,000 items">
+    <text x="16" y="22" class="label" fill="var(--accent)" font-weight="700">SORTING 500,000 ITEMS — three completely different work ceilings</text>
+
+    <rect x="16" y="36" width="206" height="124" rx="8" fill="color-mix(in srgb, var(--bad) 8%, var(--surface))" stroke="var(--bad)" stroke-width="1.5"/>
+    <text x="119" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--bad)">Insertion sort</text>
+    <text x="119" y="82" class="label" text-anchor="middle" fill="var(--text-strong)">O(n²) worst case</text>
+    <text x="119" y="102" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">~125B comparisons</text>
+    <text x="119" y="124" class="label" text-anchor="middle" fill="var(--ok)">O(n) if nearly sorted!</text>
+    <text x="119" y="144" class="label" text-anchor="middle" fill="var(--muted)">fast only for tiny runs</text>
+
+    <rect x="247" y="36" width="206" height="124" rx="8" fill="color-mix(in srgb, var(--accent) 8%, var(--surface))" stroke="var(--accent)" stroke-width="1.8"/>
+    <text x="350" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--accent)">Merge / Quick / Timsort</text>
+    <text x="350" y="82" class="label" text-anchor="middle" fill="var(--text-strong)">O(n log n) comparisons</text>
+    <text x="350" y="102" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">~9.5M comparisons</text>
+    <text x="350" y="124" class="label" text-anchor="middle" fill="var(--text-strong)">works on ANY comparable key</text>
+    <text x="350" y="144" class="label" text-anchor="middle" fill="var(--muted)">13,000× less work than n²</text>
+
+    <rect x="478" y="36" width="206" height="124" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="581" y="58" class="label" text-anchor="middle" font-weight="700" fill="var(--ok)">Counting / Radix sort</text>
+    <text x="581" y="82" class="label" text-anchor="middle" fill="var(--text-strong)">O(n + key range k)</text>
+    <text x="581" y="102" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">0 comparisons!</text>
+    <text x="581" y="124" class="label" text-anchor="middle" fill="var(--text-strong)">needs small integer keys</text>
+    <text x="581" y="144" class="label" text-anchor="middle" fill="var(--muted)">breaks if key range = 10⁹</text>
+  </svg>
+  <div class="cap">Sorting once in <code>O(n log n)</code> is often the cheapest preprocessing move in an interview — turning messy <code>O(n²)</code> scans into single linear passes.</div>
+</div>
+
+<p>Once data is sorted, four classic interview moves open right up:</p>
+<ul>
+  <li><b>Group duplicates &amp; intervals:</b> equal values and overlapping meetings sit right next to each other.</li>
+  <li><b>Two-pointer scans:</b> finding triples summing to zero or pairing smallest with largest walks inward in <code>O(n)</code>.</li>
+  <li><b>Binary search:</b> jump to any threshold or boundary in <code>O(log n)</code>.</li>
+  <li><b>Custom ranking:</b> sort by multi-field tie-breakers or custom rules in one line.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>What makes a sort stable — and why is n log n a speed limit?</h2>
+
+<p>Two foundational properties separate sorting algorithms before you write any code:</p>
+
+<p><b>1. Stability (preserving tie order).</b> Suppose your exam stack is already sorted alphabetically by student name, and you now sort by city. A <b>stable</b> sort guarantees that two students with the <em>same</em> city (say <code>(NYC, Ana)</code> before <code>(NYC, Ben)</code>) keep that exact relative order after sorting. An <b>unstable</b> sort (like Quicksort or Heapsort) swaps distant papers across the stack, scrambling tied items.</p>
+
+<p><b>Why stability matters in real systems:</b> spreadsheet multi-column sorts ("sort by Name, then sort by City"), database <code>ORDER BY</code> pipelines, and Radix sort (Section 6) all break unless the sort preserves earlier tie order.</p>
+
+<p><b>2. The <code>Ω(n log n)</code> comparison speed limit.</b> Why can <em>no</em> sort that only asks yes/no questions like <code>a &lt; b</code> beat <code>O(n log n)</code> in the worst case? Try just <b>3 papers</b>: there are <code>3! = 6</code> possible starting shuffles. Two yes/no comparisons can distinguish at most <code>2² = 4</code> outcomes — too few for 6! You need at least <b>3</b> comparisons (<code>2³ = 8 &gt;= 6</code>).</p>
+
+<p>In general, <code>n</code> distinct papers have <code>n!</code> possible orderings, and each yes/no comparison cuts the remaining possibilities at most in half — so any comparison sort needs at least <code>log₂(n!)</code> comparisons rounded up, which grows as <b><code>Ω(n log n)</code></b> (by Stirling's approximation, roughly <code>n log₂ n − 1.44n</code>).</p>
+
+<div class="keyidea">Any comparison-based sort must make at least <b><code>Ω(n log n)</code></b> comparisons in the worst case. To beat <code>n log n</code>, you must exploit key structure (like small integer ranges) instead of comparing pairs.</div>
+
+<div class="check" id="check-stability">
+  <p class="q">Input records <code>[(Eng, Ana), (Ops, Bo), (Eng, Cy)]</code> are sorted by department. Which output proves the sort was <b>unstable</b>?</p>
+  <div class="opts">
+    <button><code>[(Eng, Ana), (Eng, Cy), (Ops, Bo)]</code></button>
+    <button data-correct><code>[(Eng, Cy), (Eng, Ana), (Ops, Bo)]</code></button>
+    <button><code>[(Ops, Bo), (Eng, Ana), (Eng, Cy)]</code></button>
+  </div>
+  <div class="fb right"><p>Exact! Both <code>Ana</code> and <code>Cy</code> share department <code>Eng</code>, yet <code>Cy</code> jumped ahead of <code>Ana</code> — proving tie order wasn't preserved. (The third option isn't sorted ascending by department at all.)</p></div>
+  <div class="fb wrong"><p>Check two things: first, ascending department puts <code>Eng</code> before <code>Ops</code>. Second, within the tied <code>Eng</code> group, <code>Ana</code> appeared before <code>Cy</code> in the input — so seeing <code>Cy</code> before <code>Ana</code> while still sorted by department proves an unstable sort.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>How does Merge Sort guarantee O(n log n) — and count inversions?</h2>
+
+<p>To sort our exam stack with zero worst-case cliffs, <b>Merge Sort</b> uses divide and conquer:</p>
+<ol>
+  <li><b>Split</b> the stack in half until every pile has 0 or 1 paper (already sorted).</li>
+  <li><b>Zip (merge)</b> two sorted piles into one sorted pile using two index cursors <code>i</code> and <code>j</code> from left to right (never <code>list.pop(0)</code>, which shifts <code>O(n)</code> items on every pop!).</li>
+</ol>
+
+<p><b>The stability rule in one character:</b> when <code>left[i]</code> and <code>right[j]</code> are <b>equal</b>, take from <b><code>left</code></b> (<code>if left[i] &lt;= right[j]</code>, NOT strict <code>&lt;</code>!). Because everything in <code>left</code> appeared earlier in the original input, picking <code>left</code> on ties guarantees stability.</p>
+
+<p><b>Piggybacking inversion count (Exercise 5 in <code>sorts.py</code>):</b> an <b>inversion</b> is an out-of-order pair <code>i &lt; j</code> with <code>a[i] &gt; a[j]</code> (equal items are <em>not</em> an inversion). It measures how unsorted a list is — insertion sort from Section 1 does roughly <code>n + inversions</code> work! Inside merge sort, whenever <code>right[j] &lt; left[i]</code> (strictly smaller), <code>right[j]</code> just jumped ahead of <code>left[i]</code> <em>and every remaining paper in the left pile</em> — adding <b><code>len(left) - i</code></b> inversions in <code>O(1)</code>!</p>
+
+<div class="figure">
+  <div id="viz-merge"></div>
+  <div class="cap">Watch merging sorted halves <code>[2, 4]</code> and <code>[1, 3]</code>. Whenever the right cursor wins, it jumps over all <code>len(L) − i</code> remaining items in <code>L</code> — counting inversions in <code>O(n log n)</code> for free.</div>
+</div>
+
+<pre><code>def merge_sort(items):
+    if len(items) &lt;= 1:
+        return list(items)                      # always return a NEW list
+    mid = len(items) // 2
+    left, right = merge_sort(items[:mid]), merge_sort(items[mid:])
+    out, i, j = [], 0, 0
+    while i &lt; len(left) and j &lt; len(right):
+        if left[i] &lt;= right[j]:                 # &lt;= preserves stability!
+            out.append(left[i]); i += 1
+        else:
+            out.append(right[j]); j += 1        # inversions += len(left) - i
+    out.extend(left[i:]); out.extend(right[j:])
+    return out</code></pre>
+
+<p>Every recursion level merges <code>n</code> items in linear time across <code>log₂ n</code> levels: guaranteed <b><code>O(n log n)</code></b> best, average, and worst case, <b>stable</b>, with <b><code>O(n)</code> extra memory</b>. <em>Hidden Python detail:</em> slicing <code>items[:mid]</code> / <code>items[mid:]</code> copies <code>O(n)</code> references per level (<code>O(n log n)</code> total copies, still <code>O(n)</code> peak extra RAM); high-performance code passes <code>(lo, hi)</code> bounds plus one shared scratch buffer.</p>
+
+<div class="check" id="check-merge-inversions">
+  <p class="q">Merging <code>left = [2, 5, 8]</code> (at <code>i = 1</code>, past <code>2</code>) with <code>right = [3, 4]</code> (at <code>j = 0</code>), <code>3 &lt; 5</code> picks <code>3</code> from <code>right</code>. How many inversions does that add?</p>
+  <div class="opts">
+    <button data-correct><code>2</code> — <code>3</code> jumps ahead of both <code>5</code> and <code>8</code> in <code>left</code></button>
+    <button><code>1</code> — <code>3</code> only compared directly with <code>5</code></button>
+    <button><code>3</code> — <code>left</code> holds 3 elements in total</button>
+  </div>
+  <div class="fb right"><p>Exact! Since <code>left</code> is sorted, <code>3 &lt; 5</code> implies <code>3</code> is strictly smaller than every remaining item in <code>left</code> — adding <code>len(left) - i = 3 - 1 = 2</code> inversions (<code>(5, 3)</code> and <code>(8, 3)</code>) in one addition.</p></div>
+  <div class="fb wrong"><p>Check which elements in <code>left</code> are still waiting at <code>i = 1</code>: only <code>5</code> and <code>8</code> (<code>2</code> was already placed and <code>2 &lt; 3</code> is not inverted). Both <code>(5, 3)</code> and <code>(8, 3)</code> are inverted → <code>len(left) - i = 2</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How does Quicksort sort in place — and how does Quickselect hit O(n)?</h2>
+
+<p>Merge Sort needs an <code>O(n)</code> scratch buffer. To sort <b>in place</b>, <b>Quicksort</b> picks one divider paper (a <b>random pivot</b> <code>p</code>) and partitions the stack on the way <em>down</em> into three zones — smaller than <code>p</code> on the left, equal to <code>p</code> in the middle, larger than <code>p</code> on the right — then recursively sorts only the strictly smaller and strictly larger sides.</p>
+
+<p><b>One-pass 3-way partition (Dutch National Flag — 3 colored stripes = 3 zones):</b> maintain three pointers <code>lt, i, gt</code> so at every step <code>a[lo..lt-1] &lt; p</code>, <code>a[lt..i-1] == p</code>, <code>a[i..gt]</code> is unseen, and <code>a[gt+1..hi] &gt; p</code>. Each item is compared with <code>p</code> at most twice in one pass, and grouping all <code>== p</code> values in the middle prevents duplicate keys from causing quadratic recursion:</p>
+
+<pre><code>def partition3(a, lo, hi):
+    p = a[random.randint(lo, hi)]               # random pivot defeats sorted inputs
+    lt, i, gt = lo, lo, hi
+    while i &lt;= gt:
+        if a[i] &lt; p:
+            a[lt], a[i] = a[i], a[lt]; lt += 1; i += 1
+        elif a[i] &gt; p:
+            a[i], a[gt] = a[gt], a[i]; gt -= 1  # re-check swapped-in a[i]!
+        else:
+            i += 1
+    return lt, gt                               # a[lt..gt] are ALL == p</code></pre>
+
+<div class="figure">
+  <div id="viz-dnf"></div>
+  <div class="cap">Watch one-pass 3-way partitioning on <code>[4, 2, 4, 1, 5, 4, 3]</code> with pivot <code>4</code>. Every element lands in <code>[&lt; p | == p | &gt; p]</code> without extra arrays.</div>
+</div>
+
+<p><b>Quickselect (<code>kth_smallest</code> in <code>O(n)</code> average):</b> if you only want the <b><code>k</code>-th smallest</b> paper (target 0-based index <code>t = k - 1</code>), partition once with <code>partition3</code>: if <code>lt &lt;= t &lt;= gt</code> return <code>a[t]</code> immediately; otherwise discard the side that cannot hold <code>t</code> and narrow <code>(lo, hi)</code> to <b>only one side</b> in a loop! If each step roughly halves the active slice, total work sums geometrically to <code>n + n/2 + n/4 + … = 2n</code> — linear <b><code>O(n)</code></b> (<code>~3.4n–5n</code> average comparisons with random pivots, beating full sorting's <code>~13n</code> at <code>n = 20,000</code>).</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: why Lomuto breaks on all-equal inputs, O(log n) worst-case stack, and strict O(n) selection</summary>
+  <p><b>The two-way Lomuto trap:</b> classic two-way Lomuto partitioning puts every item <code>&lt;= p</code> on the left. On all-equal input <code>[7, 7, …, 7]</code>, every element lands on the left — a <code>(n − 1) vs. 0</code> split even with a <em>random</em> pivot, crashing straight into <b><code>O(n²)</code></b>! With <code>partition3</code> above, <code>[7, 7, …, 7]</code> returns <code>lt = lo, gt = hi</code> on the very first pass and finishes in <code>O(n)</code> with zero recursive calls.</p>
+  <p><b>Guaranteeing <code>O(log n)</code> worst-case Quicksort stack:</b> naive two-call recursion (<code>qs(lo, lt-1); qs(gt+1, hi)</code>) can reach <code>O(n)</code> stack depth on unlucky pivots. Always recurse on the <em>smaller</em> partition and loop on the <em>larger</em> one (tail-call elimination) so stack depth is strictly <code>O(log n)</code> even in the worst case.</p>
+  <p><b>Adversarial inputs &amp; strict worst-case <code>O(n)</code> selection:</b> random pivots defeat adversarial sorted/killer inputs with high probability. If an interviewer asks for strict deterministic <code>O(n)</code> worst-case selection, mention <b>Median of Medians (BFPRT)</b> (or C++'s <b>Introselect</b>, which falls back to Median of Medians / Heapsort if Quickselect slows down).</p>
+</details>
+
+<div class="check" id="check-quickselect">
+  <p class="q">In <code>partition3</code> above, when <code>a[i] &gt; p</code> we swap <code>a[i]</code> with <code>a[gt]</code> and decrement <code>gt</code>, yet keep <code>i</code> unchanged. Why?</p>
+  <div class="opts">
+    <button>The item swapped in from <code>a[gt]</code> is always equal to <code>p</code></button>
+    <button>Incrementing <code>i</code> would skip past the pivot sitting at <code>lo</code></button>
+    <button data-correct>The item swapped in from <code>a[gt]</code> has not been checked yet</button>
+  </div>
+  <div class="fb right"><p>Exact! When <code>a[i] &lt; p</code>, the item coming from <code>a[lt]</code> was already scanned (it's <code>== p</code>), so <code>i += 1</code> is safe; when <code>a[i] &gt; p</code>, the newcomer from <code>a[gt]</code> is unseen and must be inspected next.</p></div>
+  <div class="fb wrong"><p>Trace <code>[5, 1]</code> with pivot <code>p = 3</code> (<code>lt = i = 0, gt = 1</code>): <code>a[0] = 5 &gt; 3</code> swaps <code>5</code> and <code>1</code> → <code>[1, 5]</code>, <code>gt = 0</code>. If you incremented <code>i</code> to <code>1</code>, the loop would stop immediately — leaving <code>1</code> stuck outside the <code>&lt; 3</code> zone!</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>What if you need O(1) RAM, no O(n²) tail, or nearly-sorted speed?</h2>
+
+<p>Quicksort still carries an <code>O(n²)</code> worst-case tail (and <code>O(log n)</code> stack), while Merge Sort needs <code>O(n)</code> extra memory. Two practical sorts fill those exact gaps:</p>
+
+<ul>
+  <li><b>Heapsort:</b> build a <b>max-heap</b> in place in <code>O(n)</code> (<a href="../../01-data-structures/concepts/heaps.html">Chapter 1.4</a>), then repeatedly swap the largest element at slot 0 into the back and sift-down the shrinking prefix. Payoff: strict <b><code>O(n log n)</code> worst case</b> AND <b><code>O(1)</code> extra memory</b>. Trade-off: <b>unstable</b>, and jumping across parent/child indices <code>2i + 1</code> hurts CPU cache locality compared to Quicksort and Timsort.</li>
+  <li><b>Timsort (Python &amp; Java's object sort):</b> real-world logs and tables are full of already-sorted stretches ("runs"). Timsort detects natural ascending/descending runs, sorts tiny runs (~32–64 items) with <b>insertion sort</b> (fastest in CPU cache at small sizes), and merges runs stably. Result: <b><code>O(n)</code> best case</b> on nearly sorted data, <b><code>O(n log n)</code> worst case</b>, and <b>stable</b>!</li>
+</ul>
+
+<p><em>Where our hand-sorting exam-paper analogy breaks:</em> counting raw comparisons makes Heapsort look equal to Quicksort and Timsort. Real CPUs fetch memory in contiguous 64-byte cache lines and predict simple loops — which is why contiguous-scan hybrids (Timsort in Python, and C++'s <em>Introsort</em> hybrid of Quicksort + Heapsort fallback + Insertion sort) beat pure Heapsort in wall-clock time.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: external sorting (larger than RAM) and distributed sorting across 100 machines</summary>
+  <p><b>External merge sort (500 GB file, 16 GB RAM):</b> read 10 GB chunks, sort each chunk in RAM, and write 50 sorted runs to disk. Then run Chapter 1.4's <b>50-way min-heap merge</b> over buffered file streams! Total I/O is just two sequential passes over disk.</p>
+  <p><b>Distributed sorting (100 machines — Sample Sort / MapReduce):</b> sample keys across all machines to pick 99 split boundaries (quantiles), shuffle each record to its target range-partition machine, and sort locally in parallel. Every machine's local sort produces one clean, non-overlapping slice of the global sorted output.</p>
+</details>
+
+<div class="check" id="check-timsort-heapsort">
+  <p class="q">An embedded device must sort 1,000,000 records with strict <code>O(1)</code> extra RAM and a hard worst-case <code>O(n log n)</code> latency bound (stability not required). Which sort fits?</p>
+  <div class="opts">
+    <button>Timsort — stable hybrid sort used by Python and Java</button>
+    <button data-correct>Heapsort — in-place max-heap sort using sift-down</button>
+    <button>Randomized 3-way Quicksort — in-place random-pivot sort</button>
+  </div>
+  <div class="fb right"><p>Spot on! Timsort violates the <code>O(1)</code> RAM limit (needs up to <code>O(n)</code> merge buffer), and Quicksort has an <code>O(n²)</code> worst-case tail plus stack space. Heapsort meets both hard guarantees.</p></div>
+  <div class="fb wrong"><p>Plug <code>n = 1,000,000</code> records into the two hardware limits: a merge buffer for Timsort needs megabytes of extra RAM (violating <code>O(1)</code> RAM), and an unlucky Quicksort split could blow the hard worst-case latency bound. Heapsort mutates the input array in place with zero extra buffer and at most ~<code>2n log₂ n</code> comparisons.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>When can you beat O(n log n) without comparing two items?</h2>
+
+<p>What if every exam paper has an integer score from <code>0</code> to <code>100</code>? Instead of comparing any two papers, line up <b>101 numbered cubbies</b> and drop each paper straight into cubby <code>score</code> — <b>zero comparisons</b>!</p>
+
+<p><b>Stable Counting Sort (<code>O(n + k)</code> time, where <code>k = max_key + 1</code>):</b> to preserve stability for full objects (not just bare ints!), count how many items land in each cubby, accumulate running cumulative totals (<code>counts[v] += counts[v - 1]</code>, called <b>prefix sums</b>) so <code>counts[v]</code> holds the <b>exclusive ending position</b> of key <code>v</code> (count of items <code>&lt;= v</code>, i.e., last slot + 1), then place items scanning <b>right-to-left</b>:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 182" role="img" aria-label="Stable counting sort in three linear passes: count keys into k cubbies, accumulate cumulative totals for exclusive ending positions, and place items scanning right to left with zero comparisons">
+    <text x="16" y="20" class="label" fill="var(--ok)" font-weight="700">STABLE COUNTING SORT — 0 comparisons, O(n + k) time</text>
+
+    <rect x="16" y="38" width="202" height="106" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="117" y="60" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">Pass 1: Count keys</text>
+    <text x="117" y="84" class="label" text-anchor="middle">in: [(2,a), (0,b), (2,c)]</text>
+    <text x="117" y="106" class="label" text-anchor="middle" fill="var(--text-strong)">count = [1, 0, 2]</text>
+    <text x="117" y="128" class="label" text-anchor="middle" fill="var(--muted)">1×key 0, 0×key 1, 2×key 2</text>
+
+    <line x1="220" y1="91" x2="244" y2="91" stroke="var(--accent)" stroke-width="2"/>
+    <polygon points="244,86 252,91 244,96" fill="var(--accent)"/>
+
+    <rect x="254" y="38" width="190" height="106" rx="8" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
+    <text x="349" y="60" class="label" text-anchor="middle" fill="var(--accent-2)" font-weight="700">Pass 2: Running totals</text>
+    <text x="349" y="84" class="label" text-anchor="middle" fill="var(--text-strong)">pos = [1, 1, 3]</text>
+    <text x="349" y="106" class="label" text-anchor="middle">pos[k] − 1 = last slot</text>
+    <text x="349" y="128" class="label" text-anchor="middle" fill="var(--muted)">key 0→slot 0, key 2→slot 2</text>
+
+    <line x1="446" y1="91" x2="470" y2="91" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="470,86 478,91 470,96" fill="var(--ok)"/>
+
+    <rect x="480" y="38" width="204" height="106" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="582" y="60" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">Pass 3: Place right → left</text>
+    <text x="582" y="84" class="label" text-anchor="middle">(2,c)→slot 2, (0,b)→slot 0</text>
+    <text x="582" y="106" class="label" text-anchor="middle">(2,a)→slot 1 (stable!)</text>
+    <text x="582" y="128" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">[(0,b), (2,a), (2,c)]</text>
+
+    <text x="350" y="168" class="label" text-anchor="middle" fill="var(--muted)">Direct slot indexing skips item comparisons completely — O(n + k) time and space</text>
+  </svg>
+  <div class="cap">Decrementing <code>pos[k]</code> while walking right-to-left places the <em>later</em> tied item <code>(2, c)</code> into the last slot of its group first, keeping <code>(2, a)</code> ahead of <code>(2, c)</code>.</div>
+</div>
+
+<pre><code>def counting_sort(items, key, max_key):
+    counts = [0] * (max_key + 1)
+    keys = [key(x) for x in items]              # call key() once per item
+    for k in keys: counts[k] += 1
+    for v in range(1, max_key + 1):             # cumulative total = last slot + 1
+        counts[v] += counts[v - 1]
+    out = [None] * len(items)
+    for x, k in zip(reversed(items), reversed(keys)):
+        counts[k] -= 1
+        out[counts[k]] = x                      # right-to-left preserves stability
+    return out</code></pre>
+
+<p><b>Handling negative keys or shifted ranges:</b> if keys live in <code>[min_val, max_val]</code> (say temperatures in <code>[-50, 50]</code> or years in <code>[1900, 2026]</code>), subtract <code>min_val</code> to shift every key into <code>0 .. max_val - min_val</code>! <b>When Counting Sort fails:</b> if <code>n = 1,000</code> and <code>max_key = 10⁹</code>, allocating a billion cubbies burns gigabytes of RAM — stick to comparison sorting unless <code>k</code> is near <code>O(n)</code>.</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: Radix sort and Bucket sort</summary>
+  <p><b>Radix sort</b> handles larger fixed-width integers (e.g. 32-bit IDs or fixed-length strings) by running <b>stable Counting Sort</b> digit by digit from <em>least</em> significant digit to <em>most</em> significant digit in <code>O(d · (n + b))</code> time (e.g. 4 passes of base <code>b = 256</code> for 32-bit ints). Stability is mandatory — an unstable inner sort destroys the lower-digit order on every pass.</p>
+  <p><b>Bucket sort</b> scatters uniformly distributed floats in <code>[0, 1)</code> into <code>n</code> equal-width buckets, sorts each tiny bucket with insertion sort, and concatenates for <code>O(n)</code> average time (degrading to <code>O(n²)</code> if all values cluster into one bucket).</p>
+</details>
+
+<div class="check" id="check-counting-dir">
+  <p class="q">In Pass 3 of <code>counting_sort</code> above, what breaks if you loop left-to-right instead of right-to-left while still decrementing <code>counts[k] -= 1</code>?</p>
+  <div class="opts">
+    <button>Keys come out sorted in descending order instead of ascending</button>
+    <button><code>counts[k]</code> drops below zero and raises an <code>IndexError</code></button>
+    <button data-correct>Keys stay sorted, yet tied items come out reversed (unstable)</button>
+  </div>
+  <div class="fb right"><p>Spot on! Decrementing <code>counts[k]</code> fills each group from its rightmost slot leftward — so walking forward puts the <em>first</em> item into the last slot of its group, reversing ties.</p></div>
+  <div class="fb wrong"><p>Trace <code>[(2, a), (2, c)]</code> with <code>counts[2] = 2</code> going left-to-right: <code>(2, a)</code> decrements <code>counts[2]</code> to <code>1</code> and lands at <code>out[1]</code>; <code>(2, c)</code> lands at <code>out[0]</code> → <code>[(2, c), (2, a)]</code>! Still sorted by key, yet stability is lost.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>How can sorting break — and when is it the wrong tool?</h2>
+
+<p>Five classic bugs turn a clean sort solution into a time-limit timeout or wrong answer:</p>
+<ol>
+  <li><b>Fixed pivot in Quicksort / Quickselect:</b> picking <code>a[lo]</code> or <code>a[hi]</code> hits <code>O(n²)</code> on already-sorted input. Always pick a random pivot.</li>
+  <li><b>Two-way <code>&lt;=</code> partition on duplicate keys:</b> all-equal input splits <code>(n − 1) vs. 0</code> → <code>O(n²)</code>. Use 3-way Dutch National Flag partitioning.</li>
+  <li><b><code>left[i] &lt; right[j]</code> in Merge Sort:</b> dropping the <code>=</code> takes from <code>right</code> on ties, silently breaking stability (and miscounting equal pairs as inversions!).</li>
+  <li><b><code>list.pop(0)</code> inside merge:</b> shifts the whole remaining pile on every append, turning <code>O(n log n)</code> into <code>O(n²)</code>. Advance integer cursors <code>i, j</code>.</li>
+  <li><b>Three separate comprehensions in Quickselect:</b> <code>[x for x in a if x &lt; p]</code>, <code>[== p]</code>, <code>[&gt; p]</code> compares every element <b>3 times</b> per level and allocates <code>O(n)</code> copies — partition in one pass instead.</li>
+</ol>
+
+<p><b>When sorting everything is the wrong tool:</b></p>
+<ul>
+  <li>Need only the <code>k</code> largest from a live stream? Use a size-<code>k</code> min-heap in <code>O(n log k)</code> time and <code>O(k)</code> RAM (<a href="../../01-data-structures/concepts/heaps.html">Chapter 1.4</a>).</li>
+  <li>Need only exact membership or pair-sum lookup? A hash set/map runs in <code>O(n)</code> instead of <code>O(n log n)</code>.</li>
+  <li>Need only the single <code>k</code>-th smallest in a static array? Quickselect hits <code>O(n)</code> average.</li>
+  <li>Dataset exceeds RAM? Use Section 5's external k-way merge sort (covered deeply in Chapter 2.13).</li>
+</ul>
+
+<div class="check" id="check-wrong-tool-sort">
+  <p class="q">You need the exact <b>median</b> of 200,001 unsorted numbers already in RAM, with no future inserts or queries. Which approach minimizes average comparisons?</p>
+  <div class="opts">
+    <button data-correct>3-way randomized Quickselect targeting index <code>n // 2</code></button>
+    <button>Merge Sort the whole array, then read <code>a[n // 2]</code></button>
+    <button>Build a min-heap in place, then pop <code>n // 2</code> times</button>
+  </div>
+  <div class="fb right"><p>Exact! Both Merge Sort and popping half of a heap do <code>O(n log n)</code> work; Quickselect skips sorting the untouched side for <code>O(n)</code> average time.</p></div>
+  <div class="fb wrong"><p>Compare actual comparison counts at <code>n = 200,001</code> (<code>log₂ n ≈ 17.6</code>): Merge Sort runs ~<code>3.3M</code> comparisons, popping half a heap runs ~<code>3.5M</code> comparisons, while randomized Quickselect finishes in ~<code>0.7M–1.0M</code> comparisons — cutting work by more than 3×!</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8"><span class="sec-num">8</span>How you use sorting in interviews (custom keys &amp; patterns)</h2>
+
+<p>Four high-frequency sorting patterns show up repeatedly in coding rounds:</p>
+
+<ul>
+  <li><b>1. Custom sort keys &amp; pairwise comparators:</b> prefer Python's <code>key=</code> whenever possible — it calls your key function once per item (<code>O(n)</code> calls), e.g. <code>items.sort(key=lambda x: (-x.score, x.name))</code>. When order depends on comparing <em>two</em> items together (like <em>Largest Number</em> on non-negative integers: checking <code>"3" + "30" &gt; "30" + "3"</code> instead of trying <code>n!</code> permutations), wrap a comparator with <code>functools.cmp_to_key</code> (<code>O(n log n)</code> calls; return <code>-1</code> to put <code>a</code> before <code>b</code>, <code>+1</code> for <code>b</code> before <code>a</code>, <code>0</code> for tie — and make sure the rule is transitive!):</li>
+</ul>
+
+<pre><code>from functools import cmp_to_key
+
+def largest_number(nums):                       # non-negative integers
+    if not nums: return ""
+    strs = [str(x) for x in nums]
+    strs.sort(key=cmp_to_key(lambda a, b: -1 if a + b &gt; b + a else (1 if a + b &lt; b + a else 0)))
+    return "0" if strs[0] == "0" else "".join(strs)</code></pre>
+
+<ul>
+  <li><b>2. Merge Intervals (Exercise 8 in <code>sorts.py</code>):</b> checking every pair for overlap takes <code>O(n²)</code>; sorting by start time lets one linear sweep merge all touching/overlapping spans in <code>O(n log n)</code>. Watch the nested-interval trap — keep <code>max(out[-1][1], e)</code>!</li>
+</ul>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 700 156" role="img" aria-label="Merge Intervals timeline showing (1,10), nested (2,3), and (4,12) merging into (1,12) using max of endpoints, while (15,18) starts a new interval">
+    <text x="16" y="20" class="label" fill="var(--accent)" font-weight="700">MERGE INTERVALS — sort by start, extend end with max(cur_end, e)</text>
+
+    <!-- Number line -->
+    <line x1="30" y1="128" x2="670" y2="128" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <text x="50" y="145" class="label" text-anchor="middle">1</text>
+    <text x="206" y="145" class="label" text-anchor="middle">6</text>
+    <text x="330" y="145" class="label" text-anchor="middle">10</text>
+    <text x="392" y="145" class="label" text-anchor="middle">12</text>
+    <text x="485" y="145" class="label" text-anchor="middle">15</text>
+    <text x="578" y="145" class="label" text-anchor="middle">18</text>
+
+    <!-- Input intervals -->
+    <rect x="50" y="34" width="280" height="20" rx="5" fill="color-mix(in srgb, var(--accent) 16%, var(--surface))" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="190" y="48" class="label" text-anchor="middle" font-weight="700">(1, 10)</text>
+
+    <rect x="81" y="60" width="32" height="20" rx="5" fill="color-mix(in srgb, var(--warn) 18%, var(--surface))" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="120" y="74" class="label" fill="var(--warn)" font-weight="700">← (2, 3) nested inside!</text>
+
+    <rect x="143" y="86" width="249" height="20" rx="5" fill="color-mix(in srgb, var(--accent) 16%, var(--surface))" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="267" y="100" class="label" text-anchor="middle" font-weight="700">(4, 12)</text>
+
+    <!-- Merged result highlight -->
+    <rect x="485" y="34" width="93" height="20" rx="5" fill="color-mix(in srgb, var(--ok) 15%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="531" y="48" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">(15, 18)</text>
+
+    <rect x="456" y="74" width="224" height="42" rx="7" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.6"/>
+    <text x="568" y="92" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">Merged: [(1, 12), (15, 18)]</text>
+    <text x="568" y="109" class="label" text-anchor="middle" fill="var(--muted)">max(10, 3) keeps end = 10</text>
+  </svg>
+  <div class="cap">Sorting by start time guarantees any interval overlapping the current span arrives immediately next; taking <code>max(cur_end, e)</code> prevents nested spans like <code>(2, 3)</code> from shrinking the end.</div>
+</div>
+
+<pre><code>def merge_intervals(intervals):
+    if not intervals: return []
+    out = []
+    for s, e in merge_sort(intervals):          # or sorted(intervals) in interviews
+        if out and s &lt;= out[-1][1]:             # overlaps or touches
+            out[-1] = (out[-1][0], max(out[-1][1], e))
+        else:
+            out.append((s, e))
+    return out</code></pre>
+
+<ul>
+  <li><b>3. Sort Colors (0s, 1s, 2s in one pass):</b> run Section 4's exact 3-way <code>partition3</code> with fixed pivot <code>p = 1</code> — <code>O(n)</code> time, <code>O(1)</code> space!</li>
+  <li><b>4. Merge Sorted Array in place (<code>nums1</code> has trailing zeros):</b> merging left-to-right overwrites unread items in <code>nums1</code>; write <b>back-to-front</b> (largest first) in <code>O(m + n)</code> time and <code>O(1)</code> space:</li>
+</ul>
+
+<pre><code>def merge_in_place(nums1, m, nums2, n):
+    i, j, w = m - 1, n - 1, m + n - 1           # write from the back!
+    while j &gt;= 0:
+        if i &gt;= 0 and nums1[i] &gt; nums2[j]: nums1[w] = nums1[i]; i -= 1
+        else:                              nums1[w] = nums2[j]; j -= 1
+        w -= 1</code></pre>
+
+<div class="check" id="check-merge-intervals">
+  <p class="q">In <code>merge_intervals</code> on <code>[(1, 10), (2, 3), (4, 12)]</code>, you write <code>out[-1] = (out[-1][0], e)</code> instead of <code>max(out[-1][1], e)</code>. What output do you get?</p>
+  <div class="opts">
+    <button><code>[(1, 10), (2, 3), (4, 12)]</code> — none of the spans merge</button>
+    <button data-correct><code>[(1, 3), (4, 12)]</code> — nested <code>(2, 3)</code> shrinks <code>10</code> to <code>3</code></button>
+    <button><code>[(1, 12)]</code> — <code>(4, 12)</code> still bridges back to <code>1</code></button>
+  </div>
+  <div class="fb right"><p>Sharp catch! Overwriting <code>10</code> with <code>3</code> makes <code>4 &lt;= 3</code> fail on the next interval, splitting one continuous span into two broken pieces.</p></div>
+  <div class="fb wrong"><p>Hand-trace step by step: <code>out</code> starts as <code>[(1, 10)]</code>. At <code>(2, 3)</code>, <code>2 &lt;= 10</code> matches and blindly sets the end to <code>3</code> → <code>out = [(1, 3)]</code>! At <code>(4, 12)</code>, <code>4 &lt;= 3</code> is false, outputting <code>[(1, 3), (4, 12)]</code>.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9"><span class="sec-num">9</span>What to say in the interview</h2>
+
+<p>Hit these four beats in ~90 seconds if an interviewer asks <em>"How do the major sorting algorithms compare, and when do you pick each?"</em>:</p>
+<ol>
+  <li><b>Comparison lower bound &amp; stability:</b> "Any comparison sort needs at least <code>Ω(n log n)</code> comparisons in the worst case because distinguishing <code>n!</code> permutations takes <code>log₂(n!)</code> binary splits. Stability preserves the input order of tied keys — essential for multi-column sorts and Radix sort."</li>
+  <li><b>Merge vs. Quick vs. Heap:</b> "Merge Sort guarantees <code>O(n log n)</code> and stability using <code>O(n)</code> extra space; randomized 3-way Quicksort is <code>O(n log n)</code> average, in-place (<code>O(log n)</code> expected stack — or worst-case if you recurse on the smaller side first), cache-friendly, unstable, and stays <code>O(n)</code> on all-equal inputs; Heapsort guarantees <code>O(n log n)</code> worst case in <code>O(1)</code> space but is unstable with weaker cache locality."</li>
+  <li><b>Timsort &amp; Quickselect:</b> "Python's built-in Timsort merges natural sorted runs stably (<code>O(n)</code> on nearly sorted data, <code>O(n log n)</code> worst case). When I only need the <code>k</code>-th smallest in a static array, 3-way Quickselect narrows to one side for <code>O(n)</code> average time."</li>
+  <li><b>Beating <code>n log n</code>:</b> "When keys are small integers in a range of size <code>k</code>, stable Counting Sort (or Radix Sort digit by digit) skips comparisons completely for <code>O(n + k)</code> — as long as <code>k</code> isn't huge compared to <code>n</code>."</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Algorithm</th><th>Best</th><th>Average</th><th>Worst</th><th>Extra Space</th><th>Stable?</th></tr></thead>
+  <tbody>
+    <tr><td>Insertion sort</td><td><b>O(n)</b></td><td>O(n²)</td><td>O(n²)</td><td><b>O(1)</b></td><td>Yes</td></tr>
+    <tr><td>Merge sort</td><td>O(n log n)</td><td>O(n log n)</td><td><b>O(n log n)</b></td><td>O(n)</td><td><b>Yes</b></td></tr>
+    <tr><td>Quicksort (random 3-way)</td><td>O(n) (all equal)</td><td><b>O(n log n)</b></td><td>O(n²)</td><td>O(log n) avg*</td><td>No</td></tr>
+    <tr><td>Heapsort</td><td>O(n) (all equal)</td><td>O(n log n)</td><td><b>O(n log n)</b></td><td><b>O(1)</b></td><td>No</td></tr>
+    <tr><td>Timsort (Python <code>sort()</code>)</td><td><b>O(n)</b></td><td>O(n log n)</td><td><b>O(n log n)</b></td><td>O(n)</td><td><b>Yes</b></td></tr>
+    <tr><td>Counting sort (range <code>k</code>)</td><td><b>O(n + k)</b></td><td><b>O(n + k)</b></td><td><b>O(n + k)</b></td><td>O(n + k)</td><td><b>Yes</b></td></tr>
+    <tr><td>Radix sort (<code>d</code> digits, base <code>b</code>)</td><td>O(d(n+b))</td><td>O(d(n+b))</td><td>O(d(n+b))</td><td>O(n + b)</td><td><b>Yes</b></td></tr>
+    <tr><td>Quickselect (3-way random)</td><td>O(n)</td><td><b>O(n)</b></td><td>O(n²)</td><td>O(1) in-place†</td><td>—</td></tr>
+  </tbody>
+</table></div>
+<p class="small muted">*Quicksort stack is <code>O(n)</code> worst case unless you always recurse on the smaller side first. †<code>O(n)</code> extra memory if copying the input to avoid mutating the caller's list (as in Exercise 9).</p>
+
+<div class="review" id="review"></div>
+
+<!-- ============================================================ -->
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Do warm-ups 1–3 on paper first. Exercises 4–9 match the exact numbered functions in <a href="../exercises/sorts.py">sorts.py</a> (Week 1 core: <b>#4 <code>merge_sort</code></b> and <b>#9 <code>kth_smallest</code></b>; #5–#8 are stretch). Tests count comparisons and reject <code>sorted()</code>/<code>.sort()</code>/<code>heapq</code>/<code>bisect</code>.</p>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>1. Trace merge stability &amp; inversion count</h4>
+  <p>Count inversions by hand on <code>[2, 4, 1, 3, 5]</code>, then trace merging <code>[2, 4]</code> with <code>[1, 3, 5]</code> and verify that summing <code>len(left) - i</code> on right-pile picks matches your count.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>Inversions are <code>(2, 1)</code>, <code>(4, 1)</code>, <code>(4, 3)</code> → <b>3</b>. During merge: pick <code>1</code> from right (+2 remaining in left: <code>2, 4</code>), pick <code>2</code> from left (+0), pick <code>3</code> from right (+1 remaining in left: <code>4</code>), pick <code>4</code> then <code>5</code> → <code>2 + 1 = 3</code>.</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>2. Trace 3-way partition by hand</h4>
+  <p>Run <code>partition3</code> on <code>[3, 1, 3, 5, 2, 3]</code> with pivot <code>p = 3</code>. Write <code>(lt, i, gt)</code> and the array after each step. Confirm <code>a[lt..gt]</code> holds all three <code>3</code>s.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>Start <code>lt=0, i=0, gt=5</code>: <code>a[0]=3 → i=1</code>; <code>a[1]=1&lt;3 → swap(0,1) [1, 3, 3, 5, 2, 3], lt=1, i=2</code>; <code>a[2]=3 → i=3</code>; <code>a[3]=5&gt;3 → swap(3,5) [1, 3, 3, 3, 2, 5], gt=4</code>; <code>a[3]=3 → i=4</code>; <code>a[4]=2&lt;3 → swap(1,4) [1, 2, 3, 3, 3, 5], lt=2, i=5</code>. Loop ends with <code>lt=2, gt=4</code>: <code>a[2..4] == [3, 3, 3]</code>!</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper</div>
+  <h4>3. Pick the right sort</h4>
+  <p>Choose the best algorithm and give a 1-sentence reason: (a) sort 5M user ages in <code>[0, 120]</code> stably; (b) sort 1M nearly-sorted log lines; (c) find the 95th percentile latency in an unsorted static array of 200k floats; (d) sort 1M structs with strict <code>O(1)</code> extra memory and worst-case <code>O(n log n)</code>.</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>(a) Counting sort (<code>O(n + 121)</code>, stable, zero comparisons). (b) Timsort (<code>O(n)</code> on natural runs, stable). (c) 3-way Quickselect (<code>O(n)</code> average). (d) Heapsort (in-place <code>O(1)</code> memory, strict <code>O(n log n)</code> worst case).</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code (sorts.py #4)</div>
+  <h4>4. Stable <code>merge_sort(items)</code></h4>
+  <p>Implement <code>merge_sort</code> in <a href="../exercises/sorts.py">sorts.py</a> returning a new sorted list (even for 0 or 1 items), preserving tie order (<code>&lt;=</code>), with at most <code>n log₂ n</code> comparisons and no <code>pop(0)</code>.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · code (sorts.py #5–#8)</div>
+  <h4>5–8. <code>count_inversions</code>, <code>quicksort</code>, <code>counting_sort</code> &amp; <code>merge_intervals</code></h4>
+  <p>Implement exercises 5, 6 (random 3-way in-place quicksort — passes sorted and all-equal inputs), 7 (comparison-free stable counting sort calling <code>key()</code> at most twice per item), and 8 (merge intervals handling nested spans) in <a href="../exercises/sorts.py">sorts.py</a>.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · code (sorts.py #9)</div>
+  <h4>9. <code>kth_smallest(items, k)</code> via 3-way Quickselect</h4>
+  <p>Implement 1-indexed <code>kth_smallest</code> in <a href="../exercises/sorts.py">sorts.py</a> without mutating the caller's list, using one-pass 3-way partitioning on a copy so average comparisons stay well under <code>10n</code> on random, sorted, reversed, and all-equal inputs.</p>
+</div>
+
+<p>Also try two timed bare-editor drills from <code>02.02</code>: <em>Sort Colors</em>, <em>Merge Sorted Array</em>, <em>Sort an Array</em>, or <em>Largest Number</em>. Run the tests from the repo root:</p>
+<pre class="plain"><code>python3 -m pytest -k sorts</code></pre>
+
+<nav class="chapter-nav">
+  <a href="complexity.html"><small>← Previous</small>How fast is your code?</a>
+  <a class="next" href="../index.html#t-02.03"><small>Next →</small>Binary search (Section 02 overview)</a>
+</nav>
+
+</main>
+
+<script>
+(function () {
+  /* ---- Player 1: Merge Sort zip + inversion counting (section 3) ---- */
+  (function () {
+    const L = [2, 4], R = [1, 3];
+    const frames = [
+      { i: 0, j: 0, out: [], inv: 0, msg: "Ready to merge sorted halves <code>L = [2, 4]</code> and <code>R = [1, 3]</code>. Inversions so far: <b>0</b>." },
+      { i: 0, j: 0, out: [], inv: 0, cmp: true, msg: "Compare <code>L[0]=2</code> vs <code>R[0]=1</code>: <b>1 &lt; 2</b> → right pile wins!" },
+      { i: 0, j: 1, out: [1], inv: 2, msg: "Append <b>1</b>, advance <code>j</code>. Because 1 jumped over all <code>len(L) − 0 = 2</code> remaining items in L (2, 4), add <b>+2 inversions</b> (total: <b>2</b>)." },
+      { i: 0, j: 1, out: [1], inv: 2, cmp: true, msg: "Compare <code>L[0]=2</code> vs <code>R[1]=3</code>: <b>2 &lt;= 3</b> → left pile wins (0 inversions)." },
+      { i: 1, j: 1, out: [1, 2], inv: 2, msg: "Append <b>2</b>, advance <code>i</code>. Total inversions: <b>2</b>." },
+      { i: 1, j: 1, out: [1, 2], inv: 2, cmp: true, msg: "Compare <code>L[1]=4</code> vs <code>R[1]=3</code>: <b>3 &lt; 4</b> → right pile wins!" },
+      { i: 1, j: 2, out: [1, 2, 3], inv: 3, msg: "Append <b>3</b>, advance <code>j</code>. Jumped over <code>len(L) − 1 = 1</code> remaining item in L (4) → <b>+1 inversion</b> (total: <b>3</b>)." },
+      { i: 2, j: 2, out: [1, 2, 3, 4], inv: 3, done: true, msg: "Right pile empty → flush remaining <b>4</b> from L. Done: <code>[1, 2, 3, 4]</code>, <b>3 inversions</b>!" }
+    ];
+
+    V.player(document.getElementById("viz-merge"), {
+      frames,
+      speed: 1000,
+      draw(f, stage) {
+        const ptrL = f.i < L.length ? { [f.i]: "i" } : {};
+        const ptrR = f.j < R.length ? { [f.j]: "j" } : {};
+        const rowTop = V.el("div", { style: "display:flex;gap:28px;flex-wrap:wrap;margin-bottom:14px" },
+          V.el("div", {},
+            V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Left pile (L)"),
+            V.cells(L, { ptrs: ptrL, cls: (idx) => idx < f.i ? "dim" : (f.cmp && idx === f.i ? "cmp" : idx === f.i ? "hl" : "") })),
+          V.el("div", {},
+            V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Right pile (R)"),
+            V.cells(R, { ptrs: ptrR, cls: (idx) => idx < f.j ? "dim" : (f.cmp && idx === f.j ? "cmp" : idx === f.j ? "hl" : "") })));
+        const rowOut = V.el("div", {},
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, `Merged output · inversions counted: ${f.inv}`),
+          f.out.length
+            ? V.cells(f.out, { idx: false, cls: (idx) => f.done ? "done" : (idx === f.out.length - 1 ? "hl" : "done") })
+            : V.el("div", { class: "small muted", style: "font-family:var(--mono);padding:6px 0" }, "[]"));
+        stage.append(rowTop, rowOut);
+      }
+    });
+  })();
+
+  /* ---- Player 2: 3-way Dutch National Flag partition (section 4) ---- */
+  (function () {
+    const start = [4, 2, 4, 1, 5, 4, 3];
+    const p = 4;
+    const frames = [];
+    const a = start.slice();
+    let lt = 0, i = 0, gt = a.length - 1;
+    frames.push({ a: a.slice(), lt, i, gt, msg: `Start 3-way partition with random pivot <b>p = ${p}</b>. Zones: <code>&lt;4</code> | <code>==4</code> | unseen | <code>&gt;4</code>.` });
+    while (i <= gt) {
+      const v = a[i];
+      if (v < p) {
+        [a[lt], a[i]] = [a[i], a[lt]];
+        const oldLt = lt, oldI = i;
+        lt++; i++;
+        frames.push({ a: a.slice(), lt, i, gt, msg: `<code>a[${oldI}] = ${v} &lt; ${p}</code> → swap with <code>lt=${oldLt}</code>, advance both <code>lt=${lt}, i=${i}</code>.` });
+      } else if (v > p) {
+        [a[i], a[gt]] = [a[gt], a[i]];
+        const oldGt = gt;
+        gt--;
+        frames.push({ a: a.slice(), lt, i, gt, msg: `<code>a[${i}] = ${v} &gt; ${p}</code> → swap with <code>gt=${oldGt}</code>, shrink <code>gt=${gt}</code> (keep <code>i=${i}</code> to inspect newcomer <b>${a[i]}</b>!).` });
+      } else {
+        i++;
+        frames.push({ a: a.slice(), lt, i, gt, msg: `<code>a[${i - 1}] = ${v} == ${p}</code> → stays in middle zone, advance <code>i=${i}</code>.` });
+      }
+    }
+    frames.push({ a: a.slice(), lt, i, gt, done: true, msg: `Done in 1 pass! <code>&lt;4</code>: [${a.slice(0, lt).join(", ")}] · <code>==4</code>: [${a.slice(lt, gt + 1).join(", ")}] (slots ${lt}..${gt}) · <code>&gt;4</code>: [${a.slice(gt + 1).join(", ")}].` });
+
+    V.player(document.getElementById("viz-dnf"), {
+      frames,
+      speed: 950,
+      draw(f, stage) {
+        const ptrs = {};
+        if (!f.done) {
+          const addPtr = (idx, lbl) => { if (idx >= 0 && idx < f.a.length) ptrs[idx] = ptrs[idx] ? ptrs[idx] + "," + lbl : lbl; };
+          addPtr(f.lt, "lt");
+          if (f.i <= f.gt) addPtr(f.i, "i");
+          addPtr(f.gt, "gt");
+        }
+        const cells = V.cells(f.a, {
+          ptrs,
+          cls(idx) {
+            if (idx < f.lt) return "win";
+            if (idx > f.gt) return "bad";
+            if (idx < f.i) return "pivot";
+            if (!f.done && idx === f.i && f.i <= f.gt) return "cmp";
+            return "";
+          }
+        });
+        const leg = V.el("div", { class: "legend" },
+          V.el("span", {}, V.el("i", { style: "background:var(--ok)" }), "< 4"),
+          V.el("span", {}, V.el("i", { style: "background:var(--accent-2)" }), "== 4 (middle)"),
+          V.el("span", {}, V.el("i", { style: "background:var(--warn)" }), "inspecting i"),
+          V.el("span", {}, V.el("i", { style: "background:var(--bad)" }), "> 4"));
+        stage.append(cells, leg);
+      }
+    });
+  })();
+})();
+</script>
+</body>
+</html>

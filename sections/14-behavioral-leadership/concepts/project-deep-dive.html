@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="topic" content="14.01">
-  <title>Flagship project &amp; 60-sec intro</title>
+  <title>Explain a system you built (Project deep dive)</title>
   <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
   <link rel="stylesheet" href="../../../assets/style.css">
   <script src="../../../assets/curriculum.js"></script>
@@ -16,119 +16,544 @@
 <main class="content book">
 
 <header class="chapter-head">
-  <div class="eyebrow">Phase 0 · Recruiter &amp; HM baseline</div>
-  <h1>Flagship project &amp; 60-sec intro</h1>
-  <div class="meta"><span>about 12 minutes</span><span>3 quick checks · worksheet setup</span></div>
+  <div class="eyebrow">Chapter 14 · Part 1</div>
+  <h1>Explain a system you built</h1>
+  <div class="meta"><span><span class="badge P0">P0</span> recruiter, hiring manager, and onsite anchor</span><span>about 17 minutes</span><span>6 quick checks · 5 exercises</span></div>
 </header>
 
-<p>Because your resumes are going out now, recruiter calls and hiring manager screens can land while you're deep in Week 2 graphs. Doing this baseline once in Phase 0 ensures you never get caught rambling on "Tell me about yourself" or fumbling numbers on the hardest system you built.</p>
+<p>Almost every senior loop — starting with the first recruiter and hiring manager call — asks you to walk through a real system you built. It is the highest-leverage round to prepare because <em>you choose the topic</em>. Yet strong engineers routinely get down-leveled here by rambling through tech stacks instead of explaining engineering judgment.</p>
 
 <div class="learn-list">
-  <h4>By the end you'll have</h4>
+  <h4>By the end you'll be able to</h4>
   <ol>
-    <li>A crisp 60-second "Tell me about yourself" tuned for Senior / L5 scope.</li>
-    <li>Your strongest flagship project selected using an objective L5-scope rubric.</li>
-    <li>A filled deep-dive worksheet with real numbers, rejected alternatives, a real failure, and a 5-rung follow-up ladder.</li>
+    <li>Score three candidate projects and pick the one that proves senior ownership, trade-offs, and scar tissue.</li>
+    <li>Deliver a crisp 60-second "tell me about yourself" and 60-second project pitch with real numbers.</li>
+    <li>Sketch a 4-to-7-box architecture map in five minutes and hand the interviewer the steering wheel.</li>
+    <li>Frame every technical choice as <em>Decision vs. Rejected Alternative vs. Constraint vs. Cost Accepted</em> — using "I" clearly without erasing teammates.</li>
+    <li>Survive the 6-rung follow-up ladder (10× traffic, failures, testing, rollout, monitoring, disagreement) without bluffing.</li>
   </ol>
 </div>
 
-<p class="muted small">How to read this: read through once, then generate your worksheet with <code>python3 tools/new.py deepdive "Your project name"</code> and rehearse the 5-minute map out loud.</p>
+<p class="muted small">How to read this: top to bottom, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Follow Week 1's cadence: score three projects &amp; draft your 60-second intro on Day 3 (Exercises 1 &amp; 3), scaffold your worksheet with <code>python3 tools/new.py deepdive "Your project title"</code> on Day 4 (Exercise 4), and rehearse your 5-minute map &amp; ladders aloud on Day 6 (Exercise 5). Builds on no prior chapters.</p>
 
 <!-- ============================================================ -->
-<h2 id="s1"><span class="sec-num">1</span>Pick the right flagship project (the L5 scope test)</h2>
+<h2 id="s1"><span class="sec-num">1</span>Why do strong engineers get down-leveled talking about their own work?</h2>
 
-<p>Most senior candidates pick their <em>most recent</em> project instead of their <em>most defensible</em> project. Score your top 3 past projects from 1 to 3 on each row below—your highest scorer is your flagship:</p>
+<div class="story">
+  <p>A senior engineer joins a 45-minute hiring-manager deep dive. Asked <em>"Tell me about your hardest project,"</em> they spend <b>18 uninterrupted minutes</b> narrating company history, team structure, and every cloud service on the diagram — saying <em>"we"</em> for every choice and never giving a traffic number. When the manager finally asks <em>"Why Kafka instead of a database queue?"</em> and <em>"What broke?"</em>, they hedge. Verdict: <b>Mid-level</b> — even though they led the entire system.</p>
+</div>
+
+<p>Compare that rambling dump against running a structured <b>architect's zoom-level tour</b> across the same 45 minutes:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 174" role="img" aria-label="Comparing an 18-minute rambling dump against a three-zoom architect tour: 60-second pitch, 5-minute map, and 30-minute interactive deep dive">
+    <text x="14" y="20" class="label" fill="var(--bad)" font-weight="700">UNSTRUCTURED DUMP — long monologue, vague "we", caught off-guard</text>
+    <rect x="14" y="30" width="274" height="32" rx="5" fill="var(--bad-soft)" stroke="var(--bad)"/>
+    <text x="151" y="50" class="label" text-anchor="middle">0–18m: org chart + tech monologue</text>
+    <rect x="292" y="30" width="240" height="32" rx="5" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="412" y="50" class="label" text-anchor="middle">18–35m: scrambling on "why?"</text>
+    <rect x="536" y="30" width="130" height="32" rx="5" fill="var(--surface)" stroke="var(--border-strong)"/>
+    <text x="601" y="50" class="label" text-anchor="middle" fill="var(--muted)">35–45m: Q&amp;A</text>
+
+    <line x1="14" y1="80" x2="666" y2="80" stroke="var(--border)" stroke-dasharray="4 4"/>
+
+    <text x="14" y="102" class="label" fill="var(--ok)" font-weight="700">THE 3-ZOOM BLUEPRINT TOUR (after 60s intro) — hook fast, map cleanly, drill deep</text>
+    <rect x="14" y="112" width="104" height="44" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="66" y="130" class="label" text-anchor="middle" font-weight="700">Zoom 1: Pitch</text>
+    <text x="66" y="147" class="label" text-anchor="middle" fill="var(--muted)">60 sec</text>
+
+    <rect x="122" y="112" width="150" height="44" rx="5" fill="color-mix(in srgb, var(--accent-2) 14%, var(--surface))" stroke="var(--accent-2)"/>
+    <text x="197" y="130" class="label" text-anchor="middle" font-weight="700">Zoom 2: 5-Box Map</text>
+    <text x="197" y="147" class="label" text-anchor="middle" fill="var(--muted)">5 min + hand pointer</text>
+
+    <rect x="276" y="112" width="280" height="44" rx="5" fill="var(--ok-soft)" stroke="var(--ok)"/>
+    <text x="416" y="130" class="label" text-anchor="middle" font-weight="700">Zoom 3: Trade-offs, Outage &amp; 6-Rung Probes</text>
+    <text x="416" y="147" class="label" text-anchor="middle" fill="var(--muted)">~30 min interactive</text>
+
+    <rect x="560" y="112" width="106" height="44" rx="5" fill="var(--surface)" stroke="var(--ok)"/>
+    <text x="613" y="130" class="label" text-anchor="middle" font-weight="700">Your Qs</text>
+    <text x="613" y="147" class="label" text-anchor="middle" fill="var(--muted)">5–8 min</text>
+  </svg>
+  <div class="cap">Finishing your intro, pitch, and map by minute 7 leaves ~30 full minutes for the interactive probes where senior credit is won.</div>
+</div>
+
+<p>Running this zoom-level tour unlocks three immediate payoffs:</p>
+<ul>
+  <li><b>Instant scope signal:</b> problem + number + architecture + hardest trade-off + measured outcome earns trust in 60 seconds.</li>
+  <li><b>You steer toward your strongest ground:</b> a crisp 5-box map invites the interviewer to tap the exact load-bearing beams you actually engineered.</li>
+  <li><b>Ownership without bragging:</b> defending rejected alternatives and production scars proves you drove the system rather than attending its standups.</li>
+</ul>
+
+<p>Carry one physical picture through the chapter: <b>an architect touring a building you designed using three zoom lenses</b> — first a 60-second aerial view, then a 5-minute floor plan with load numbers, then zooming straight into whichever load-bearing beam the inspector taps.</p>
+
+<p class="small muted"><em>Where the blueprint analogy breaks:</em> concrete beams don't push back in design reviews or page engineers at 3 a.m. Software is built and run by people — so interviewers probe human constraints (who disagreed, team size, rollout risk, on-call pain) right alongside structural ones.</p>
+
+<div class="keyidea">A senior deep dive is not a chronological history — it is an interactive blueprint tour proving you made constrained decisions, owned outcomes, and learned from real failures.</div>
+
+<div class="check" id="check-tour">
+  <p class="q">Ten minutes into a 45-minute deep dive, you are still listing every microservice and database table before the interviewer has asked a question. What's the real risk?</p>
+  <div class="opts">
+    <button data-correct>You're burning the interactive probe window where interviewers actually calibrate your seniority and judgment</button>
+    <button>None — walking through every service up front keeps the interviewer from losing track of your stack</button>
+    <button>Interviewers assume a project with fewer than ten services wasn't senior enough</button>
+  </div>
+  <div class="fb right"><p>Spot on! Interviewers calibrate level by probing <em>why</em> you rejected alternatives and <em>how</em> you handled failures. Finish your high-level map in 5 minutes and hand over the laser pointer.</p></div>
+  <div class="fb wrong"><p>Back to the blueprint tour: nobody hires an architect because they read aloud every bolt number for 15 minutes — they hire them when the architect hands over the laser pointer and calmly defends load-bearing choices under questioning. Finish Zoom 2 by minute 6–7.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Which project should you pick to tour?</h2>
+
+<p>Don't tour a famous skyscraper where you only wired one lobby light switch; tour the bridge whose load-bearing trusses <em>you</em> engineered. An interviewer will gladly hire a Staff engineer who owned a messy 400 requests-per-second (<b>RPS</b>) billing rewrite end-to-end, and reject someone who "worked on an AI platform" but can't explain why its storage layer was chosen.</p>
+
+<p>Compare two sample projects across <b>five criteria</b> (1–5 each) below — then score three of your own in Exercise 1:</p>
+
+<div class="figure">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    <button class="btn primary" id="sc-a">Project A: Hyped AI Platform</button>
+    <button class="btn" id="sc-b">Project B: Checkout Payment Retry</button>
+  </div>
+  <div class="viz-stage" id="sc-stage"></div>
+  <div class="viz-caption" id="sc-msg"></div>
+  <div class="cap">Start on Project A, then click <b>Project B</b>. High personal ownership + sharp constraints + a production scar beat brand-name buzzwords every time.</div>
+</div>
+
+<p>Your chosen anchor needs all five ingredients: <b>(1) personal ownership</b> (decisions <em>you</em> drove), <b>(2) rejected alternatives</b> (real trade-offs, not routine create-read-update-delete forms), <b>(3) honest numbers</b> (traffic, data, latency, impact), <b>(4) at least one real failure or pivot</b>, and <b>(5) crisp memory</b> (recent enough that you recall exact failure modes).</p>
+
+<div class="keyidea">Tour the building whose hardest beams <em>you</em> engineered and still remember operating — never a prestigious team project where someone else made the architecture calls.</div>
+
+<div class="check" id="check-pick">
+  <p class="q">You're choosing between three projects you personally led: (A) a shiny greenfield tool that never launched to users, (B) a massive system from 5 years ago whose metrics and outages you barely remember, and (C) a messy 300-RPS billing migration from last year with two painful incidents and clear numbers. Which wins?</p>
+  <div class="opts">
+    <button>Project A — greenfield systems let you show cleaner architecture with zero legacy clutter</button>
+    <button>Project B — massive scale from 5 years ago sounds more impressive than 300 RPS</button>
+    <button data-correct>Project C — fresh numbers, real user traffic, and concrete production scars survive 6-rung grilling</button>
+  </div>
+  <div class="fb right"><p>Exactly! Unlaunched systems have zero rollout, monitoring, or incident signal, and foggy 5-year-old memories collapse on Rung 2. Fresh ownership + real scars always win.</p></div>
+  <div class="fb wrong"><p>Picture the inspector climbing the 6-rung ladder: on Project A (never launched), Rungs 2, 4, and 5 ("what broke, how did you roll it out, what paged you?") are completely blank! On Project B, forgotten numbers sound like you weren't really driving. Fresh, shipped ownership beats both.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>How do the three zoom levels unfold?</h2>
+
+<p>Every strong deep dive opens with two short frames, then hands the interviewer the laser pointer:</p>
+<ol>
+  <li><b>"Tell me about yourself" (60 seconds, opening the call):</b> <b>Present</b> (role &amp; scope) → <b>Past</b> (1–2 shaping highlights that naturally tee up your anchor project) → <b>Future</b> (why this role now).</li>
+  <li><b>Zoom 1 — The 60-second pitch:</b> five sentences: <b>Context → Problem with a number → What you built → Hardest decision → Result with how you measured it.</b></li>
+  <li><b>Zoom 2 — The 5-minute map:</b> draw <b>4–7 boxes</b> (never 20!), label arrows with flow &amp; rough rates, share <b>5 scale numbers</b> (users/callers, peak RPS, data size/growth, latency/cost target, team/timeline — plus <em>how you know each number</em>), then ask: <em>"Where should we zoom in?"</em></li>
+  <li><b>Zoom 3 — Deep dive (~30 min):</b> follow the interviewer's pointer into trade-offs, outages, and the 6-rung ladder.</li>
+</ol>
+
+<p><b>Worked 60-second "Tell me about yourself"</b> (notice how it tees up the anchor project cleanly instead of reading a resume backward):</p>
+<pre class="plain" style="white-space:pre-wrap"><code>"I'm a senior backend engineer at Acme, leading our 3-person checkout reliability team handling ~400 peak requests per second. Over the last two years I designed our payment retry pipeline — cutting duplicate charges to zero — and earlier led a search-index migration that cut 99th-percentile latency by 40%. I'm excited about this role because your team owns high-reliability core infrastructure where small design calls matter at scale."</code></pre>
+
+<p>Now step through all three zoom levels on that exact <b>Checkout Payment Retry</b> project below:</p>
+
+<div class="figure">
+  <div id="zoom-player"></div>
+  <div class="cap">Press <b>▶ Play</b> or step with <b>▶|</b>. Zoom 1 hooks with numbers, Zoom 2 maps 5 boxes with key flow rates, and Zoom 3 defends trade-offs and all 6 ladder rungs cleanly.</div>
+</div>
+
+<div class="keyidea">Use three crisp zoom lenses: 60s intro &amp; 60s pitch (with numbers) → 5-minute map (4–7 boxes + 5 scale numbers) → hand the interviewer the laser pointer.</div>
+
+<div class="check" id="check-zoom">
+  <p class="q">You finish sketching your 5-box architecture map at minute 7. What is the strongest sentence to say next?</p>
+  <div class="opts">
+    <button>"Next, let me walk through the exact column schema of the orders and outbox tables."</button>
+    <button data-correct>"That's the map — the trickiest beams were the idempotency ledger and retry worker. Where would you like to zoom in?"</button>
+    <button>"That covers the architecture — do you have any questions about the overall system?"</button>
+  </div>
+  <div class="fb right"><p>Textbook! You hand the interviewer control <em>while</em> pointing directly at the two richest engineering beams so you spend the next 30 minutes on senior-bar territory.</p></div>
+  <div class="fb wrong"><p>Compare the three moves: diving uninvited into table columns hijacks the clock; saying "any questions overall?" leaves them guessing where the hard engineering actually lived. Highlighting the 1–2 load-bearing beams and asking where to zoom in shows calm leadership.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How do you defend decisions without sounding like buzzword soup?</h2>
+
+<p>When a building inspector asks <em>"Why steel beams instead of timber?"</em>, an architect never says <em>"We liked steel."</em> They cite the floor load, where timber bends, and the extra cost steel added. Tie every box on your map to a real <b>constraint</b>, name the <b>rejected alternative</b>, separate what <b>I</b> drove, and admit the <b>cost accepted</b>:</p>
+
+<div class="cols">
+  <div>
+    <p class="small muted"><b>Mid-level signal (vague "we", taste, zero cost)</b></p>
+<pre class="plain" style="white-space:pre-wrap"><code>"We built a new retry service using Postgres because our team liked SQL and it was super reliable. Everyone thought it worked really well and double-charges went way down."</code></pre>
+  </div>
+  <div>
+    <p class="small" style="color:var(--ok)"><b>Senior signal ("I", rejected alt, constraint, cost)</b></p>
+<pre class="plain" style="white-space:pre-wrap"><code>"I proposed a Postgres transactional outbox (saving the retry job in the same DB commit) over Kafka because peak was 400 RPS and our 3-person team had 6 weeks with no Kafka ops. Cost accepted: ~20% extra primary write load, capped via 14-day table partitions."</code></pre>
+  </div>
+</div>
+
+<p>Make your personal ownership concrete with 3 short <b>"What I did"</b> bullets before the call (crediting teammates explicitly): <em>(1) I wrote the design doc comparing outbox vs. Kafka and ran the load benchmark; (2) I implemented the idempotency key ledger (preventing double charges on retries) while Maya built the merchant UI; (3) I ran the staged rollout and post-incident dead-letter queue fix.</em></p>
+
+<details class="aside another">
+  <summary>Explain it another way: sorting constraints (physical, resource, conventional, inherited)</summary>
+  <p>Anchor every choice to the right kind of constraint: <b>Physical</b> (network latency, durable disk writes), <b>Resource</b> (3 engineers, 6-week deadline, budget), <b>Inherited</b> (existing Postgres cluster — price the migration cost!), and question <b>Conventional</b> ("everyone uses Kafka" is never a valid reason alone).</p>
+</details>
+
+<details class="aside deeper">
+  <summary>Go deeper: build vs. buy vs. don't build, migrations, and defending impact attribution</summary>
+  <p><b>The hidden alternative ("why build at all?"):</b> Senior interviewers love asking why you didn't buy a vendor tool or run a 1-day script. Have a 1-sentence constraint ready (e.g., vendor lacked atomic checkout rollback or cost $15k/mo).</p>
+  <p><b>Not greenfield?</b> Messy migrations, reliability rescues, and latency cuts often make <em>stronger</em> senior stories than greenfield builds because inherited constraints and safe zero-downtime rollouts are harder.</p>
+  <p><b>Metric attribution ("how do you know YOUR change caused it?"):</b> Know how you measured impact (support ticket tags, Stripe duplicate-charge logs, p99 dashboard) and name any confounders honestly if other changes shipped that quarter.</p>
+</details>
+
+<div class="keyidea">Every major architecture box needs four fields: what <em>you</em> chose, what you rejected, which real constraint forced the call, and what downside you knowingly accepted.</div>
+
+<div class="check" id="check-tradeoff">
+  <p class="q">An interviewer asks: <em>"Why did you keep a single Postgres database instead of splitting out a separate message queue service?"</em> Which answer clears the senior bar?</p>
+  <div class="opts">
+    <button>"At 400 peak RPS, Postgres handles everything effortlessly with zero downsides and much simpler code."</button>
+    <button data-correct>"At 400 peak RPS with 3 engineers and a 6-week launch, avoiding a second distributed system cut operational risk — accepting ~20% extra primary write load, which we monitored and partitioned."</button>
+    <button>"Our team already knew SQL well, so using Postgres let us ship faster and keep the stack clean."</button>
+  </div>
+  <div class="fb right"><p>Nailed it! Concrete scale number, explicit team/timeline constraint, AND an honest downside accepted with a guardrail — whereas claiming "zero downsides" makes interviewers skeptical.</p></div>
+  <div class="fb wrong"><p>Picture our architect again: saying "steel has zero downsides" fails the inspection because every material has a trade-off (weight, cost, fabrication time), and saying "we know SQL" is just preference without scale or risk. Name the scale, the constraint, and the exact cost you accepted.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>How do you survive the 6-rung follow-up ladder?</h2>
+
+<p>Once the inspector taps a beam on your blueprint, they run a <b>6-point structural stress test</b> — climbing six rungs deep to confirm you truly built and operated it:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 198" role="img" aria-label="Six-rung follow-up ladder an interviewer climbs on any box: 10x traffic, first failure, testing, rollout and rollback, monitoring, and disagreement">
+    <text x="14" y="20" class="label" fill="var(--accent)" font-weight="700">THE 6-RUNG FOLLOW-UP LADDER — prep all 6 rungs for your 2–3 core boxes</text>
+
+    <rect x="14" y="34" width="318" height="46" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.5"/>
+    <text x="26" y="53" class="label" fill="var(--accent)" font-weight="700">1. 10× traffic</text>
+    <text x="26" y="70" class="label">Which exact bottleneck melts first?</text>
+
+    <rect x="14" y="88" width="318" height="46" rx="6" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.5"/>
+    <text x="26" y="107" class="label" fill="var(--bad)" font-weight="700">2. First failure</text>
+    <text x="26" y="124" class="label">Downstream hangs or dies — then what?</text>
+
+    <rect x="14" y="142" width="318" height="46" rx="6" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.5"/>
+    <text x="26" y="161" class="label" fill="var(--ok)" font-weight="700">3. Testing</text>
+    <text x="26" y="178" class="label">How did you prove retries/races worked?</text>
+
+    <rect x="348" y="34" width="318" height="46" rx="6" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.5"/>
+    <text x="360" y="53" class="label" fill="var(--warn)" font-weight="700">4. Rollout &amp; rollback</text>
+    <text x="360" y="70" class="label">Shadow/canary, and safe 2-min rollback?</text>
+
+    <rect x="348" y="88" width="318" height="46" rx="6" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.5"/>
+    <text x="360" y="107" class="label" fill="var(--accent-2)" font-weight="700">5. Monitoring</text>
+    <text x="360" y="124" class="label">Which metric paged you before users did?</text>
+
+    <rect x="348" y="142" width="318" height="46" rx="6" fill="var(--surface)" stroke="var(--brand)" stroke-width="1.5"/>
+    <text x="360" y="161" class="label" fill="var(--brand)" font-weight="700">6. Disagreement</text>
+    <text x="360" y="178" class="label">Who pushed back, and how did you align?</text>
+  </svg>
+  <div class="cap">If you honestly forget a number (like an exact timeout), say so directly and explain how you sized it — never bluff a constant that collapses under sanity-check math.</div>
+</div>
+
+<p>What passes each rung at the senior bar:</p>
+<ul>
+  <li><b>10× traffic:</b> pinpoint the <em>single shared bottleneck</em> that saturates first (DB writes, lock contention, queue depth) — never just say "turn on autoscaling."</li>
+  <li><b>First failure &amp; testing:</b> name timeouts, bounded retries, and how you simulated failures (injected timeouts, duplicate-delivery tests) rather than only unit-testing happy paths.</li>
+  <li><b>Rollout &amp; monitoring:</b> explain staged launch (shadow writes → 5% <b>canary</b> slice → 100%) with an instant kill-switch, and name the exact leading indicator (like queue age or 99th-percentile <b>p99</b> latency) that alerted before customers complained.</li>
+  <li><b>Disagreement:</b> state the other person's <em>valid</em> concern fairly, show the evidence or benchmark that settled it, and name the compromise.</li>
+</ul>
+
+<details class="aside deeper">
+  <summary>Go deeper: schema rollbacks, disagree-and-commit, and blunt pushback</summary>
+  <p><b>When "2-minute rollback" breaks:</b> Reverting application code fails if a migration already dropped or renamed a DB column! Use <b>expand–contract</b> deploys: add the new column + dual-write first, deploy readers, only drop old columns days later.</p>
+  <p><b>When you were overruled (Rung 6):</b> Show disagree-and-commit maturity — state your concern clearly with data, commit fully once leadership decides, and agree on an objective metric that triggers revisiting the call.</p>
+  <p><b>Blunt pushback ("Isn't this over-engineered?"):</b> Never get defensive. Agree with the instinct for simplicity, then point to the one concrete failure mode (e.g., duplicate charges on crash) that a simpler cron job couldn't prevent.</p>
+</details>
+
+<div class="keyidea">Prep all six ladder rungs for your 2–3 core boxes — finding the real 10× bottleneck, naming leading alerts, staging safe rollouts, and admitting forgotten constants honestly.</div>
+
+<div class="check" id="check-ladder">
+  <p class="q">On Rung 1 (<em>"What happens at 10× traffic?"</em>) for Checkout API + Postgres Outbox, a candidate answers: <em>"We'd enable autoscaling to spin up 10× more Checkout API servers."</em> What breaks immediately?</p>
+  <div class="opts">
+    <button>Stateless API servers can't run in parallel without a distributed lock</button>
+    <button data-correct>10× more API servers hammer the shared Postgres primary's connections and write I/O even faster, making the real bottleneck collapse sooner</button>
+    <button>Nothing breaks — autoscaling the API tier automatically scales database write throughput 10×</button>
+  </div>
+  <div class="fb right"><p>Spot on! Adding stateless front-ends never fixes a shared stateful bottleneck. At 4,000 RPS you'd name Postgres write/connection saturation first, then propose offloading the outbox to a partitioned queue or sharding.</p></div>
+  <div class="fb wrong"><p>Picture a 1-lane tollbooth at the end of a bridge: widening the highway from 2 lanes to 20 lanes doesn't clear traffic — it just jams 10× more cars into the exact same tollbooth! Always trace 10× load until you hit the single shared stateful bottleneck (here, primary Postgres).</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6"><span class="sec-num">6</span>Why does talking about what broke earn MORE trust?</h2>
+
+<p>In our building tour, pointing to a hairline foundation crack — and showing the steel brace you installed so it can never spread — proves you actually maintained the structure. A polished story where "everything went smoothly" signals either a trivial project or someone who didn't hold the pager. Prepare <b>one real incident</b> and <b>two things you'd change today</b>:</p>
+
+<div class="figure">
+  <svg class="viz" viewBox="0 0 680 116" role="img" aria-label="Four-beat incident anatomy: Symptom, Root cause, Fast fix, Systemic guardrail">
+    <rect x="12" y="18" width="150" height="74" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
+    <text x="87" y="40" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">1. SYMPTOM</text>
+    <text x="87" y="61" class="label" text-anchor="middle">Alert fired: queue lag</text>
+    <text x="87" y="79" class="label" text-anchor="middle" fill="var(--muted)">spiked 10× in 4 min</text>
+
+    <line x1="162" y1="55" x2="180" y2="55" stroke="var(--muted)" stroke-width="1.8"/>
+    <polygon points="180,50 188,55 180,60" fill="var(--muted)"/>
+
+    <rect x="190" y="18" width="150" height="74" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="265" y="40" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">2. ROOT CAUSE</text>
+    <text x="265" y="61" class="label" text-anchor="middle">Bad message retried</text>
+    <text x="265" y="79" class="label" text-anchor="middle" fill="var(--muted)">forever (no DLQ)</text>
+
+    <line x1="340" y1="55" x2="358" y2="55" stroke="var(--muted)" stroke-width="1.8"/>
+    <polygon points="358,50 366,55 358,60" fill="var(--muted)"/>
+
+    <rect x="368" y="18" width="146" height="74" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="441" y="40" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">3. FAST FIX</text>
+    <text x="441" y="61" class="label" text-anchor="middle">Quarantined bad ID</text>
+    <text x="441" y="79" class="label" text-anchor="middle" fill="var(--muted)">drained backlog in 8m</text>
+
+    <line x1="514" y1="55" x2="532" y2="55" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="532,50 540,55 532,60" fill="var(--ok)"/>
+
+    <rect x="542" y="18" width="126" height="74" rx="8" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="605" y="40" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">4. GUARDRAIL</text>
+    <text x="605" y="61" class="label" text-anchor="middle">5-retry cap +</text>
+    <text x="605" y="79" class="label" text-anchor="middle">dead-letter alert</text>
+  </svg>
+  <div class="cap">A "poison pill" (one malformed message crashing every retry) blocks healthy work unless failed jobs move to a <b>dead-letter queue (DLQ)</b>. Step 4 is the senior leadership payoff.</div>
+</div>
+
+<p>For <b>"What would you change now?"</b>, skip humble-brags ("more unit tests"). Name two concrete architectural upgrades, explain why each is better today, and price <b>both</b> why you skipped it back then <em>and</em> the ongoing cost of the new design (e.g., maintaining a DLQ replay runbook).</p>
+
+<details class="aside deeper">
+  <summary>Go deeper: calibrating for Google L5 and Anthropic hiring-manager probes</summary>
+  <p><b>Google L5 (Googleyness &amp; Leadership):</b> probes navigating ambiguity, leading across teams without formal authority, and handling scope trade-offs — expect <em>"How did you align a skeptical partner team?"</em> and <em>"What if priorities flipped mid-quarter?"</em></p>
+  <p><b>Anthropic:</b> probes intellectual honesty, epistemic humility, and pragmatic simplicity — expect <em>"Could you have deleted half those boxes?"</em>, <em>"What assumption proved wrong?"</em>, and deep probes on verification and reliability.</p>
+</details>
+
+<div class="keyidea">A real incident ending in a systemic guardrail — plus two honest "what I'd change now" trade-offs pricing both past and ongoing costs — proves real operational ownership.</div>
+
+<div class="check" id="check-broke">
+  <p class="q">Asked <em>"What would you do differently if you built this again?"</em>, which answer shows senior judgment?</p>
+  <div class="opts">
+    <button>"I'd start with Kafka from day one for 100× headroom so we never have to worry about database write load."</button>
+    <button>"Honestly, the architecture held up well — I'd mostly add better documentation and extra unit tests."</button>
+    <button data-correct>"I'd build a dead-letter queue and retry cap from day one — we skipped it to hit our 6-week launch, which later caused a retry storm, and the small cost of a replay tool is well worth it."</button>
+  </div>
+  <div class="fb right"><p>Spot on! Specific upgrade, linked to real production pain, honoring the earlier deadline while pricing the ongoing replay-tool cost.</p></div>
+  <div class="fb wrong"><p>"Start with Kafka for 100× headroom" ignores the real 6-week / 3-engineer constraint that made Postgres right at the time (hindsight without pricing trade-offs), and "more docs/tests" avoids architectural reflection. Name one concrete change, what broke without it, and what it costs.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7"><span class="sec-num">7</span>How can a project deep dive break?</h2>
+
+<p>Even a great building tour falls apart if you use the wrong zoom lens for the audience or hide your role behind vague pronouns. Here is how to fix the two sharpest language traps live:</p>
+
+<div class="cols">
+  <div>
+    <p class="small muted"><b>Traps: "We" fog &amp; NDA (non-disclosure agreement) shutdown</b></p>
+<pre class="plain" style="white-space:pre-wrap"><code>"We built a system for [redacted] — actually I can't talk about our proprietary pipeline due to NDA, but we migrated everything and latency got way better."</code></pre>
+  </div>
+  <div>
+    <p class="small" style="color:var(--ok)"><b>Senior fix: clear "I" + domain-generic framing</b></p>
+<pre class="plain" style="white-space:pre-wrap"><code>"Without sharing customer names, I owned the ledger service (~400 peak RPS) while Sam built the dashboard. I replaced synchronous retries with a DB outbox, cutting duplicate charges to zero."</code></pre>
+  </div>
+</div>
+
+<p><b>Match the zoom to the round (when the 45-minute script is the wrong tool):</b></p>
+<ul>
+  <li><b>Recruiter screen (2–3 min):</b> deliver ONLY your 60s intro + Zoom 1 pitch. Never launch into a 5-box map.</li>
+  <li><b>Hiring manager round (45 min):</b> full 3-zoom tour emphasizing ownership, cross-team alignment, and business impact.</li>
+  <li><b>Onsite technical deep dive (45–60 min, <code>15.10</code>):</b> compress context to 30 seconds and spend 40+ minutes whiteboarding data flow, failure modes, and 6-rung technical probes.</li>
+  <li><b>Interrupted at minute 2?</b> Yield the floor immediately! An early interruption means they already found the beam they want to inspect — never insist on finishing your rehearsed slides first.</li>
+</ul>
 
 <div class="table-wrap"><table>
-  <thead><tr><th>L5 Signal</th><th>Weak (L4 / task execution)</th><th>Strong (L5 / Senior ownership)</th></tr></thead>
+  <thead><tr><th>Other trap</th><th>What the interviewer hears</th><th>Exact fix</th></tr></thead>
   <tbody>
-    <tr><td><b>Ambiguity</b></td><td>Clear spec handed to you</td><td>Messy problem; you defined requirements &amp; architecture</td></tr>
-    <tr><td><b>Personal impact ("I")</b></td><td>"We built a microservice…"</td><td>3–5 concrete technical decisions <em>you</em> drove and can defend</td></tr>
-    <tr><td><b>Real constraints</b></td><td>Toy traffic or no hard trade-offs</td><td>Measurable scale (QPS, data, p99, cost, org alignment)</td></tr>
-    <tr><td><b>Rejected alternatives</b></td><td>"We just used Postgres + Kafka"</td><td>Can name 2 rejected designs and the exact constraint that ruled them out</td></tr>
-    <tr><td><b>Scars &amp; hindsight</b></td><td>"Everything went smoothly"</td><td>One real outage or wrong call + what you'd change today and why</td></tr>
+    <tr><td><b>Number-free buzzwords</b></td><td>"High scale, low latency, microservices"</td><td>Give rough honest numbers + how you knew them (~400 RPS from monitoring dashboards, p99 &lt; 250 ms).</td></tr>
+    <tr><td><b>Blaming teammates</b></td><td>"Infra refused to listen to us"</td><td>State their valid constraint fairly before explaining the data that aligned both teams.</td></tr>
+    <tr><td><b>Bluffing forgotten details</b></td><td>"Yeah, pool size was 128 across 40 servers"</td><td>Say plainly when you forget a constant, then explain the sizing formula and safety limit instead.</td></tr>
   </tbody>
 </table></div>
 
 <!-- ============================================================ -->
-<h2 id="s2"><span class="sec-num">2</span>The 60-second "Tell me about yourself"</h2>
+<h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
 
-<p>Interviewers use this opener to calibrate your seniority in the first minute. Keep it strictly under 60 seconds using <b>Present → Past → Future</b>:</p>
-
-<div class="figure">
-<pre class="diagram"><code>1. PRESENT (15s): Role, team scope, and the core systems you own today.
-2. PAST    (30s): 1–2 defining achievements with real numbers (tease your flagship project).
-3. FUTURE  (15s): Why this level &amp; type of problem now (tailored to Google / Anthropic / target).</code></pre>
-  <div class="cap">Say it out loud with a stopwatch until it feels conversational—never memorized like a script, never a 4-minute chronological resume reading.</div>
-</div>
-
-<!-- ============================================================ -->
-<h2 id="s3"><span class="sec-num">3</span>How to deliver the 5-minute architecture map</h2>
-
-<p>In a past-project deep dive (common in Anthropic HM/technical screens and Google team-match/G&amp;L probes), never dump 20 minutes of monologue. Give a tight <b>5-minute zoomable overview</b> and invite the interviewer to pull on any thread:</p>
-
+<p>Rehearse Beats 1 and 2 until they take under two minutes combined, and Beat 3 in five minutes — leaving ~30 minutes for interactive probes (Beat 4) plus 5–8 minutes for your questions:</p>
 <ol>
-  <li><b>Context &amp; pain (45s):</b> What product, what broke or scaled poorly, and the baseline number.</li>
-  <li><b>4–7 box diagram (2m):</b> Draw the request/data flow cleanly with approximate QPS, data size, and latency targets.</li>
-  <li><b>Your 2 hardest trade-offs (1m 30s):</b> State what you chose, what you <em>rejected</em>, and which constraint forced your hand.</li>
-  <li><b>Measured result &amp; invitation (45s):</b> Give the before/after metric, then ask: <i>"Which part would you like to dive deepest into—the storage layer, failure handling, or rollout?"</i></li>
+  <li><b>"Tell me about yourself" (60s):</b> "Right now I'm [role &amp; scope]. Before that, [1–2 highlights teeing up your anchor project]. Now I'm excited about [this role] because [specific fit]."</li>
+  <li><b>Zoom 1 pitch (60s):</b> "At [team/product], [problem with number] was hurting us. I built [architecture shape in one breath]. The hardest decision was [choice vs. rejected alternative because of constraint], giving up [cost]. As a result, [outcome with number], which we measured via [source]."</li>
+  <li><b>Zoom 2 hand-off (5m):</b> Draw 4–7 boxes with flow rates and 5 scale numbers (+ how you knew them), then say: "The trickiest beams were [A] and [B] — which would you like to zoom into first?"</li>
+  <li><b>Zoom 3 trade-off frame (any probe):</b> "I chose [X] over [Y] because of [constraint], accepting [cost]. When [incident] hit, we fixed it and added [guardrail]."</li>
 </ol>
 
-<div class="keyidea">Saying "we" hides your level. Use <b>"I"</b> for decisions you made and credit teammates explicitly for what they owned—interviewers respect honesty and clarity about scope.</div>
-
 <!-- ============================================================ -->
-<h2 id="s4"><span class="sec-num">4</span>Quick checks</h2>
-
-<div class="check" id="check-we">
-  <p class="q">An interviewer asks about your flagship migration and you say: "We decided to dual-write and we migrated traffic over two weeks." What signal does that accidentally hide?</p>
-  <div class="opts">
-    <button>That you're a team player</button>
-    <button data-correct>Whether you designed and drove the migration strategy or merely executed someone else's plan</button>
-    <button>How many engineers were on the team</button>
-  </div>
-  <div class="fb right"><p>Spot on. Give team context once ("three of us worked on this"), then switch cleanly to "I designed the shadow-traffic verifier and owned the cutover plan, while Sarah built the backfill workers."</p></div>
-  <div class="fb wrong"><p>Hiring committees at Google and Anthropic specifically scan behavioral notes for individual ownership. Using "we" throughout leaves the committee unable to distinguish L4 execution from L5 technical leadership.</p></div>
-</div>
-
-<div class="check" id="check-alt">
-  <p class="q">Why do interviewers always ask "What alternatives did you reject, and what would you change now?" during a project deep dive?</p>
-  <div class="opts">
-    <button>To see if you memorized the names of rival technologies</button>
-    <button data-correct>To test engineering judgment—whether choices were grounded in real constraints and whether you have the epistemic humility to spot flaws in your own past work</button>
-    <button>To catch you admitting mistakes so they can reject you</button>
-  </div>
-  <div class="fb right"><p>Exactly. Especially at Anthropic (epistemic humility) and Google L5 (senior judgment), candidly explaining a trade-off that aged poorly is a strong hire signal.</p></div>
-  <div class="fb wrong"><p>Every real system has scars and trade-offs. Claiming a design had no downsides signals either junior scope or lack of self-awareness—naming the rejected alternative and the constraint that settled it proves real ownership.</p></div>
-</div>
-
-<div class="check" id="check-opener">
-  <p class="q">In a 45-minute past-project deep dive, how long should your initial project overview take before pausing for questions?</p>
-  <div class="opts">
-    <button>15–20 minutes so you cover every box thoroughly</button>
-    <button data-correct>About 5 minutes: context, 4–7 boxes with numbers, 2 key trade-offs, measured result, then ask where to zoom in</button>
-    <button>30 seconds, then wait for the interviewer to ask everything</button>
-  </div>
-  <div class="fb right"><p>Right! A 5-minute high-signal map proves you can summarize at executive altitude while leaving 35+ minutes for the deep technical grilling that earns a Strong Hire.</p></div>
-  <div class="fb wrong"><p>A 20-minute monologue burns half the round on areas the interviewer doesn't care about, while a 30-second opener forces them to drag context out of you. Aim for a tight 5-minute map and hand them the zoom lens.</p></div>
-</div>
+<h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<ol>
+  <li>Pick the project with the highest personal ownership, sharpest trade-offs, honest numbers, fresh memory, and a real production scar.</li>
+  <li>Open recruiter and HM calls with a 60-second Present → Past → Future intro that tees up your anchor project.</li>
+  <li>Run the 3-zoom blueprint tour: 60s pitch → 5m map (4–7 boxes + 5 scale numbers) → hand over the pointer (and yield immediately if interrupted).</li>
+  <li>Defend every box with <b>I chose X over Y because of constraint Z, accepting cost C</b>, crediting teammates explicitly.</li>
+  <li>Prep all 6 ladder rungs (10× traffic bottleneck, first failure, testing, rollout/rollback, monitoring, disagreement) and never bluff forgotten numbers.</li>
+  <li>Own one real incident (Symptom → Root cause → Fast fix → Guardrail) and two honest "what I'd change now" trade-offs.</li>
+</ol>
 
 <div class="review" id="review"></div>
 
 <!-- ============================================================ -->
-<h2 id="exercises"><span class="sec-num">✎</span>Phase 0 Day 4 Setup</h2>
+<h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
+<p>Follow the Week 1 cadence: Exercises 1 &amp; 3 (plus optional warm-up 2) on Day 3, start Exercise 4 on Day 4, and finish Exercise 4 + run Exercise 5 on Day 6.</p>
 
 <div class="exercise">
-  <div class="tier core">Core · worksheet</div>
-  <h4>1. Create and fill your flagship deep-dive worksheet</h4>
-  <p>Run the command below, fill every section (60-sec version, 4–7 box map, scale table, rejected alternatives, what broke, follow-up ladder), and practice the 5-minute map out loud with a timer.</p>
-<pre class="plain"><code>python3 tools/new.py deepdive "Your flagship project"</code></pre>
+  <div class="tier warm">Warm-up · pen and paper (Day 3)</div>
+  <h4>1. Score three candidate projects</h4>
+  <p>List three real projects from your past 3–4 years. Score each 1–5 on: (1) Personal ownership of hard choices, (2) Sharp rejected alternatives, (3) Honest scale &amp; impact numbers, (4) Real incident or pivot you handled, (5) Freshness in memory. Circle the winner — that's your primary deep-dive anchor.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier warm">Warm-up · pen and paper (optional 5-min drill)</div>
+  <h4>2. Rewrite three vague statements into senior trade-offs</h4>
+  <p>Rewrite each into <em>"I chose X over Y because of constraint Z, accepting cost C"</em>: (a) "We used a cache to make reads faster"; (b) "We rewrote the service in Go because Python was slow"; (c) "We decided not to shard the database."</p>
+  <details class="aside another"><summary>Answer</summary>
+    <p>Sample senior rewrites (plug in your real numbers): (a) "I added a 60-second Redis read-through cache over adding more DB replicas because 95% of reads hit the same 200 catalog items, accepting up to 60 s of stale prices." (b) "I moved the hot media-proxy loop to Go over adding more Python workers because CPU saturation at 8k RPS was tripling our compute bill, accepting a second language for the team to maintain." (c) "I stayed on one vertically scaled Postgres primary with read replicas over sharding because our 400 GB dataset had 3 years of headroom and sharding would break cross-account joins."</p>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · pen and paper (Day 3)</div>
+  <h4>3. Write &amp; time "Tell me about yourself" (60 seconds)</h4>
+  <p>Write a 3-part intro (<b>Present</b> role/scope → <b>Past</b> 1–2 shaping highlights teeing up your anchor project → <b>Future</b> why this role now). Rehearse with a 60-second timer until it lands cleanly at 50–60 seconds without notes.</p>
+</div>
+
+<div class="exercise">
+  <div class="tier core">Core · worksheet (Days 4–6)</div>
+  <h4>4. Build your deep-dive worksheet</h4>
+  <p>Scaffold your worksheet with <code>python3 tools/new.py deepdive "Your project title"</code> (copies <code>templates/deep-dive.md</code> into <code>sections/14-behavioral-leadership/stories/</code>). Fill all 8 sections: 60-second version, 4–7 box map + scale numbers ("how you know it"), What <em>I</em> did, Decisions table, What broke, What I'd change now, the 6-rung follow-up ladder, and your Exercise 3 "Tell me about yourself."</p>
+</div>
+
+<div class="exercise">
+  <div class="tier stretch">Stretch · timed rehearsal (Day 6)</div>
+  <h4>5. The closed-worksheet 5-minute map &amp; two ladders</h4>
+  <p>Close your worksheet completely. Start a 5-minute timer, draw your 4–7 box map on blank paper while narrating aloud, and stop by 5:00. Then pick the two hardest boxes and speak all 6 ladder rungs aloud for each. When ready for a full rehearsal, run: <em>"mock interview, past-project deep dive, 45 minutes."</em></p>
 </div>
 
 <nav class="chapter-nav">
-  <a href="../../15-interview-formats/concepts/bare-editor-playbook.html"><small>← Previous</small>Bare-editor coding playbook</a>
-  <a class="next" href="../../../index.html#stage-w1"><small>Next →</small>Week 1: Complexity &amp; core data structures</a>
+  <a href="../index.html"><small>← Back to</small>Chapter 14 overview</a>
+  <a class="next" href="../index.html#t-14.02"><small>Next →</small>Ownership stories</a>
 </nav>
 
 </main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ---- Project scorer comparison (section 2) ----
+  (function () {
+    const projects = {
+      a: {
+        name: "Project A: Hyped AI Platform (built 1 REST endpoint)",
+        total: 13, verdict: "Weak anchor — collapses at minute 15 when probed on architecture",
+        color: "var(--bad)",
+        rows: [
+          ["Personal ownership", 2, "Tech lead chose model, storage, and infra"],
+          ["Rejected alternatives", 2, "Only picked request payload format"],
+          ["Honest numbers", 3, "Knows team launch headline, not backend p99"],
+          ["Real failure / scar", 2, "Never held on-call pager for core pipeline"],
+          ["Fresh memory", 4, "Shipped last quarter"],
+        ],
+      },
+      b: {
+        name: "Project B: Checkout Payment Retry (led end-to-end)",
+        total: 23, verdict: "Strong senior anchor — survives all 6 ladder rungs on every box",
+        color: "var(--ok)",
+        rows: [
+          ["Personal ownership", 5, "Drove design doc, outbox schema, staged rollout"],
+          ["Rejected alternatives", 5, "Postgres outbox vs Kafka; idempotency keys"],
+          ["Honest numbers", 4, "2M shoppers, 400 peak RPS, 99.94%→99.995%, 3 devs/6 wks"],
+          ["Real failure / scar", 5, "Bad-message retry storm → added DLQ & alert"],
+          ["Fresh memory", 4, "Still recall exact latency, metrics & failure modes"],
+        ],
+      },
+    };
+    function render(key) {
+      const p = projects[key];
+      $("sc-a").className = "btn" + (key === "a" ? " primary" : "");
+      $("sc-b").className = "btn" + (key === "b" ? " primary" : "");
+      const host = $("sc-stage");
+      const list = V.el("div", { style: "display:grid;gap:8px" },
+        p.rows.map(([label, score, note]) => V.el("div", { style: "padding:8px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:0.84rem" },
+          V.el("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px" },
+            V.el("strong", {}, label),
+            V.el("div", { style: "display:flex;gap:3px" },
+              [1, 2, 3, 4, 5].map((k) => V.el("span", {
+                style: `display:inline-block;width:16px;height:10px;border-radius:3px;border:1px solid var(--border-strong);background:${k <= score ? (score >= 4 ? "var(--ok)" : score === 3 ? "var(--warn)" : "var(--bad)") : "var(--bg-2)"}`,
+              })))),
+          V.el("div", { class: "muted" }, note))));
+      host.replaceChildren(list);
+      $("sc-msg").innerHTML = `<b>${p.name}</b> — score <b>${p.total} / 25</b>: <span style="color:${p.color};font-weight:600">${p.verdict}</span>.`;
+    }
+    $("sc-a").onclick = () => render("a");
+    $("sc-b").onclick = () => render("b");
+    render("a");
+  })();
+
+  // ---- 3-Zoom Blueprint Tour stepper (section 3) ----
+  (function () {
+    const frames = [
+      {
+        zoom: "Zoom 1 · 60-Second Aerial Pitch", badge: "01:00 – 02:00",
+        body: [
+          ["Context", "3-person payments team owning checkout settlement."],
+          ["Problem + #", "Gateway timeouts caused ~180 duplicate charges/wk and $40k/mo support cost (from support tags)."],
+          ["What I built", "Idempotent payment ledger + transactional outbox retry pipeline."],
+          ["Hardest choice", "Postgres outbox over Kafka (400 peak RPS, 6-week launch, no Kafka ops), accepting ~20% extra DB writes."],
+          ["Result + #", "Duplicate charges hit 0; settlement rose 99.94% → 99.995% (verified in Stripe reconciliation logs)."],
+        ],
+        msg: "<b>Zoom 1 (60s):</b> Five sentences hook the interviewer with scale, ownership, measurement, and a real trade-off.",
+      },
+      {
+        zoom: "Zoom 2 · 5-Minute 5-Box Floor Plan", badge: "02:00 – 07:00",
+        diagram: "(400 RPS, idemp_key)\n   │\n   ▼\n[1. Checkout API] ──▶ [2. Postgres: Orders + Outbox]\n                              │ (~8/s, 2% retries)\n                              ▼\n                      [3. Retry Worker] ──▶ [4. Stripe API]\n                              │ (<0.01% after 5 fails)\n                              ▼\n                      [5. Dead-Letter Queue + Pager]",
+        body: [
+          ["5 scale numbers", "~2M monthly shoppers · 400 peak RPS (~100M orders/yr, ~120 GB/yr) · p99 < 250 ms · 3 devs / 6 wks."],
+          ["How we knew", "Monitoring latency dashboards, DB table-size alerts, and weekly Stripe settlement reports."],
+          ["Hand-off", "\"The trickiest beams were the idempotency ledger and retry worker — where should we zoom in?\""],
+        ],
+        msg: "<b>Zoom 2 (5m):</b> Five clearly bounded boxes, key flow rates, all 5 scale numbers — then hand over the pointer.",
+      },
+      {
+        zoom: "Zoom 3a · Trade-Off Card (Outbox Box)", badge: "07:00 – 20:00",
+        body: [
+          ["Decision", "Single Postgres transaction writing order row + outbox row atomically."],
+          ["Rejected alt", "Publish directly to Kafka after DB commit (crash between DB & Kafka causes lost/dup charges + ops load)."],
+          ["Constraint", "Zero-duplicate requirement + 3-person team with 6 weeks and existing Postgres."],
+          ["Cost accepted", "~20% extra write load on primary DB — capped via 14-day table partitioning."],
+        ],
+        msg: "<b>Zoom 3a (Decision):</b> Anchored to real constraints and honest accepted costs — zero buzzwords.",
+      },
+      {
+        zoom: "Zoom 3b · All 6 Rungs on the Outbox Box", badge: "20:00 – 37:00",
+        body: [
+          ["1. 10× (4k RPS)", "Primary DB disk write I/O saturates first → move outbox polling to partitioned Kafka / change-data-capture (CDC)."],
+          ["2. First failure", "Stripe hangs 30s → 5s worker timeout + randomized exponential backoff stops thread starvation."],
+          ["3. Testing", "Fault-injection tests killed workers mid-retry and verified duplicate deliveries still charged once."],
+          ["4. Rollout", "1-week shadow writes, 5%→25%→100% canary behind feature flag for instant rollback."],
+          ["5. Monitoring", "Paged on oldest unprocessed outbox row > 30s (caught stalls before shoppers noticed)."],
+          ["6. Disagreement", "Infra flagged primary DB write load → ran 2× load test & agreed on 14-day partitions + write alerts."],
+        ],
+        msg: "<b>Zoom 3b (6-rung ladder):</b> Every single rung grounded in concrete mechanisms, tests, and real alignment.",
+      },
+    ];
+    V.player($("zoom-player"), {
+      frames, speed: 1500,
+      draw(f, stage) {
+        const head = V.el("div", { style: "display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:baseline" },
+          V.el("strong", { style: "color:var(--accent)" }, f.zoom),
+          V.el("span", { class: "small", style: "font-family:var(--mono);padding:2px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border-strong)" }, f.badge));
+        const kids = [head];
+        if (f.diagram) {
+          kids.push(V.el("pre", { class: "diagram", style: "margin:0 0 10px;padding:10px 12px;font-size:0.78rem;overflow-x:auto" }, V.el("code", {}, f.diagram)));
+        }
+        kids.push(V.el("div", { style: "display:grid;gap:6px" },
+          f.body.map(([k, v]) => V.el("div", { style: "display:grid;grid-template-columns:minmax(96px,118px) minmax(0,1fr);gap:8px;font-size:0.86rem;padding:6px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--border)" },
+            V.el("strong", { style: "color:var(--accent-2)" }, k),
+            V.el("span", {}, v)))));
+        stage.append(...kids);
+      },
+    });
+  })();
+})();
+</script>
 </body>
 </html>

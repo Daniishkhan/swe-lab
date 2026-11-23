@@ -73,8 +73,9 @@ def test_empty_and_bad_index():
     for op in (d.pop, d.popleft):
         with pytest.raises(IndexError):
             op()
-    with pytest.raises(IndexError):
-        d[0]
+    for i in (0, -1):
+        with pytest.raises(IndexError):
+            d[i]
     d.append("x")
     for i in (1, -2, 5):
         with pytest.raises(IndexError):
@@ -100,7 +101,7 @@ def test_wraps_without_growing():
         d.append(x)
     assert d.popleft() == "A" and d.popleft() == "B"
     for x in "DEF":
-        d.append(x)  # C at slot 2, then D, E wrap to slots 3, 0, 1
+        d.append(x)  # C at slot 2, then D, E, F wrap to slots 3, 0, 1
     assert list(d) == list("CDEF")
     assert d.copies == 0, "4 items fit in 4 slots: nothing should have been copied yet"
     d.append("G")  # full: grow, copying C, D, E, F in line order

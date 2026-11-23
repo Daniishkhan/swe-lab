@@ -1768,8 +1768,8 @@ window.CURRICULUM = {
     {
      "file": "heaps.html",
      "topic": "01.04",
-     "title": "Heaps & priority queues",
-     "status": "outline"
+     "title": "Always grab the smallest next (Heaps and priority queues)",
+     "status": "complete"
     },
     {
      "file": "intervals.html",
@@ -1780,8 +1780,8 @@ window.CURRICULUM = {
     {
      "file": "linear-structures.html",
      "topic": "01.02",
-     "title": "Linked lists, stacks, queues & monotonic stacks",
-     "status": "outline"
+     "title": "Lines, chains, and waiting lists (Linear structures & monotonic stack/queue)",
+     "status": "complete"
     },
     {
      "file": "lru-lfu-cache.html",
@@ -1804,8 +1804,8 @@ window.CURRICULUM = {
     {
      "file": "trees.html",
      "topic": "01.03",
-     "title": "Trees, BSTs & traversals",
-     "status": "outline"
+     "title": "Split the search in half at every branch (Trees, BSTs & LCA)",
+     "status": "complete"
     },
     {
      "file": "tries.html",
@@ -2094,7 +2094,7 @@ window.CURRICULUM = {
     {
      "file": "tree_traversals.py",
      "module": "tree_traversals",
-     "title": "Tree traversals, BST validation and building a balanced tree",
+     "title": "tree_traversals",
      "topics": [
       "01.03"
      ],
@@ -2600,8 +2600,8 @@ window.CURRICULUM = {
     {
      "file": "complexity.html",
      "topic": "02.01",
-     "title": "How fast is your code? (Complexity & amortized cost)",
-     "status": "outline"
+     "title": "How fast is your code? (Complexity analysis)",
+     "status": "complete"
     },
     {
      "file": "consistent-hashing.html",
@@ -2632,6 +2632,12 @@ window.CURRICULUM = {
      "topic": "02.04",
      "title": "Two pointers, sliding window & prefix sums",
      "status": "outline"
+    },
+    {
+     "file": "sorting.html",
+     "topic": "02.02",
+     "title": "Put chaos in order — and pick the right tool (Sorting & quickselect)",
+     "status": "complete"
     }
    ],
    "exercises": [
@@ -4171,7 +4177,7 @@ window.CURRICULUM = {
     {
      "file": "python-toolkit.html",
      "topic": "10.01",
-     "title": "Python standard library toolkit",
+     "title": "Python for interview speed (Standard library toolkit)",
      "status": "complete"
     }
    ],
@@ -4548,7 +4554,7 @@ window.CURRICULUM = {
     {
      "file": "project-deep-dive.html",
      "topic": "14.01",
-     "title": "Flagship project & 60-sec intro",
+     "title": "Explain a system you built (Project deep dive)",
      "status": "complete"
     }
    ],
@@ -4655,9 +4661,9 @@ window.CURRICULUM = {
    ],
    "concepts": [
     {
-     "file": "bare-editor-playbook.html",
+     "file": "algorithmic-round.html",
      "topic": "15.01",
-     "title": "Bare-editor coding playbook",
+     "title": "How to run an algorithmic coding round",
      "status": "complete"
     }
    ],
@@ -4667,5 +4673,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 17:41"
+ "generated": "2026-11-23 18:35"
 };

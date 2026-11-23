@@ -738,8 +738,9 @@ svg.viz .node circle { fill: var(--surface); stroke: var(--border-strong); strok
 svg.viz .node text { fill: var(--text-strong); font-size: 13px; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
 svg.viz .node.hl circle { fill: color-mix(in srgb, var(--accent) 14%, var(--surface)); stroke: var(--accent); stroke-width: 2.4; }
 svg.viz .node.done circle { fill: color-mix(in srgb, var(--ok) 13%, var(--surface)); stroke: var(--ok); }
-svg.viz .node.warn circle { fill: color-mix(in srgb, var(--warn) 14%, var(--surface)); stroke: var(--warn); }
+svg.viz .node.warn circle, svg.viz .node.cmp circle { fill: color-mix(in srgb, var(--warn) 14%, var(--surface)); stroke: var(--warn); }
 svg.viz .node.bad circle { fill: color-mix(in srgb, var(--bad) 14%, var(--surface)); stroke: var(--bad); }
+svg.viz .node.dim { opacity: 0.3; }
 svg.viz .label { fill: var(--muted); font-size: 11px; }
 svg.viz .axis { stroke: var(--border-strong); }
 svg.viz .grid-line { stroke: var(--border); stroke-dasharray: 3 4; }

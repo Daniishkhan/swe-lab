@@ -71,9 +71,24 @@ def test_top_k_examples():
     assert top_k(iter([4, 9, 1, 7, 3, 8]), 3) == [9, 8, 7]
     assert top_k(iter([5, 1]), 3) == [5, 1]
     assert top_k(iter([]), 2) == []
+    assert top_k(iter([1, 2, 3]), 0) == []
     assert top_k(iter([2, 2, 2, 1]), 2) == [2, 2]
     assert top_k([3, 1, 2], 1) == [3]
     assert top_k(iter("banana"), 2) == ["n", "n"]
+
+
+def test_top_k_only_requires_less_than():
+    class LtOnly:
+        __slots__ = ("v",)
+
+        def __init__(self, v):
+            self.v = v
+
+        def __lt__(self, other):
+            return self.v < other.v
+
+    got = top_k((LtOnly(v) for v in [4, 9, 1, 7, 3, 8, 9]), 3)
+    assert [x.v for x in got] == [9, 9, 8]
 
 
 def test_top_k_random():
@@ -135,7 +150,7 @@ def test_merge_random():
         assert list(merge_sorted([iter(x) for x in lists])) == sorted(v for x in lists for v in x)
 
 
-def test_merge_items_that_only_know_less_than():
+def test_merge_equal_items_do_not_compare_iterators():
     class Job:  # equal priorities from different lists must not crash a tuple comparison
         def __init__(self, p):
             self.p = p
@@ -150,6 +165,20 @@ def test_merge_items_that_only_know_less_than():
 
     lists = [[Job(1), Job(3)], [Job(1), Job(2)], [Job(3)]]
     assert [j.p for j in merge_sorted([iter(x) for x in lists])] == [1, 1, 2, 3, 3]
+
+
+def test_merge_only_requires_less_than():
+    class LtOnly:
+        __slots__ = ("v",)
+
+        def __init__(self, v):
+            self.v = v
+
+        def __lt__(self, other):
+            return self.v < other.v
+
+    lists = [[LtOnly(1), LtOnly(4)], [LtOnly(1), LtOnly(3)], [LtOnly(2)]]
+    assert [x.v for x in merge_sorted([iter(xs) for xs in lists])] == [1, 1, 2, 3, 4]
 
 
 def test_merge_is_lazy():
@@ -222,3 +251,23 @@ def test_assign_many_workers():
     assert len(got) == n
     assert got[:3] == [(0, 0), (1, 0), (2, 0)] and got[w] == (0, 1) and got[-1] == (w - 1, n // w - 1)
     assert all(got[j] == (j % w, j // w) for j in range(0, n, 997))
+
+
+def test_assign_varying_durations_large():
+    # Varying durations exercise non-uniform sift depths across 10,000 workers.
+    rng = random.Random(19)
+    n, w = 60_000, 10_000
+    durs = [rng.randint(1, 50) for _ in range(n)]
+    got = assign_jobs(durs, w)
+    assert len(got) == n
+    # Verify schedule invariants: every assignment starts at that worker's current free time,
+    # and start times are monotonically non-decreasing.
+    free = [0] * w
+    prev_start = 0
+    for d, (worker, start) in zip(durs, got):
+        assert 0 <= worker < w
+        assert start == free[worker]
+        assert start >= prev_start
+        prev_start = start
+        free[worker] += d
+    assert max(free) - min(free) <= 50, "greedy earliest-free assignment keeps worker finish times within max job duration"

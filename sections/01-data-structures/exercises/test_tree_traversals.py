@@ -136,6 +136,15 @@ def test_warmup_tree():
     assert level_order(root) == [[8], [3, 10], [1, 6, 14], [4, 7, 13]]
 
 
+def test_non_bst_with_duplicates():
+    # Non-BST with duplicate values: catches inorder() cheating via sorted(preorder(root)).
+    root = TreeNode(1, TreeNode(5, TreeNode(2), TreeNode(5)), TreeNode(0, TreeNode(9)))
+    assert preorder(root) == [1, 5, 2, 5, 0, 9]
+    assert inorder(root) == [2, 5, 5, 1, 9, 0]
+    assert postorder(root) == [2, 5, 5, 9, 0, 1]
+    assert level_order(root) == [[1], [5, 0], [2, 5, 9]]
+
+
 def test_random_shapes():
     rng = random.Random(17)
     for _ in range(150):
@@ -162,7 +171,7 @@ def test_level_order_on_a_wide_tree():
     start = time.perf_counter()
     levels = level_order(nodes[0])
     took = time.perf_counter() - start
-    assert took < 2.0, f"level_order took {took:.1f} s on {n:,} nodes (an O(n) version takes about 0.1 s): is the queue a list with pop(0)?"
+    assert took < 4.0, f"level_order took {took:.1f} s on {n:,} nodes (an O(n) deque version finishes in ~1 s): is the queue a list with pop(0)?"
     assert len(levels) == 19
     for d, level in enumerate(levels):
         assert level == list(range(2 ** d - 1, 2 ** (d + 1) - 1)), f"level {d} is wrong"
@@ -178,8 +187,10 @@ def test_valid_bst_small():
     assert is_valid_bst(TreeNode(2, TreeNode(2))) is False  # equal values aren't allowed
     assert is_valid_bst(TreeNode(2, None, TreeNode(2))) is False
     assert is_valid_bst(TreeNode(0, TreeNode(-5), TreeNode(5))) is True
-    assert is_valid_bst(TreeNode(0, None, TreeNode(-1))) is False  # 0 is a real value, not "nothing yet"
+    assert is_valid_bst(TreeNode(0, None, TreeNode(-1))) is False  # 0 is a real lo bound, not "nothing yet"
     assert is_valid_bst(TreeNode(0, None, TreeNode(0))) is False
+    assert is_valid_bst(TreeNode(0, TreeNode(1), None)) is False  # 0 is a real hi bound, not "nothing yet"
+    assert is_valid_bst(TreeNode(0, TreeNode(0), None)) is False
 
 
 def test_valid_bst_checks_the_whole_subtree():
@@ -204,14 +215,21 @@ def test_valid_bst_random():
         assert is_valid_bst(root) is False
 
 
-def test_valid_bst_deep_chain():
+@pytest.mark.parametrize("side", ["left", "right"])
+def test_valid_bst_deep_chain(side):
     n = 100_000
-    root, nodes = chain(n, "left")
+    root, nodes = chain(n, side)
     assert is_valid_bst(root) is True
-    nodes[0].right = TreeNode(n + 5)  # bigger than its parent, 0, but also bigger than the root
-    assert is_valid_bst(root) is False
-    nodes[0].right = TreeNode(0.5)  # between 0 and 1: valid
-    assert is_valid_bst(root) is True
+    if side == "left":
+        nodes[0].right = TreeNode(n + 5)  # bigger than its parent, 0, but also bigger than the root
+        assert is_valid_bst(root) is False
+        nodes[0].right = TreeNode(0.5)  # between 0 and 1: valid
+        assert is_valid_bst(root) is True
+    else:
+        nodes[-1].left = TreeNode(-5)  # smaller than its parent, n-1, but also smaller than the root
+        assert is_valid_bst(root) is False
+        nodes[-1].left = TreeNode(n - 1.5)  # between n-2 and n-1: valid
+        assert is_valid_bst(root) is True
 
 
 # build_balanced

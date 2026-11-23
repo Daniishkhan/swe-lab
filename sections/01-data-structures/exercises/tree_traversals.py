@@ -1,10 +1,10 @@
-"""
+r"""
 Tree traversals, BST validation and building a balanced tree
 Topic: 01.03  |  Priority: P0
 
 Problem
 -------
-Section 7 of the chapter, plus two classic tree questions. Trees are made
+Sections 3, 7, and 8 of the chapter, plus two classic tree questions. Trees are made
 of TreeNode objects (below): `val`, `left`, `right`.
 
         8

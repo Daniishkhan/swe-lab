@@ -120,6 +120,7 @@ def test_window_examples():
     assert sliding_window_max([1, 2, 3], 3) == [3]
     assert sliding_window_max([2, 2, 2, 2], 2) == [2, 2, 2]
     assert sliding_window_max([5, 1, 2], 1) == [5, 1, 2]
+    assert sliding_window_max([-5, -2, -8, -1], 2) == [-2, -2, -1]
 
 
 def test_window_matches_brute_force():
@@ -133,7 +134,7 @@ def test_window_matches_brute_force():
 def test_window_reads_each_item_about_once():
     n, k = 300_000, 20_000
     # Falling values: each window's max is its first item, and max() of every
-    # window would read n * k = 6 billion items.
+    # window would read (n - k + 1) * k ≈ 5.6 billion items.
     nums = list(range(n, 0, -1))
     got = sliding_window_max(CountingList(nums, budget=8 * n), k)
     assert got == nums[: n - k + 1]
