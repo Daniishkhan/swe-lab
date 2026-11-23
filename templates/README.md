@@ -10,30 +10,52 @@ the style guide that keeps new pages consistent.
 reference. A book chapter reads top to bottom instead of being a stack of boxes:
 
 - `<main class="content book">`, load `assets/book.js` after `shell.js`.
-- `header.chapter-head` (eyebrow, h1, meta), then a `.learn-list` of outcomes.
-- Numbered sections: `<h2 id="s1"><span class="sec-num">1</span>Title</h2>`.
-  The sidebar table of contents is built from these.
-- Section 1 is always **the problem**, told as a small `.story` in plain words.
-- Each idea, intuition before formalism: the picture (analogy, worked numbers
-  or a `.figure` visualization), then the general rule and its name, then
-  code if needed, then a `.keyidea`, then a `.check` (quick check). Hard ideas
-  get more space.
-- Quick check: `.check` with `.q`, buttons in `.opts` (right one has
-  `data-correct`), `.fb.right` and `.fb.wrong`. The wrong feedback must explain
-  the idea again in a *different* way, not just give the answer.
-- Optional asides: `details.aside.another` ("Explain it another way") and
-  `details.aside.deeper` ("Go deeper") for the formal or senior-level material.
-- End: "What to say in the interview", `#summary`, `<div class="review" id="review">`,
-  `#exercises` with `.exercise` cards tiered `warm` (paper), `core` (code with
-  tests that count work, not just answers), `stretch`; then `nav.chapter-nav`.
-  Point its links at the section neighbours; on track pages `shell.js`
-  rewrites them to follow the track.
+- `header.chapter-head` (eyebrow, plain-English h1, meta), intro, and a
+  `.learn-list` of plain-English outcomes (**zero unintroduced jargon or
+  Big-O walls** before Section 1).
 - The "How to read this" line names the chapters this one builds on. They are
   the topic's `requires` in `curriculum.json`.
-- Voice: write for a smart high schooler. Short sentences, everyday analogies,
-  real numbers. Define every term the first time it appears. Never "simply",
-  "obviously" or "trivially". The explanation method itself (pain, primitives,
-  rebuild one fix at a time) is in `.claude/skills/teach/SKILL.md`.
+- **Target scope:** ~2,000–3,500 visible words (~12–20 min), 6–9 numbered
+  sections, 5–8 quick checks. Focus the main path on **one core mental model**;
+  put secondary architectures, proofs, runtime internals, and historical/security
+  deep dives in `details.aside.deeper` — or split into Part 1 (Intuition, Core
+  & Patterns) and Part 2 (Under the Hood).
+- **Canonical data flow:**
+  1. `<h2 id="s1"><span class="sec-num">1</span>Why do we even need this?</h2>`
+     — `.story` pain with real numbers + early visual before/after + quick
+     preview of the 2–4 real problems it unlocks.
+  2. **The rebuild (4–6 numbered sections)** — one fix per section forced by
+     the previous step's flaw, with **question/tension headings** and **one
+     running physical analogy** carried throughout (noting where it breaks).
+  3. **How can this break?** — 2–4 core gotchas, worst case, and when it is the
+     *wrong* tool.
+  4. **How you use this in interviews** — concrete patterns with before/after
+     examples (never a tiny afterthought table).
+  5. **What to say in the interview** — a 3–5 step spoken script.
+  6. `#summary`, `<div class="review" id="review">`, `#exercises` (`.exercise`
+     cards tiered `warm`, `core` with work-measuring tests, `stretch`), and
+     `nav.chapter-nav`. Point its links at the section neighbours; on track
+     pages `shell.js` rewrites them to follow the track.
+- **Inside each section (strictly intuition before formalism):**
+  1–2 sentences raising the question → physical picture (running analogy and/or
+  visual) → small mental-math numbers (3–8 items) → plain-English rule *then*
+  its CS name/symbol → 5–15 lines of commented Python if needed → `.keyidea` →
+  `.check`. Hard ideas get more space.
+- **Visual pacing:** First visual in Section 1 or 2; never more than 2
+  consecutive sections without a visual (`.figure`, inline SVG, or `.diagram` —
+  plain tables and code blocks do not count).
+- **Quick checks (`.check`):** `.q`, 3 buttons in `.opts` (one `data-correct`),
+  `.fb.right`, and `.fb.wrong` (re-teaching from a *different* angle). Test
+  mental models, predictions, and "what breaks if X changes" — never detached
+  math/probability trivia or pure terminology recall.
+- **Optional asides:** `details.aside.another` ("Explain it another way") and
+  `details.aside.deeper` ("Go deeper") for secondary architectures, proofs, and
+  senior/production internals.
+- **Voice:** Warm, direct mentor talking to a smart friend — never dry
+  conclusion-first textbook prose. Short sentences, one running everyday
+  analogy, small head-traceable numbers. Define every term the first time it
+  appears. Never "simply", "obviously" or "trivially". The full method is in
+  `.claude/skills/teach/SKILL.md` and `.claude/skills/write-chapter/SKILL.md`.
 
 ## Older box pages (legacy)
 

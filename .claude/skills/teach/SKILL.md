@@ -10,15 +10,31 @@ from scratch, change one condition and predict what breaks, and defend the
 choice to a senior interviewer. Recognition feels like understanding and
 isn't.
 
-## 1. Start from the pain
+## 1. Start from "why should I care?" (pain + payoff)
 
-Open with a concrete problem that hurts without the idea, with real numbers:
-"10 million user ids in a list; checking one takes 10 million steps." Not a
-definition. If you can't name the pain, you can't teach the idea yet.
+Open with two things before any definition, formula, or Big-O:
 
-## 2. Find the primitives
+- **The pain:** a concrete problem that hurts without the idea, with real
+  numbers ("10 million usernames in a list; checking one takes 10 million
+  steps"). If you can't name the pain, you can't teach the idea yet.
+- **The payoff:** a quick preview of the superpower this unlocks in real
+  software and interviews (what becomes instant, or what nested loop
+  disappears), so Danish immediately knows *why* this is worth learning before
+  opening the hood.
 
-List the few facts the idea rests on, then put each one through the
+## 2. Pick one running analogy & find the primitives
+
+Pick **one everyday physical analogy** (the anchor) that can carry the whole
+rebuild — not disconnected one-off metaphors. Map every mechanism in the design
+onto that same physical picture, and explicitly state where the analogy breaks.
+
+Physical anchors that work: a coat-check room with numbered hooks (hash maps),
+a hand of playing cards (sorting), a line at a counter (queues), one key to a
+single bathroom (locks), pipe width vs. distance (throughput vs. latency), a
+full sink you stop pouring into (backpressure), how the pile of work grows when
+the input doubles (Big-O).
+
+Then list the few facts the idea rests on, and put each one through the
 **primitive test**:
 
 - Can it be broken down further? Then it isn't a primitive yet; keep going.
@@ -31,12 +47,14 @@ List the few facts the idea rests on, then put each one through the
 Stop at things a smart high schooler already trusts: counting, halving,
 waiting in line, distance and time.
 
-## 3. Rebuild it, one fix at a time
+## 3. Rebuild it, one question at a time
 
-Start with the simplest thing that could work. Show where it breaks, with
-numbers. Fix exactly that flaw and nothing else. Repeat until you reach the
-real design. Every step must be forced by the previous step's failure; a step
-that appears from nowhere gets memorized instead of understood.
+Start with the simplest thing that could work. Frame every step as a
+`Question → Naive attempt → Break → Fix` loop — never a textbook definition
+followed by a proof. Show where the naive idea breaks with small numbers, fix
+exactly that flaw and nothing else, and repeat until you reach the real design.
+Every step must be forced by the previous step's failure; a step that appears
+from nowhere gets memorized instead of understood.
 
 > Membership lookup: scan a list (n steps) → sort it and binary search
 > (log n, but inserts now cost n) → use the id itself as an array index (1 step,
@@ -45,22 +63,21 @@ that appears from nowhere gets memorized instead of understood.
 > by growing the table when it fills. That's a hash map, and every part of it
 > has a reason.
 
-## 4. Picture first, then numbers, words, code
+## 4. Picture first, simple numbers, plain words, jargon last, code last
 
-Intuition comes before formalism, in this order:
+Intuition comes before formalism, strictly in this order:
 
-1. **Picture:** what the idea would look like if it were made of physical
-   things. What moves, what piles up, what waits, what blocks? Use an
-   everyday analogy or a visualization, and say where it breaks.
-2. **Numbers:** one worked example small enough to trace by hand.
-3. **Words:** only now the general rule and its name, each term defined in
-   plain words the first time.
-4. **Code:** 5–15 lines of Python, once the idea is already clear.
-
-Physical anchors that work: a queue is the line at a counter. A hash is a
-coat-check ticket. A lock is the one key to a single bathroom. Latency is
-distance and throughput is pipe width. Backpressure is a full sink you stop
-pouring into. Big-O is how the pile of work grows when the input doubles.
+1. **Picture (mandatory):** what the idea looks like in the running physical
+   analogy or a visual diagram. What moves, what piles up, what waits, what
+   blocks? Worked numbers alone do *not* replace a picture. Say where the
+   analogy breaks.
+2. **Simple numbers:** one worked example small enough to trace in your head
+   (3–8 items, simple arithmetic). Save realistic production math (base-31
+   hashing, combinatorics, proofs) for after the intuition clicks.
+3. **Plain words, then the CS name:** explain the concept in everyday words
+   first, *then* attach the formal term or symbol (e.g., "crowdedness" before
+   "load factor `α`"). Define every term the first time it appears.
+4. **Code:** 5–15 lines of Python, only once the idea is already clear.
 
 When one way doesn't land, switch to a different one. Repeating the same
 explanation more slowly doesn't help.
@@ -105,6 +122,9 @@ fit in two sentences, the explanation isn't done.
 
 ## Rules
 
+- Warm, conversational mentor voice — never dry, declarative textbook prose.
+- Protect first-pass cognitive load: land **one core mental model** before
+  introducing secondary architectures, proofs, history, or language internals.
 - One question at a time. Let Danish try before you explain.
 - Spend words where people get confused; an easy idea gets a paragraph.
 - Never write "simply", "obviously", "trivially" or "it's easy to see".

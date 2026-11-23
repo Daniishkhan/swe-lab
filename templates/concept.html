@@ -14,68 +14,100 @@
   <script src="../../../assets/book.js"></script>
 </head>
 <body data-root="../../.." data-section="{{SECTION_ID}}" data-page="concept">
-<!-- Book chapter skeleton. Spec: templates/README.md. Reference: sections/02-algorithms/concepts/sorting.html. -->
+<!-- Book chapter skeleton. Spec: templates/README.md & .claude/skills/write-chapter/SKILL.md.
+     Budget: ~2,000–3,500 visible words (~12–20 min), 6–9 sections, 5–8 quick checks.
+     Core rules: why-care first · one running physical analogy · early visual (s1–s2) ·
+     question-led sections · mentor voice · secondary architectures/proofs in .deeper or Part 2. -->
 <main class="content book">
 
 <header class="chapter-head">
   <div class="eyebrow">§{{SECTION_ID}} {{SECTION_TITLE}} · {{TOPIC_ID}}</div>
   <h1>{{TITLE}}</h1>
-  <div class="meta"><span><span class="badge {{TAG}}">{{TAG}}</span> {{TOPIC_TEXT}}</span><span>about N minutes</span><span>N quick checks · N exercises</span></div>
+  <div class="meta"><span><span class="badge {{TAG}}">{{TAG}}</span> {{TOPIC_TEXT}}</span><span>about 15 minutes</span><span>6 quick checks · 5 exercises</span></div>
 </header>
 
-<p>Why this chapter matters, in two or three plain sentences.</p>
+<!-- Plain English only: zero unintroduced jargon or Big-O walls before Section 1. -->
+<p>Why this chapter matters, in two or three plain, conversational sentences.</p>
 
 <div class="learn-list">
   <h4>By the end you'll be able to</h4>
   <ol>
-    <li>…</li>
+    <li>Plain-English outcome (no unintroduced jargon yet)…</li>
   </ol>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="s1"><span class="sec-num">1</span>The problem: …</h2>
+<!-- Section 1: Pain + Payoff + early visual before opening the hood. -->
+<h2 id="s1"><span class="sec-num">1</span>Why do we even need this?</h2>
 
 <div class="story">
-  <p>A concrete situation with real numbers, where the idea is missing and it hurts.</p>
+  <p>A concrete situation with real numbers where the idea is missing and it hurts.</p>
 </div>
 
-<div class="check" id="check-problem">
-  <p class="q">Question?</p>
-  <div class="opts">
-    <button>A mistake real people make</button>
-    <button data-correct>The right answer</button>
-    <button>Another real mistake</button>
-  </div>
-  <div class="fb right"><p>Why it's right.</p></div>
-  <div class="fb wrong"><p>The idea again, explained a different way.</p></div>
+<!-- Early visual (inline SVG, pre.diagram, or .cols before/after): never wait until mid-chapter. -->
+<div class="figure">
+  <pre class="diagram">Before (slow / painful)  vs.  After (what this unlocks)</pre>
+  <div class="cap">What to notice in the before/after comparison.</div>
 </div>
+
+<p>Quick preview of the superpower — 2–4 real problems (and interview situations) this unlocks before we open the hood:</p>
+<ul>
+  <li><b>Use case 1:</b> plain-English payoff.</li>
+  <li><b>Use case 2:</b> plain-English payoff.</li>
+</ul>
 
 <!-- ============================================================ -->
-<h2 id="s2"><span class="sec-num">2</span>The simplest thing that could work</h2>
+<!-- Sections 2..N: The rebuild (4–6 sections). One fix per section forced by the last step's flaw.
+     Frame headings as questions. Carry ONE running physical analogy throughout (and say where it breaks).
+     Order inside each section: question/tension → analogy/visual → small mental-math numbers →
+     plain rule then CS term → 5–15 lines of commented Python if needed → .keyidea → .check. -->
+<h2 id="s2"><span class="sec-num">2</span>What's the simplest thing that could work?</h2>
 
-<p>Plain explanation first. Then the picture or code that answers the question the text just raised.</p>
+<p>Raise the question or tension first — never open with a dry textbook definition. Introduce the running physical analogy here.</p>
 
 <div class="figure">
   <div id="viz-s2"></div>
   <div class="cap">What to look at, and what to try.</div>
 </div>
 
-<div class="keyidea">One or two sentences.</div>
+<div class="keyidea">One or two plain sentences summarizing the core mental model.</div>
+
+<!-- Quick checks test mental models, predictions, or "what breaks if X changes" — never math trivia. -->
+<div class="check" id="check-core">
+  <p class="q">Prediction or "what breaks if…" question?</p>
+  <div class="opts">
+    <button>A mistake real people make</button>
+    <button data-correct>The right answer</button>
+    <button>Another real mistake</button>
+  </div>
+  <div class="fb right"><p>Why it's right.</p></div>
+  <div class="fb wrong"><p>The idea again, explained a different way (must make sense for either wrong choice).</p></div>
+</div>
 
 <details class="aside another">
   <summary>Explain it another way</summary>
-  <p>A second analogy.</p>
+  <p>A second angle or picture for a hard idea.</p>
 </details>
 
 <details class="aside deeper">
   <summary>Go deeper: …</summary>
-  <p>Real systems, failure modes, proofs.</p>
+  <p>Secondary architectures, production math/proofs, language internals, or security edge cases.</p>
 </details>
 
 <!-- ============================================================ -->
-<h2 id="s3"><span class="sec-num">3</span>What to say in the interview</h2>
+<h2 id="s3"><span class="sec-num">3</span>How can this break?</h2>
+
+<p>The 2–4 core gotchas interviewers probe, worst-case behavior, and when this is the wrong tool — anchored back to the running analogy.</p>
+
+<!-- ============================================================ -->
+<h2 id="s4"><span class="sec-num">4</span>How you use this in interviews</h2>
+
+<p>Concrete coding patterns with a clear before/after showing what brute-force work disappears (never a tiny afterthought table).</p>
+
+<!-- ============================================================ -->
+<h2 id="s5"><span class="sec-num">5</span>What to say in the interview</h2>
 <ol>
-  <li>…</li>
+  <li>3–5 step spoken script you can say out loud in under two minutes…</li>
 </ol>
 
 <!-- ============================================================ -->

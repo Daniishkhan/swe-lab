@@ -9,22 +9,38 @@ Two passes over a drafted chapter: first what to show, then how it reads.
 
 ## 1. Find the spots for a visual
 
-A visual earns its place when it shows something **changing step by step** or
-**a shape you can't hold in your head**: a pointer moving, a structure growing,
-work splitting into levels, two curves pulling apart. If a sentence or a small
-table says it as well, don't build one.
+Danish learns visually first — never leave a chapter as a wall of text with
+widgets tacked on halfway down.
+
+- **Early visual rule:** Every chapter MUST have its first visual (inline SVG,
+  `.diagram`, or interactive `.figure`) in **Section 1 or Section 2** — never
+  make the reader wade through 1,500+ words before seeing a picture.
+- **No visual deserts:** Allow **at most 2 consecutive sections** without a
+  visual (`.figure`, inline SVG diagram, or `pre.diagram`). Plain tables and
+  code blocks do *not* count as visuals for this rule.
+
+A visual earns its place whenever it shows **pain vs. superpower**, **how data
+transforms**, **something changing step by step**, **a before/after state**, or
+**a shape you can't hold in your head**: a pointer moving, a structure growing
+or rehashing, a broken invariant, work splitting into levels, two curves
+pulling apart. If a sentence says it just as clearly, don't force one.
 
 For each candidate, write down the idea it teaches, why words struggle there,
-and the kind:
+and the kind (mix lightweight static diagrams with interactive widgets):
 
-- **Stepper** (`V.player` with frames): an algorithm's mechanism.
+- **Lightweight static diagram** (inline SVG, `pre.diagram`, or side-by-side
+  `.cols` before/after): great for Section 1 pain-vs-superpower, data
+  pipelines (`key → hash → bucket`), before/after transforms (e.g., resizing
+  an 8-slot table to 16), broken invariants (e.g., a stranded mutated key),
+  and nested-loop-to-single-pass pattern shifts.
+- **Stepper** (`V.player` with frames): an algorithm's step-by-step mechanism.
 - **Slider**: input → live numbers or chart, for growth and trade-offs.
 - **Playground**: pick algorithm × input shape, for comparisons.
-- **Static diagram**: `pre.diagram` or inline SVG.
 
-Most chapters need 2–4: one stepper for the core mechanism, one slider or
-playground for "how does it scale, when does it break". Each sits right after
-the paragraph that raises its question.
+Most chapters need **2–4 lightweight diagrams** plus **1–3 interactive
+widgets** (a stepper for the core mechanism, and a slider or playground for
+"how does it scale, when does it break"). Each sits right after the paragraph
+that raises its question.
 
 ## 2. Build them
 
@@ -48,8 +64,11 @@ the paragraph that raises its question.
 Run `node tools/check_page.js <page> --shots <scratch dir>` and look at the
 screenshots (desktop 1280 wide and phone 390 wide, every theme). Then check:
 
-- **Rhythm:** no more than about 4 paragraphs in a row without code, a figure,
-  a key idea, a check or a table.
+- **Early visual & no visual deserts:** confirm there is a visual in Section 1
+  or 2, and never more than 2 consecutive sections without a `.figure`, inline
+  SVG, or `.diagram`.
+- **Rhythm:** no more than about 4 paragraphs in a row without a visual,
+  code, a key idea, a check or a table.
 - **Order in a section:** the words that raise the question come before the
   figure or code that answers it. Then `.keyidea`, then `.check`.
 - **Code:** at most about 15 lines, beside the prose that explains it.

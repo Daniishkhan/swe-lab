@@ -7,22 +7,43 @@ opened straight from disk (`file://`), no build step except `tools/build.py`.
 
 ## How we teach (every chapter, every explanation)
 
-Break each topic down to first principles, then build it back up, with
-intuition before formalism:
+Danish learns through **"why should I care?"**, **visual intuition**,
+**everyday analogies**, and **first principles**. Break each topic down and
+rebuild it from scratch, intuition before formalism:
 
-1. **Start from the pain:** a concrete problem with real numbers, never a
-   definition.
-2. **Break it down** to facts a smart high schooler already trusts
-   (counting, halving, waiting in line, distance and time). Then rebuild the
-   idea one fix at a time, each step forced by the last one's flaw.
-3. **Picture first:** every idea gets a physical picture, an everyday analogy
-   (and where it breaks) or a visualization *before* any formula, jargon or
-   code. Then real numbers, then the general rule and its name, then code.
-4. **Check by explaining back,** never by asking "does that make sense?".
+1. **Start from "why should I care?" (pain + payoff):** open with a concrete
+   problem with real numbers *and* a quick preview of the superpower this
+   unlocks in real software and interviews — never a definition, formula, or
+   Big-O wall. Keep titles, intros, and learning outcomes in plain English
+   (zero unintroduced jargon).
+2. **One running physical analogy:** pick a single everyday mental model
+   (coat-check room, playing cards, line at a counter, filing cabinet) and
+   carry it through the whole rebuild, mapping every mechanism onto it — and
+   explicitly stating where the analogy breaks.
+3. **Rebuild one question at a time:** break the idea down to facts a smart
+   high schooler already trusts (counting, halving, waiting in line, distance
+   and time), then rebuild via `Question → Naive attempt → Break → Fix`. Frame
+   headings and openers as questions or tension, never dry textbook thesis
+   statements.
+4. **Picture first, simple numbers next, jargon last, code last:** every idea
+   gets a visual or physical picture *before* formulas, symbols, Big-O, or
+   code. Start with numbers small enough to trace in your head; explain the
+   plain-English idea before naming the CS term (e.g., "crowdedness" before
+   "load factor α").
+5. **Protect the first-pass core path:** keep a chapter focused on **one core
+   mental model** (~2,000–3,500 visible words, ~12–20 minutes). Put secondary
+   architectures (e.g., open addressing alongside chaining), heavy math/proofs,
+   language internals, and production/security edge cases in collapsed
+   `details.aside.deeper` boxes — or split into a Part 2 chapter — never
+   blocking first-pass intuition.
+6. **Check intuition, not trivia:** check by explaining back or predicting what
+   breaks when one condition changes — never "does that make sense?" and never
+   detached math/probability trivia.
 
-Short sentences, every term defined the first time, the most words on the
-hardest ideas. The full method is the `teach` skill. Chapters apply it
-through `write-chapter` and `visuals-and-layout`.
+Write in a warm, direct mentor voice (never dry textbook prose). Short
+sentences, every term defined the first time, the most words on the hardest
+ideas. The full method is the `teach` skill. Chapters apply it through
+`write-chapter`, `visuals-and-layout`, and `review-chapter`.
 
 ## Hard rules
 
