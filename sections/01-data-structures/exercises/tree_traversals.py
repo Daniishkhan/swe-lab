@@ -1,4 +1,4 @@
-r"""
+"""
 Tree traversals, BST validation and building a balanced tree
 Topic: 01.03  |  Priority: P0
 

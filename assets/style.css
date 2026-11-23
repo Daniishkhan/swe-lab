@@ -759,8 +759,6 @@ svg.viz .grid-line { stroke: var(--border); stroke-dasharray: 3 4; }
    ========================================================================== */
 main.book { max-width: calc(var(--measure) + 96px); font: 1.0625rem/1.78 var(--read); }
 main.book > * { max-width: 100%; }
-/* Room between paragraphs of running text. Boxes keep the tighter default. */
-main.book > p, main.book > ul, main.book > ol { margin-bottom: 1.3em; }
 main.book h2 {
   font-size: 1.6rem; margin: 72px 0 16px; padding-top: 0; letter-spacing: -0.02em; line-height: 1.25;
   display: flex; align-items: baseline; gap: 14px;

@@ -52,7 +52,7 @@ def scan_exercises(section_dir: Path, results: dict) -> list[dict]:
         text = f.read_text(encoding="utf-8")
         m = EX_TOPIC.search(text)
         topics = [m.group(1)] + TOPIC_ID.findall(m.group(2)) if m else []
-        doc_title = text.split('"""')[1].strip().splitlines()[0] if text.startswith(('"""', 'r"""')) else f.stem
+        doc_title = text.split('"""')[1].strip().splitlines()[0] if text.startswith('"""') else f.stem
         out.append({"file": f.name, "module": f.stem, "title": doc_title, "topics": topics,
                     "result": results.get(f.stem)})
     return out

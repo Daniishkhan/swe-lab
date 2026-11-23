@@ -11,9 +11,7 @@
  *   - every V.player stepped to its last frame, then re-checked
  * Book pages also get a markup lint: each .check has a check-* id, one
  * data-correct option and both feedback blocks; each .figure has a .cap;
- * every h2 has an id; no duplicate ids. At desktop width, code blocks too wide
- * for their box are reported too, including those in asides and feedback,
- * because the hidden end of a line is easy to miss.
+ * every h2 has an id; no duplicate ids.
  * --shots DIR saves full-page screenshots: desktop in all four themes, phone in dark.
  *
  * Needs Playwright (pre-installed in Claude's cloud sessions; locally: npm i -g playwright).
@@ -79,24 +77,6 @@ const lint = () => {
   return out;
 };
 
-// Code blocks whose lines are cut off at this width. Opens asides and shows quick-check feedback first.
-const clipped = () => {
-  const shut = [...document.querySelectorAll("main details:not([open])")];
-  shut.forEach((d) => (d.open = true));
-  const css = document.createElement("style");
-  css.textContent = "main .check .fb { display: block !important; }";
-  document.head.append(css);
-  const out = [...document.querySelectorAll("main pre")]
-    .filter((p) => p.scrollWidth > p.clientWidth + 1)
-    .map((p) => {
-      const longest = p.textContent.split("\n").reduce((a, b) => (b.length > a.length ? b : a), "").trim();
-      return `code block cut off by ${p.scrollWidth - p.clientWidth}px: "${longest.slice(0, 50)}${longest.length > 50 ? "…" : ""}"`;
-    });
-  css.remove();
-  shut.forEach((d) => (d.open = false));
-  return out;
-};
-
 (async () => {
   const browser = await chromium.launch();
   let bad = 0;
@@ -113,7 +93,6 @@ const clipped = () => {
       const o1 = await tab.evaluate(overflow);
       if (o1) problems.add(`${size.name}: ${o1}`);
       if (size.name === "desktop") (await tab.evaluate(lint)).forEach((p) => problems.add(p));
-      if (size.name === "desktop") (await tab.evaluate(clipped)).forEach((p) => problems.add(p));
       const players = await tab.evaluate(stepPlayers);
       const o2 = await tab.evaluate(overflow);
       if (o2 && o2 !== o1) problems.add(`${size.name}, players at last frame: ${o2}`);

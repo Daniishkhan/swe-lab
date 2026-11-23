@@ -22,10 +22,9 @@ and the kind:
 - **Playground**: pick algorithm × input shape, for comparisons.
 - **Static diagram**: `pre.diagram` or inline SVG.
 
-Most chapters need 1–3: a stepper for the core mechanism, and a slider or
-playground only if "how does it scale, when does it break" can't be shown in
-a small table. Each sits right after the paragraph that raises its question,
-and the text around it reads complete without it.
+Most chapters need 2–4: one stepper for the core mechanism, one slider or
+playground for "how does it scale, when does it break". Each sits right after
+the paragraph that raises its question.
 
 ## 2. Build them
 
@@ -49,11 +48,10 @@ and the text around it reads complete without it.
 Run `node tools/check_page.js <page> --shots <scratch dir>` and look at the
 screenshots (desktop 1280 wide and phone 390 wide, every theme). Then check:
 
-- **Flow:** the running text carries the chapter and every box interrupts
-  it. Boxes go where a section pauses, usually at its end and never in the
-  middle of an argument, and a section that is fine in words gets none.
+- **Rhythm:** no more than about 4 paragraphs in a row without code, a figure,
+  a key idea, a check or a table.
 - **Order in a section:** the words that raise the question come before the
-  figure or code that answers it. A quick check goes last.
+  figure or code that answers it. Then `.keyidea`, then `.check`.
 - **Code:** at most about 15 lines, beside the prose that explains it.
   Side-by-side comparisons use `.cols`, which stacks on a phone.
 - **Figures:** controls fit on one line on desktop and wrap cleanly on a phone.

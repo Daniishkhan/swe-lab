@@ -31,8 +31,8 @@ What the tests measure
 ----------------------
 They use keys that count every == and every hash() call. Looking up 5,000
 keys must average only a few == each, the longest chain must stay short,
-keys spread far apart must all survive the resizes, and the capacity must
-grow by a multiple (a handful of resizes), not by a fixed step.
+and the capacity must grow by a multiple (a handful of resizes), not by a
+fixed step.
 
 Before you code (say it out loud)
 ---------------------------------
@@ -41,7 +41,7 @@ Before you code (say it out loud)
 3. What does a resize cost, and why is it still O(1) amortized?
 4. Why can't a resize copy bucket i to bucket i?
 
-Run:  pytest -k test_hash_map
+Run:  pytest -k hash_map
 """
 
 
