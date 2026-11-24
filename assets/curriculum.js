@@ -7,8 +7,16 @@ window.CURRICULUM = {
     "id": "p0",
     "label": "Phase 0",
     "title": "Python fluency warm-up, coding playbook & recruiter baseline",
-    "goal": "Build effortless Python muscle memory (comprehensions, lambdas, generators, data model, gotchas and stdlib), learn the bare-editor coding protocol, and lock down your 60-second intro and flagship project map before Week 1 begins.",
+    "goal": "Build automatic Python muscle memory from core foundations (control flow, loops, functions, built-in list/tuple/str/dict/set) through memory model, streams, decorators, and stdlib, learn the bare-editor coding protocol, and lock down your 60-second intro and flagship project map before Week 1 begins.",
     "steps": [
+     {
+      "topic": "10.13",
+      "do": "Master Python control flow, loops, and functions from one picture (the railway switchyard): indentation blocks, if/elif/else, chained bounds, half-open range (forward & reverse), while, continue/break/for...else, tuple returns, and explicit ValueError guards."
+     },
+     {
+      "topic": "10.14",
+      "do": "Master Python's four built-in data structures and strings (list, tuple, str, dict, set): indexing/slicing costs, O(n) ''.join(), safe dict.get/items, O(1) set membership & set algebra (& | - ^), and classic container traps. Then solve py_foundations."
+     },
      {
       "topic": "10.10",
       "do": "Master Python's object & reference model from one physical picture (sticky notes on boxes): mutable vs immutable, 2D grid aliasing, shallow vs deep copy, hidden slicing cost, mutable default args, and late-binding loop closures."
@@ -34,10 +42,31 @@ window.CURRICULUM = {
       "do": "Draft your 60-second 'tell me about yourself' and your flagship project deep-dive worksheet (python3 tools/new.py deepdive \"Project\") so early recruiter and hiring manager calls don't disrupt technical weeks."
      }
     ],
-    "dayNote": "About 17 hours across 4 days (~4 to 4.5 hours/day) before Week 1. Investing time in Python fluency upfront pays off on every coding mock and drill.",
+    "dayNote": "About 21 hours across 5 days (~4 to 4.5 hours/day) before Week 1. Building rock-solid Python foundations upfront pays off on every coding mock and drill.",
     "days": [
      {
-      "label": "Day 1 · Memory model, comprehensions, lambdas & lazy streams",
+      "label": "Day 1 · Python foundations: loops, functions & built-in data structures",
+      "plan": [
+       {
+        "t": "1h",
+        "topic": "10.13",
+        "do": "Read Python control flow, loops, and functions: if/elif/else, chained bounds, half-open range, while, break/continue/for...else, helper returns, and ValueError guards"
+       },
+       {
+        "t": "1h 15m",
+        "topic": "10.14",
+        "do": "Read Python's built-in data structures: list ends & slicing, tuple/str immutability & ''.join(), dict patterns, set membership & set algebra"
+       },
+       {
+        "t": "1h 45m",
+        "topic": "10.14",
+        "do": "Complete py_foundations (all 5 functions, including O(n) work-capped set/dict tests)"
+       }
+      ],
+      "drills": []
+     },
+     {
+      "label": "Day 2 · Memory model, comprehensions, lambdas & lazy streams",
       "plan": [
        {
         "t": "1h 15m",
@@ -58,7 +87,7 @@ window.CURRICULUM = {
       "drills": []
      },
      {
-      "label": "Day 2 · Decorators, dataclasses, memoization & context managers",
+      "label": "Day 3 · Decorators, dataclasses, memoization & context managers",
       "plan": [
        {
         "t": "1h 30m",
@@ -74,7 +103,7 @@ window.CURRICULUM = {
       "drills": []
      },
      {
-      "label": "Day 3 · Standard library toolkit & bare-editor playbook",
+      "label": "Day 4 · Standard library toolkit & bare-editor playbook",
       "plan": [
        {
         "t": "1h 15m",
@@ -95,7 +124,7 @@ window.CURRICULUM = {
       "drills": []
      },
      {
-      "label": "Day 4 · Flagship project baseline & Python speed check",
+      "label": "Day 5 · Flagship project baseline & Python speed check",
       "plan": [
        {
         "t": "2h 30m",
@@ -110,7 +139,7 @@ window.CURRICULUM = {
        {
         "t": "45m",
         "topic": "10.12",
-        "do": "Redo any shaky idiom from py_idioms / py_internals / py_toolkit from a blank editor"
+        "do": "Redo any shaky idiom from py_foundations / py_idioms / py_internals / py_toolkit from a blank editor"
        }
       ],
       "drills": []
@@ -4115,11 +4144,30 @@ window.CURRICULUM = {
    "notes": [],
    "topics": [
     {
+     "id": "10.13",
+     "tag": "P0",
+     "short": "Python control flow, loops & functions",
+     "text": "Python control flow, loops, and functions: indentation blocks, if/elif/else, chained comparisons, short-circuit truthiness, half-open range (forward & reverse), while loops, break/continue/for...else, tuple returns, default arguments, and explicit ValueError guards",
+     "requires": []
+    },
+    {
+     "id": "10.14",
+     "tag": "P0",
+     "short": "Built-in structures (list, tuple, dict, set)",
+     "text": "Python's built-in data structures: list indexing/slicing and back vs front costs, immutable tuple records and str ''.join(), dict safe lookups (.get/.items/.pop), set O(1) membership and set algebra (& | - ^), and classic container traps",
+     "requires": [
+      "10.13"
+     ]
+    },
+    {
      "id": "10.10",
      "tag": "P0",
      "short": "Python memory model, copies & closures",
      "text": "How Python holds data in memory: names vs objects, mutable vs immutable, 2D grid aliasing, shallow vs deep copy, hidden slicing cost, mutable default arguments, late-binding closures, truthiness, and mutating while iterating",
-     "requires": []
+     "requires": [
+      "10.13",
+      "10.14"
+     ]
     },
     {
      "id": "10.11",
@@ -4209,6 +4257,18 @@ window.CURRICULUM = {
      "status": "complete"
     },
     {
+     "file": "python-control-flow.html",
+     "topic": "10.13",
+     "title": "Python control flow, loops, and functions",
+     "status": "complete"
+    },
+    {
+     "file": "python-data-structures.html",
+     "topic": "10.14",
+     "title": "Python's built-in data structures (list, tuple, str, dict & set)",
+     "status": "complete"
+    },
+    {
      "file": "python-idioms.html",
      "topic": "10.11",
      "title": "Transforming and streaming data (Comprehensions, itertools & lazy generators)",
@@ -4228,6 +4288,16 @@ window.CURRICULUM = {
     }
    ],
    "exercises": [
+    {
+     "file": "py_foundations.py",
+     "module": "py_foundations",
+     "title": "Python foundations: control flow, loops, functions & built-in data structures",
+     "topics": [
+      "10.14",
+      "10.13"
+     ],
+     "result": null
+    },
     {
      "file": "py_idioms.py",
      "module": "py_idioms",
@@ -4719,5 +4789,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-23 21:06"
+ "generated": "2026-11-24 04:22"
 };

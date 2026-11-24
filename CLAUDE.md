@@ -109,9 +109,10 @@ node tools/check_page.js <page.html> [--shots DIR]  # console errors, offline, 3
 ## Layout
 
 - `curriculum.json`: source of truth. `track` separates concerns cleanly into
-  four lanes: **Phase 0** (4-day Python fluency warm-up covering idioms,
-  lambdas, generators, gotchas and stdlib via `py_idioms`/`py_internals`/`py_toolkit`,
-  plus bare-editor playbook and recruiter-call project baseline), **Weeks 1 to
+  four lanes: **Phase 0** (5-day Python fluency warm-up covering foundations,
+  memory model, idioms, lambdas, generators, decorators and stdlib via
+  `py_foundations`/`py_idioms`/`py_internals`/`py_toolkit`, plus bare-editor
+  playbook and recruiter-call project baseline), **Weeks 1 to
   10** (pure technical spine at ~5h/day — 4 weeks to technical-screen readiness,
   8 to 12 weeks to full onsite mastery — with a technical milestone mock each
   week), a **Parallel Behavioral Track** (`parallel: true`, ~1h/week on Sundays

@@ -56,11 +56,11 @@ swe-prep/
 
 ## What's written so far
 
-12 full visual chapters (all 6 Phase 0 guides + all 6 Week 1 chapters), 16 blueprint chapter outlines (`Weeks 2–9`), and 82 Python exercises with work-measuring tests:
+14 full visual chapters (all 8 Phase 0 guides + all 6 Week 1 chapters), 16 blueprint chapter outlines (`Weeks 2–9`), and 83 Python exercises with work-measuring tests:
 
 | Chapter | Book chapters (`concepts/*.html`) | Exercises (stubs + work-measuring tests) |
 |---|---|---|
-| Phase 0 (§10, §14, §15) | All 6 Phase 0 chapters written: `python-memory-model.html`, `python-idioms.html`, `python-building-blocks.html`, `python-toolkit.html`, `algorithmic-round.html`, `project-deep-dive.html` | 3 Python warm-up suites (`py_idioms`, `py_internals`, `py_toolkit`) |
+| Phase 0 (§10, §14, §15) | All 8 Phase 0 chapters written: `python-control-flow.html`, `python-data-structures.html`, `python-memory-model.html`, `python-idioms.html`, `python-building-blocks.html`, `python-toolkit.html`, `algorithmic-round.html`, `project-deep-dive.html` | 4 Python warm-up suites (`py_foundations`, `py_idioms`, `py_internals`, `py_toolkit`) |
 | §01 Data structures | 4 full Week 1 chapters (`hash-maps.html`, `linear-structures.html`, `trees.html`, `heaps.html`) + 2 outlines (`tries.html`, `probabilistic-ds.html`) | 37 exercises, from `hash_map` and `lru_cache` to `bloom_filter`, `lsm_store` and `mpmc_queue` |
 | §02 Algorithms | 2 full Week 1 chapters (`complexity.html`, `sorting.html`) + 6 outlines (`binary-search.html`, `sliding-window.html`, `graphs.html`, `intervals.html`, `backtracking-dp.html`, `greedy.html`) | 36 exercises, from `sorts` and `graphs` to `dijkstra`, `kruskal_mst`, `kmp_search`, `external_sort`, `token_bucket`, `consistent_hash` and `capacity_estimate` |
 | §03 Concurrency | 2 outlines (`concurrency-fundamentals.html`, `concurrency-patterns.html`) | 3 concurrency suites (`bounded_queue`, `single_flight_cache`, `concurrent_crawler`) |
@@ -78,11 +78,13 @@ The home page separates concerns cleanly into four lanes so setup, technical
 study, behavioral prep, and company-specific onsite prep never mix—with plain
 sequential numbering (`1, 2, 3…`) instead of jumping chapter IDs:
 
-1. **Phase 0 (4 days, before Week 1):** Deep Python warm-up (comprehensions,
-   lambdas, closures, lazy generators, data model, gotchas, decorators, context
-   managers, and stdlib via `py_idioms`, `py_internals`, and `py_toolkit`), the
-   Google bare-editor coding playbook, and your 60-second intro + flagship
-   project baseline so early recruiter calls never interrupt technical study.
+1. **Phase 0 (5 days, before Week 1):** Deep Python warm-up from foundations
+   (control flow, loops, functions, built-in `list`/`tuple`/`str`/`dict`/`set`
+   via `py_foundations`) through memory model, comprehensions, lambdas,
+   closures, lazy generators, decorators, context managers, and stdlib via
+   `py_idioms`, `py_internals`, and `py_toolkit`, plus the Google bare-editor
+   coding playbook and your 60-second intro + flagship project baseline so early
+   recruiter calls never interrupt technical study.
 2. **Weeks 1 to 10 (pure technical spine, ~5h/day):** Zero behavioral or setup
    steps mixed in. **Weeks 1 to 4 make you technical-screen ready** across
    Google (bare-editor DSA), Anthropic (4-level practical + concurrency), and
@@ -97,7 +99,7 @@ sequential numbering (`1, 2, 3…`) instead of jumping chapter IDs:
 
 | Stage | Focus | Milestone |
 |---|---|---|
-| Phase 0 | **Python warm-up & setup (4 days)**: idioms, comprehensions, lambdas, generators, gotchas (`py_idioms`, `py_internals`), stdlib toolkit (`py_toolkit`), bare-editor coding playbook, 60-sec intro + flagship project baseline | *(4-day pre-flight warm-up)* |
+| Phase 0 | **Python warm-up & setup (5 days)**: loops, functions & built-in data structures (`py_foundations`), memory model, streams & decorators (`py_idioms`, `py_internals`), stdlib toolkit (`py_toolkit`), bare-editor coding playbook, 60-sec intro + flagship project baseline | *(5-day pre-flight warm-up)* |
 | Week 1 | Complexity & amortized cost, hash maps, linear/monotonic structures, trees, heaps, sorting & quickselect | Mock 1: Google coding #1 (bare editor, 1 medium + follow-up) |
 | Week 2 | Binary search on answer, sliding window, graphs, BFS/DFS/topo, **Union-Find**, **tries**, **intervals**, **Dijkstra** | Mock 2: Google coding #2 (Medium-Hard graph/interval/trie + 2 follow-ups) |
 | Week 3 | Backtracking, DP, **greedy**, LRU/TTL cache, rate limiters; testing, designing for change, 4-level progressive builds | Mock 3: Practical 4-level screen (Anthropic CodeSignal style, 90m) |

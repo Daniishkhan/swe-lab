@@ -16,7 +16,7 @@
 <main class="content book">
 
 <header class="chapter-head">
-  <div class="eyebrow">Phase 0 · Day 1 · Part 2</div>
+  <div class="eyebrow">Phase 0 · Day 2 · Part 2</div>
   <h1>Transforming and streaming data</h1>
   <div class="meta"><span><span class="badge P0">P0</span> Phase 0 Python pipelines</span><span>about 16 minutes</span><span>6 quick checks · 4 exercises</span></div>
 </header>
@@ -34,7 +34,7 @@
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Phase 0 Day 1 right after Part 1. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Builds on <a href="python-memory-model.html">How Python holds data in memory</a>.</p>
+<p class="muted small">How to read this: top to bottom on Phase 0 Day 2 right after Part 1. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Builds on <a href="python-memory-model.html">How Python holds data in memory</a>.</p>
 
 <!-- ============================================================ -->
 <h2 id="s1"><span class="sec-num">1</span>Why do giant intermediate lists stall (or blow up) your code?</h2>
@@ -254,7 +254,7 @@ def window_sums(nums, k):
 
 <details class="aside deeper">
   <summary>Go deeper: O(k) streaming windows and the groupby sub-iterator trap</summary>
-  <p><b>True <code>O(k)</code> memory over an endless stream:</b> if <code>nums</code> arrives as a billion-item stream that doesn't fit in RAM, keep a fixed ring buffer <code>buf = collections.deque(maxlen=k)</code> (covered on Day 3) and a single integer <code>running = 0</code>. Each step, subtract <code>buf[0]</code> if <code>len(buf) == k</code>, append the new item, add it to <code>running</code>, and <code>yield running</code> once full — <code>O(k)</code> RAM and <code>O(1)</code> per item!</p>
+  <p><b>True <code>O(k)</code> memory over an endless stream:</b> if <code>nums</code> arrives as a billion-item stream that doesn't fit in RAM, keep a fixed ring buffer <code>buf = collections.deque(maxlen=k)</code> (covered on Day 4) and a single integer <code>running = 0</code>. Each step, subtract <code>buf[0]</code> if <code>len(buf) == k</code>, append the new item, add it to <code>running</code>, and <code>yield running</code> once full — <code>O(k)</code> RAM and <code>O(1)</code> per item!</p>
   <p><b>The <code>groupby</code> sub-iterator trap:</b> <code>groupby</code> shares its underlying conveyor belt with every group sub-iterator <code>g</code>. Writing <code>groups = [(k, g) for k, g in groupby(data)]</code> stores <em>exhausted</em> sub-iterators because advancing the outer loop drains earlier groups! Always materialize immediately — <code>[(k, list(g)) for k, g in groupby(data)]</code> — if you need the items later.</p>
 </details>
 
@@ -328,7 +328,7 @@ def flatten_stream(nested):
   <li><b>When a plain <code>for</code> loop beats a clever comprehension:</b> if a pipeline needs side effects, multiple accumulators, or more than two nested <code>for</code>/<code>if</code> clauses, write a clean <code>for</code> loop. Interviewers reward readability over code golf.</li>
 </ol>
 
-<p>See how these Day 1 pipeline idioms simplify real interview code:</p>
+<p>See how these Day 2 pipeline idioms simplify real interview code:</p>
 <div class="cols">
   <div style="min-width:0">
     <p class="small muted"><b>Before: manual loops + slow window slice</b></p>
@@ -370,7 +370,7 @@ ws = [b - a for a, b in zip(p, islice(p, k, None))]</code></pre>
 <!-- ============================================================ -->
 <h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
 
-<p>Before coding <code>py_idioms.py</code> and moving to Day 2's building blocks (<a href="python-building-blocks.html">Chapter 10.12</a>), make sure you can explain these four ideas aloud in 45 seconds:</p>
+<p>Before coding <code>py_idioms.py</code> and moving to Day 3's building blocks (<a href="python-building-blocks.html">Chapter 10.12</a>), make sure you can explain these four ideas aloud in 45 seconds:</p>
 <ol>
   <li><b>Batches vs. streams:</b> "I'll use a list comprehension when I need random access or sorting, and a generator expression <code>(...)</code> for single-pass reductions like <code>any</code>/<code>sum</code>/<code>next</code> so extra memory stays <code>O(1)</code> and it short-circuits on the first hit."</li>
   <li><b>Ranking &amp; transposing:</b> "Tuple keys rank by multiple rules in one pass (negate numbers for descending, guard <code>is not None</code> to keep <code>0</code>), and <code>zip(*matrix)</code> transposes rows into columns cleanly."</li>
@@ -418,7 +418,7 @@ ws = [b - a for a, b in zip(p, islice(p, k, None))]</code></pre>
 </div>
 
 <div class="exercise">
-  <div class="tier core">Day 1 · Core code (all 5 functions)</div>
+  <div class="tier core">Day 2 · Core code (all 5 functions)</div>
   <h4>3. Complete the full idioms &amp; streams suite</h4>
   <p>Implement <code>rank_candidates</code>, <code>transpose_and_filter</code>, <code>make_multipliers</code> (from Chapter 10.10), <code>flatten_stream</code>, and <code>window_sums</code> in <a href="../exercises/py_idioms.py">py_idioms.py</a>. Tests verify falsy <code>0</code> scores, closure snapshots, deterministic pull caps on infinite streams, and deterministic <code>O(n)</code> read counts on window sums.</p>
 <pre class="plain"><code>python3 -m pytest -k py_idioms</code></pre>

@@ -16,7 +16,7 @@
 <main class="content book">
 
 <header class="chapter-head">
-  <div class="eyebrow">Phase 0 · Day 2</div>
+  <div class="eyebrow">Phase 0 · Day 3</div>
   <h1>Python decorators and clean building blocks</h1>
   <div class="meta"><span><span class="badge P0">P0</span> Phase 0 clean Python structure</span><span>about 16 minutes</span><span>5 quick checks · 4 exercises</span></div>
 </header>
@@ -34,7 +34,7 @@
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Phase 0 Day 2 before solving <code>py_internals.py</code>. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Builds on <a href="python-memory-model.html">How Python holds data in memory</a> and <a href="python-idioms.html">Transforming and streaming data</a>.</p>
+<p class="muted small">How to read this: top to bottom on Phase 0 Day 3 before solving <code>py_internals.py</code>. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Builds on <a href="python-memory-model.html">How Python holds data in memory</a> and <a href="python-idioms.html">Transforming and streaming data</a>.</p>
 
 <!-- ============================================================ -->
 <h2 id="s1"><span class="sec-num">1</span>Why does code structure matter as much as Big-O in senior rounds?</h2>
@@ -144,7 +144,7 @@ def compute(x):
 <!-- ============================================================ -->
 <h2 id="s3"><span class="sec-num">3</span>How do you wrap a class into a safe, sortable value record?</h2>
 
-<p>Raw tuples like <code>(2, 1, "send_email")</code> work fine inside a 3-line sort (Chapter 10.11), yet once you pass tasks across functions, store them in sets/dicts, or push them into Python's priority queue (<code>heapq</code>, covered on Day 3), raw tuples get cryptic fast — and plain custom classes crash on comparisons (<code>&lt;</code>) and sets (<code>hash()</code>) unless you hand-write 30 lines of dunder methods.</p>
+<p>Raw tuples like <code>(2, 1, "send_email")</code> work fine inside a 3-line sort (Chapter 10.11), yet once you pass tasks across functions, store them in sets/dicts, or push them into Python's priority queue (<code>heapq</code>, covered on Day 4), raw tuples get cryptic fast — and plain custom classes crash on comparisons (<code>&lt;</code>) and sets (<code>hash()</code>) unless you hand-write 30 lines of dunder methods.</p>
 
 <p>Snap <b><code>@dataclass(frozen=True, order=True)</code></b> onto a 4-line class definition instead (this is <code>PriorityTask</code> in <code>py_internals.py</code>):</p>
 
@@ -396,7 +396,7 @@ with scoped_append(path, u):
 <!-- ============================================================ -->
 <h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
 
-<p>Before coding <code>py_internals.py</code> and moving to Day 3's standard library toolkit (<a href="python-toolkit.html">Chapter 10.01</a>), make sure you can speak these four points aloud in under 45 seconds:</p>
+<p>Before coding <code>py_internals.py</code> and moving to Day 4's standard library toolkit (<a href="python-toolkit.html">Chapter 10.01</a>), make sure you can speak these four points aloud in under 45 seconds:</p>
 <ol>
   <li><b>How <code>@</code> works:</b> "A decorator runs once at definition time (<code>fn = dec(fn)</code>), wrapping the target; I always include <code>@functools.wraps(fn)</code> so metadata like <code>__name__</code> and docstrings survive."</li>
   <li><b>Value objects:</b> "I'll use <code>@dataclass(frozen=True, order=True)</code> so records have named fields, hash safely for dicts/sets when compared fields are immutable, and break priority-queue ties left to right."</li>
@@ -442,16 +442,16 @@ with scoped_append(path, u):
 </div>
 
 <div class="exercise">
-  <div class="tier core">Day 2 · Core code (all 5 drills)</div>
+  <div class="tier core">Day 3 · Core code (all 5 drills)</div>
   <h4>3. Complete the full internals &amp; building blocks suite</h4>
   <p>Implement <code>make_grid</code> and <code>append_log</code> (from Chapter 10.10) alongside <code>PriorityTask</code>, <code>memoize</code>, and <code>scoped_append</code> in <a href="../exercises/py_internals.py">py_internals.py</a>. Tests verify row independence, empty caller lists, hashability/immutability/ordering, multi-arg + 0-arg + falsy caching, and nested exception-safe backtracking.</p>
 <pre class="plain"><code>python3 -m pytest -k py_internals</code></pre>
 </div>
 
 <div class="exercise">
-  <div class="tier core">Day 4 · Bare-editor speed check (45 min)</div>
+  <div class="tier core">Day 5 · Bare-editor speed check (45 min)</div>
   <h4>4. Redo shaky idioms from a blank editor</h4>
-  <p>On Phase 0 Day 4, open the <a href="../../../practice.html">Practice hub</a> bare-editor scratchpad (zero autocomplete) and spend 45 minutes rewriting any shaky function from <code>py_idioms</code>, <code>py_internals</code>, or <code>py_toolkit</code> cleanly from memory, then verify with pytest.</p>
+  <p>On Phase 0 Day 5, open the <a href="../../../practice.html">Practice hub</a> bare-editor scratchpad (zero autocomplete) and spend 45 minutes rewriting any shaky function from <code>py_foundations</code>, <code>py_idioms</code>, <code>py_internals</code>, or <code>py_toolkit</code> cleanly from memory, then verify with pytest.</p>
 </div>
 
 <nav class="chapter-nav">

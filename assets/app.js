@@ -228,7 +228,7 @@
 
     // 4-lane readiness overview cards
     const LANE_CARDS = [
-      { key: "p0", eyebrow: "Phase 0 · 4 days", title: "Python warm-up & setup", sub: "Idioms, stdlib, bare-editor playbook & project map", ids: ["p0"], cls: "lane-p0" },
+      { key: "p0", eyebrow: "Phase 0 · 5 days", title: "Python warm-up & setup", sub: "Foundations, idioms, stdlib, bare-editor playbook & project map", ids: ["p0"], cls: "lane-p0" },
       { key: "coding", eyebrow: "Weeks 1–4 · Screen Ready", title: "Coding & concurrency", sub: "Google bare-editor DSA, 4-level builds & threads/asyncio", ids: ["w1", "w2", "w3", "w4"], cls: "lane-coding" },
       { key: "systems", eyebrow: "Weeks 5–10 · Onsite Mastery", title: "System design & AI infra", sub: "L5 distributed systems, storage, LLM serving & scale follow-ups", ids: ["w5", "w6", "w7", "w8", "w9", "w10"], cls: "lane-systems" },
       { key: "behavioral", eyebrow: "Parallel · 1h / Sunday", title: "Behavioral & leadership", sub: "STAR bank, Google G&L hypotheticals & Anthropic Values", ids: ["behavioral"], cls: "lane-beh" },

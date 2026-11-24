@@ -16,7 +16,7 @@
 <main class="content book">
 
 <header class="chapter-head">
-  <div class="eyebrow">Phase 0 · Day 3</div>
+  <div class="eyebrow">Phase 0 · Day 4</div>
   <h1>Python for interview speed</h1>
   <div class="meta"><span><span class="badge P0">P0</span> turns 25 bug-prone lines into 5 fast ones</span><span>about 17 minutes</span><span>6 quick checks · 8 exercises</span></div>
 </header>
@@ -29,12 +29,12 @@
     <li>Pick the right Python standard-library tool for counting, grouping, queuing, range counting, and tracking top-k items.</li>
     <li>Spot why a plain <code>list</code> melts at scale when used as a front-popping queue or lookup table.</li>
     <li>Write custom multi-rule sorting keys, range counts, and streaming top-k trackers cleanly.</li>
-    <li>Dodge the four Day 3 stdlib &amp; math traps (<code>Counter</code> zero counts &amp; <code>defaultdict</code> read insertion, <code>sort()</code> returning <code>None</code> / unsorted <code>groupby</code>, mutating while looping, and negative floor division).</li>
+    <li>Dodge the four Day 4 stdlib &amp; math traps (<code>Counter</code> zero counts &amp; <code>defaultdict</code> read insertion, <code>sort()</code> returning <code>None</code> / unsorted <code>groupby</code>, mutating while looping, and negative floor division).</li>
     <li>Build a one-page cheat sheet to keep beside you through every coding drill.</li>
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Phase 0 Day 3, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Then write your one-page cheat sheet (Exercise 3) and solve <code>py_toolkit.py</code>. We focus on <em>when</em> each tool wins and what it costs; Chapters 1 and 2 open the hood later. Builds on <a href="python-memory-model.html">How Python holds data in memory</a>, <a href="python-idioms.html">Transforming and streaming data</a>, and <a href="python-building-blocks.html">Python decorators and clean building blocks</a>.</p>
+<p class="muted small">How to read this: top to bottom on Phase 0 Day 4, answering every quick check before moving on (skip collapsed "Go deeper" boxes on a first pass). Then write your one-page cheat sheet (Exercise 3) and solve <code>py_toolkit.py</code>. We focus on <em>when</em> each tool wins and what it costs; Chapters 1 and 2 open the hood later. Builds on <a href="python-memory-model.html">How Python holds data in memory</a>, <a href="python-idioms.html">Transforming and streaming data</a>, and <a href="python-building-blocks.html">Python decorators and clean building blocks</a>.</p>
 
 <!-- ============================================================ -->
 <h2 id="s1"><span class="sec-num">1</span>Why does plain-list Python melt under interview scale?</h2>
@@ -307,7 +307,7 @@ heapq.heappush(tasks, (priority, next(seq), task_obj))</code></pre>
 <!-- ============================================================ -->
 <h2 id="s6"><span class="sec-num">6</span>How can Python's standard library and math trip you up?</h2>
 
-<p>You already nailed Day 1's object-reference traps — <code>[[0] * 3] * 3</code> grid aliasing, shallow copies, and mutable default arguments (see <a href="python-memory-model.html#s3">Chapter 10.10</a> for a quick recap). Add these <b>four Day 3 stdlib and math traps</b> to your cheat sheet:</p>
+<p>You already nailed Day 2's object-reference traps — <code>[[0] * 3] * 3</code> grid aliasing, shallow copies, and mutable default arguments (see <a href="python-memory-model.html#s3">Chapter 10.10</a> for a quick recap). Add these <b>four Day 4 stdlib and math traps</b> to your cheat sheet:</p>
 
 <h3>1. <code>defaultdict</code> mutating on read &amp; <code>Counter</code> zero-count ghosts</h3>
 <p>Looking up a missing key <code>d["ghost"]</code> on a <code>defaultdict(list)</code> silently inserts <code>"ghost": []</code> into the dictionary — inflating <code>len(d)</code> and breaking iteration! And decrementing a <code>Counter</code> down to zero (<code>c[k] -= 1</code>) leaves <code>k: 0</code> inside <code>c</code>, so <code>len(c)</code> and <code>k in c</code> stay truthy until you explicitly delete zero keys:</p>
@@ -335,9 +335,9 @@ heapq.heappush(tasks, (priority, next(seq), task_obj))</code></pre>
 </div>
 
 <h3>2. <code>arr.sort()</code> returns <code>None</code>, <code>bisect.insort</code> is <code>O(n)</code>, and <code>groupby</code> needs sorted input</h3>
-<p><code>a = arr.sort()</code> sets <code>a</code> to <code>None</code> (use <code>sorted(arr)</code> to keep a copy); <code>bisect.insort(a, x)</code> shifts the array in <code>O(n)</code>; and as a Day 1 recap (<a href="python-idioms.html#s5">Chapter 10.11</a>), <code>itertools.groupby</code> only merges <em>adjacent</em> equal keys — calling it on unsorted <code>["a", "b", "a"]</code> yields two separate <code>"a"</code> groups!</p>
+<p><code>a = arr.sort()</code> sets <code>a</code> to <code>None</code> (use <code>sorted(arr)</code> to keep a copy); <code>bisect.insort(a, x)</code> shifts the array in <code>O(n)</code>; and as a Day 2 recap (<a href="python-idioms.html#s5">Chapter 10.11</a>), <code>itertools.groupby</code> only merges <em>adjacent</em> equal keys — calling it on unsorted <code>["a", "b", "a"]</code> yields two separate <code>"a"</code> groups!</p>
 
-<h3>3. Mutating a collection while looping over it (Day 1 recap)</h3>
+<h3>3. Mutating a collection while looping over it (Day 2 recap)</h3>
 <p>As we saw on the workshop bench (<a href="python-memory-model.html#s7">Chapter 10.10</a>), removing items from a <code>list</code> inside <code>for x in nums:</code> shifts indices and silently skips neighbors, and adding or deleting keys inside <code>for k in d:</code> raises <code>RuntimeError</code>. Build a filtered comprehension (<code>[x for x in nums if keep(x)]</code>) or loop over <code>list(d)</code>.</p>
 
 <h3>4. Negative integer division (<code>//</code>) and remainder (<code>%</code>)</h3>
@@ -347,7 +347,7 @@ heapq.heappush(tasks, (priority, next(seq), task_obj))</code></pre>
   <summary>Go deeper: four subtle Python power-user gotchas</summary>
   <p><b>Two-pass stable sort for descending strings:</b> Since you can't negate a string, sort by secondary ascending key first, then sort by primary descending key (<code>reverse=True</code>) — Python's stable sort keeps ties ordered!</p>
   <p><b><code>deque(maxlen=k)</code>:</b> Auto-evicts the oldest item when full — a 1-line fixed ring buffer.</p>
-  <p><b>Shallow <code>.copy()</code> (Day 1 recap):</b> <code>grid.copy()</code> only copies outer row references (use <code>[r[:] for r in grid]</code> for 2D boards — see <a href="python-memory-model.html#s4">Chapter 10.10</a>).</p>
+  <p><b>Shallow <code>.copy()</code> (Day 2 recap):</b> <code>grid.copy()</code> only copies outer row references (use <code>[r[:] for r in grid]</code> for 2D boards — see <a href="python-memory-model.html#s4">Chapter 10.10</a>).</p>
   <p><b>Huge integer division via floats:</b> <code>int(a / b)</code> loses float precision above <code>2⁵³</code> — use pure integer floor math if numbers exceed 53 bits.</p>
 </details>
 
@@ -458,7 +458,7 @@ def climb(steps):
   <li><code>deque</code> gives <code>O(1)</code> <code>popleft()</code>/<code>append()</code>, but <code>O(n)</code> middle indexing — keep <code>list</code> for random access.</li>
   <li>Count items in <code>[lo, hi]</code> on a sorted copy with <code>bisect_right(a, hi) - bisect_left(a, lo)</code> (guard <code>lo &gt; hi</code>; never assume <code>insort</code> is <code>O(log n)</code>).</li>
   <li><code>heapq</code> is a min-heap: negate priorities for max-heaps, keep a bounded size-<code>k</code> heap for live streams, and add <code>itertools.count()</code> before uncomparable objects.</li>
-  <li>Dodge the Day 3 stdlib &amp; math traps: <code>Counter</code> zero counts, <code>defaultdict</code> read insertion, <code>arr.sort()</code> returning <code>None</code> / unsorted <code>groupby</code>, mutating while looping, and negative floor division <code>//</code>.</li>
+  <li>Dodge the Day 4 stdlib &amp; math traps: <code>Counter</code> zero counts, <code>defaultdict</code> read insertion, <code>arr.sort()</code> returning <code>None</code> / unsorted <code>groupby</code>, mutating while looping, and negative floor division <code>//</code>.</li>
 </ol>
 
 <div class="review" id="review"></div>
@@ -478,7 +478,7 @@ def climb(steps):
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>2. Fix the four Day 3 stdlib &amp; math traps</h4>
+  <h4>2. Fix the four Day 4 stdlib &amp; math traps</h4>
   <p>Each line hits one of section 6's four traps. Name the bug and write the fix: (a) checking <code>if adj[node]:</code> on a <code>defaultdict(list)</code> (or decrementing <code>win[ch] -= 1</code> without pruning zero); (b) <code>ordered = nums.sort()</code> and calling <code>groupby(["a", "b", "a"])</code> expecting two groups; (c) calling <code>del d[k]</code> inside a <code>for k in d:</code> loop; (d) <code>mid = -7 // 2</code> when you need truncation toward zero (<code>-3</code>).</p>
   <details class="aside another"><summary>Answer</summary>
     <p>(a) <code>adj[node]</code> silently inserts <code>node: []</code> → check <code>if node in adj:</code> (and run <code>if win[ch] == 0: del win[ch]</code> on <code>Counter</code>). (b) <code>nums.sort()</code> returns <code>None</code> → use <code>sorted(nums)</code>; <code>groupby</code> needs sorted input → <code>groupby(sorted(items))</code>. (c) Deleting keys while iterating dict raises <code>RuntimeError</code> → loop over <code>list(d)</code> or rebuild with a dict comprehension. (d) <code>//</code> floors toward −∞ (giving <code>-4</code>) → use <code>int(-7 / 2)</code> for small ints (giving <code>-3</code>).</p>
