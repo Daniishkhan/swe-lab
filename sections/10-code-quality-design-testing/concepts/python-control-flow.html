@@ -18,428 +18,404 @@
 <header class="chapter-head">
   <div class="eyebrow">Phase 0 · Day 1 · Part 1</div>
   <h1>Python control flow, loops, and functions</h1>
-  <div class="meta"><span><span class="badge P0">P0</span> Phase 0 Python foundations</span><span>about 15 minutes</span><span>6 quick checks · 4 exercises</span></div>
+  <div class="meta"><span><span class="badge P0">P0</span> Python fluency</span><span>about 15 minutes</span><span>6 quick checks · 4 exercises</span></div>
 </header>
 
-<p>If you are switching to Python from Java, C++, Go, or JavaScript — or shaking off rust before timed rounds — tiny control-flow slips eat minutes you never get back. An off-by-one countdown drops index <code>0</code>, a stray <code>continue</code> freezes a <code>while</code> loop, or a <code>break</code> exits only the inner loop of a 2D scan. Before touching data structures or algorithms, let's make Python's execution tracks second nature.</p>
+<p>Before diving into data structures or algorithms, let's get genuinely comfortable reading and writing everyday Python. This chapter starts from square one — no prior Python fluency and no algorithm background assumed. Every example uses plain, everyday situations so your brain focuses on how Python works rather than solving math puzzles in your head.</p>
 
 <div class="learn-list">
-  <h4>By the end you'll be able to</h4>
+  <h4>By the end of Part 1, you'll be comfortable with</h4>
   <ol>
-    <li>Steer decisions cleanly using indented blocks, range bounds, left-to-right guards, and empty-container checks.</li>
-    <li>Write forward and backward loops without off-by-one boundary bugs.</li>
-    <li>Choose cleanly between fixed loops and condition loops, and steer early exits without extra flag variables.</li>
-    <li>Package reusable logic into functions that return multiple values, reject invalid inputs loudly, and exit nested loops cleanly.</li>
-    <li>Spot and fix the three classic loop and function bugs during a bare-editor dry run.</li>
+    <li>Storing values in variables, reading Python's indentation, and steering decisions with <code>if</code>, <code>elif</code>, and <code>else</code>.</li>
+    <li>Repeating steps cleanly with <code>for</code> loops and <code>range</code> — including counting backward without dropping <code>0</code>.</li>
+    <li>Looping until a condition changes with <code>while</code>, and steering early exits with <code>continue</code>, <code>break</code>, and <code>for ... else</code>.</li>
+    <li>Bundling reusable logic into <code>def</code> functions with defaults, explicit <code>return</code> values, and clean exits from nested loops.</li>
+    <li>Rejecting bad inputs with <code>raise</code> and catching expected errors safely with <code>try / except</code>.</li>
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Phase 0 Day 1 before touching built-in data structures. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Builds on no prior chapters.</p>
+<p class="muted small">Need a fast syntax table while reading? Keep the <a href="../../../python-cheatsheet.html#s1">Python Cheatsheet</a> open alongside this chapter — here we focus on how the pieces fit together and feel natural to write. Answer the quick checks as you go; clicking a wrong choice explains the idea a second way.</p>
 
 <!-- ============================================================ -->
-<h2 id="s1"><span class="sec-num">1</span>Why do small control-flow mistakes derail timed rounds?</h2>
+<h2 id="s1"><span class="sec-num">1</span>Variables, basic values, and indentation</h2>
 
-<div class="story">
-  <p>Picture a 45-minute bare-editor coding round with zero autocomplete and no "Run" button. You need to scan an array backwards to find a peak, then search a 2D grid for the first negative cell. You type <code>for i in range(n - 1, 0, -1):</code> from habit, wrap your 2D search in a messy <code>found = False</code> flag, and stack two <code>if</code> statements where you meant <code>elif</code>. Your algorithm is optimal — yet your hand-trace uncovers three control-flow bugs at minute 38.</p>
-</div>
+<p>Python runs a file one line at a time, from top to bottom. To store a value, write a name, an equals sign, and the value — there is no type or declaration keyword like <code>int</code> or <code>let</code>, and no semicolons at the end of lines:</p>
 
-<p>Think of every Python program as a <b>railway switchyard</b>. Execution rolls down the main track line by line, top to bottom. Four pieces of track equipment steer every train:</p>
-<ul>
-  <li><b>Branch switches (<code>if</code> / <code>elif</code> / <code>else</code>):</b> pick a single side track based on a condition.</li>
-  <li><b>Fixed loops (<code>for</code> + <code>range</code>):</b> circle a known stretch of track once per item or stop number.</li>
-  <li><b>Condition loops (<code>while</code>) &amp; detour switches (<code>continue</code> / <code>break</code>):</b> keep circling until a live condition flips, skip one stop, or leave the loop right now.</li>
-  <li><b>Helper tracks (<code>def</code> functions):</b> route repeated work onto a named sub-track that hands back a clean result.</li>
-</ul>
+<pre><code>age = 25              # whole number (int)
+price = 4.50          # decimal number (float)
+name = "Maya"         # text (str)
+is_member = True      # True or False (bool)
+coupon = None         # means "no value here yet"</code></pre>
 
-<div class="figure">
-  <svg class="viz" viewBox="0 0 720 148" role="img" aria-label="Comparing noisy C-style loops with manual index counters and boolean flags against Python's clean switchyard of chained bounds, direct iteration, and helper returns">
-    <rect x="14" y="16" width="322" height="116" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
-    <text x="28" y="38" class="label" fill="var(--bad)" font-weight="700">NOISY PORTED LOOP STYLE</text>
-    <text x="28" y="62" class="label">• Manual i = 0; while i &lt; n: i += 1</text>
-    <text x="28" y="84" class="label">• Tangled found = False + 2x break</text>
-    <text x="28" y="106" class="label" fill="var(--bad)">• Easy to drop index 0 or loop forever</text>
+<p>Instead of curly braces <code>{ }</code>, Python uses <b>indentation</b> (4 spaces) to show which lines belong inside a decision, loop, or function. Whenever a line ends with a colon (<code>:</code>), the indented lines right below it belong to that block; stepping back to the left ends the block:</p>
 
-    <line x1="346" y1="74" x2="370" y2="74" stroke="var(--ok)" stroke-width="2"/>
-    <polygon points="370,69 380,74 370,79" fill="var(--ok)"/>
+<pre><code>if is_member:
+    print("Welcome back,", name)   # inside the if block
+    price = price - 1.00           # also inside the if block
 
-    <rect x="384" y="16" width="322" height="116" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
-    <text x="398" y="38" class="label" fill="var(--ok)" font-weight="700">CLEAN PYTHON SWITCHYARD</text>
-    <text x="398" y="62" class="label">• Direct for x in items / range(a, b)</text>
-    <text x="398" y="84" class="label">• Chained 0 &lt;= r &lt; rows &amp; elif gates</text>
-    <text x="398" y="106" class="label" fill="var(--ok)">• Helper def + early return (no flags)</text>
-  </svg>
-  <div class="cap">Every extra flag variable or manual counter is one more line you have to trace by hand in a bare editor.</div>
-</div>
+print("Total:", price)             # back on the left: always runs!</code></pre>
 
-<p><em>Where the switchyard analogy breaks:</em> physical tracks sit flat on the ground, whereas a Python helper function can call <em>itself</em> (recursion) and stack fresh private variables on every call — and an unhandled error derails execution straight up to the nearest <code>try / except</code> catch net.</p>
+<p class="small muted">Want every operator and type conversion in one lookup table? Bookmark <a href="../../../python-cheatsheet.html#s1">Python Cheatsheet §1 (Basics)</a>.</p>
 
-<p>Let's lay this switchyard one piece at a time: branch gates first (§2), fixed <code>for</code> / <code>range</code> loops (§3), dynamic <code>while</code> loops and exit switches (§4), reusable functions and input guards (§5), and finally the three traps that catch engineers during dry runs (§6).</p>
+<p>With names and indentation in place, let's look at how Python chooses between multiple paths.</p>
 
 <!-- ============================================================ -->
-<h2 id="s2"><span class="sec-num">2</span>How does Python steer decisions without braces?</h2>
+<h2 id="s2"><span class="sec-num">2</span>Making decisions with if, elif, and else</h2>
 
-<p>Python uses <b>indentation</b> (4 spaces) instead of curly braces <code>{ }</code> to mark which lines sit inside a branch or loop. Everything indented under a colon (<code>:</code>) runs together as one track; dedenting returns to the main line.</p>
+<p>Picture pricing a movie ticket by age: kids under 12 pay $8, regular tickets (ages 12–64) cost $14, and seniors 65 or older pay $10. Each customer should match <b>exactly one</b> price.</p>
 
-<p>When a value must match <b>at most one</b> branch, chain <code>if</code> → <code>elif</code> → <code>else</code>. The instant one switch matches, Python skips every remaining <code>elif</code> and <code>else</code> below it. Stacking two separate <code>if</code> statements instead checks <em>both</em> gates independently — a classic bug when assigning grades or categories:</p>
+<p>In Python, chain <code>if</code> → <code>elif</code> ("else if") → <code>else</code>. The instant Python finds a matching branch, it runs that block and <b>skips every branch below it</b>. Writing two separate <code>if</code> statements instead checks both conditions independently — one of the easiest ways to overwrite your own answer by accident:</p>
 
 <div class="figure">
-  <svg class="viz" viewBox="0 0 720 144" role="img" aria-label="Comparing an exclusive if/elif/else switch that takes only the first matching branch against two independent if statements that both run when score is 92">
-    <rect x="14" y="16" width="324" height="112" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
-    <text x="28" y="38" class="label" fill="var(--ok)" font-weight="700">EXCLUSIVE SWITCH: if / elif / else</text>
-    <text x="28" y="62" class="label">score = 92</text>
-    <text x="28" y="84" class="label">• if score &gt;= 90 → grade = "A" (TAKEN)</text>
-    <text x="28" y="106" class="label" fill="var(--ok)">• elif score &gt;= 80 → skipped cleanly!</text>
+  <svg class="viz" viewBox="0 0 720 148" role="img" aria-label="Comparing an exclusive if/elif/else ticket check against two separate if statements that overwrite the result">
+    <rect x="14" y="16" width="324" height="116" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
+    <text x="28" y="38" class="label" fill="var(--ok)" font-weight="700">ONE WINNER: if / elif / else</text>
+    <text x="28" y="62" class="label">age = 8</text>
+    <text x="28" y="84" class="label">• if age &lt; 12 → ticket = 8 (MATCHED)</text>
+    <text x="28" y="106" class="label" fill="var(--ok)">• elif age &lt; 65 → skipped cleanly!</text>
 
-    <rect x="382" y="16" width="324" height="112" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
-    <text x="396" y="38" class="label" fill="var(--bad)" font-weight="700">INDEPENDENT GATES: if / if</text>
-    <text x="396" y="62" class="label">score = 92</text>
-    <text x="396" y="84" class="label">• if score &gt;= 90 → grade = "A"</text>
-    <text x="396" y="106" class="label" fill="var(--bad)">• if score &gt;= 80 → OVERWRITES to "B"!</text>
+    <rect x="382" y="16" width="324" height="116" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
+    <text x="396" y="38" class="label" fill="var(--bad)" font-weight="700">BOTH RUN: separate if / if</text>
+    <text x="396" y="62" class="label">age = 8</text>
+    <text x="396" y="84" class="label">• if age &lt; 12 → ticket = 8</text>
+    <text x="396" y="106" class="label" fill="var(--bad)">• if age &lt; 65 → OVERWRITES to 14!</text>
   </svg>
-  <div class="cap">Use <code>elif</code> whenever branches are mutually exclusive; use separate <code>if</code> gates only when multiple rules can apply together.</div>
+  <div class="cap">Use <code>elif</code> whenever only one branch should win; use separate <code>if</code> blocks only when multiple checks can apply at the same time.</div>
 </div>
 
-<p>Three Python branch idioms make interview code dramatically shorter and safer:</p>
-<ul>
-  <li><b>Chained comparisons:</b> write <code>if 0 &lt;= r &lt; rows and 0 &lt;= c &lt; cols:</code> straight out of math class — no repeating <code>r &gt;= 0 and r &lt; rows</code>!</li>
-  <li><b>Short-circuit <code>and</code> / <code>or</code>:</b> Python evaluates left to right and stops the instant the outcome is settled. In <code>if nums and nums[0] &gt; 0:</code>, when <code>nums</code> is empty (<code>[]</code>), Python stops at <code>nums</code> and never touches <code>nums[0]</code> (preventing <code>IndexError</code>!).</li>
-  <li><b>Truthiness &amp; 1-line conditional:</b> in an <code>if</code> condition, <b>empty or zero values</b> (<code>0</code>, <code>0.0</code>, <code>""</code>, <code>[]</code>, <code>{}</code>, <code>set()</code>, <code>None</code>, <code>False</code>) evaluate to <code>False</code> ("falsy"), and almost everything else evaluates to <code>True</code> ("truthy"). For a simple value pick, use <code>sign = "neg" if x &lt; 0 else "non-neg"</code>.</li>
-</ul>
-
-<pre><code># Clean Python decision idioms in grid &amp; bounds code
-if 0 &lt;= r &lt; rows and 0 &lt;= c &lt; cols:       # chained bounds check!
-    cell = grid[r][c]
-if nums and nums[0] &lt; 0:                  # short-circuit guards empty list!
-    label = "starts negative"
+<pre><code>if age &lt; 12:
+    ticket = 8
+elif age &lt; 65:
+    ticket = 14
 else:
-    label = "empty or non-negative"</code></pre>
+    ticket = 10</code></pre>
 
-<p class="small muted"><b>Heads-up on truthiness:</b> checking <code>if nums:</code> is great for testing whether a list is non-empty, yet when a number can legally be <code>0</code> or missing (<code>None</code>), always write <code>if val is not None:</code> (we unpack why in <a href="python-memory-model.html#s7">Chapter 10.10</a>).</p>
+<p>To test equality inside a condition, use two equals signs (<code>==</code>) and <code>!=</code> for "not equal" (a single <code>=</code> stores a value, while <code>==</code> compares two values). Four small Python habits make everyday conditions much cleaner to read:</p>
+<ul>
+  <li><b>Chained comparisons:</b> write <code>if 13 &lt;= age &lt;= 19:</code> just like normal math, instead of repeating <code>age &gt;= 13 and age &lt;= 19</code>.</li>
+  <li><b>Left-to-right short-circuiting:</b> with <code>and</code>, Python stops the moment the left side is <code>False</code>. In <code>if people &gt; 0 and total / people &gt; 20:</code>, when <code>people</code> is <code>0</code>, Python stops early and never divides by zero.</li>
+  <li><b>Truthiness and <code>is None</code>:</b> inside an <code>if</code>, empty text <code>""</code>, zero <code>0</code>, <code>False</code>, and <code>None</code> all act like <code>False</code> (Python calls these <b>falsy</b>), while non-empty text and non-zero numbers act like <code>True</code>. Write <code>if name:</code> to check that a user typed something — but whenever <code>0</code> is a valid value (like a test score of <code>0</code>), write <code>if score is not None:</code> so zero doesn't get treated as missing!</li>
+  <li><b>1-line conditional expression:</b> when picking between two values, you can write <code>value_if_true if condition else value_if_false</code> on one short line.</li>
+</ul>
 
-<div class="keyidea">Use <code>if / elif / else</code> for mutually exclusive branches, chained comparisons (<code>0 &lt;= i &lt; n</code>) for bounds, and left-to-right short-circuiting (<code>if xs and xs[0] == target:</code>) to guard empty containers before indexing.</div>
+<pre><code># Clean everyday checks
+if 13 &lt;= age &lt;= 19:
+    group = "teen"
+
+if people &gt; 0 and total / people &gt; 20:    # safe: never divides by 0
+    note = "large share"
+
+if score is not None:                     # keeps score == 0!
+    print("Recorded score:", score)
+
+shipping = 0 if order_total &gt;= 50 else 6  # free shipping at $50+, else $6</code></pre>
+
+<div class="keyidea">Use <code>if / elif / else</code> when only one branch should run, <code>==</code> / <code>!=</code> for comparisons, chained range checks like <code>13 &lt;= age &lt;= 19</code>, and <code>is not None</code> whenever <code>0</code> or <code>""</code> is a real value you want to keep.</div>
 
 <div class="check" id="check-elif-chain">
-  <p class="q">You classify request latency with the snippet below and pass <code>ms = 450</code>. What value does <code>tier</code> hold afterward?</p>
-<pre><code>tier = "fast"
-if ms &gt;= 400:
-    tier = "slow"
-if ms &gt;= 200:
-    tier = "ok"</code></pre>
+  <p class="q">You run this weather check with <code>temp = 105</code>. What value does <code>label</code> end up holding?</p>
+<pre><code>label = "cool"
+if temp &gt;= 95:
+    label = "hot"
+if temp &gt;= 70:
+    label = "warm"</code></pre>
   <div class="opts">
-    <button><code>"slow"</code> — Python skips the second <code>if</code> once the first branch matches</button>
-    <button data-correct><code>"ok"</code> — the second <code>if</code> runs independently and overwrites <code>tier</code> to <code>"ok"</code></button>
-    <button><code>"fast"</code> — Python ignores both branches when two conditions overlap</button>
+    <button><code>"hot"</code> — Python skips the second <code>if</code> once the first one matches</button>
+    <button data-correct><code>"warm"</code> — the second <code>if</code> runs on its own and overwrites <code>label</code></button>
+    <button><code>"cool"</code> — Python ignores overlapping <code>if</code> blocks</button>
   </div>
-  <div class="fb right"><p>Spot on! Two separate <code>if</code> statements are two independent gates: <code>450 &gt;= 400</code> sets <code>"slow"</code>, then <code>450 &gt;= 200</code> is also <code>True</code> and overwrites <code>tier</code> with <code>"ok"</code>. Change the second <code>if</code> to <code>elif</code>.</p></div>
-  <div class="fb wrong"><p>Trace a fresh example with <code>temp = 105</code>: if you write <code>if temp &gt;= 100: state = "hot"</code> followed by a separate <code>if temp &gt;= 70: state = "warm"</code>, Python checks <em>both</em> statements top to bottom — setting <code>"hot"</code> first and immediately overwriting it with <code>"warm"</code>! Only <code>elif</code> skips later checks once an earlier branch matches.</p></div>
+  <div class="fb right"><p>Spot on! Two separate <code>if</code> lines run one after the other: <code>105 &gt;= 95</code> sets <code>"hot"</code>, and then <code>105 &gt;= 70</code> is also <code>True</code> and overwrites <code>label</code> to <code>"warm"</code>. Changing the second <code>if</code> to <code>elif</code> fixes it.</p></div>
+  <div class="fb wrong"><p>Try a second example with <code>score = 92</code>: if you write <code>if score &gt;= 90: grade = "A"</code> followed by a separate <code>if score &gt;= 80: grade = "B"</code>, Python checks <em>both</em> lines top to bottom — setting <code>"A"</code> first and immediately overwriting it with <code>"B"</code>. Only <code>elif</code> skips later checks once an earlier branch matches.</p></div>
 </div>
 
-<p>Branch switches steer one pass down the track. Next question: how do you circle a track cleanly over every element — or count backwards — without slipping past the boundary by one?</p>
+<p>Decisions let your code pick a path once. Next, let's repeat an action cleanly over a known sequence of steps or items.</p>
 
 <!-- ============================================================ -->
-<h2 id="s3"><span class="sec-num">3</span>How do for loops and range walk tracks without off-by-one bugs?</h2>
+<h2 id="s3"><span class="sec-num">3</span>Repeating a known number of times with for and range</h2>
 
-<p>In Java or C++, you reach for an index loop (<code>for (int i = 0; i &lt; n; i++)</code>) by reflex. In Python, if you only need each value, iterate the container <b>directly</b> — zero indices, zero off-by-one risk:</p>
+<p>Whenever you know up front how many times to repeat — or you already have items to walk through — reach for a <b><code>for</code></b> loop.</p>
 
-<pre><code>total = 0
-for price in prices:            # walks every item directly, no index math!
-    total += price</code></pre>
+<p>To count through numbers, Python gives you <b><code>range(start, stop, step)</code></b>. Memorize one rule and you will never get tripped up by <code>range</code> again: <b><code>range</code> starts at <code>start</code>, jumps by <code>step</code> each time (default <code>+1</code>), and stops right before hitting <code>stop</code></b> (the stop number itself is never included).</p>
 
-<p>When you genuinely need numeric positions — like stepping by 2, counting backwards, or tracking row/column indices — Python gives you <b><code>range(start, stop, step)</code></b>. Memorize one ironclad rule: <b><code>range</code> is always half-open <code>[start, stop)</code></b> — it includes <code>start</code> and stops <em>strictly before</em> hitting <code>stop</code>:</p>
 <ul>
-  <li><b><code>range(5)</code>:</b> starts at <code>0</code>, stops before <code>5</code> → yields <code>0, 1, 2, 3, 4</code> (exact valid indices of a length-5 list!).</li>
-  <li><b><code>range(2, 6)</code>:</b> starts at <code>2</code>, stops before <code>6</code> → yields <code>2, 3, 4, 5</code> (count = <code>6 - 2 = 4</code>).</li>
-  <li><b><code>range(n, -1, -1)</code>:</b> counts <b>down</b> from <code>n</code> to <code>0</code> inclusive! Because <code>stop</code> is excluded, you MUST set <code>stop = -1</code> to include <code>0</code>.</li>
+  <li><b><code>range(4)</code></b> starts at <code>0</code> and stops before <code>4</code> → produces <code>0, 1, 2, 3</code> (4 steps total).</li>
+  <li><b><code>range(1, 5)</code></b> starts at <code>1</code> and stops before <code>5</code> → produces <code>1, 2, 3, 4</code>.</li>
+  <li><b><code>range(0, 8, 2)</code></b> jumps by <code>+2</code> → produces <code>0, 2, 4, 6</code>.</li>
+  <li><b><code>range(4, -1, -1)</code></b> uses a negative <code>step</code> (<code>-1</code>) to count <b>backward</b> from <code>4</code> down to <code>0</code>! Because the stop number is never included, you must set <code>stop = -1</code> if you want the countdown to reach <code>0</code> (similarly, <code>step = -2</code> counts down by 2s).</li>
 </ul>
 
-<p>Watch the difference between safe <code>range(4, -1, -1)</code> and the #1 countdown bug <code>range(4, 0, -1)</code>:</p>
+<pre><code># Count 1, 2, 3
+for num in range(1, 4):
+    print("Round", num)
+
+# Rocket countdown: 3, 2, 1, 0!
+for sec in range(3, -1, -1):
+    print(sec)</code></pre>
+
+<p>Step through the countdown below and watch why <code>range(4, -1, -1)</code> finishes cleanly while <code>range(4, 0, -1)</code> stops one step too early:</p>
 
 <div class="figure">
   <div id="viz-range"></div>
-  <div class="cap">Switch the dropdown between safe <code>range(4, -1, -1)</code> and buggy <code>range(4, 0, -1)</code>. Remember: the stop wall is <em>never</em> stepped onto — whether walking forward or backward!</div>
+  <div class="cap">Switch the dropdown between safe <code>range(4, -1, -1)</code> and buggy <code>range(4, 0, -1)</code>. The stop number acts like a wall you stop <em>before</em> touching — whether counting up or down.</div>
 </div>
 
-<p>That exact rule solves <code>countdown_evens(n)</code> in <code>py_foundations.py</code> cleanly in three lines (start at the largest even number <code>&lt;= n</code>, step by <code>-2</code>, stop wall at <code>-1</code> so <code>0</code> is always included!):</p>
+<p>You don't need <code>range</code> when you already have items to visit. Python lets you walk straight through the characters of a string — or through a <b>list</b> of values inside square brackets <code>[...]</code> (we'll explore lists in depth in Part 2):</p>
 
-<pre><code># py_foundations: countdown_evens(n) — even numbers from n down to 0 inclusive
-def countdown_evens(n):
-    if n &lt; 0:
-        raise ValueError("n must be non-negative")
-    start = n if n % 2 == 0 else n - 1
-    return list(range(start, -1, -2))</code></pre>
+<pre><code># Walk each character of a word directly
+for letter in "hello":
+    print(letter)
 
-<div class="keyidea">Iterate directly (<code>for x in items:</code>) whenever you don't need indices. When you use <code>range(start, stop, step)</code>, treat <code>stop</code> as a wall you stop <em>before</em> touching — so counting down to <code>0</code> inclusive always uses <code>stop = -1</code>.</div>
+# Walk each name in a list directly — no counter variable needed!
+guests = ["Maya", "Sam", "Kai"]
+for guest in guests:
+    print("Welcome,", guest)</code></pre>
+
+<div class="keyidea">Walk items directly (<code>for guest in guests:</code>) when you just need each value. When counting with <code>range(start, stop, step)</code>, remember that <code>step</code> sets the jump size and <code>stop</code> is never included — so counting down to <code>0</code> always uses <code>stop = -1</code>.</div>
 
 <div class="check" id="check-range-reverse">
-  <p class="q">What list does <code>list(range(6, 0, -2))</code> produce?</p>
+  <p class="q">Which numbers does this loop print?</p>
+<pre><code>for n in range(6, 0, -2):
+    print(n)</code></pre>
   <div class="opts">
-    <button><code>[6, 4, 2, 0]</code> — stops right after reaching the boundary value <code>0</code></button>
-    <button><code>[]</code> — Python always requires <code>start &lt; stop</code> when calling <code>range</code></button>
-    <button data-correct><code>[6, 4, 2]</code> — the <code>stop</code> wall <code>0</code> is excluded so counting halts at <code>2</code></button>
+    <button><code>6, 4, 2, 0</code> — it includes the stop value <code>0</code></button>
+    <button>Nothing — <code>range</code> cannot count backward</button>
+    <button data-correct><code>6, 4, 2</code> — the stop value <code>0</code> is excluded, so the loop stops at <code>2</code></button>
   </div>
-  <div class="fb right"><p>Exact! Half-open means <code>stop</code> is never included, even when stepping backward. Pass <code>-1</code> as the stop value (<code>range(6, -1, -2)</code>) to include <code>0</code>.</p></div>
-  <div class="fb wrong"><p>Check the same rule walking forward first: <code>list(range(0, 6, 2))</code> yields <code>[0, 2, 4]</code> — it stops strictly <em>before</em> hitting <code>6</code>. Stepping backward works the exact same way: <code>range(6, 0, -2)</code> yields <code>6</code>, then <code>4</code>, then <code>2</code>, sees the wall <code>0</code> next, and halts at <code>[6, 4, 2]</code>.</p></div>
+  <div class="fb right"><p>Exact! Just like <code>range(0, 6, 2)</code> prints <code>0, 2, 4</code> and stops before <code>6</code>, counting backward with <code>range(6, 0, -2)</code> stops before <code>0</code>. Use <code>range(6, -1, -2)</code> to include <code>0</code>.</p></div>
+  <div class="fb wrong"><p>Think about counting up first: <code>range(0, 6, 2)</code> prints <code>0</code>, <code>2</code>, <code>4</code>, then sees the stop wall <code>6</code> and stops. Counting down follows the exact same rule: <code>range(6, 0, -2)</code> prints <code>6</code>, <code>4</code>, <code>2</code>, sees the stop wall <code>0</code> next, and halts.</p></div>
 </div>
 
-<p><code>for</code> handles every track where the stops are known upfront. What when your stopping condition changes dynamically while you run — like two pointers closing in on each other, stripping digits off a number, or exiting early the moment you spot a match?</p>
+<p>A <code>for</code> loop handles every job where the number of steps or the items are known up front. What about when you don't know ahead of time how many turns a loop will take — or when you want to stop a loop early?</p>
 
 <!-- ============================================================ -->
-<h2 id="s4"><span class="sec-num">4</span>When do you switch from for to while — and how do break, continue, and else steer exits?</h2>
+<h2 id="s4"><span class="sec-num">4</span>Looping on a condition with while, continue, break, and else</h2>
 
-<p>Switch from <code>for</code> to <b><code>while condition:</code></b> whenever you cannot know the exact number of iterations ahead of time — such as binary search (<code>while lo &lt;= hi:</code>), two pointers converging (<code>while left &lt; right:</code>), draining a work queue (<code>while queue:</code>), or peeling base-10 digits (<code>while n &gt; 0:</code>).</p>
+<p>Switch from <code>for</code> to <b><code>while condition:</code></b> whenever a loop needs to keep going until something changes. Imagine you have a $15 coffee gift card and every coffee costs $4. You don't need to divide ahead of time — just keep buying a cup <code>while balance &gt;= 4</code> (note: <code>balance -= 4</code> is shorthand for <code>balance = balance - 4</code>, and <code>cups += 1</code> is shorthand for <code>cups = cups + 1</code>):</p>
 
-<pre><code># Classic while loop: sum the base-10 digits of a positive integer
-digit_sum = 0
-while n &gt; 0:
-    digit_sum += n % 10       # grab the last digit
-    n //= 10                  # shrink n strictly toward 0 so the loop MUST end!</code></pre>
+<pre><code>balance = 15
+cups = 0
 
-<p>Inside either a <code>for</code> or a <code>while</code> loop, three switchyard commands steer early detours:</p>
+while balance &gt;= 4:
+    balance -= 4       # spend $4: 15 -> 11 -> 7 -> 3
+    cups += 1          # count the cup: 1 -> 2 -> 3
+
+print("Bought", cups, "cups; left with $", balance)
+# Bought 3 cups; left with $ 3</code></pre>
+
+<p>Notice the golden rule of every <code>while</code> loop: <b>something inside the loop must move the condition closer to becoming <code>False</code>.</b> Here, <code>balance -= 4</code> shrinks <code>balance</code> on every turn until it drops to <code>3</code> and the loop ends. Forget that line and the loop runs forever.</p>
+
+<p>Inside either a <code>for</code> or a <code>while</code> loop, three keywords let you steer the flow:</p>
 <ul>
-  <li><b><code>continue</code>:</b> skips the remaining lines of the <em>current</em> iteration and jumps straight to the next iteration.</li>
-  <li><b><code>break</code>:</b> exits the <em>innermost</em> enclosing loop immediately.</li>
-  <li><b><code>for ... else:</code> (and <code>while ... else:</code>):</b> an optional track attached to the loop that runs <b>only if the loop finished normally without hitting <code>break</code></b>. Read <code>else:</code> here as <em>"no break occurred"</em> — eliminating awkward <code>found = False</code> flags!</li>
+  <li><b><code>continue</code>:</b> skips the rest of the <em>current</em> turn and jumps straight to the next turn.</li>
+  <li><b><code>break</code>:</b> leaves the loop immediately.</li>
+  <li><b><code>for ... else:</code> (or <code>while ... else:</code>):</b> an optional block lined up under <code>for</code> (not under <code>if</code>!) that runs <b>only if the loop finished without hitting <code>break</code></b>. Read <code>else:</code> here as <em>"no break happened"</em>.</li>
 </ul>
 
-<p>Step through searching <code>[3, 5, 7, 11]</code> with <code>for ... else:</code> when the target is found vs. missing:</p>
+<pre><code># continue: skip blank entries while greeting guests
+for name in ["Maya", "", "Sam", "", "Kai"]:
+    if name == "":
+        continue                    # skip this turn, jump to next name
+    print("Hello,", name)
+
+# break + for ... else: search a guest list without a "found = False" flag
+guests = ["Sam", "Kai", "Maya", "Leo"]
+target = "Maya"
+for guest in guests:
+    if guest == target:
+        print("Found", target)
+        break
+else:                               # lined up with `for`: runs only if break never fired!
+    print(target, "is not on the list")</code></pre>
+
+<p>Step through the guest-list search below to see when the loop's <code>else:</code> block runs and when <code>break</code> skips it:</p>
 
 <div class="figure">
   <div id="viz-loop-else"></div>
-  <div class="cap">Toggle between <code>target = 7</code> (hits <code>break</code>, so <code>else:</code> is skipped) and <code>target = 9</code> (finishes every stop with no <code>break</code>, so <code>else:</code> runs!).</div>
+  <div class="cap">Switch between <code>target = "Maya"</code> (hits <code>break</code>, so <code>else:</code> is skipped) and <code>target = "Zoe"</code> (checks every guest with no <code>break</code>, so <code>else:</code> runs).</div>
 </div>
 
-<p>Notice the indentation carefully: <code>else:</code> lines up directly under <code>for</code> (not under <code>if</code>!), because it belongs to the loop as a whole:</p>
+<p><b>One classic bug to watch for right away:</b> combining <code>while</code> with <code>continue</code>! If your <code>continue</code> sits <em>above</em> the line that updates your counter, the counter never changes and the loop freezes forever:</p>
 
-<pre><code>for num in [3, 5, 7, 11]:
-    if num == target:
-        print("found", num)
-        break
-else:                         # aligned with `for` — runs only if `break` never fired!
-    print("not found")</code></pre>
+<pre><code># BUG: freezes at step == 3 forever because `continue` skips `step += 1`!
+step = 1
+while step &lt;= 5:
+    if step == 3:
+        continue       # jumps back to `while` while step is STILL 3!
+    print(step)
+    step += 1
 
-<div class="keyidea">Use <code>for</code> for fixed sequences and <code>while</code> when your loop state evolves dynamically (always proving each step shrinks toward termination!). Remember <code>for ... else:</code> means <em>"ran to completion without hitting <code>break</code>"</em>.</div>
+# FIX: advance `step += 1` before `continue` (or use `for step in range(1, 6):`)
+step = 1
+while step &lt;= 5:
+    if step == 3:
+        step += 1
+        continue
+    print(step)
+    step += 1</code></pre>
+
+<div class="keyidea">Use <code>while</code> when you loop until a condition changes, and make sure every branch moves closer to stopping (especially right before a <code>continue</code>!). Use <code>break</code> to leave a loop early, and remember <code>for ... else:</code> runs only when <code>break</code> never happened.</div>
 
 <div class="check" id="check-for-else">
-  <p class="q">What does <code>status</code> equal after this loop finishes?</p>
-<pre><code>status = "init"
-for x in [2, 4, 6]:
-    if x == 4:
-        status = "found"
+  <p class="q">What does <code>result</code> equal after this loop finishes?</p>
+<pre><code>result = "checking"
+for color in ["red", "blue", "green"]:
+    if color == "blue":
+        result = "found"
         break
 else:
-    status = "missing"</code></pre>
+    result = "missing"</code></pre>
   <div class="opts">
-    <button data-correct><code>"found"</code> — hitting <code>break</code> skips the loop's <code>else</code> block completely</button>
-    <button><code>"missing"</code> — Python always runs the <code>else</code> block after any <code>for</code> loop ends</button>
-    <button><code>"init"</code> — breaking early rolls back variable assignments inside the loop</button>
+    <button data-correct><code>"found"</code> — hitting <code>break</code> skips the loop's <code>else</code> block</button>
+    <button><code>"missing"</code> — Python always runs <code>else</code> after a <code>for</code> loop ends</button>
+    <button><code>"checking"</code> — <code>break</code> undoes assignments made inside the loop</button>
   </div>
-  <div class="fb right"><p>Spot on! Because <code>x == 4</code> triggered <code>break</code>, Python exits the entire <code>for ... else</code> construct without entering <code>else:</code>, keeping <code>status == "found"</code>.</p></div>
-  <div class="fb wrong"><p>Compare with a second list <code>[1, 3, 5]</code> searching for <code>2</code>: the loop checks <code>1</code>, <code>3</code>, and <code>5</code>, never hits <code>break</code>, and <em>therefore</em> runs <code>else:</code>. In <code>[2, 4, 6]</code>, finding <code>4</code> hits <code>break</code>, which jumps straight past <code>else:</code> so <code>status</code> stays <code>"found"</code>.</p></div>
-</div>
-
-<p>Now imagine your search lives inside <em>two</em> nested loops (rows and columns of a 2D grid). Calling <code>break</code> inside the inner column loop only breaks out of that row! How do you exit cleanly — and package repeated logic so your code stays readable?</p>
-
-<!-- ============================================================ -->
-<h2 id="s5"><span class="sec-num">5</span>How do you package tracks into reusable functions — and reject bad inputs cleanly?</h2>
-
-<p>A <b>function</b> (<code>def name(params):</code>) bundles a sub-track behind one clear name. Calling <code>return value</code> immediately hands <code>value</code> back to the caller — cleanly exiting <em>every</em> loop inside the function in one shot, zero boolean flags needed!</p>
-
-<pre><code># py_foundations: first_negative_coords — clean early return exits BOTH loops!
-def first_negative_coords(grid):
-    for r in range(len(grid)):
-        for c in range(len(grid[r])):
-            if grid[r][c] &lt; 0:
-                return (r, c)         # packs two values into one tuple &amp; exits now!
-    return None                       # explicit fallback when no negative exists</code></pre>
-
-<div class="figure">
-  <svg class="viz" viewBox="0 0 720 132" role="img" aria-label="Flow of a Python function: arguments and default values enter the body, explicit return hands back a tuple that unpacks cleanly, whereas falling off the end silently returns None">
-    <rect x="14" y="20" width="170" height="84" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
-    <text x="99" y="44" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">1. INPUTS</text>
-    <text x="99" y="68" class="label" text-anchor="middle">positional / keyword</text>
-    <text x="99" y="88" class="label" text-anchor="middle">immutable defaults</text>
-
-    <line x1="188" y1="62" x2="224" y2="62" stroke="var(--accent)" stroke-width="2"/>
-    <polygon points="224,57 234,62 224,67" fill="var(--accent)"/>
-
-    <rect x="238" y="20" width="204" height="84" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
-    <text x="340" y="44" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">2. FUNCTION BODY</text>
-    <text x="340" y="68" class="label" text-anchor="middle">guard bad args → raise</text>
-    <text x="340" y="88" class="label" text-anchor="middle">early return exits loops</text>
-
-    <line x1="446" y1="62" x2="482" y2="62" stroke="var(--ok)" stroke-width="2"/>
-    <polygon points="482,57 492,62 482,67" fill="var(--ok)"/>
-
-    <rect x="496" y="20" width="210" height="84" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
-    <text x="601" y="44" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">3. OUTPUT</text>
-    <text x="601" y="68" class="label" text-anchor="middle">r, c = fn(grid) unpacks</text>
-    <text x="601" y="88" class="label" text-anchor="middle" fill="var(--muted)">no return → None!</text>
-  </svg>
-  <div class="cap">Every Python function returns a value — if execution falls off the bottom without hitting <code>return</code>, Python quietly hands back <code>None</code>.</div>
-</div>
-
-<p>Four function habits make your interview code crisp from line 1:</p>
-<ol>
-  <li><b>Tuple unpacking for multiple returns:</b> returning <code>(r, c)</code> lets callers write <code>row, col = pos</code> (after checking <code>pos is not None</code>) without inventing a temporary wrapper object.</li>
-  <li><b>Keyword arguments &amp; safe defaults:</b> give optional parameters clear immutable defaults like <code>def paginate(items, page=1, size=20):</code>, and pass named arguments at call sites (<code>paginate(rows, size=50)</code>) so readers never guess what <code>1, 50</code> means! <em>(Always use immutable defaults like ints, strings, or <code>None</code> — <a href="python-memory-model.html#s5">Chapter 10.10</a> explains the shared-list bug if you ever write <code>out=[]</code>.)</em></li>
-  <li><b>Validate contracts loudly with <code>raise</code>:</b> when an input violates a precondition (like <code>n &lt; 0</code> in <code>countdown_evens</code> or <code>k &lt;= 0</code> in a window size), fail fast with <code>raise ValueError("n must be non-negative")</code> instead of returning silent garbage.</li>
-  <li><b>Catch only specific exceptions:</b> when calling fallible code (like parsing text into an integer), wrap only the risky line in <code>try / except ValueError:</code> — never a blank <code>except:</code> that swallows unrelated typos:</li>
-</ol>
-
-<pre><code>def parse_int(token, default=None):
-    try:
-        return int(token)
-    except ValueError:                # catches bad text only — never hides typos!
-        return default</code></pre>
-
-<details class="aside deeper">
-  <summary>Go deeper: forwarding unknown arguments with *args and **kwargs</summary>
-  <p>Sometimes you write a thin wrapper function that accepts any number of positional or named arguments and forwards them to another helper. Adding <code>*args</code> collects extra positional arguments into a tuple (<code>(1, 2, 3)</code>), and <code>**kwargs</code> collects extra keyword arguments into a dictionary (<code>{"timeout": 5}</code>). You will use <code>def wrapper(*args):</code> directly when building caching decorators on Day 3 (<a href="python-building-blocks.html#s4">Chapter 10.12</a>).</p>
-</details>
-
-<div class="keyidea">Use helper functions to exit nested loops with a clean early <code>return</code>, unpack multi-value tuple returns directly, fail fast with <code>raise ValueError</code> on invalid inputs, and remember that forgetting <code>return</code> silently returns <code>None</code>.</div>
-
-<div class="check" id="check-func-return">
-  <p class="q">What does <code>ans</code> hold after calling <code>ans = sum_evens([2, 4, 5])</code> on the function below?</p>
-<pre><code>def sum_evens(nums):
-    total = 0
-    for x in nums:
-        if x % 2 == 0:
-            total += x
-    print(total)</code></pre>
-  <div class="opts">
-    <button><code>6</code> — Python returns the last printed expression automatically</button>
-    <button data-correct><code>None</code> — the function prints <code>6</code> yet lacks a <code>return</code> statement</button>
-    <button><code>0</code> — local variable <code>total</code> resets when the loop finishes</button>
-  </div>
-  <div class="fb right"><p>Sharp catch! <code>print(total)</code> displays <code>6</code> to the console and returns <code>None</code>; because <code>sum_evens</code> falls off the end with no <code>return total</code>, <code>ans</code> receives <code>None</code>.</p></div>
-  <div class="fb wrong"><p>Try tracing an even shorter helper: <code>def double(x): y = x * 2</code>. Running <code>val = double(5)</code> computes <code>10</code> inside <code>y</code>, throws <code>y</code> away when the function exits, and hands back <code>None</code>! Printing a value only writes text to stdout — a caller only receives a value when you explicitly write <code>return total</code>.</p></div>
-</div>
-
-<p>Now you have every piece of Python's control-flow switchyard. Before moving to Python's built-in data structures, lock down the three bugs that silently wreck bare-editor dry runs.</p>
-
-<!-- ============================================================ -->
-<h2 id="s6"><span class="sec-num">6</span>How can loops and functions trip you up in bare-editor rounds?</h2>
-
-<p>Every interview dry run should scan for these three control-flow failures:</p>
-
-<div class="figure">
-  <svg class="viz" viewBox="0 0 720 144" role="img" aria-label="Three classic Python control-flow pitfalls: break exiting only the inner loop in 2D search, continue skipping pointer updates in a while loop causing an infinite loop, and bare except hiding real bugs">
-    <rect x="12" y="14" width="220" height="116" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
-    <text x="122" y="36" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">1. INNER-ONLY BREAK</text>
-    <text x="122" y="60" class="label" text-anchor="middle">nested for r / for c: break</text>
-    <text x="122" y="82" class="label" text-anchor="middle" fill="var(--bad)">→ outer loop keeps going!</text>
-    <text x="122" y="108" class="label" text-anchor="middle" fill="var(--ok)">Fix: helper def + return</text>
-
-    <rect x="250" y="14" width="220" height="116" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
-    <text x="360" y="36" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">2. WHILE + CONTINUE</text>
-    <text x="360" y="60" class="label" text-anchor="middle">if skip: continue / i += 1</text>
-    <text x="360" y="82" class="label" text-anchor="middle" fill="var(--bad)">→ i never moves: hangs!</text>
-    <text x="360" y="108" class="label" text-anchor="middle" fill="var(--ok)">Fix: i += 1 before continue</text>
-
-    <rect x="488" y="14" width="220" height="116" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
-    <text x="598" y="36" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">3. BARE EXCEPT CLAUSE</text>
-    <text x="598" y="60" class="label" text-anchor="middle">try: parse(s) / except:</text>
-    <text x="598" y="82" class="label" text-anchor="middle" fill="var(--bad)">→ hides NameError typos!</text>
-    <text x="598" y="108" class="label" text-anchor="middle" fill="var(--ok)">Fix: except ValueError:</text>
-  </svg>
-  <div class="cap">Also watch <code>for ... else:</code> on readability — if your loop sits inside a helper function, an early <code>return</code> is even clearer than <code>break</code> + <code>else:</code>!</div>
-</div>
-
-<p><b>When a plain loop beats clever shortcuts:</b> keep <code>for ... else:</code> for short, obvious searches — never nest <code>for ... else:</code> inside another loop, and never write a 3-line ternary expression nested inside another ternary (<code>a if c1 else b if c2 else d</code>). Clear <code>if / elif / else</code> tracks beat compressed one-liners in every senior rubric.</p>
-
-<div class="check" id="check-nested-break">
-  <p class="q">Inside a 2D scan over <code>[[1, -2], [-3, 4]]</code>, you run <code>ans = (r, c); break</code> inside the inner <code>for c</code> loop — without breaking the outer <code>for r</code> loop. What does <code>ans</code> end up holding?</p>
-  <div class="opts">
-    <button data-correct><code>(1, 0)</code> — <code>break</code> only exits row 0, so row 1 overwrites <code>ans</code></button>
-    <button><code>(0, 1)</code> — <code>break</code> automatically exits every enclosing loop</button>
-    <button><code>None</code> — breaking inside nested loops aborts the entire scan</button>
-  </div>
-  <div class="fb right"><p>Caught it! <code>break</code> only exits the inner <code>for c</code> loop — so Python immediately advances to row 1, sees <code>-3</code> at <code>(1, 0)</code>, and overwrites <code>ans</code>! Wrapping the search in a helper function and writing <code>return (r, c)</code> exits both loops cleanly.</p></div>
-  <div class="fb wrong"><p>Trace a fresh 2×2 grid <code>[[0, -1], [-5, 2]]</code>: on row <code>0</code>, column <code>1</code>, seeing <code>-1</code> sets <code>ans = (0, 1)</code> and runs <code>break</code>. That only leaves the inner column loop — the outer row loop still advances to row <code>1</code>, sees <code>-5</code> at <code>(1, 0)</code>, and overwrites <code>ans</code>! Extract a helper and use <code>return (r, c)</code>.</p></div>
+  <div class="fb right"><p>Exact! Finding <code>"blue"</code> hits <code>break</code>, which leaves the entire <code>for ... else</code> block immediately without running <code>else:</code>, so <code>result</code> stays <code>"found"</code>.</p></div>
+  <div class="fb wrong"><p>Compare with searching <code>["red", "green"]</code> for <code>"blue"</code>: the loop checks both colors, never hits <code>break</code>, and <em>then</em> runs <code>else:</code> to set <code>"missing"</code>. Because <code>"blue"</code> IS in <code>["red", "blue", "green"]</code>, <code>break</code> fires and skips <code>else:</code> completely.</p></div>
 </div>
 
 <div class="check" id="check-while-continue">
-  <p class="q">What happens when you run this <code>while</code> loop on <code>nums = [2, -1, 4]</code>?</p>
-<pre><code>i, total = 0, 0
-while i &lt; len(nums):
-    if nums[i] &lt; 0:
+  <p class="q">What happens when you run this <code>while</code> loop?</p>
+<pre><code>n = 1
+while n &lt;= 4:
+    if n == 2:
         continue
-    total += nums[i]
-    i += 1</code></pre>
+    print(n)
+    n += 1</code></pre>
   <div class="opts">
-    <button>It finishes cleanly with <code>total == 6</code>, skipping the negative value</button>
-    <button>It raises <code>IndexError</code> after skipping <code>-1</code> and running past the end</button>
-    <button data-correct>It loops forever at <code>i = 1</code> because <code>continue</code> skips <code>i += 1</code></button>
+    <button>It prints <code>1</code>, <code>3</code>, <code>4</code> and finishes cleanly</button>
+    <button>It stops immediately at <code>2</code> and prints only <code>1</code></button>
+    <button data-correct>It prints <code>1</code> and then loops forever at <code>n == 2</code> because <code>continue</code> skips <code>n += 1</code></button>
   </div>
-  <div class="fb right"><p>Exact! At <code>i = 1</code>, <code>nums[1] == -1 &lt; 0</code> hits <code>continue</code>, jumping straight back to <code>while i &lt; len(nums):</code> with <code>i</code> still stuck at <code>1</code> forever! Increment <code>i += 1</code> before <code>continue</code> — or better yet, use <code>for x in nums:</code>.</p></div>
-  <div class="fb wrong"><p>Trace an even shorter 2-item list <code>[-1, 5]</code>: on the very first check, <code>i = 0</code> sees <code>-1 &lt; 0</code> and hits <code>continue</code>, jumping right back to the <code>while</code> condition <em>before</em> ever reaching <code>i += 1</code>! On the next turn <code>i</code> is still <code>0</code>, so the loop spins forever (the exact same freeze hits <code>[2, -1, 4]</code> at <code>i = 1</code>).</p></div>
+  <div class="fb right"><p>Sharp catch! On <code>n = 2</code>, <code>continue</code> jumps straight back to <code>while n &lt;= 4:</code> without ever reaching <code>n += 1</code>, so <code>n</code> stays <code>2</code> forever. Always advance your counter before <code>continue</code> — or use <code>for n in range(1, 5):</code>.</p></div>
+  <div class="fb wrong"><p>Picture an even shorter countdown starting at <code>t = 3</code>: if the loop skips <code>t == 3</code> with <code>continue</code> <em>before</em> <code>t -= 1</code> ever runs, <code>t</code> never changes from <code>3</code>! Here the exact same trap strikes at <code>n = 2</code>, freezing forever after printing <code>1</code>.</p></div>
 </div>
 
-<p>Now let's put all of those switchyard habits side by side on a real 2D interview search.</p>
+<p>Now imagine you want to reuse a chunk of logic in several places — or exit cleanly out of <em>two</em> loops nested inside each other. That is where functions shine.</p>
 
 <!-- ============================================================ -->
-<h2 id="s7"><span class="sec-num">7</span>How you use clean control flow in interviews</h2>
+<h2 id="s5"><span class="sec-num">5</span>Packaging reusable steps into functions with def and return</h2>
 
-<p>Compare porting C-style manual counters and boolean flags against writing clean Python control flow for the exact same task (finding the first negative number inside a 2D grid):</p>
+<p>A <b>function</b> gives a name to a block of code so you can run it whenever you need it. Define it once with <code>def</code>, pass inputs as parameters, and hand back the answer with <code>return</code>:</p>
+
+<pre><code>def order_total(price, qty=1, discount=0):
+    return price * qty - discount
+
+order_total(5)                 # 5  — uses qty=1 and discount=0
+order_total(5, 3)              # 15 — 3 items at $5 each
+order_total(5, discount=1)     # 4  — keyword argument lets you skip qty!</code></pre>
+
+<p>Default values (like <code>qty=1</code>) make optional inputs effortless, and <b>keyword arguments</b> (like <code>discount=1</code>) make function calls self-documenting so you never have to guess what a bare number means.</p>
+
+<p>Three habits make Python functions click right away:</p>
+
+<ol>
+  <li><b><code>return</code> sends a value back; <code>print()</code> only shows it on screen.</b> If a function finishes without hitting <code>return</code>, Python quietly hands back <code>None</code>. A classic beginner surprise is writing <code>print(total)</code> instead of <code>return total</code> and wondering why <code>bill = calc_total(...)</code> ends up as <code>None</code>!</li>
+  <li><b>Returning two values at once.</b> Separate them with a comma — Python bundles them together (into a fixed pair called a <em>tuple</em>, which we cover in Part 2; you may also see parentheses like <code>(each, tip)</code>) and lets the caller unpack them cleanly in one line:
+<pre><code>def split_bill(total, people):
+    each = total / people
+    tip = total * 0.15
+    return each, tip
+
+share, tip = split_bill(60, 3)   # share is 20.0, tip is 9.0</code></pre>
+  </li>
+  <li><b>Exiting nested loops cleanly with <code>return</code>.</b> Suppose <code>rows</code> is a list of theater rows (like <code>[["taken", "free"], ["free", "taken"]]</code>), counting from <code>0</code> just like <code>range</code>: <code>len(rows)</code> gives the number of rows, <code>rows[r]</code> gives row <code>r</code> (so <code>len(rows[r])</code> is how many seats are in it), and <code>rows[r][s]</code> checks seat <code>s</code> in row <code>r</code> (we unpack list indexing thoroughly in Part 2). A <code>break</code> inside the inner seat loop only leaves the <em>current row</em> — the outer loop immediately moves on to the next row! Wrapping the search in a function lets <code>return r, s</code> exit <b>both</b> loops at once:</li>
+</ol>
 
 <div class="cols">
   <div style="min-width:0">
-    <p class="small muted"><b>Before: manual counters + flag + double break</b></p>
-<pre><code>def first_negative_coords(grid):
-    found = False
-    ans = None
-    r = 0
-    while r &lt; len(grid):
-        c = 0
-        while c &lt; len(grid[r]):
-            if grid[r][c] &lt; 0:
-                ans = (r, c)
-                found = True
-                break
-            c += 1
-        if found:
-            break
-        r += 1
-    return ans</code></pre>
+    <p class="small muted"><b>Clumsy: <code>break</code> only exits one loop</b></p>
+<pre><code>found = False
+spot = None
+for r in range(len(rows)):
+    for s in range(len(rows[r])):
+        if rows[r][s] == "free":
+            spot = (r, s)
+            found = True
+            break          # exits inner loop only
+    if found:
+        break              # need a second break!</code></pre>
   </div>
   <div style="min-width:0">
-    <p class="small" style="color:var(--ok)"><b>After: helper def + range + early return</b></p>
-<pre><code>def first_negative_coords(grid):
-    for r in range(len(grid)):
-        row = grid[r]
-        for c in range(len(row)):
-            if row[c] &lt; 0:
-                return (r, c)
+    <p class="small" style="color:var(--ok)"><b>Clean: helper <code>def</code> + early <code>return</code></b></p>
+<pre><code>def find_free_seat(rows):
+    for r in range(len(rows)):
+        for s in range(len(rows[r])):
+            if rows[r][s] == "free":
+                return r, s   # exits BOTH loops!
     return None</code></pre>
   </div>
 </div>
 
-<p>Half the lines, zero flag state, zero risk of forgetting <code>c += 1</code> on a branch, and fast to dry-run in a bare editor. Practice stating those choices aloud in 30 seconds before writing code.</p>
+<details class="aside deeper">
+  <summary>Optional preview: flexible arguments with *args and **kwargs</summary>
+  <p>Later, when writing wrapper functions and decorators (Day 3), you will see <code>*args</code> (collects any number of positional arguments) and <code>**kwargs</code> (collects any number of named keyword arguments). You don't need them on Day 1 — they are also summarized in <a href="../../../python-cheatsheet.html#s6">Python Cheatsheet §6</a> whenever you want a quick peek.</p>
+</details>
+
+<div class="keyidea">Always use <code>return</code> (not <code>print</code>) to hand answers back from a function, use default and keyword arguments to keep calls readable, and wrap nested searches in a helper function so <code>return</code> exits every loop cleanly in one line.</div>
+
+<div class="check" id="check-func-return">
+  <p class="q">What does <code>ans</code> hold after calling <code>ans = double_price(6)</code>?</p>
+<pre><code>def double_price(price):
+    total = price * 2
+    print(total)</code></pre>
+  <div class="opts">
+    <button><code>12</code> — Python returns whatever you print last</button>
+    <button data-correct><code>None</code> — the function prints <code>12</code> to the screen, but has no <code>return</code> line</button>
+    <button><code>6</code> — it returns the original input if nothing is returned</button>
+  </div>
+  <div class="fb right"><p>Spot on! <code>print(total)</code> writes <code>12</code> to the console, and because the function ends without a <code>return total</code> statement, <code>ans</code> receives <code>None</code>.</p></div>
+  <div class="fb wrong"><p>Compare with <code>def add_tax(x): print(x + 1)</code>: calling <code>bill = add_tax(10)</code> prints <code>11</code> on screen for a human to read, yet hands <code>None</code> back to <code>bill</code> because nothing was returned. Only <code>return total</code> sends <code>12</code> back to <code>ans</code>.</p></div>
+</div>
+
+<div class="check" id="check-nested-break">
+  <p class="q">Suppose <code>rows = [["taken", "free"], ["free", "taken"]]</code>. You loop over each row and each seat, and when you see <code>"free"</code> you set <code>spot = (r, s)</code> and call <code>break</code> — with no second <code>break</code> on the outer loop. What does <code>spot</code> end up holding?</p>
+  <div class="opts">
+    <button data-correct><code>(1, 0)</code> — <code>break</code> only leaves row 0, so row 1 runs and overwrites <code>spot</code></button>
+    <button><code>(0, 1)</code> — <code>break</code> automatically exits both loops</button>
+    <button><code>None</code> — <code>break</code> cancels the assignment</button>
+  </div>
+  <div class="fb right"><p>Caught it! <code>break</code> only stops the innermost loop (the seats in row 0). The outer loop still moves on to row 1, finds <code>"free"</code> at <code>(1, 0)</code>, and overwrites <code>spot</code>. Putting the search inside a function and writing <code>return r, s</code> exits both loops cleanly.</p></div>
+  <div class="fb wrong"><p>Picture checking a 2-floor hotel room by room: finding an open room on floor <code>0</code> and hitting <code>break</code> only stops checking the rest of floor <code>0</code> — you still walk upstairs to floor <code>1</code>! So here row <code>0</code> sets <code>spot = (0, 1)</code>, then row <code>1</code> runs anyway and overwrites <code>spot</code> to <code>(1, 0)</code>. Use <code>return r, s</code> inside a function to leave immediately.</p></div>
+</div>
+
+<p>Now that you can write clean functions, there is one last control-flow skill to pick up: what should your function do when someone hands it bad input, or when an operation like converting text to a number might fail?</p>
 
 <!-- ============================================================ -->
-<h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
+<h2 id="s6"><span class="sec-num">6</span>Guarding bad inputs and catching errors safely</h2>
 
-<p>Before coding the first two drills in <code>py_foundations.py</code> and moving straight into Python's built-in data structures (<a href="python-data-structures.html">Chapter 10.14</a>), make sure you can explain these four habits clearly:</p>
-<ol>
-  <li><b>Branch safety:</b> "I'll use <code>if / elif / else</code> for exclusive branches, chained bounds like <code>0 &lt;= r &lt; rows</code>, and short-circuit guards like <code>if nums and nums[0] &lt; 0:</code> before indexing."</li>
-  <li><b>Loop boundaries:</b> "<code>range(start, stop, step)</code> is half-open <code>[start, stop)</code>, so forward loops stop at <code>n</code> and reverse loops reaching index <code>0</code> use <code>stop = -1</code>."</li>
-  <li><b><code>for</code> vs. <code>while</code>:</b> "I use <code>for</code> over fixed sequences and <code>while</code> only when pointers or state shift dynamically — verifying every branch makes progress toward termination."</li>
-  <li><b>Clean exits &amp; guards:</b> "For nested searches I extract a small helper function so early <code>return</code> exits all loops cleanly without boolean flags, and I guard invalid inputs with <code>raise ValueError</code>."</li>
-</ol>
+<p>Sometimes an input makes no sense — like ordering <code>-3</code> coffees or asking for a countdown from <code>-5</code>. Instead of quietly returning a bogus answer, fail loudly right at the top of your function with <b><code>raise ValueError(...)</code></b>:</p>
+
+<pre><code>def order_total(price, qty=1):
+    if qty &lt; 0:
+        raise ValueError("qty cannot be negative")
+    return price * qty</code></pre>
+
+<p>On the flip side, when you call something that might legitimately fail on messy input — like turning user text into an integer with <code>int(text)</code> — wrap <em>only</em> the risky line in <b><code>try / except</code></b> and name the exact error you expect:</p>
+
+<pre><code>def parse_age(text, default=None):
+    try:
+        return int(text)            # works for "25", fails for "twenty"
+    except ValueError:              # catches ONLY bad number text!
+        return default</code></pre>
+
+<p><b>Never write a bare (blank) <code>except:</code></b> with no error name after it. A bare <code>except:</code> catches <em>everything</em> — including your own typos like spelling <code>text</code> as <code>txet</code> (<code>NameError</code>) — turning an obvious typo into a silent bug that takes 20 minutes to find.</p>
+
+<div class="keyidea">Guard invalid inputs at the top of a function with <code>raise ValueError("...")</code>, and catch only the exact exception you expect (like <code>except ValueError:</code>) so typos never get swallowed.</div>
 
 <!-- ============================================================ -->
 <h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<p class="small muted">Full syntax reference: <a href="../../../python-cheatsheet.html#s1">Basics (§1)</a> · <a href="../../../python-cheatsheet.html#s2">Control flow (§2)</a> · <a href="../../../python-cheatsheet.html#s6">Functions (§6)</a> · <a href="../../../python-cheatsheet.html#s12">Exceptions (§12)</a></p>
 <div class="table-wrap"><table>
-  <thead><tr><th>Control-flow need</th><th>Fragile / noisy way</th><th>Clean Python way</th></tr></thead>
+  <thead><tr><th>What you want to do</th><th>Watch out for</th><th>Clean Python</th></tr></thead>
   <tbody>
-    <tr><td>Exclusive categories</td><td>Multiple stacked <code>if</code> blocks</td><td><code>if / elif / else</code></td></tr>
-    <tr><td>Bounds check</td><td><code>r &gt;= 0 and r &lt; rows</code></td><td><code>0 &lt;= r &lt; rows</code></td></tr>
-    <tr><td>Count down to <code>0</code></td><td><code>range(n - 1, 0, -1)</code> (skips <code>0</code>!)</td><td><code>range(n - 1, -1, -1)</code></td></tr>
-    <tr><td>Search without flags</td><td><code>found = False</code> + <code>break</code></td><td><code>for ... else:</code> or helper <code>return</code></td></tr>
-    <tr><td>Exit nested 2D loop</td><td>Two <code>break</code>s + boolean flag</td><td>Helper <code>def</code> + early <code>return (r, c)</code></td></tr>
-    <tr><td>Invalid parameter</td><td>Silently return <code>[]</code> or <code>-1</code></td><td><code>raise ValueError("...")</code></td></tr>
-    <tr><td>Catch parse errors</td><td>Bare <code>except:</code> (hides typos!)</td><td><code>except ValueError:</code></td></tr>
+    <tr><td>Pick one branch</td><td>Two separate <code>if</code>s overwriting each other</td><td><code>if / elif / else</code></td></tr>
+    <tr><td>Check a number is in a range</td><td>Repeating the variable twice</td><td><code>13 &lt;= age &lt;= 19</code></td></tr>
+    <tr><td>Check optional numbers (<code>0</code> allowed)</td><td><code>if score:</code> drops <code>0</code>!</td><td><code>if score is not None:</code></td></tr>
+    <tr><td>Count down to <code>0</code> inclusive</td><td><code>range(4, 0, -1)</code> stops at <code>1</code></td><td><code>range(4, -1, -1)</code></td></tr>
+    <tr><td>Skip a turn in a <code>while</code> loop</td><td><code>continue</code> skipping your counter update</td><td>Advance counter before <code>continue</code></td></tr>
+    <tr><td>Exit two nested loops at once</td><td><code>break</code> only leaves the inner loop</td><td>Wrap in a <code>def</code> + <code>return</code></td></tr>
+    <tr><td>Hand back a function result</td><td><code>print(x)</code> returns <code>None</code></td><td><code>return x</code></td></tr>
+    <tr><td>Catch bad user text safely</td><td>Bare <code>except:</code> hides typos</td><td><code>except ValueError:</code></td></tr>
   </tbody>
 </table></div>
 
@@ -447,37 +423,37 @@ while i &lt; len(nums):
 
 <!-- ============================================================ -->
 <h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
-<p>Work Warm-ups 1–2 on paper first, then complete the first two control-flow drills in <a href="../exercises/py_foundations.py">py_foundations.py</a> before reading <a href="python-data-structures.html">Chapter 10.14</a>.</p>
+<p>Try Warm-ups 1 and 2 in your head or on paper first — no tricks, just building muscle memory. Then write the first two functions in <a href="../exercises/py_foundations.py">py_foundations.py</a> before moving on to Part 2 (<a href="python-data-structures.html">Built-in data structures</a>).</p>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>1. Predict the exact output (no Python!)</h4>
-  <p>Write what each snippet produces: (a) <code>list(range(5, 0, -2))</code>; (b) <code>list(range(4, -1, -2))</code>; (c) <code>bool([])</code>, <code>bool([0])</code>, and <code>bool("")</code>; (d) calling <code>def f(x): x + 1</code> and assigning <code>y = f(10)</code>.</p>
+  <h4>1. Predict what Python produces</h4>
+  <p>Work out each one before checking the answer: (a) what numbers does <code>for n in range(5, 0, -2):</code> print? (b) what about <code>for n in range(4, -1, -2):</code>? (c) what is <code>ans</code> after <code>def add_one(x): x + 1</code> and <code>ans = add_one(10)</code>? (d) when <code>score = 0</code>, which check runs: <code>if score:</code> or <code>if score is not None:</code>?</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) <code>[5, 3, 1]</code>. (b) <code>[4, 2, 0]</code> (stop <code>-1</code> includes <code>0</code>). (c) <code>False</code>, <code>True</code> (non-empty list is truthy even though its element is <code>0</code>!), <code>False</code>. (d) <code>None</code> (missing <code>return</code>).</p>
+    <p>(a) <code>5, 3, 1</code> (stops before <code>0</code>). (b) <code>4, 2, 0</code> (stop <code>-1</code> includes <code>0</code>). (c) <code>None</code> (there is no <code>return</code> statement). (d) <code>if score is not None:</code> runs; <code>if score:</code> treats <code>0</code> as falsy and skips it.</p>
   </details>
 </div>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>2. Fix three control-flow bugs</h4>
-  <p>Spot the bug and write the fix: (a) <code>for i in range(len(arr) - 1, 0, -1):</code> missing element 0; (b) a <code>while i &lt; n:</code> loop with <code>if skip(i): continue</code> placed above <code>i += 1</code>; (c) a bare <code>except:</code> around <code>int(token)</code> hiding a misspelled variable name.</p>
+  <h4>2. Fix three tiny bugs</h4>
+  <p>Spot what is wrong and write the clean fix: (a) <code>for n in range(10, 0, -1):</code> meant to print <code>10</code> down to <code>0</code>; (b) a <code>while step &lt;= 5:</code> loop with <code>if step == 3: continue</code> above <code>step += 1</code>; (c) a bare <code>except:</code> around <code>int(raw)</code>.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) Change stop to <code>-1</code>: <code>range(len(arr) - 1, -1, -1)</code>. (b) Increment <code>i += 1</code> before <code>continue</code> (or switch to a <code>for i in range(n):</code> loop). (c) Narrow to <code>except ValueError:</code>.</p>
+    <p>(a) Change stop from <code>0</code> to <code>-1</code>: <code>range(10, -1, -1)</code>. (b) Put <code>step += 1</code> right before <code>continue</code> (or use <code>for step in range(1, 6):</code>). (c) Narrow to <code>except ValueError:</code> so typos raise normally.</p>
   </details>
 </div>
 
 <div class="exercise">
-  <div class="tier core">Day 1 · Core code (2 control-flow drills)</div>
-  <h4>3. Implement reverse range and 2D early-return search</h4>
-  <p>Implement <code>countdown_evens</code> and <code>first_negative_coords</code> in <a href="../exercises/py_foundations.py">py_foundations.py</a> and verify them now (you will finish the remaining three data-structure functions right after Chapter 10.14):</p>
+  <div class="tier core">Day 1 · Hands-on coding</div>
+  <h4>3. Build countdown_evens and first_negative_coords</h4>
+  <p>Open <a href="../exercises/py_foundations.py">py_foundations.py</a> and implement the first two functions — <code>countdown_evens(n)</code> (reverse <code>range</code> + <code>raise ValueError</code>; handy tips: <code>n % 2 == 1</code> checks if <code>n</code> is odd via remainder, and <code>list(range(...))</code> turns a range into a list) and <code>first_negative_coords(grid)</code> (nested loops + early <code>return</code>). Run the tests to check your work:</p>
 <pre class="plain"><code>python3 -m pytest -k "countdown_evens or first_negative_coords"</code></pre>
 </div>
 
 <div class="exercise">
-  <div class="tier stretch">Stretch · bare-editor dry run</div>
-  <h4>4. Hand-trace a two-pointer loop on paper</h4>
-  <p>Open the <a href="../../../practice.html">Practice hub</a> bare editor and write a <code>while lo &lt; hi:</code> function that checks whether a string is a palindrome while skipping spaces — then build a literal step-by-step table proving both pointers always advance on every branch.</p>
+  <div class="tier stretch">Fluency practice · optional</div>
+  <h4>4. Write a tiny café checkout helper</h4>
+  <p>Open a scratch file or the <a href="../../../practice.html">Practice hub</a> and write <code>checkout(prices, budget)</code>: walk through a list of item prices, skip any invalid price <code>&lt;= 0</code> with <code>continue</code>, stop buying with <code>break</code> the first time an item costs more than your remaining <code>budget</code>, and return two values: <code>(items_bought, remaining_budget)</code>. Test it on <code>checkout([4, 0, 5, 10, 2], 12)</code> — you should buy 2 items and have <code>3</code> left over!</p>
 </div>
 
 <nav class="chapter-nav">
@@ -491,29 +467,29 @@ while i &lt; len(nums):
 (function () {
   /* ---- Player 1: Safe range(4, -1, -1) vs buggy range(4, 0, -1) (section 3) ---- */
   (function () {
-    const arr = ["a", "b", "c", "d", "e"];
+    const stops = ["0", "1", "2", "3", "4"];
     const modes = {
       safe: {
         frames: [
-          { idx: -1, visited: [], msg: "<code>range(4, -1, -1)</code>: starts at index <code>4</code>, stop wall is <code>-1</code> (so index <code>0</code> IS visited!)." },
-          { idx: 4, visited: ["e"], msg: "Step 1: <code>i = 4</code> (&gt; -1) → visits <code>arr[4] = 'e'</code>." },
-          { idx: 3, visited: ["e", "d"], msg: "Step 2: <code>i = 3</code> (&gt; -1) → visits <code>arr[3] = 'd'</code>." },
-          { idx: 2, visited: ["e", "d", "c"], msg: "Step 3: <code>i = 2</code> (&gt; -1) → visits <code>arr[2] = 'c'</code>." },
-          { idx: 1, visited: ["e", "d", "c", "b"], msg: "Step 4: <code>i = 1</code> (&gt; -1) → visits <code>arr[1] = 'b'</code>." },
-          { idx: 0, visited: ["e", "d", "c", "b", "a"], ok: true, msg: "Step 5: <code>i = 0</code> (&gt; -1) → visits <code>arr[0] = 'a'</code>, then hits wall <code>-1</code> and stops cleanly!" }
+          { idx: -1, visited: [], msg: "<code>range(4, -1, -1)</code>: starts at <code>4</code>, steps by <code>-1</code>, stops before <code>-1</code> (so <code>0</code> IS printed!)." },
+          { idx: 4, visited: ["4"], msg: "Step 1: <code>sec = 4</code> → prints <code>4</code>." },
+          { idx: 3, visited: ["4", "3"], msg: "Step 2: <code>sec = 3</code> → prints <code>3</code>." },
+          { idx: 2, visited: ["4", "3", "2"], msg: "Step 3: <code>sec = 2</code> → prints <code>2</code>." },
+          { idx: 1, visited: ["4", "3", "2", "1"], msg: "Step 4: <code>sec = 1</code> → prints <code>1</code>." },
+          { idx: 0, visited: ["4", "3", "2", "1", "0"], ok: true, msg: "Step 5: <code>sec = 0</code> → prints <code>0</code>, then sees stop wall <code>-1</code> and finishes cleanly!" }
         ]
       },
       bug: {
         frames: [
-          { idx: -1, visited: [], msg: "<code>range(4, 0, -1)</code>: stop wall is <code>0</code> — half-open means Python stops <em>before</em> index <code>0</code>!" },
-          { idx: 4, visited: ["e"], msg: "Step 1: <code>i = 4</code> (&gt; 0) → visits <code>'e'</code>." },
-          { idx: 3, visited: ["e", "d"], msg: "Step 2: <code>i = 3</code> (&gt; 0) → visits <code>'d'</code>." },
-          { idx: 2, visited: ["e", "d", "c"], msg: "Step 3: <code>i = 2</code> (&gt; 0) → visits <code>'c'</code>." },
-          { idx: 1, visited: ["e", "d", "c", "b"], bad: true, msg: "Step 4: <code>i = 1</code> → visits <code>'b'</code>, sees stop wall <code>0</code> next, and HALTS! Index <code>0 ('a')</code> silently dropped!" }
+          { idx: -1, visited: [], msg: "<code>range(4, 0, -1)</code>: stop wall is <code>0</code> — Python stops <em>before</em> reaching <code>0</code>!" },
+          { idx: 4, visited: ["4"], msg: "Step 1: <code>sec = 4</code> → prints <code>4</code>." },
+          { idx: 3, visited: ["4", "3"], msg: "Step 2: <code>sec = 3</code> → prints <code>3</code>." },
+          { idx: 2, visited: ["4", "3", "2"], msg: "Step 3: <code>sec = 2</code> → prints <code>2</code>." },
+          { idx: 1, visited: ["4", "3", "2", "1"], bad: true, msg: "Step 4: <code>sec = 1</code> → prints <code>1</code>, sees stop wall <code>0</code> next, and STOPS! <code>0</code> is skipped!" }
         ]
       }
     };
-    const sel = V.el("select", { "aria-label": "Choose reverse range mode" },
+    const sel = V.el("select", { "aria-label": "Choose countdown range mode" },
       V.el("option", { value: "safe" }, "Safe: range(4, -1, -1)"),
       V.el("option", { value: "bug" }, "Bug: range(4, 0, -1)"));
     const api = V.player(document.getElementById("viz-range"), {
@@ -521,66 +497,68 @@ while i &lt; len(nums):
       speed: 950,
       extraControls: [sel],
       draw(f, stage) {
-        const ptrs = f.idx >= 0 ? { [f.idx]: "i" } : {};
-        const arrRow = V.el("div", { style: "margin-bottom:12px" },
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Array arr (indices 0..4)"),
-          V.el("div", { style: "white-space:nowrap" }, V.cells(arr, {
+        const ptrs = f.idx >= 0 ? { [f.idx]: "sec" } : {};
+        const numRow = V.el("div", { style: "margin-bottom:12px" },
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Countdown numbers (0 to 4)"),
+          V.el("div", { style: "white-space:nowrap;" + (f.idx < 0 ? "padding-top:22px" : "") }, V.cells(stops, {
             ptrs,
-            idx: true,
+            idx: false,
             cls: (k) => k === f.idx ? (f.ok ? "done" : f.bad ? "warn" : "hl") : (f.bad && k === 0 ? "bad" : (f.idx >= 0 && k > f.idx ? "done" : ""))
           })));
         const outRow = V.el("div", {},
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Visited values so far"),
-          f.visited.length
-            ? V.el("div", { style: "white-space:nowrap" }, V.cells(f.visited, { idx: false, cls: () => f.ok ? "done" : f.bad ? "bad" : "hl" }))
-            : V.el("div", { class: "small muted", style: "font-family:var(--mono);padding:4px 0" }, "(not started)"));
-        stage.append(arrRow, outRow);
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Printed so far"),
+          V.el("div", { style: "white-space:nowrap" }, V.cells(f.visited.length ? f.visited : ["—"], {
+            idx: false,
+            cls: () => !f.visited.length ? "dim" : (f.ok ? "done" : f.bad ? "bad" : "hl")
+          })));
+        stage.append(numRow, outRow);
       }
     });
     sel.onchange = () => api.load(modes[sel.value].frames);
   })();
 
-  /* ---- Player 2: for ... else with break vs natural completion (section 4) ---- */
+  /* ---- Player 2: for ... else searching a guest list (section 4) ---- */
   (function () {
-    const nums = [3, 5, 7, 11];
+    const guests = ["Sam", "Kai", "Maya", "Leo"];
     const modes = {
       hit: {
         frames: [
-          { pos: -1, state: "searching target = 7", msg: "Loop over <code>[3, 5, 7, 11]</code> searching for <code>7</code> with an attached <code>else:</code> block." },
-          { pos: 0, state: "3 != 7 → next", msg: "Index 0: <code>3 != 7</code> → keep walking." },
-          { pos: 1, state: "5 != 7 → next", msg: "Index 1: <code>5 != 7</code> → keep walking." },
-          { pos: 2, state: "7 == 7 → BREAK!", ok: true, msg: "Index 2: <code>7 == 7</code> → hits <b>break</b>! Skips index 3 AND skips <code>else:</code> completely!" }
+          { pos: -1, state: 'searching for "Maya"', msg: 'Loop over <code>["Sam", "Kai", "Maya", "Leo"]</code> looking for <code>"Maya"</code>.' },
+          { pos: 0, state: '"Sam" != "Maya" → next', msg: 'Check <code>"Sam"</code> — not a match, move on.' },
+          { pos: 1, state: '"Kai" != "Maya" → next', msg: 'Check <code>"Kai"</code> — not a match, move on.' },
+          { pos: 2, state: '"Maya" == "Maya" → BREAK!', ok: true, msg: 'Match! Hits <b>break</b> — skips <code>"Leo"</code> AND skips <code>else:</code> completely!' }
         ]
       },
       miss: {
         frames: [
-          { pos: -1, state: "searching target = 9", msg: "Loop over <code>[3, 5, 7, 11]</code> searching for <code>9</code> with an attached <code>else:</code> block." },
-          { pos: 0, state: "3 != 9 → next", msg: "Index 0: <code>3 != 9</code> → keep walking." },
-          { pos: 1, state: "5 != 9 → next", msg: "Index 1: <code>5 != 9</code> → keep walking." },
-          { pos: 2, state: "7 != 9 → next", msg: "Index 2: <code>7 != 9</code> → keep walking." },
-          { pos: 3, state: "11 != 9 → loop ends", msg: "Index 3: <code>11 != 9</code> → loop finishes all items with <b>no break</b>." },
-          { pos: 4, state: "else: runs → 'not found'", warn: true, msg: "<b>else: runs!</b> Because the loop never hit <code>break</code>, Python enters the <code>else:</code> track cleanly." }
+          { pos: -1, state: 'searching for "Zoe"', msg: 'Loop over <code>["Sam", "Kai", "Maya", "Leo"]</code> looking for <code>"Zoe"</code>.' },
+          { pos: 0, state: '"Sam" != "Zoe" → next', msg: 'Check <code>"Sam"</code> — not a match, move on.' },
+          { pos: 1, state: '"Kai" != "Zoe" → next', msg: 'Check <code>"Kai"</code> — not a match, move on.' },
+          { pos: 2, state: '"Maya" != "Zoe" → next', msg: 'Check <code>"Maya"</code> — not a match, move on.' },
+          { pos: 3, state: '"Leo" != "Zoe" → loop ends', msg: 'Check <code>"Leo"</code> — finished every guest with <b>no break</b>.' },
+          { pos: 4, state: 'else: runs → "not on the list"', warn: true, msg: '<b>else: runs!</b> Because <code>break</code> never fired, Python enters the <code>else:</code> block.' }
         ]
       }
     };
-    const sel = V.el("select", { "aria-label": "Choose search target" },
-      V.el("option", { value: "hit" }, "target = 7 (hits break → skips else)"),
-      V.el("option", { value: "miss" }, "target = 9 (no break → runs else)"));
+    const sel = V.el("select", { "aria-label": "Choose guest to search for" },
+      V.el("option", { value: "hit" }, 'target = "Maya" (hits break → skips else)'),
+      V.el("option", { value: "miss" }, 'target = "Zoe" (no break → runs else)'));
     const api = V.player(document.getElementById("viz-loop-else"), {
       frames: modes.hit.frames,
       speed: 950,
       extraControls: [sel],
       draw(f, stage) {
-        const ptrs = f.pos >= 0 && f.pos < nums.length ? { [f.pos]: "x" } : {};
+        const hasPtr = f.pos >= 0 && f.pos < guests.length;
+        const ptrs = hasPtr ? { [f.pos]: "guest" } : {};
         const arrRow = V.el("div", { style: "margin-bottom:12px" },
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Items in nums"),
-          V.el("div", { style: "white-space:nowrap" }, V.cells(nums, {
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Guest list"),
+          V.el("div", { style: "white-space:nowrap;" + (!hasPtr ? "padding-top:22px" : "") }, V.cells(guests, {
             ptrs,
-            idx: true,
+            idx: false,
             cls: (k) => k === f.pos ? (f.ok ? "done" : "hl") : (k < f.pos ? "dim" : "")
           })));
         const stRow = V.el("div", {},
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Switchyard status"),
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "What Python does next"),
           V.el("div", { style: "white-space:nowrap" }, V.cells([f.state], { idx: false, cls: () => f.ok ? "done" : f.warn ? "warn" : "hl" })));
         stage.append(arrRow, stRow);
       }

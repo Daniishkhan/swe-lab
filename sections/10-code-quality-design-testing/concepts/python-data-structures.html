@@ -18,283 +18,327 @@
 <header class="chapter-head">
   <div class="eyebrow">Phase 0 · Day 1 · Part 2</div>
   <h1>Python's built-in data structures</h1>
-  <div class="meta"><span><span class="badge P0">P0</span> Phase 0 Python foundations</span><span>about 17 minutes</span><span>6 quick checks · 4 exercises</span></div>
+  <div class="meta"><span><span class="badge P0">P0</span> Python fluency</span><span>about 15 minutes</span><span>6 quick checks · 4 exercises</span></div>
 </header>
 
-<p>Control flow tells Python <em>which</em> lines to run; data structures decide <em>how fast</em> those lines finish. Almost every first-round timeout in Python comes from reaching for a plain <code>list</code> when the job calls for a <code>set</code>, a <code>dict</code>, or a <code>tuple</code> — or concatenating strings inside a loop. Before we zoom into memory references tomorrow, let's master Python's four core containers and text strings from one clear picture.</p>
+<p>In Part 1, you learned how to steer Python with decisions, loops, and functions. Now you need clean places to hold groups of values — a playlist of songs, a café menu, a guest list, or a map pin. Python gives you four built-in containers (<code>list</code>, <code>tuple</code>, <code>dict</code>, and <code>set</code>) plus text strings (<code>str</code>). Let's make choosing and using all five feel automatic.</p>
 
 <div class="learn-list">
-  <h4>By the end you'll be able to</h4>
+  <h4>By the end of Part 2, you'll be comfortable with</h4>
   <ol>
-    <li>Pick the right built-in container for order, uniqueness, and instant lookups.</li>
-    <li>Index and slice ordered sequences cleanly, and explain why editing the back is fast while editing the front shifts every element.</li>
-    <li>Use sealed records for fixed coordinates and lookup keys, and assemble text in linear time instead of repeated copying.</li>
-    <li>Build frequency counts, bucket maps, instant membership checks, and set comparisons without nested loops.</li>
-    <li>Avoid the four classic container traps: empty braces creating a dictionary, missing single-tuple commas, scanning a list inside a loop, and using editable lists as keys.</li>
+    <li>Picking the right container for ordered items, fixed records, label-to-value lookups, or unique groups.</li>
+    <li>Indexing and slicing lists and strings — and knowing why editing the back of a list is fast while editing the front shifts everything over.</li>
+    <li>Using locked tuples for fixed pairs and keys, and building long text strings cleanly with <code>"".join(...)</code>.</li>
+    <li>Counting items and grouping values in dictionaries without crashing on missing keys.</li>
+    <li>Using sets for instant membership checks, removing duplicates while keeping original order, and 1-line group comparisons.</li>
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Phase 0 Day 1 right after Part 1. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Builds on <a href="python-control-flow.html">Python control flow, loops, and functions</a>.</p>
+<p class="muted small">Keep <a href="../../../python-cheatsheet.html#s3">Python Cheatsheet (§3–§5)</a> nearby as a quick syntax lookup while you read. This chapter builds directly on <a href="python-control-flow.html">Part 1: Control flow, loops, and functions</a> — no algorithm background needed.</p>
 
 <!-- ============================================================ -->
-<h2 id="s1"><span class="sec-num">1</span>Why does picking the wrong built-in container make clean code 1,000× slower?</h2>
+<h2 id="s1"><span class="sec-num">1</span>Four everyday containers, four clear jobs</h2>
 
-<div class="story">
-  <p>Your service receives <b>100,000</b> unique request IDs and needs to drop duplicates while keeping first-seen arrival order. You write a clean 4-line loop: <code>out = []</code>, then for each ID <code>if req_id not in out: out.append(req_id)</code>. On 10 test items it finishes instantly. On 100,000 items, every <code>not in out</code> scans from slot <code>0</code> — performing roughly <b>5 billion</b> comparisons and timing out! Adding one helper container (<code>seen = set()</code>) cuts that exact loop to 100,000 constant-time checks — over <b>1,000× faster</b>.</p>
-</div>
-
-<p>Picture Python's four built-in data structures as <b>four storage containers on a workshop floor</b> — each built for one job:</p>
+<p>Think of Python's four built-in containers as four everyday organizers — each one shines at a different job:</p>
 
 <div class="figure">
-  <svg class="viz" viewBox="0 0 720 156" role="img" aria-label="Comparing Python's four built-in containers on a workshop floor: list numbered shelf, tuple sealed crate, dict labeled cabinet, and set badge-check gate">
+  <svg class="viz" viewBox="0 0 720 156" role="img" aria-label="Comparing Python's four built-in containers: list as an editable playlist, tuple as a locked map pin, dict as a café menu, and set as a unique guest list">
     <rect x="12" y="14" width="166" height="128" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
     <text x="95" y="36" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">1. list [a, b]</text>
-    <text x="95" y="58" class="label" text-anchor="middle">Numbered shelf</text>
+    <text x="95" y="58" class="label" text-anchor="middle">Playlist / cart</text>
     <text x="95" y="80" class="label" text-anchor="middle">Ordered · editable</text>
-    <text x="95" y="102" class="label" text-anchor="middle" fill="var(--ok)">back push: O(1)</text>
-    <text x="95" y="124" class="label" text-anchor="middle" fill="var(--bad)">x in list: O(n)</text>
+    <text x="95" y="102" class="label" text-anchor="middle" fill="var(--ok)">add at back: instant</text>
+    <text x="95" y="124" class="label" text-anchor="middle" fill="var(--warn)">search: walks all</text>
 
     <rect x="189" y="14" width="166" height="128" rx="8" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
     <text x="272" y="36" class="label" text-anchor="middle" fill="var(--accent-2)" font-weight="700">2. tuple (a, b)</text>
-    <text x="272" y="58" class="label" text-anchor="middle">Sealed crate</text>
-    <text x="272" y="80" class="label" text-anchor="middle">Ordered · fixed</text>
-    <text x="272" y="102" class="label" text-anchor="middle" fill="var(--ok)">dict/set key OK</text>
-    <text x="272" y="124" class="label" text-anchor="middle" fill="var(--muted)">coords, returns</text>
+    <text x="272" y="58" class="label" text-anchor="middle">Map pin / color</text>
+    <text x="272" y="80" class="label" text-anchor="middle">Ordered · locked</text>
+    <text x="272" y="102" class="label" text-anchor="middle" fill="var(--ok)">safe as dict/set key</text>
+    <text x="272" y="124" class="label" text-anchor="middle" fill="var(--muted)">unpacks cleanly</text>
 
     <rect x="366" y="14" width="166" height="128" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
     <text x="449" y="36" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">3. dict {k: v}</text>
-    <text x="449" y="58" class="label" text-anchor="middle">Labeled cabinet</text>
-    <text x="449" y="80" class="label" text-anchor="middle">Key → value map</text>
-    <text x="449" y="102" class="label" text-anchor="middle" fill="var(--ok)">lookup: O(1) avg</text>
+    <text x="449" y="58" class="label" text-anchor="middle">Café menu</text>
+    <text x="449" y="80" class="label" text-anchor="middle">Label → value</text>
+    <text x="449" y="102" class="label" text-anchor="middle" fill="var(--ok)">lookup: instant</text>
     <text x="449" y="124" class="label" text-anchor="middle" fill="var(--muted)">keeps insert order</text>
 
     <rect x="543" y="14" width="166" height="128" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
     <text x="626" y="36" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">4. set {a, b}</text>
-    <text x="626" y="58" class="label" text-anchor="middle">Badge gate</text>
+    <text x="626" y="58" class="label" text-anchor="middle">Guest list</text>
     <text x="626" y="80" class="label" text-anchor="middle">Unique items only</text>
-    <text x="626" y="102" class="label" text-anchor="middle" fill="var(--ok)">x in set: O(1) avg</text>
-    <text x="626" y="124" class="label" text-anchor="middle" fill="var(--ok)">&amp;  |  -  ^ math</text>
+    <text x="626" y="102" class="label" text-anchor="middle" fill="var(--ok)">check in: instant</text>
+    <text x="626" y="124" class="label" text-anchor="middle" fill="var(--ok)">&amp;  |  -  ^ diffs</text>
   </svg>
-  <div class="cap">Pick the container by the operation your loop runs most often — especially membership checks (<code>in</code>) and insertions.</div>
+  <div class="cap">Pick the container by what you do most often — keeping order, looking up by label, or checking whether an item is already present.</div>
 </div>
 
-<p><em>Where the workshop-container analogy breaks:</em> a physical badge gate never gets confused by similar names, whereas Python's <code>dict</code> and <code>set</code> jump directly to a slot using a numeric fingerprint called a <b>hash</b> — making lookups <code>O(1)</code> on average (with a rare <code>O(n)</code> worst case if many keys collide, unpacked in Week 1's Hash Maps chapter).</p>
+<p><b>One practical speed intuition worth knowing right away:</b> checking whether something is inside a <code>list</code> (<code>"Maya" in names</code>) walks from the first item to the last — fine for 20 items, painfully slow if you do it inside a loop over 50,000 items. A <code>dict</code> or <code>set</code> jumps straight to the answer in one step regardless of size! <em>(In Week 1 you will learn the formal names <code>O(1)</code> and <code>O(n)</code> for this — for now, just remember "instant jump" vs. "walks the whole list".)</em></p>
 
-<p>Let's inspect each container on the workshop floor in order: growable shelves (<code>list</code>, §2), sealed crates and text ribbons (<code>tuple</code> &amp; <code>str</code>, §3), labeled filing cabinets (<code>dict</code>, §4), badge gates and set math (<code>set</code>, §5), and the four traps that catch people under interview pressure (§6).</p>
+<p>Let's walk through each container one at a time, starting with the one you will use every single day: <code>list</code>.</p>
 
 <!-- ============================================================ -->
-<h2 id="s2"><span class="sec-num">2</span>How do lists work — and where do hidden linear costs hide?</h2>
+<h2 id="s2"><span class="sec-num">2</span>Lists: ordered collections you can grow and edit</h2>
 
-<p>A <b><code>list</code></b> is an ordered, resizable numbered shelf: slots start at index <code>0</code> from the left and <code>-1</code> from the right (so <code>nums[-1]</code> grabs the last item cleanly without typing <code>nums[len(nums) - 1]</code>). Just like <code>range(start, stop, step)</code> from Part 1, <b>slicing</b> <code>nums[start:stop:step]</code> is half-open <code>[start, stop)</code> and builds a new list:</p>
+<p>A <b><code>list</code></b> stores items in order inside square brackets <code>[...]</code>. Positions (called <b>indices</b>) start at <code>0</code> from the left and <code>-1</code> from the right, so <code>snacks[-1]</code> always grabs the last item cleanly. <code>len(snacks)</code> tells you how many items are inside.</p>
 
-<pre><code>nums = [10, 20, 30, 40, 50]
-nums[0], nums[-1]       # (10, 50) — first and last item in O(1)
-nums[1:4]               # [20, 30, 40] — indices 1, 2, 3 (stops before 4!)
-nums[:2], nums[-2:]     # ([10, 20], [40, 50]) — first 2 and last 2
-nums[::-1]              # [50, 40, 30, 20, 10] — reversed copy in O(n)</code></pre>
+<p>To grab a sub-section, use a <b>slice</b>: <code>snacks[start:stop]</code> (or <code>snacks[start:stop:step]</code>). It follows the exact same rule as <code>range</code> from Part 1 — it starts at <code>start</code> and stops <em>before</em> <code>stop</code>, returning a fresh list. Leave <code>start</code> blank to begin at index <code>0</code>, leave <code>stop</code> blank to run to the end, and use step <code>-1</code> (<code>[::-1]</code>) to walk backward through every item:</p>
 
-<p>Because Python stores list slots side by side in contiguous memory, <b>which end you touch changes performance completely</b>:</p>
+<pre><code>snacks = ["apple", "chips", "cookie", "nuts", "pear"]
+
+snacks[0]           # "apple"  (first item)
+snacks[-1]          # "pear"   (last item)
+snacks[1:4]         # ["chips", "cookie", "nuts"]  (indices 1, 2, 3 — stops before 4!)
+snacks[:2]          # ["apple", "chips"]           (first 2 items)
+snacks[-2:]         # ["nuts", "pear"]             (last 2 items)
+snacks[::-1]        # ["pear", "nuts", "cookie", "chips", "apple"]  (reversed copy)</code></pre>
+
+<p>Because a list stores items side by side in numbered slots, <b>the back end is fast and the front end is slow</b>:</p>
 <ul>
-  <li><b>Back of the shelf (<code>append(x)</code>, <code>pop()</code>, <code>nums[i]</code>):</b> instant <code>O(1)</code> (amortized for <code>append</code>/<code>pop()</code> when resizing occasionally). That makes a Python <code>list</code> a fast ready-made <b>stack</b> (last-in, first-out).</li>
-  <li><b>Front or middle (<code>insert(0, x)</code>, <code>pop(0)</code>, <code>x in nums</code>):</b> slow <code>O(n)</code>! Inserting or removing at index <code>0</code> forces Python to slide <em>every</em> remaining box one slot over — turning a queue loop into <code>O(n²)</code>! (On Day 4, <code>collections.deque</code> gives you <code>O(1)</code> at both ends.)</li>
+  <li><b>Adding or removing at the back:</b> <code>snacks.append("tea")</code> and <code>snacks.pop()</code> touch only the last slot — 1 quick step!</li>
+  <li><b>Adding or removing at the front:</b> <code>snacks.insert(0, "tea")</code> and <code>snacks.pop(0)</code> force Python to scoot <em>every other item</em> one slot over! Doing that inside a big loop makes your program crawl.</li>
 </ul>
 
 <div class="figure">
   <div id="viz-list-ends"></div>
-  <div class="cap">Toggle between pushing at the back (<code>nums.append(9)</code>: 1 step) and inserting at the front (<code>nums.insert(0, 9)</code>: shifts every existing slot right!).</div>
+  <div class="cap">Switch between adding at the back (<code>fruits.append("kiwi")</code>: 1 step) and inserting at the front (<code>fruits.insert(0, "kiwi")</code>: scoots every existing fruit one slot to the right).</div>
 </div>
 
-<div class="keyidea">A <code>list</code> is fast by index (<code>nums[i]</code>, <code>nums[-1]</code>) and fast at the back (<code>append</code> / <code>pop()</code> in <code>O(1)</code> amortized). Treat front edits (<code>insert(0, x)</code>, <code>pop(0)</code>) and membership scans (<code>x in nums</code>) as <code>O(n)</code> — never hide them inside a loop!</div>
+<div class="keyidea">Lists are great for ordered, changing sequences. Use <code>[0]</code>, <code>[-1]</code>, and <code>[start:stop]</code> to read them, and prefer editing at the back (<code>append</code> and <code>pop()</code>) rather than inserting or popping at index <code>0</code> inside loops.</div>
 
 <div class="check" id="check-list-slice">
-  <p class="q">Given <code>vals = [5, 15, 25, 35, 45]</code>, what do <code>vals[-2]</code> and <code>vals[2:4]</code> evaluate to?</p>
+  <p class="q">Given <code>snacks = ["apple", "chips", "cookie", "nuts", "pear"]</code>, what do <code>snacks[-2]</code> and <code>snacks[1:3]</code> return?</p>
   <div class="opts">
-    <button data-correct><code>35</code> and <code>[25, 35]</code> — <code>-1</code> is the last slot and slices stop before index <code>4</code></button>
-    <button><code>25</code> and <code>[25, 35, 45]</code> — negative indices start at <code>-0</code> and slices include stop</button>
-    <button><code>35</code> and <code>[15, 25, 35]</code> — Python slices start one slot early up to stop</button>
+    <button data-correct><code>"nuts"</code> and <code>["chips", "cookie"]</code> — <code>-1</code> is the last item and slices stop before index <code>3</code></button>
+    <button><code>"cookie"</code> and <code>["chips", "cookie", "nuts"]</code> — slices include the stop index</button>
+    <button><code>"nuts"</code> and <code>["apple", "chips", "cookie"]</code> — slices start one slot early</button>
   </div>
-  <div class="fb right"><p>Spot on! Counting from the back goes <code>-1 → 45</code>, <code>-2 → 35</code>; and half-open <code>[2, 4)</code> takes indices <code>2, 3</code> → <code>[25, 35]</code>.</p></div>
-  <div class="fb wrong"><p>Check on a 4-item shelf <code>letters = ["a", "b", "c", "d"]</code>: <code>letters[-1]</code> is <code>"d"</code> (last), so <code>letters[-2]</code> is <code>"c"</code> (second from last). And half-open <code>letters[1:3]</code> starts at index <code>1</code> (<code>"b"</code>) and stops strictly <em>before</em> index <code>3</code> (<code>"d"</code>), returning <code>["b", "c"]</code>. Apply the exact same rule to <code>vals</code> → <code>35</code> and <code>[25, 35]</code>.</p></div>
+  <div class="fb right"><p>Spot on! From the back: <code>-1</code> is <code>"pear"</code> and <code>-2</code> is <code>"nuts"</code>. And <code>[1:3]</code> takes indices <code>1</code> and <code>2</code> and stops before <code>3</code> → <code>["chips", "cookie"]</code>.</p></div>
+  <div class="fb wrong"><p>Check on a tiny 4-item list <code>["a", "b", "c", "d"]</code>: counting from the end, <code>-1</code> is <code>"d"</code> and <code>-2</code> is <code>"c"</code>. For slicing <code>[1:3]</code>, start at index <code>1</code> (<code>"b"</code>), take index <code>2</code> (<code>"c"</code>), and stop strictly <em>before</em> index <code>3</code> (<code>"d"</code>). Same rule on <code>snacks</code> gives <code>"nuts"</code> and <code>["chips", "cookie"]</code>.</p></div>
 </div>
 
-<p>Lists shine when items grow and change. What when you want a fixed record whose slots should never change — like a 2D coordinate <code>(row, col)</code> you can drop straight into a lookup table — or a sequence of characters?</p>
+<p>Lists are built to change. Next, what about values that should stay locked once created — like a map pin or a piece of text?</p>
 
 <!-- ============================================================ -->
-<h2 id="s3"><span class="sec-num">3</span>When should you reach for a sealed tuple or a text ribbon?</h2>
+<h2 id="s3"><span class="sec-num">3</span>Tuples and strings: ordered values that stay locked</h2>
 
-<p>A <b><code>tuple</code></b> is a <b>sealed shipping crate</b>: ordered and indexable like a list (<code>pt[0]</code>, <code>pt[-1]</code>), yet you cannot append, pop, or overwrite its slots after creating it. That permanence unlocks three daily interview moves:</p>
+<p>A <b><code>tuple</code></b> looks like a list with parentheses <code>(...)</code> instead of square brackets — you can read <code>spot[0]</code> and <code>spot[-1]</code> just like a list, but once created, you <b>cannot</b> append, remove, or overwrite its items. That lock gives you three handy everyday perks:</p>
+
 <ul>
-  <li><b>Clean unpacking &amp; swaps:</b> <code>r, c = (2, 5)</code> unpacks fields by name, and <code>a, b = b, a</code> swaps two variables in one line without a temporary variable.</li>
-  <li><b>Legal keys for dicts and sets:</b> because a tuple of immutable values (like <code>(r, c)</code>) cannot change its contents later, Python lets you store it inside a <code>set</code> of visited coordinates or as a <code>dict</code> key — whereas putting a mutable <code>list</code> <code>[r, c]</code> there crashes!</li>
-  <li><b>Watch the 1-element comma trap:</b> parentheses alone just group math expressions — so <code>(42)</code> is the integer <code>42</code>! A single-item tuple <em>requires</em> a trailing comma: <code>(42,)</code>.</li>
+  <li><b>Clean unpacking and 1-line swaps:</b> assign every slot to a named variable in one line:
+<pre><code>pin = (37.77, -122.42)
+lat, lon = pin            # lat is 37.77, lon is -122.42
+
+a, b = 10, 20
+a, b = b, a               # swaps a and b cleanly: now 20, 10!</code></pre>
+  </li>
+  <li><b>Safe inside sets and as dictionary keys:</b> because a tuple of fixed values (like <code>(lat, lon)</code> or <code>("Maya", 2026)</code>) cannot change later, Python lets you store it in a <code>set</code> or use it as a <code>dict</code> key — whereas editable lists are not allowed there!</li>
+  <li><b>Watch the 1-item comma catch:</b> parentheses alone just group expressions like <code>(2 + 3)</code>, so <code>(42)</code> is just the number <code>42</code>! A 1-item tuple always needs a trailing comma: <code>(42,)</code>.</li>
 </ul>
 
-<p>A <b><code>str</code></b> (string) is an immutable <b>text ribbon</b> of characters. You get all the same indexing and slicing (<code>s[0]</code>, <code>s[-1]</code>, <code>s[::-1]</code>) plus workhorse parsing methods: <code>s.strip()</code> (trim outer whitespace), <code>s.lower()</code> (case-fold), and <code>s.split()</code> (split on whitespace into a list of tokens). Because strings cannot be edited in place, building a long string via <code>out += ch</code> inside an <code>n</code>-step loop copies the entire growing ribbon over and over — <code>1 + 2 + ... + n = O(n²)</code>! Collect pieces in a <code>list</code> and seal the ribbon once with <code>"".join(parts)</code> in <code>O(n)</code>:</p>
+<p>A <b><code>str</code></b> (string of text) is also locked once created. You can index and slice it just like a list (<code>word[0]</code>, <code>word[-1]</code>, <code>word[::-1]</code>), and Python gives you friendly everyday text helpers:</p>
+
+<pre><code>raw = "  Maya@Example.COM  "
+clean = raw.strip().lower()     # "maya@example.com" — trims spaces &amp; lowercases
+
+words = "go dog go".split()     # ["go", "dog", "go"] — splits on spaces
+csv = "red,blue,green".split(",") # ["red", "blue", "green"]</code></pre>
+
+<p>Because strings cannot be edited in place, gluing text with <code>msg += piece</code> inside a large loop copies the entire growing text over and over! Instead, collect pieces in a list and join them <b>once</b> at the end with <code>"".join(parts)</code> (or <code>", ".join(names)</code>):</p>
 
 <div class="figure">
-  <svg class="viz" viewBox="0 0 720 140" role="img" aria-label="Comparing quadratic string concatenation s += ch copying every prefix on each step against linear list append plus ''.join(parts) copying once">
+  <svg class="viz" viewBox="0 0 720 140" role="img" aria-label="Comparing repeated string gluing msg += piece copying every character again and again against collecting pieces in a list and joining once with ''.join(parts)">
     <rect x="14" y="14" width="322" height="112" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
-    <text x="28" y="36" class="label" fill="var(--bad)" font-weight="700">SLOW: out += ch IN A LOOP</text>
-    <text x="28" y="58" class="label">step 1: "a"</text><text x="184" y="58" class="label">(copies 1)</text>
-    <text x="28" y="76" class="label">step 2: "ab"</text><text x="184" y="76" class="label">(copies 2)</text>
-    <text x="28" y="94" class="label">step 3: "abc"</text><text x="184" y="94" class="label">(copies 3)</text>
-    <text x="28" y="114" class="label" fill="var(--bad)">Total: 1+2+...+n → O(n²) copies!</text>
+    <text x="28" y="36" class="label" fill="var(--bad)" font-weight="700">SLOW: msg += letter IN A LOOP</text>
+    <text x="28" y="58" class="label">step 1: "a"</text><text x="186" y="58" class="label">(copies 1)</text>
+    <text x="28" y="76" class="label">step 2: "ab"</text><text x="186" y="76" class="label">(copies 2)</text>
+    <text x="28" y="94" class="label">step 3: "abc"</text><text x="186" y="94" class="label">(copies 3)</text>
+    <text x="28" y="114" class="label" fill="var(--bad)">Re-copies the whole string each turn!</text>
 
     <line x1="346" y1="70" x2="370" y2="70" stroke="var(--ok)" stroke-width="2"/>
     <polygon points="370,65 380,70 370,75" fill="var(--ok)"/>
 
     <rect x="384" y="14" width="322" height="112" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
     <text x="398" y="36" class="label" fill="var(--ok)" font-weight="700">FAST: parts.append + "".join()</text>
-    <text x="398" y="58" class="label">parts = ["a", "b", "c"]  (O(1) each)</text>
+    <text x="398" y="58" class="label">parts = ["a", "b", "c"]</text>
     <text x="398" y="80" class="label">"".join(parts) → "abc"</text>
-    <text x="398" y="114" class="label" fill="var(--ok)">Measures once, copies ONCE → O(n)!</text>
+    <text x="398" y="114" class="label" fill="var(--ok)">Copies each character ONCE total!</text>
   </svg>
-  <div class="cap">Same rule for joining comma-separated tags: use <code>", ".join(tags)</code> instead of concatenating in a loop.</div>
+  <div class="cap">Want comma-separated names? Put the separator in front of <code>.join</code>: <code>", ".join(["Maya", "Sam", "Kai"])</code> → <code>"Maya, Sam, Kai"</code>.</div>
 </div>
 
-<details class="aside deeper">
-  <summary>Go deeper: why CPython microbenchmarks sometimes hide s += ch costs</summary>
-  <p>CPython includes an internal optimization that can resize an unreferenced string in place under narrow conditions — making <code>s += ch</code> look fast on tiny local tests. That optimization vanishes the moment another reference exists, under PyPy or alternative runtimes, or during senior code review. Always build strings with <code>parts.append(...)</code> and <code>"".join(parts)</code> so linear <code>O(n)</code> time is guaranteed everywhere.</p>
-</details>
-
-<div class="keyidea">Use <code>tuple</code> for fixed records and dict/set keys (remembering the trailing comma in <code>(x,)</code>!), and always assemble multi-step strings via <code>parts.append(...)</code> + <code>"".join(parts)</code> for guaranteed <code>O(n)</code> time.</div>
+<div class="keyidea">Use <code>tuple</code> for fixed pairs and keys (remember the comma in a 1-item tuple <code>(42,)</code>!), and build multi-step strings by appending to a list and calling <code>"".join(parts)</code> once.</div>
 
 <div class="check" id="check-tuple-str">
-  <p class="q">You want a 1-element tuple holding <code>42</code>, write <code>single = (42)</code>, and then call <code>len(single)</code>. What happens?</p>
+  <p class="q">You want a 1-item tuple holding <code>42</code>, write <code>one = (42)</code>, and then call <code>len(one)</code>. What happens?</p>
   <div class="opts">
-    <button>Returns <code>1</code> because parentheses always create a tuple around any value</button>
-    <button>Returns <code>2</code> because Python counts the two decimal digits inside <code>42</code></button>
-    <button data-correct>Raises <code>TypeError</code> because <code>(42)</code> is a plain <code>int</code> — write <code>(42,)</code> instead</button>
+    <button>Returns <code>1</code> because parentheses always make a tuple</button>
+    <button>Returns <code>2</code> because <code>42</code> has two digits</button>
+    <button data-correct>Raises <code>TypeError</code> because <code>(42)</code> is just the number <code>42</code> — write <code>(42,)</code> instead</button>
   </div>
-  <div class="fb right"><p>Sharp catch! Without a comma, <code>(42)</code> is identical to <code>42</code> (an <code>int</code>, which has no <code>len()</code>). Always add a trailing comma for a 1-tuple: <code>single = (42,)</code>.</p></div>
-  <div class="fb wrong"><p>Test a second value in your head: in arithmetic, <code>(3 + 4) * 2</code> uses parentheses to group the integer <code>7</code> — not to make a tuple! So <code>("hi")</code> is just the string <code>"hi"</code> (length 2, not 1!) and <code>(42)</code> is just the integer <code>42</code>, crashing on <code>len(42)</code> with <code>TypeError</code> until you add the comma: <code>(42,)</code>.</p></div>
+  <div class="fb right"><p>Spot on! Without a comma, parentheses just group an expression, so <code>(42)</code> is a plain <code>int</code> (which has no length). Write <code>one = (42,)</code> to make a 1-item tuple.</p></div>
+  <div class="fb wrong"><p>Think about math: in <code>(3 + 4) * 2</code>, parentheses around <code>7</code> just keep the number <code>7</code> — they do not turn it into a tuple! So <code>(42)</code> is just <code>42</code>, and calling <code>len(42)</code> crashes with <code>TypeError</code> until you add a trailing comma: <code>(42,)</code>.</p></div>
 </div>
 
-<p>Now you have ordered shelves (<code>list</code>), sealed crates (<code>tuple</code>), and text ribbons (<code>str</code>). None of them can answer <em>"which indices did the word <code>'go'</code> appear at?"</em> without scanning from index <code>0</code>. Enter the labeled filing cabinet.</p>
+<p>So far every collection looked items up by number (<code>0, 1, 2...</code>). What when you want to look something up directly by a <em>label</em> — like looking up the price of <code>"latte"</code> on a menu, or counting votes?</p>
 
 <!-- ============================================================ -->
-<h2 id="s4"><span class="sec-num">4</span>How do dictionaries give you instant key-to-value lookup?</h2>
+<h2 id="s4"><span class="sec-num">4</span>Dictionaries: instant lookup by label</h2>
 
-<p>A <b><code>dict</code></b> maps unique hashable <b>keys</b> to <b>values</b> in <code>O(1)</code> average time — and remembers <b>insertion order</b> (guaranteed across Python 3.7+). Memorize these four daily interview operations:</p>
-<ul>
-  <li><b>Safe lookup vs. strict lookup:</b> <code>d[key]</code> raises <code>KeyError</code> if <code>key</code> is missing; <code>d.get(key, default)</code> returns <code>default</code> (or <code>None</code>) without crashing or modifying <code>d</code>.</li>
-  <li><b>Counting &amp; bucketing in one pass:</b> increment counts with <code>counts[k] = counts.get(k, 0) + 1</code>, or create a bucket list the first time a key appears (<code>if w not in pos: pos[w] = []</code> then <code>pos[w].append(i)</code>).</li>
-  <li><b>Clean iteration:</b> walk keys directly (<code>for k in d:</code>), values (<code>d.values()</code>), or both together (<code>for k, v in d.items():</code>) in exact insertion order.</li>
-  <li><b>Safe deletion:</b> <code>d.pop(key, None)</code> removes and returns the value if present, or returns <code>None</code> safely if absent (whereas <code>del d[key]</code> raises <code>KeyError</code> on missing keys).</li>
-</ul>
+<p>A <b><code>dict</code></b> pairs each unique <b>key</b> (label) with a <b>value</b> inside curly braces <code>{key: value}</code>. Looking up a value by its key is instant, and Python remembers the exact order you added keys. Writing <code>key in menu</code> (or <code>key not in menu</code>) checks whether a <em>key</em> exists in the dictionary (not a value).</p>
 
-<pre><code># py_foundations: word_positions — map each lowercase word to its token indices
-def word_positions(text):
-    positions = {}
-    tokens = text.lower().split()
-    for i in range(len(tokens)):
-        word = tokens[i]
-        if word not in positions:
-            positions[word] = []
-        positions[word].append(i)
-    return positions</code></pre>
+<pre><code>menu = {"latte": 5, "tea": 3, "muffin": 4}
+
+menu["latte"]                 # 5 (instant lookup!)
+menu.get("mocha", 0)          # 0 (safe fallback if "mocha" is missing)
+menu["tea"] = 3.5             # updates an existing price
+menu["bagel"] = 4             # adds a new item
+menu.pop("muffin", None)      # removes "muffin" safely (returns None if missing)
+
+for item, price in menu.items():
+    print(item, "costs $", price)</code></pre>
+
+<p><b>Crucial difference:</b> <code>menu["mocha"]</code> crashes with a <code>KeyError</code> if <code>"mocha"</code> is not on the menu, whereas <code>menu.get("mocha", 0)</code> quietly returns <code>0</code> without changing <code>menu</code>.</p>
+
+<p>Two dictionary patterns show up constantly in everyday Python:</p>
+
+<ol>
+  <li><b>Counting how often items appear:</b>
+<pre><code>votes = ["tacos", "sushi", "tacos", "pizza", "tacos"]
+counts = {}
+for food in votes:
+    counts[food] = counts.get(food, 0) + 1
+# counts is {"tacos": 3, "sushi": 1, "pizza": 1}</code></pre>
+  </li>
+  <li><b>Grouping items into lists by a label:</b>
+<pre><code>people = [("Maya", "NYC"), ("Sam", "LA"), ("Kai", "NYC")]
+by_city = {}
+for name, city in people:
+    if city not in by_city:       # checks dictionary keys!
+        by_city[city] = []        # create an empty list the first time we see this city
+    by_city[city].append(name)
+# by_city is {"NYC": ["Maya", "Kai"], "LA": ["Sam"]}</code></pre>
+  </li>
+</ol>
 
 <div class="figure">
   <div id="viz-dict-build"></div>
-  <div class="cap">Step through <code>word_positions("Go dog go")</code> one token at a time. Each dictionary lookup jumps straight to that word's bucket in <code>O(1)</code> average time!</div>
+  <div class="cap">Step through grouping <code>[("Maya", "NYC"), ("Sam", "LA"), ("Kai", "NYC")]</code> into a dictionary one person at a time.</div>
 </div>
 
-<div class="keyidea">Reach for a <code>dict</code> whenever you map keys to counts, indices, or records in <code>O(1)</code> average time. Use <code>d.get(k, default)</code> for safe reads, <code>d.pop(k, None)</code> for safe deletes, and <code>for k, v in d.items():</code> to iterate in insertion order.</div>
+<div class="keyidea">Use a <code>dict</code> whenever you look up values by label, count items, or group items into lists. Use <code>.get(key, default)</code> for safe reads, <code>.pop(key, None)</code> for safe deletes, and <code>for k, v in d.items():</code> to loop over pairs.</div>
 
 <div class="check" id="check-dict-get">
-  <p class="q">Given <code>counts = {"a": 2}</code>, what happens when you evaluate <code>counts["b"]</code> vs. <code>counts.get("b", 0)</code>?</p>
+  <p class="q">Given <code>menu = {"latte": 5}</code>, what happens when you run <code>menu["mocha"]</code> vs. <code>menu.get("mocha", 0)</code>?</p>
   <div class="opts">
-    <button>Both return <code>0</code>, while <code>counts.get("b", 0)</code> also inserts <code>"b": 0</code></button>
-    <button data-correct><code>counts["b"]</code> raises <code>KeyError</code>; <code>counts.get("b", 0)</code> returns <code>0</code> safely</button>
-    <button><code>counts["b"]</code> returns <code>None</code>; <code>counts.get("b", 0)</code> raises <code>KeyError</code></button>
+    <button>Both return <code>0</code>, and <code>.get()</code> also adds <code>"mocha": 0</code> into <code>menu</code></button>
+    <button data-correct><code>menu["mocha"]</code> raises <code>KeyError</code>; <code>menu.get("mocha", 0)</code> returns <code>0</code> safely without editing <code>menu</code></button>
+    <button><code>menu["mocha"]</code> returns <code>None</code>; <code>menu.get("mocha", 0)</code> raises <code>KeyError</code></button>
   </div>
-  <div class="fb right"><p>Exact! Direct bracket indexing <code>counts["b"]</code> fails loudly with <code>KeyError</code> when a key is absent, whereas <code>.get("b", 0)</code> returns the fallback <code>0</code> and leaves <code>counts</code> untouched.</p></div>
-  <div class="fb wrong"><p>Check a second dictionary <code>scores = {"kim": 10}</code> when looking up an unknown player <code>"lee"</code>: <code>scores["lee"]</code> immediately crashes with <code>KeyError: 'lee'</code>, while <code>scores.get("lee", 0)</code> quietly hands back <code>0</code> without adding <code>"lee"</code> into <code>scores</code>! (Day 4's <code>defaultdict</code> is the specialized tool that auto-inserts on read.)</p></div>
+  <div class="fb right"><p>Exact! Square brackets <code>menu["mocha"]</code> fail loudly with <code>KeyError</code> when a key isn't there, while <code>.get("mocha", 0)</code> returns your fallback value and leaves <code>menu</code> untouched.</p></div>
+  <div class="fb wrong"><p>Try a tiny phonebook <code>phones = {"Maya": "555-0100"}</code>: asking for <code>phones["Sam"]</code> crashes right away with <code>KeyError: 'Sam'</code>, whereas <code>phones.get("Sam", "unknown")</code> hands back <code>"unknown"</code> cleanly without adding <code>"Sam"</code> to the phonebook.</p></div>
 </div>
 
-<p>A dictionary maps each key to a payload value. What when you do <em>not</em> need a value at all — you only care whether an item has been seen before, or which tags were added, removed, or kept between two snapshots?</p>
+<p>A dictionary pairs each label with a value. What if you don't need values at all — you just want unique items, instant "have I seen this already?" checks, or a clean way to compare two groups?</p>
 
 <!-- ============================================================ -->
-<h2 id="s5"><span class="sec-num">5</span>How do sets give you instant membership checks and clean set math?</h2>
+<h2 id="s5"><span class="sec-num">5</span>Sets: unique items, instant checks, and comparing two groups</h2>
 
-<p>A <b><code>set</code></b> is a <b>badge-check gate</b> holding unique hashable items with <code>O(1)</code> average membership checks (<code>x in seen</code>). Watch one critical syntax trap on day one: writing <code>{}</code> creates an empty <b>dictionary</b>, NOT a set — always write <code>seen = set()</code> for an empty set!</p>
+<p>A <b><code>set</code></b> holds unique items with zero duplicates and lets you check <code>item in seen</code> instantly. Memorize one syntax gotcha right away: empty curly braces <code>{}</code> make an empty <b>dictionary</b>, NOT a set — always write <b><code>seen = set()</code></b> for an empty set! To turn an existing list into a set (dropping duplicates), call <code>set(my_list)</code>.</p>
 
-<pre><code># py_foundations: dedupe_preserve_order — O(n) via set + list (NOT O(n²) `in out`!)
-def dedupe_preserve_order(items):
-    seen = set()              # MUST be set(), never {}!
-    out = []
-    for item in items:
-        if item not in seen:  # O(1) average badge check!
-            seen.add(item)
-            out.append(item)
-    return out</code></pre>
+<pre><code>seen = set()          # empty set (NEVER {}!)
+seen.add("Maya")      # adds "Maya"
+seen.add("Maya")      # already there — ignored!
+seen.discard("Zoe")   # safe remove (no error if "Zoe" isn't in seen)
+"Maya" in seen        # True — instant check!
 
-<p>Use <code>seen.add(x)</code> to insert and <code>seen.discard(x)</code> to remove safely without crashing if <code>x</code> isn't there (whereas <code>seen.remove(x)</code> raises <code>KeyError</code> if missing). Better yet, Python sets support clean mathematical <b>set algebra</b> in one symbol — turning multi-loop comparisons into single expressions (this solves <code>tag_diff</code> in <code>py_foundations.py</code>!):</p>
+old = set(["latte", "tea", "mocha", "tea"])  # {"latte", "tea", "mocha"}</code></pre>
+
+<p>Because a set does not remember insertion order, a favorite everyday trick is pairing a <b><code>set</code></b> (for instant duplicate checks) with a <b><code>list</code></b> (to keep items in the order they arrived). Suppose you want to keep unique song requests in order:</p>
+
+<pre><code>requests = ["Song B", "Song A", "Song B", "Song C", "Song A"]
+seen = set()
+playlist = []
+
+for song in requests:
+    if song not in seen:        # instant check — even with 50,000 songs!
+        seen.add(song)
+        playlist.append(song)
+# playlist is ["Song B", "Song A", "Song C"]</code></pre>
+
+<p>Sets also shine when comparing two groups using clean 1-symbol operators. Picture comparing last week's café drinks against this week's menu:</p>
 
 <div class="figure">
-  <svg class="viz" viewBox="0 0 720 148" role="img" aria-label="Visualizing Python set algebra on cur = {a, b, c} and tgt = {b, c, d}: tgt - cur gives {d}, cur - tgt gives {a}, cur &amp; tgt gives {b, c}, and cur | tgt gives {a, b, c, d}">
-    <text x="16" y="24" class="label" fill="var(--muted)" font-weight="700">cur = {"a", "b", "c"}</text>
-    <text x="236" y="24" class="label" fill="var(--muted)" font-weight="700">tgt = {"b", "c", "d"}</text>
+  <svg class="viz" viewBox="0 0 720 148" role="img" aria-label="Comparing two Python sets old = {'latte', 'tea', 'mocha'} and new = {'tea', 'mocha', 'matcha'} with difference, intersection, and union">
+    <text x="16" y="24" class="label" fill="var(--muted)" font-weight="700">old = {"latte", "tea", "mocha"}</text>
+    <text x="290" y="24" class="label" fill="var(--muted)" font-weight="700">new = {"tea", "mocha", "matcha"}</text>
 
     <rect x="14" y="38" width="166" height="96" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.6"/>
-    <text x="97" y="60" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">tgt - cur</text>
-    <text x="97" y="84" class="label" text-anchor="middle">Difference (add)</text>
-    <text x="97" y="112" class="label" text-anchor="middle" font-weight="700">{"d"}</text>
+    <text x="97" y="60" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">new - old</text>
+    <text x="97" y="84" class="label" text-anchor="middle">Newly added</text>
+    <text x="97" y="112" class="label" text-anchor="middle" font-weight="700">{"matcha"}</text>
 
     <rect x="190" y="38" width="166" height="96" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
-    <text x="273" y="60" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">cur - tgt</text>
-    <text x="273" y="84" class="label" text-anchor="middle">Difference (drop)</text>
-    <text x="273" y="112" class="label" text-anchor="middle" font-weight="700">{"a"}</text>
+    <text x="273" y="60" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">old - new</text>
+    <text x="273" y="84" class="label" text-anchor="middle">Removed</text>
+    <text x="273" y="112" class="label" text-anchor="middle" font-weight="700">{"latte"}</text>
 
     <rect x="366" y="38" width="166" height="96" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
-    <text x="449" y="60" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">cur &amp; tgt</text>
-    <text x="449" y="84" class="label" text-anchor="middle">Intersection (kept)</text>
-    <text x="449" y="112" class="label" text-anchor="middle" font-weight="700">{"b", "c"}</text>
+    <text x="449" y="60" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">old &amp; new</text>
+    <text x="449" y="84" class="label" text-anchor="middle">In both</text>
+    <text x="449" y="112" class="label" text-anchor="middle" font-weight="700">{"tea", "mocha"}</text>
 
     <rect x="542" y="38" width="166" height="96" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
-    <text x="625" y="60" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">cur | tgt / ^</text>
-    <text x="625" y="84" class="label" text-anchor="middle">Union / Sym-diff</text>
-    <text x="625" y="112" class="label" text-anchor="middle" font-weight="700">all / {"a", "d"}</text>
+    <text x="625" y="60" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">old | new</text>
+    <text x="625" y="84" class="label" text-anchor="middle">All combined</text>
+    <text x="625" y="112" class="label" text-anchor="middle" font-weight="700">all 4 drinks</text>
   </svg>
-  <div class="cap">Sets do <em>not</em> guarantee a sorted order — wrap set results with <code>sorted(...)</code> whenever deterministic alphabetical output is required.</div>
+  <div class="cap">Also handy: <code>old ^ new</code> gives items in <em>only one</em> menu (<code>{"latte", "matcha"}</code>). Because sets don't promise alphabetical order, wrap any set result in <code>sorted(...)</code> whenever you want a neat sorted list back!</div>
 </div>
 
-<pre><code># py_foundations: tag_diff — O(n + m) set algebra + O(k log k) sort
-def tag_diff(current, target):
-    cur, tgt = set(current), set(target)
-    return (sorted(tgt - cur), sorted(cur - tgt), sorted(cur &amp; tgt))</code></pre>
-
-<div class="keyidea">Create empty sets with <code>set()</code> (never <code>{}</code>), pair a <code>set</code> with a <code>list</code> whenever you need both uniqueness and insertion order in <code>O(n)</code>, and use <code>&amp;</code>, <code>|</code>, <code>-</code>, and <code>^</code> to compare collections without nested loops.</div>
+<div class="keyidea">Create empty sets with <code>set()</code> (never <code>{}</code>), convert lists with <code>set(items)</code>, pair a <code>set</code> with a <code>list</code> when you need both uniqueness and original order, and use <code>-</code>, <code>&amp;</code>, <code>|</code>, and <code>^</code> to compare two groups cleanly.</div>
 
 <div class="check" id="check-set-empty">
-  <p class="q">You initialize <code>seen = {}</code> at the top of a loop and call <code>seen.add("req_1")</code> on the next line. What happens?</p>
+  <p class="q">You write <code>guests = {}</code> and then call <code>guests.add("Maya")</code>. What happens?</p>
   <div class="opts">
-    <button>It inserts <code>"req_1"</code> cleanly because <code>{}</code> turns into a set on <code>.add()</code></button>
+    <button>It adds <code>"Maya"</code> and turns <code>guests</code> into a set</button>
     <button data-correct>Raises <code>AttributeError</code> because <code>{}</code> creates an empty <code>dict</code>, not a <code>set</code></button>
-    <button>It stores <code>{"req_1": None}</code> silently inside a dictionary instead of a set</button>
+    <button>It stores <code>{"Maya": None}</code> inside a dictionary</button>
   </div>
-  <div class="fb right"><p>Spot on! Because empty braces <code>{}</code> belong to <code>dict</code> in Python, calling <code>.add()</code> fails with <code>AttributeError: 'dict' object has no attribute 'add'</code>. Always write <code>seen = set()</code>.</p></div>
-  <div class="fb wrong"><p>Check <code>type({})</code> vs. <code>type({1})</code> in your head: non-empty <code>{1}</code> has no colons so Python knows it is a <code>set</code>, whereas empty <code>{}</code> is ambiguous and always creates an empty <code>dict</code>! Dictionaries don't have an <code>.add()</code> method, so <code>seen = {}</code> crashes the instant you call <code>seen.add(...)</code> — use <code>seen = set()</code>.</p></div>
+  <div class="fb right"><p>Caught it! Empty braces <code>{}</code> always belong to <code>dict</code>, which has no <code>.add()</code> method. Write <code>guests = set()</code> for an empty set.</p></div>
+  <div class="fb wrong"><p>Compare <code>{"Maya"}</code> with <code>{}</code>: when there is an item inside with no colon, Python knows <code>{"Maya"}</code> is a set. When the braces are empty, Python always creates an empty <code>dict</code> — so <code>guests.add("Maya")</code> fails immediately until you write <code>guests = set()</code>.</p></div>
 </div>
 
-<p>Now you know all four workshop containers — and just like control flow, four specific container mistakes account for almost every Phase 0 bug.</p>
+<div class="check" id="check-dedupe-cost">
+  <p class="q">Suppose you have 50,000 unique song requests and want to keep only the first occurrence of each. Why is checking <code>if song not in seen:</code> (a <code>set</code>) dramatically faster than checking <code>if song not in playlist:</code> (a <code>list</code>)?</p>
+  <div class="opts">
+    <button>Because <code>list.append()</code> shifts the whole list every time</button>
+    <button>Because Python does not allow <code>not in</code> on lists</button>
+    <button data-correct>Because checking a <code>list</code> walks through every earlier song one by one, while checking a <code>set</code> jumps straight to the answer</button>
+  </div>
+  <div class="fb right"><p>Spot on! On 50,000 unique songs, checking the list compares against up to 49,999 earlier songs per turn (over a billion checks total!), whereas checking the helper <code>set</code> takes just one quick lookup per song.</p></div>
+  <div class="fb wrong"><p>Picture a paper list of 50,000 song titles in random order: to know if song #50,000 is already written down, your finger has to scan all 49,999 lines above it! A <code>set</code> acts like an instant index — it answers "already seen?" in one step without scanning the list.</p></div>
+</div>
 
 <!-- ============================================================ -->
-<h2 id="s6"><span class="sec-num">6</span>How do you pick the right container — and what four bugs bite hardest?</h2>
+<h2 id="s6"><span class="sec-num">6</span>Choosing the right container — and four mistakes to avoid</h2>
 
-<p>Before typing a single bracket or brace, check this quick mental filter — and watch out for the four traps below:</p>
+<p>Whenever you start a new function, ask one quick question:</p>
 <ul>
-  <li>Need <b>order, duplicates, or indexing</b> (or a LIFO stack)? → <b><code>list</code></b>.</li>
-  <li>Need a <b>fixed record, coordinate, or dict/set key</b>? → <b><code>tuple</code></b>.</li>
-  <li>Need <b>key → value lookups</b> (counts, caches, index maps)? → <b><code>dict</code></b>.</li>
-  <li>Need <b>unique items, fast <code>in</code> checks, or diffs</b>? → <b><code>set</code></b>.</li>
+  <li>Do I need items in order, possibly with duplicates? → <b><code>list</code></b></li>
+  <li>Is it a fixed group of values (like a coordinate or pair) that shouldn't change? → <b><code>tuple</code></b></li>
+  <li>Do I want to look up values by label, count items, or group things? → <b><code>dict</code></b></li>
+  <li>Do I only care about unique items, instant <code>in</code> checks, or comparing two groups? → <b><code>set</code></b></li>
 </ul>
 
+<p>Watch out for these four everyday container mistakes:</p>
+
 <div class="figure">
-  <svg class="viz" viewBox="0 0 720 148" role="img" aria-label="Four classic Python data-structure traps: empty braces creating a dict, missing trailing comma on a 1-tuple, quadratic x in list scans inside a loop, and using a mutable list as a dict or set key">
+  <svg class="viz" viewBox="0 0 720 148" role="img" aria-label="Four common Python container pitfalls: empty braces making a dict, missing comma on a 1-tuple, scanning a list inside a loop, and putting an editable list inside a set or dict">
     <rect x="12" y="14" width="166" height="120" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
     <text x="95" y="36" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">1. {} IS A DICT</text>
-    <text x="95" y="60" class="label" text-anchor="middle">s = {}; s.add(1)</text>
+    <text x="95" y="60" class="label" text-anchor="middle">s = {} then s.add</text>
     <text x="95" y="84" class="label" text-anchor="middle" fill="var(--bad)">→ AttributeError!</text>
     <text x="95" y="112" class="label" text-anchor="middle" fill="var(--ok)">Fix: s = set()</text>
 
@@ -306,110 +350,49 @@ def tag_diff(current, target):
 
     <rect x="364" y="14" width="166" height="120" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
     <text x="447" y="36" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">3. IN LIST LOOP</text>
-    <text x="447" y="60" class="label" text-anchor="middle">if x in out:</text>
-    <text x="447" y="84" class="label" text-anchor="middle" fill="var(--bad)">→ O(n²) timeout!</text>
+    <text x="447" y="60" class="label" text-anchor="middle">if x in big_list:</text>
+    <text x="447" y="84" class="label" text-anchor="middle" fill="var(--bad)">→ super slow!</text>
     <text x="447" y="112" class="label" text-anchor="middle" fill="var(--ok)">Fix: use a set</text>
 
     <rect x="540" y="14" width="168" height="120" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
-    <text x="624" y="36" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">4. MUTABLE KEY</text>
-    <text x="624" y="60" class="label" text-anchor="middle">seen.add([r, c])</text>
-    <text x="624" y="84" class="label" text-anchor="middle" fill="var(--bad)">→ unhashable!</text>
-    <text x="624" y="112" class="label" text-anchor="middle" fill="var(--ok)">Fix: tuple (r, c)</text>
+    <text x="624" y="36" class="label" text-anchor="middle" fill="var(--bad)" font-weight="700">4. LIST IN SET</text>
+    <text x="624" y="60" class="label" text-anchor="middle">pins.add([x, y])</text>
+    <text x="624" y="84" class="label" text-anchor="middle" fill="var(--bad)">→ TypeError!</text>
+    <text x="624" y="112" class="label" text-anchor="middle" fill="var(--ok)">Fix: tuple (x, y)</text>
   </svg>
-  <div class="cap">Also watch when a <code>set</code> is the <em>wrong</em> tool: sets drop duplicates and do not preserve insertion order, so pair <code>set</code> + <code>list</code> (or <code>dict.fromkeys</code>) whenever order matters.</div>
+  <div class="cap">Notice mistake #4: sets and dictionary keys must stay locked so Python never loses track of where it filed them (Python calls editable containers <em>"unhashable"</em>) — use a <code>tuple</code> instead of a <code>list</code>!</div>
 </div>
 
 <details class="aside deeper">
-  <summary>Go deeper: frozenset and dict.fromkeys for order-preserving deduplication</summary>
-  <p><b><code>frozenset</code>:</b> need a set of sets (for example, unordered pairs of graph nodes as dictionary keys)? A mutable <code>set</code> is unhashable, whereas <code>frozenset({u, v})</code> is sealed and hashable!</p>
-  <p><b>One-line deduplication:</b> because Python 3.7+ dictionaries preserve insertion order, <code>list(dict.fromkeys(items))</code> deduplicates hashable items in <code>O(n)</code> while keeping first-seen order — doing the same job as our explicit <code>seen = set()</code> + <code>out = []</code> loop in one expression.</p>
+  <summary>Optional bonus: frozenset and a 1-line order-preserving dedupe trick</summary>
+  <p><b><code>frozenset</code>:</b> need to put a set inside another set or use a set as a dictionary key? <code>frozenset({"a", "b"})</code> is a locked version of a set.</p>
+  <p><b>1-line dedupe:</b> because Python dictionaries remember insertion order, <code>list(dict.fromkeys(items))</code> removes duplicates while keeping first-seen order — doing the same job as our <code>seen = set()</code> + <code>playlist = []</code> loop in one expression.</p>
 </details>
 
 <div class="check" id="check-unhashable">
-  <p class="q">During a grid BFS, you track visited cells with <code>visited = set()</code> and execute <code>visited.add([r, c])</code>. What happens?</p>
+  <p class="q">You want to track saved map pins with <code>pins = set()</code> and write <code>pins.add([37, -122])</code>. What happens?</p>
   <div class="opts">
-    <button data-correct>Raises <code>TypeError: unhashable type: 'list'</code> — pass tuple <code>(r, c)</code> instead</button>
-    <button>Stores <code>[r, c]</code> cleanly because Python auto-converts lists inside sets</button>
-    <button>Adds the cell without error, yet later membership checks always return <code>False</code></button>
+    <button data-correct>Raises <code>TypeError: unhashable type: 'list'</code> — pass the tuple <code>(37, -122)</code> instead</button>
+    <button>Works fine — Python automatically converts lists inside sets</button>
+    <button>Adds the pin silently, but later <code>in</code> checks always return <code>False</code></button>
   </div>
-  <div class="fb right"><p>Caught it! Mutable containers (<code>list</code>, <code>dict</code>, <code>set</code>) have no stable hash and cannot sit inside a <code>set</code> or serve as a <code>dict</code> key. Pass the sealed tuple <code>(r, c)</code> instead.</p></div>
-  <div class="fb wrong"><p>Imagine storing a mutable list <code>pt = [0, 1]</code> in a hash bucket and then mutating <code>pt[0] = 9</code> — its contents would no longer match its bucket! To prevent silent corruption, Python disables hashing on lists, dicts, and sets and immediately raises <code>TypeError: unhashable type: 'list'</code>. Switch to <code>visited.add((r, c))</code>.</p></div>
+  <div class="fb right"><p>Spot on! Because a <code>list</code> can be edited later, Python calls it <em>unhashable</em> and refuses to put it inside a <code>set</code> or use it as a <code>dict</code> key. Switch to the locked tuple <code>pins.add((37, -122))</code>.</p></div>
+  <div class="fb wrong"><p>Think about filing a folder under a label written in pencil: if someone erased and changed the label after you filed it, you could never find it again! That's why Python blocks editable containers (<code>list</code>, <code>dict</code>, <code>set</code>) from being stored in a <code>set</code> or used as a <code>dict</code> key, raising <code>TypeError: unhashable type</code> right away. Use a locked tuple <code>(37, -122)</code> instead.</p></div>
 </div>
 
-<p>Now let's put all four containers together on one real interview snippet and watch the runtime collapse from quadratic to linear.</p>
-
-<!-- ============================================================ -->
-<h2 id="s7"><span class="sec-num">7</span>How you combine all four structures in an interview</h2>
-
-<p>Compare doing everything with repeated list scans and <code>+=</code> against combining <code>list</code>, <code>set</code>, <code>dict</code>, <code>tuple</code>, and <code>",".join()</code> for the exact same task (returning <code>(unique, counts, common_csv)</code> from two tag lists):</p>
-
-<div class="cols">
-  <div style="min-width:0">
-    <p class="small muted"><b>Before: O(n² + n·m) scans &amp; string copies</b></p>
-<pre><code>def summarize_tags(cur, tgt):
-    unique, counts = [], {}
-    for t in cur:
-        if t not in unique:       # O(n) scan!
-            unique.append(t)
-            counts[t] = cur.count(t)
-    common = [t for t in unique if t in tgt]
-    csv = ""
-    for t in sorted(common):
-        if csv:
-            csv += ","            # O(k²) copy!
-        csv += t
-    return (unique, counts, csv)</code></pre>
-  </div>
-  <div style="min-width:0">
-    <p class="small" style="color:var(--ok)"><b>After: O(n + m + k log k) with all 4 containers</b></p>
-<pre><code>def summarize_tags(cur, tgt):
-    seen, unique, counts = set(), [], {}
-    for t in cur:
-        counts[t] = counts.get(t, 0) + 1
-        if t not in seen:         # O(1) avg!
-            seen.add(t)
-            unique.append(t)
-    # O(n + m) set intersection + O(k log k) sort
-    common = sorted(seen &amp; set(tgt))
-    csv = ",".join(common)        # O(k) copy!
-    return (unique, counts, csv)  # tuple!</code></pre>
-  </div>
-</div>
-
-<div class="check" id="check-dedupe-cost">
-  <p class="q">You deduplicate 50,000 unique IDs. Why does checking <code>if x not in out:</code> on the output <code>list</code> fail work-capped tests while checking <code>if x not in seen:</code> on a helper <code>set</code> passes instantly?</p>
-  <div class="opts">
-    <button>Because <code>list.append()</code> shifts the whole list every time a new ID arrives</button>
-    <button>Because Python refuses to run <code>not in</code> on lists longer than 10,000 items</button>
-    <button data-correct>Because <code>in list</code> scans <code>O(n)</code> per item (<code>O(n²)</code> total), while <code>in set</code> is <code>O(1)</code> avg</button>
-  </div>
-  <div class="fb right"><p>Spot on! On 50,000 unique IDs, <code>in out</code> compares against <code>0 + 1 + 2 + ... + 49,999 ≈ 1.25 billion</code> items, whereas <code>in seen</code> checks one hash bucket per ID (~50,000 steps total).</p></div>
-  <div class="fb wrong"><p>Count comparisons on just 5 unique items <code>[10, 20, 30, 40, 50]</code>: with <code>if x not in out:</code>, item 5 has to check all 4 earlier items; with 50,000 items, item 50,000 checks 49,999 earlier items — summing to <code>n(n-1)/2</code> (<code>O(n²)</code>)! A helper <code>set</code> hashes straight to the slot in <code>O(1)</code> average time per item (<code>O(n)</code> total).</p></div>
-</div>
-
-<p>Now that you know all four workshop containers inside out, tomorrow's chapter (<a href="python-memory-model.html">Chapter 10.10</a>) zooms into that exact workshop floor to explain what happens when <em>two</em> variable names point to the same open <code>list</code> or <code>dict</code> — unlocking every copying, grid-aliasing, and closure mystery from one rule.</p>
-
-<!-- ============================================================ -->
-<h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
-
-<p>Before finishing all five drills in <code>py_foundations.py</code> and starting Day 2 (<a href="python-memory-model.html">Chapter 10.10</a>), make sure you can explain these four points cleanly in 45 seconds:</p>
-<ol>
-  <li><b><code>list</code> costs:</b> "Lists give <code>O(1)</code> indexing and amortized <code>O(1)</code> <code>append</code>/<code>pop()</code> at the back, while <code>insert(0)</code>, <code>pop(0)</code>, and <code>x in list</code> are <code>O(n)</code>."</li>
-  <li><b><code>tuple</code> &amp; <code>str</code>:</b> "Tuples are immutable so coordinates like <code>(r, c)</code> hash safely for dicts and sets (and 1-tuples need a trailing comma <code>(x,)</code>); strings are immutable too, so I collect chunks in a list and join once with <code>"".join(parts)</code> in <code>O(n)</code>."</li>
-  <li><b><code>dict</code> patterns:</b> "Dictionaries give <code>O(1)</code> average key lookup while preserving insertion order; I use <code>.get(k, default)</code> and <code>.pop(k, None)</code> to avoid <code>KeyError</code>."</li>
-  <li><b><code>set</code> membership &amp; math:</b> "Sets give <code>O(1)</code> average <code>in</code> checks and clean <code>&amp;</code>, <code>|</code>, <code>-</code>, <code>^</code> diffs — always initializing empty sets with <code>set()</code> rather than <code>{}</code>."</li>
-</ol>
+<p>You now have Python's core control flow and all five everyday data structures under your belt! In the next chapter (<a href="python-memory-model.html">How Python holds data in memory</a>), we'll zoom in on what happens when two variable names point to the <em>same</em> list or dictionary — one simple picture that prevents Python's sneakiest copying bugs.</p>
 
 <!-- ============================================================ -->
 <h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<p class="small muted">Full syntax &amp; method lookup: <a href="../../../python-cheatsheet.html#s3">Strings (§3)</a> · <a href="../../../python-cheatsheet.html#s4">Lists &amp; tuples (§4)</a> · <a href="../../../python-cheatsheet.html#s5">Dicts &amp; sets (§5)</a></p>
 <div class="table-wrap"><table>
-  <thead><tr><th>Structure</th><th>Editable?</th><th>Ordered?</th><th>Key / index / membership costs</th><th>Go-to interview job</th></tr></thead>
+  <thead><tr><th>Type</th><th>Editable?</th><th>Ordered?</th><th>Key habits &amp; speed intuition</th><th>Everyday job</th></tr></thead>
   <tbody>
-    <tr><td><code>list</code> <code>[1, 2]</code></td><td>Yes</td><td>Yes</td><td><code>a[i]</code>: <code>O(1)</code> · <code>append</code>, <code>pop()</code>: <code>O(1)</code> amort · <code>pop(0)</code>, <code>in</code>: <code>O(n)</code></td><td>Sequences, stacks, output buffers</td></tr>
-    <tr><td><code>tuple</code> <code>(1, 2)</code></td><td>No</td><td>Yes</td><td><code>t[i]</code>: <code>O(1)</code> · hashable if items hashable</td><td>Coords <code>(r, c)</code>, multi-returns, dict keys</td></tr>
-    <tr><td><code>str</code> <code>"abc"</code></td><td>No</td><td>Yes</td><td><code>s[i]</code>: <code>O(1)</code> · <code>"".join(parts)</code>: <code>O(n)</code></td><td>Parsing (<code>strip</code>/<code>split</code>/<code>lower</code>)</td></tr>
-    <tr><td><code>dict</code> <code>{"a": 1}</code></td><td>Yes</td><td>Insert order</td><td><code>d[k]</code>, <code>d.get</code>, <code>k in d</code>: <code>O(1)</code> avg</td><td>Counts, index maps, caches</td></tr>
-    <tr><td><code>set</code> <code>set()</code></td><td>Yes</td><td>No</td><td><code>x in s</code>, <code>add</code>, <code>discard</code>: <code>O(1)</code> avg</td><td>Visited tracking, dedup, <code>&amp; | - ^</code></td></tr>
+    <tr><td><code>list</code> <code>[1, 2]</code></td><td>Yes</td><td>Yes</td><td><code>a[0]</code>, <code>a[-1]</code>, <code>append</code>, <code>pop()</code> are instant · front edits &amp; <code>in</code> walk the list</td><td>Playlists, shopping carts, collecting results</td></tr>
+    <tr><td><code>tuple</code> <code>(1, 2)</code></td><td>No</td><td>Yes</td><td>Unpacks cleanly · 1-item needs comma <code>(42,)</code> · allowed as dict/set key</td><td>Map pins, pairs, returning 2+ values</td></tr>
+    <tr><td><code>str</code> <code>"abc"</code></td><td>No</td><td>Yes</td><td><code>strip()</code>, <code>lower()</code>, <code>split()</code> · join many pieces with <code>"".join(parts)</code></td><td>Text cleaning, parsing, messages</td></tr>
+    <tr><td><code>dict</code> <code>{"a": 1}</code></td><td>Yes</td><td>Insert order</td><td>Instant lookup by key · use <code>.get(k, default)</code> &amp; <code>.pop(k, None)</code></td><td>Menus, counts, grouping into lists</td></tr>
+    <tr><td><code>set</code> <code>set()</code></td><td>Yes</td><td>No</td><td>Empty set is <code>set()</code> (not <code>{}</code>) · instant <code>in</code> check · <code>- &amp; | ^</code> diffs</td><td>Unique items, fast checks, group diffs</td></tr>
   </tbody>
 </table></div>
 
@@ -417,37 +400,37 @@ def tag_diff(current, target):
 
 <!-- ============================================================ -->
 <h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
-<p>Work Warm-ups 1–2 on paper first, then finish all five drills in <a href="../exercises/py_foundations.py">py_foundations.py</a> (you now have every concept from Chapters 10.13 and 10.14!).</p>
+<p>Try Warm-ups 1 and 2 on paper first, then finish the remaining three functions in <a href="../exercises/py_foundations.py">py_foundations.py</a> so the full 5-function foundations suite passes!</p>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>1. Predict the exact output (no Python!)</h4>
-  <p>Write what each expression produces: (a) <code>[10, 20, 30, 40][1:-1]</code>; (b) <code>type((5))</code> vs. <code>type((5,))</code>; (c) <code>{"a", "b", "c"} - {"b", "d"}</code>; (d) <code>{"x": 1}.get("y", 99)</code> and whether <code>"y"</code> is now in the dict.</p>
+  <h4>1. Predict the exact result</h4>
+  <p>Work out each one before peeking: (a) <code>[10, 20, 30, 40][1:-1]</code>; (b) what kind of value is <code>(5)</code> vs. <code>(5,)</code>? (c) <code>{"latte", "tea", "mocha"} - {"tea", "matcha"}</code>; (d) <code>{"latte": 5}.get("mocha", 0)</code> and whether <code>"mocha"</code> gets added to the dict.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) <code>[20, 30]</code> (starts at index 1, stops before index -1). (b) <code>int</code> vs. <code>tuple</code>. (c) <code>{"a", "c"}</code>. (d) Returns <code>99</code>, and <code>"y"</code> is <b>not</b> inserted into the dict.</p>
+    <p>(a) <code>[20, 30]</code> (starts at index <code>1</code>, stops before the last index <code>-1</code>). (b) <code>(5)</code> is an <code>int</code>; <code>(5,)</code> is a 1-item <code>tuple</code>. (c) <code>{"latte", "mocha"}</code>. (d) Returns <code>0</code>, and <code>"mocha"</code> is <b>not</b> added to the dict.</p>
   </details>
 </div>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>2. Fix three data-structure bugs</h4>
-  <p>Spot the bug and write the fix: (a) <code>seen = {}; seen.add(x)</code>; (b) <code>visited = set(); visited.add([row, col])</code>; (c) <code>out = ""; for w in words: out += w + " "</code> inside a 50,000-word loop.</p>
+  <h4>2. Fix three container bugs</h4>
+  <p>Spot what is wrong and write the fix: (a) creating <code>seen = {}</code> and then calling <code>seen.add("Maya")</code>; (b) creating <code>pins = set()</code> and then calling <code>pins.add([37, -122])</code>; (c) starting with <code>text = ""</code> and running <code>text += w + " "</code> inside a 50,000-word <code>for</code> loop.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) Empty <code>{}</code> is a <code>dict</code> → use <code>seen = set()</code>. (b) Lists are mutable and unhashable → store tuple <code>visited.add((row, col))</code>. (c) Repeated string copies are <code>O(n²)</code> → use <code>" ".join(words)</code> in <code>O(n)</code>.</p>
+    <p>(a) Empty <code>{}</code> creates a <code>dict</code> → write <code>seen = set()</code>. (b) Lists are editable and can't sit in a set → use tuple <code>pins.add((37, -122))</code>. (c) Repeated <code>+=</code> re-copies the whole string each turn (and adds a stray trailing space) → use <code>" ".join(words)</code>.</p>
   </details>
 </div>
 
 <div class="exercise">
-  <div class="tier core">Day 1 · Core code (all 5 drills)</div>
-  <h4>3. Complete the full foundations suite</h4>
-  <p>Implement <code>countdown_evens</code>, <code>first_negative_coords</code> (from Chapter 10.13), <code>dedupe_preserve_order</code>, <code>word_positions</code>, and <code>tag_diff</code> in <a href="../exercises/py_foundations.py">py_foundations.py</a>. Work-measuring tests verify <code>O(n)</code> deduplication and <code>O(n + m)</code> set diffs (catching slow <code>in list</code> scans deterministically).</p>
+  <div class="tier core">Day 1 · Hands-on coding (all 5 drills)</div>
+  <h4>3. Finish py_foundations.py</h4>
+  <p>Implement <code>dedupe_preserve_order</code>, <code>word_positions</code>, and <code>tag_diff</code> (plus the two Part 1 functions if you haven't yet) in <a href="../exercises/py_foundations.py">py_foundations.py</a>, then run the full suite:</p>
 <pre class="plain"><code>python3 -m pytest -k py_foundations</code></pre>
 </div>
 
 <div class="exercise">
-  <div class="tier stretch">Stretch · bare-editor container drill</div>
-  <h4>4. Explain container trade-offs aloud</h4>
-  <p>Close this page and explain in 60 seconds why <code>dedupe_preserve_order</code> pairs a <code>set</code> with a <code>list</code> instead of using <em>only</em> a <code>list</code> (too slow) or <em>only</em> a <code>set</code> (loses first-seen order) — and why Day 2's memory model matters the moment you pass that list to another function.</p>
+  <div class="tier stretch">Fluency practice · optional</div>
+  <h4>4. Build a tiny café receipt summary</h4>
+  <p>Open a scratch file or the <a href="../../../practice.html">Practice hub</a> and write <code>summarize_order(orders, menu)</code>: given a list of drink names like <code>["latte", "tea", "latte", "juice"]</code> and a price dict <code>{"latte": 5, "tea": 3}</code>, return a 3-value tuple: <code>(counts, missing_items, total_cost)</code> where <code>counts</code> is a dict of valid drinks ordered, <code>missing_items</code> is a sorted list of unique unknown drinks (using a <code>set</code>!), and <code>total_cost</code> is the total price.</p>
 </div>
 
 <nav class="chapter-nav">
@@ -459,36 +442,36 @@ def tag_diff(current, target):
 
 <script>
 (function () {
-  /* ---- Player 1: list.append(9) O(1) back vs list.insert(0, 9) O(n) front shift (section 2) ---- */
+  /* ---- Player 1: list.append at back (1 step) vs list.insert(0) at front (shifts everything) (section 2) ---- */
   (function () {
     const modes = {
       back: {
         frames: [
-          { arr: ["10", "20", "30", "40", "·"], cls: ["", "", "", "", "dim"], ptrs: { 4: "free" }, steps: 0, msg: "<code>nums = [10, 20, 30, 40]</code> with spare capacity at the back. Calling <code>nums.append(9)</code>..." },
-          { arr: ["10", "20", "30", "40", "9"], cls: ["", "", "", "", "done"], ptrs: { 4: "write" }, steps: 1, ok: true, msg: "<b>1 step (O(1) amortized)!</b> Writes <code>9</code> directly into slot 4 — zero existing elements moved!" }
+          { arr: ["apple", "mango", "peach", "pear", null], cls: ["", "", "", "", ""], ptrs: { 4: "open" }, steps: 0, msg: 'Starting list <code>fruits = ["apple", "mango", "peach", "pear"]</code>. Calling <code>fruits.append("kiwi")</code>...' },
+          { arr: ["apple", "mango", "peach", "pear", "kiwi"], cls: ["", "", "", "", "done"], ptrs: { 4: "write" }, steps: 1, ok: true, msg: '<b>1 step!</b> Drops <code>"kiwi"</code> right into the open slot at the back — zero other items moved.' }
         ]
       },
       front: {
         frames: [
-          { arr: ["10", "20", "30", "40", "·"], cls: ["", "", "", "", "dim"], ptrs: { 0: "target" }, steps: 0, msg: "Calling <code>nums.insert(0, 9)</code>: slot 0 is occupied, so Python must slide every box right first!" },
-          { arr: ["10", "20", "30", "·", "40"], cls: ["", "", "", "dim", "warn"], ptrs: { 4: "shift" }, steps: 1, msg: "Shift 1: moves <code>40</code> from index 3 → 4." },
-          { arr: ["10", "20", "·", "30", "40"], cls: ["", "", "dim", "warn", "warn"], ptrs: { 3: "shift" }, steps: 2, msg: "Shift 2: moves <code>30</code> from index 2 → 3." },
-          { arr: ["10", "·", "20", "30", "40"], cls: ["", "dim", "warn", "warn", "warn"], ptrs: { 2: "shift" }, steps: 3, msg: "Shift 3: moves <code>20</code> from index 1 → 2." },
-          { arr: ["·", "10", "20", "30", "40"], cls: ["dim", "warn", "warn", "warn", "warn"], ptrs: { 1: "shift" }, steps: 4, msg: "Shift 4: moves <code>10</code> from index 0 → 1 to free slot 0." },
-          { arr: ["9", "10", "20", "30", "40"], cls: ["bad", "warn", "warn", "warn", "warn"], ptrs: { 0: "write" }, steps: 5, bad: true, msg: "<b>5 steps (O(n))!</b> Every item shifted right — doing this <code>n</code> times in a loop costs <code>O(n²)</code>!" }
+          { arr: ["apple", "mango", "peach", "pear", null], cls: ["", "", "", "", ""], ptrs: { 0: "target" }, steps: 0, msg: 'Calling <code>fruits.insert(0, "kiwi")</code>: slot 0 is taken, so every fruit must scoot right first!' },
+          { arr: ["apple", "mango", "peach", null, "pear"], cls: ["", "", "", "", "warn"], ptrs: { 4: "scoot" }, steps: 1, msg: 'Scoot 1: moves <code>"pear"</code> from slot 3 → 4.' },
+          { arr: ["apple", "mango", null, "peach", "pear"], cls: ["", "", "", "warn", "warn"], ptrs: { 3: "scoot" }, steps: 2, msg: 'Scoot 2: moves <code>"peach"</code> from slot 2 → 3.' },
+          { arr: ["apple", null, "mango", "peach", "pear"], cls: ["", "", "warn", "warn", "warn"], ptrs: { 2: "scoot" }, steps: 3, msg: 'Scoot 3: moves <code>"mango"</code> from slot 1 → 2.' },
+          { arr: [null, "apple", "mango", "peach", "pear"], cls: ["", "warn", "warn", "warn", "warn"], ptrs: { 1: "scoot" }, steps: 4, msg: 'Scoot 4: moves <code>"apple"</code> from slot 0 → 1 to free slot 0.' },
+          { arr: ["kiwi", "apple", "mango", "peach", "pear"], cls: ["bad", "warn", "warn", "warn", "warn"], ptrs: { 0: "write" }, steps: 5, bad: true, msg: '<b>5 steps!</b> Every single item shifted right — doing this repeatedly inside a big loop gets slow fast.' }
         ]
       }
     };
-    const sel = V.el("select", { "aria-label": "Choose list operation" },
-      V.el("option", { value: "back" }, "Fast back: nums.append(9) — O(1)"),
-      V.el("option", { value: "front" }, "Slow front: nums.insert(0, 9) — O(n)"));
+    const sel = V.el("select", { "aria-label": "Choose list edit" },
+      V.el("option", { value: "back" }, 'Back: fruits.append("kiwi") — 1 step'),
+      V.el("option", { value: "front" }, 'Front: fruits.insert(0, "kiwi") — shifts all'));
     const api = V.player(document.getElementById("viz-list-ends"), {
       frames: modes.back.frames,
       speed: 900,
       extraControls: [sel],
       draw(f, stage) {
         const shelfRow = V.el("div", { style: "margin-bottom:12px" },
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, `List shelf slots · writes/shifts so far: ${f.steps}`),
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, `List slots · steps so far: ${f.steps}`),
           V.el("div", { style: "white-space:nowrap" }, V.cells(f.arr, { ptrs: f.ptrs, idx: true, cls: (i) => f.cls[i] || "" })));
         stage.append(shelfRow);
       }
@@ -496,25 +479,25 @@ def tag_diff(current, target):
     sel.onchange = () => api.load(modes[sel.value].frames);
   })();
 
-  /* ---- Player 2: Building word_positions("Go dog go") dict in one pass (section 4) ---- */
+  /* ---- Player 2: Grouping friends by city into a dict (section 4) ---- */
   (function () {
-    const tokens = ["go", "dog", "go"];
+    const people = ['("Maya", "NYC")', '("Sam", "LA")', '("Kai", "NYC")'];
     const frames = [
-      { pos: -1, entries: ["(empty dict)"], msg: "Start: <code>tokens = \"Go dog go\".lower().split()</code> → <code>['go', 'dog', 'go']</code>, <code>positions = {}</code>." },
-      { pos: 0, entries: ["'go': [0]"], msg: "<code>i = 0</code>, word <code>'go'</code>: not in dict yet → creates bucket <code>[]</code> and appends <code>0</code>." },
-      { pos: 1, entries: ["'go': [0]", "'dog': [1]"], msg: "<code>i = 1</code>, word <code>'dog'</code>: not in dict yet → creates bucket <code>[]</code> and appends <code>1</code>." },
-      { pos: 2, entries: ["'go': [0, 2]", "'dog': [1]"], ok: true, msg: "<code>i = 2</code>, word <code>'go'</code>: <b>O(1) dict hit!</b> Appends <code>2</code> to existing <code>'go'</code> bucket → <code>{'go': [0, 2], 'dog': [1]}</code>!" }
+      { pos: -1, entries: ["(empty dict)"], msg: 'Start with <code>by_city = {}</code> and walk through each <code>(name, city)</code> pair.' },
+      { pos: 0, entries: ['"NYC": ["Maya"]'], msg: '<code>"NYC"</code> is not in <code>by_city</code> yet → create list <code>[]</code> and append <code>"Maya"</code>.' },
+      { pos: 1, entries: ['"NYC": ["Maya"]', '"LA": ["Sam"]'], msg: '<code>"LA"</code> is not in <code>by_city</code> yet → create list <code>[]</code> and append <code>"Sam"</code>.' },
+      { pos: 2, entries: ['"NYC": ["Maya", "Kai"]', '"LA": ["Sam"]'], ok: true, msg: '<code>"NYC"</code> is already a key → jump straight to its list and append <code>"Kai"</code>!' }
     ];
     V.player(document.getElementById("viz-dict-build"), {
       frames,
       speed: 1050,
       draw(f, stage) {
-        const ptrs = f.pos >= 0 ? { [f.pos]: "i" } : {};
+        const ptrs = f.pos >= 0 ? { [f.pos]: "pair" } : {};
         const tokRow = V.el("div", { style: "margin-bottom:12px" },
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Lowercased tokens"),
-          V.el("div", { style: "white-space:nowrap" }, V.cells(tokens, { ptrs, idx: true, cls: (i) => i === f.pos ? (f.ok ? "done" : "hl") : (i < f.pos ? "dim" : "") })));
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Input pairs"),
+          V.el("div", { style: "white-space:nowrap;" + (f.pos < 0 ? "padding-top:22px" : "") }, V.cells(people, { ptrs, idx: false, cls: (i) => i === f.pos ? (f.ok ? "done" : "hl") : (i < f.pos ? "dim" : "") })));
         const dictRow = V.el("div", {},
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Dictionary positions (insertion-ordered)"),
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Dictionary by_city (keeps insertion order)"),
           V.el("div", { style: "white-space:nowrap" }, V.cells(f.entries, { idx: false, cls: () => f.ok ? "done" : (f.pos >= 0 ? "hl" : "") })));
         stage.append(tokRow, dictRow);
       }
