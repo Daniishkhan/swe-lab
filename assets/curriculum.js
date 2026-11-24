@@ -4253,7 +4253,7 @@ window.CURRICULUM = {
     {
      "file": "python-building-blocks.html",
      "topic": "10.12",
-     "title": "Python decorators and clean building blocks (Dataclasses, @memoize & @contextmanager)",
+     "title": "Classes, dataclasses, decorators, and with blocks",
      "status": "complete"
     },
     {
@@ -4271,19 +4271,19 @@ window.CURRICULUM = {
     {
      "file": "python-idioms.html",
      "topic": "10.11",
-     "title": "Transforming and streaming data (Comprehensions, itertools & lazy generators)",
+     "title": "Transforming and streaming data (comprehensions, itertools & generators)",
      "status": "complete"
     },
     {
      "file": "python-memory-model.html",
      "topic": "10.10",
-     "title": "How Python holds data in memory (Names, copies & closures)",
+     "title": "How Python holds data in memory (names, copies & closures)",
      "status": "complete"
     },
     {
      "file": "python-toolkit.html",
      "topic": "10.01",
-     "title": "Python for interview speed (Standard library toolkit)",
+     "title": "Python's everyday standard library toolkit",
      "status": "complete"
     }
    ],
@@ -4789,5 +4789,5 @@ window.CURRICULUM = {
  "reference": [
   "15"
  ],
- "generated": "2026-11-24 04:22"
+ "generated": "2026-11-24 17:03"
 };

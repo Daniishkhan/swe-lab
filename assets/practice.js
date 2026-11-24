@@ -171,7 +171,7 @@
     " · ",
     h("a", { href: "sections/10-code-quality-design-testing/concepts/python-building-blocks.html#summary" }, "Decorators & @dataclass"),
     " · ",
-    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-toolkit.html#s7" }, "Stdlib toolkit"));
+    h("a", { href: "sections/10-code-quality-design-testing/concepts/python-toolkit.html#summary" }, "Stdlib toolkit"));
 
   panes.editor = h("section", {},
     h("div", { class: "timer-bar" },

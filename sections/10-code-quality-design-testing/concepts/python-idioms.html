@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="topic" content="10.11">
-  <title>Transforming and streaming data (Comprehensions, itertools &amp; lazy generators)</title>
+  <title>Transforming and streaming data (comprehensions, itertools &amp; generators)</title>
   <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
   <link rel="stylesheet" href="../../../assets/style.css">
   <script src="../../../assets/curriculum.js"></script>
@@ -18,378 +18,342 @@
 <header class="chapter-head">
   <div class="eyebrow">Phase 0 · Day 2 · Part 2</div>
   <h1>Transforming and streaming data</h1>
-  <div class="meta"><span><span class="badge P0">P0</span> Phase 0 Python pipelines</span><span>about 16 minutes</span><span>6 quick checks · 4 exercises</span></div>
+  <div class="meta"><span><span class="badge P0">P0</span> Python fluency</span><span>about 15 minutes</span><span>6 quick checks · 4 exercises</span></div>
 </header>
 
-<p>Half of every coding interview is reshaping data: filtering invalid rows, sorting by two rules, flipping rows into columns, sliding a window over 100,000 numbers, or flattening nested streams. Writing manual index loops for every step eats half your clock — and building giant intermediate lists eats your memory. Python gives you one clean pipeline vocabulary that moves smoothly from small in-memory batches to endless lazy streams.</p>
+<p>Now that you know how Python stores values and copies in memory, let's make your code shorter, clearer, and lighter on memory. Python gives you three everyday tools for working with sequences of data: <b>comprehensions</b> (building lists, dicts, and sets in one readable line), <b>custom sorting and pairing</b> (<code>sorted</code>, <code>enumerate</code>, <code>zip</code>), and <b>lazy generators</b> (processing huge or infinite streams one item at a time).</p>
 
 <div class="learn-list">
-  <h4>By the end you'll be able to</h4>
+  <h4>By the end of this chapter, you'll be comfortable with</h4>
   <ol>
-    <li>Filter, reshape, and rank collections in one readable pass using comprehensions and multi-rule sort keys.</li>
-    <li>Walk parallel sequences in lockstep and transpose 2D tables cleanly without manual index math.</li>
-    <li>Flip an eager in-memory list into a constant-memory lazy stream by swapping square brackets for parentheses.</li>
-    <li>Combine prebuilt stream helpers to replace slow sliding-window slicing with a single linear pass.</li>
-    <li>Write custom pausing streams that flatten arbitrarily nested or infinite inputs without hanging.</li>
+    <li>Writing clean list, dict, and set comprehensions — and knowing where filter <code>if</code> vs. transform <code>if / else</code> belong.</li>
+    <li>Sorting records by multiple rules using <code>sorted(..., key=lambda ...)</code> without editing the original list.</li>
+    <li>Pairing items with <code>enumerate</code> and <code>zip</code> — and flipping rows into columns with <code>zip(*table)</code>.</li>
+    <li>Switching from an eager list <code>[...]</code> to a lazy generator <code>(...)</code> or writing your own <code>yield</code> / <code>yield from</code> generator.</li>
+    <li>Using everyday <code>itertools</code> helpers (<code>islice</code>, <code>chain</code>, <code>groupby</code>, <code>accumulate</code>) to avoid slow repeated slicing.</li>
   </ol>
 </div>
 
-<p class="muted small">How to read this: top to bottom on Phase 0 Day 2 right after Part 1. Answer every quick check before moving on — a wrong answer explains the idea a second way. Skip collapsed "Go deeper" boxes on a first pass. Builds on <a href="python-memory-model.html">How Python holds data in memory</a>.</p>
+<p class="muted small">Keep <a href="../../../python-cheatsheet.html#s8">Python Cheatsheet (§8–§9)</a> open as your quick syntax table. This chapter builds directly on <a href="python-memory-model.html">Day 2 Part 1: How Python holds data in memory</a>.</p>
 
 <!-- ============================================================ -->
-<h2 id="s1"><span class="sec-num">1</span>Why do giant intermediate lists stall (or blow up) your code?</h2>
+<h2 id="s1"><span class="sec-num">1</span>Comprehensions: clean 1-line list, dict, and set builders</h2>
 
-<div class="story">
-  <p>Your service opens a <b>50-million-line</b> production log file to check one question: <em>"Does any line contain <code>FATAL</code>?"</em> The very third line is <code>FATAL: disk full</code>. Yet if you write <code>any(["FATAL" in line for line in lines])</code>, Python reads and allocates <b>all 50 million</b> booleans in RAM before <code>any()</code> ever inspects line 1 — burning over 400 MB of RAM and seconds of latency to find an answer sitting three lines in.</p>
-</div>
+<p>On Day 1, whenever you wanted to filter and transform a list, you wrote a 4-line loop: create an empty list, loop through items, check an <code>if</code>, and call <code>append</code>. A <b>list comprehension</b> expresses that exact same loop in one clean line:</p>
 
-<p>Every data-processing move in Python comes down to one physical choice: are you filling a <b>batch warehouse</b> or running a <b>conveyor belt</b>?</p>
-<ul>
-  <li><b>Batch warehouse (eager lists, dicts, sets):</b> builds every finished item upfront and stores them all on shelves in memory. Great when you need random access (<code>arr[i]</code>), sorting, <code>len()</code>, or multiple passes over the data.</li>
-  <li><b>Conveyor belt (lazy iterators &amp; generators):</b> produces <b>one item at a time</b> only when the next station pulls it — and halts immediately the moment you find your match or reach your limit.</li>
-</ul>
-
-<div class="figure">
-  <svg class="viz" viewBox="0 0 720 148" role="img" aria-label="Comparing an eager batch warehouse allocating 50 million entries upfront against a pull-based conveyor belt inspecting one line at a time and halting on the first match">
-    <rect x="14" y="16" width="324" height="116" rx="8" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.6"/>
-    <text x="28" y="38" class="label" fill="var(--bad)" font-weight="700">BATCH WAREHOUSE: [...] upfront</text>
-    <text x="28" y="62" class="label">• Builds all 50M results in RAM first</text>
-    <text x="28" y="84" class="label">• Wastes ~400 MB when hit is line #3</text>
-    <text x="28" y="106" class="label" fill="var(--bad)">• Hangs forever on an infinite stream!</text>
-
-    <line x1="346" y1="74" x2="370" y2="74" stroke="var(--ok)" stroke-width="2"/>
-    <polygon points="370,69 380,74 370,79" fill="var(--ok)"/>
-
-    <rect x="384" y="16" width="322" height="116" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
-    <text x="398" y="38" class="label" fill="var(--ok)" font-weight="700">CONVEYOR BELT: (...) or yield</text>
-    <text x="398" y="62" class="label">• Pulls 1 item at a time on demand</text>
-    <text x="398" y="84" class="label">• Stops on line #3 (49,999,997 skipped)</text>
-    <text x="398" y="106" class="label" fill="var(--ok)">• Handles infinite streams in O(1) RAM</text>
-  </svg>
-  <div class="cap">Pick the warehouse when you need the whole result stored; pick the conveyor belt when items only flow forward once.</div>
-</div>
-
-<p><em>Where the conveyor-belt analogy breaks:</em> a real factory belt runs on its own motor even if nobody picks up boxes. A Python iterator is <b>pull-driven</b> — zero work happens until the caller pulls the next item via <code>next()</code>, a <code>for</code> loop, <code>any()</code>, or <code>list()</code>.</p>
-
-<p>Let's walk this pipeline in order: first, shaping and ranking clean in-memory batches (§2–§3); then flipping the exact same syntax onto a lazy conveyor belt (§4); snapping on prebuilt <code>itertools</code> stations (§5); and finally building your own pausing stations with <code>yield</code> (§6).</p>
-
-<!-- ============================================================ -->
-<h2 id="s2"><span class="sec-num">2</span>How do you filter, shape, and rank a batch in one pass?</h2>
-
-<p>When you genuinely want a finished list, dictionary, or set in memory, Python's <b>comprehensions</b> replace 5 lines of <code>out = []; for ...: if ...: out.append(...)</code> with one scannable expression:</p>
-
-<pre><code># List, dict, and set comprehensions — build a finished batch cleanly
-squares = [x * x for x in nums if x % 2 == 0]
-by_id   = {u.id: u.name for u in users if u.active}
-domains = {email.split("@")[1] for email in emails}</code></pre>
-
-<p>Once you've filtered a batch of records, the very next interview move is usually <b>ranking</b> them by multiple rules — without mutating the caller's list. Pass a 1-line <code>lambda</code> (an unnamed rule function) returning a tuple to <code>sorted()</code>. Because Python compares tuples left-to-right (slot 0 first, slot 1 on ties, slot 2 next), negating numeric fields flips ascending into descending in one line:</p>
-
-<pre><code># py_idioms: rank_candidates — drop None scores, sort score DESC, penalty ASC, name ASC
-valid   = [r for r in records if r[1] is not None]      # Chapter 10.10: NOT `if r[1]:` (keeps 0!)
-ordered = sorted(valid, key=lambda r: (-r[1], r[2], r[0]))
-names   = [name for name, _, _ in ordered]</code></pre>
-
-<p>Trace three records through that key tuple: <code>("b", 90, 5) → (-90, 5, "b")</code>, <code>("c", 90, 2) → (-90, 2, "c")</code>, and <code>("a", 90, 2) → (-90, 2, "a")</code>. Slot 0 ties at <code>-90</code>, so slot 1 puts penalty <code>2</code> ahead of <code>5</code>, and slot 2 breaks the final tie alphabetically → <code>["a", "c", "b"]</code>. Notice also how Chapter 10.10's truthiness rule plugs in: checking <code>if r[1] is not None</code> keeps a legal score of <code>0</code> while <code>sorted()</code> returns a fresh batch, leaving <code>records</code> untouched.</p>
-
-<div class="keyidea">Use comprehensions to filter and reshape a batch in one line, test <code>is not None</code> whenever <code>0</code> or <code>""</code> is legal, and pass a tuple-returning <code>lambda</code> to <code>sorted()</code> for multi-rule ranking (negating numbers to sort descending).</div>
-
-<div class="check" id="check-comp-sort">
-  <p class="q">You want to rank <code>(name, score, penalty)</code> records by score <b>descending</b>, penalty <b>ascending</b>, then name <b>A→Z</b>. What breaks if you write <code>sorted(valid, key=lambda r: (r[1], r[2], r[0]), reverse=True)</code> instead of negating <code>r[1]</code>?</p>
-  <div class="opts">
-    <button data-correct>It flips penalty and name too — ranking both descending instead of ascending</button>
-    <button>Python raises <code>TypeError</code> because <code>reverse=True</code> cannot pair with a tuple key</button>
-    <button>It ignores <code>r[2]</code> and <code>r[0]</code> completely whenever two records tie on score</button>
+<div class="cols">
+  <div style="min-width:0">
+    <p class="small muted"><b>Standard 4-line loop</b></p>
+<pre><code>names = ["maya", "", "sam", "kai"]
+loud = []
+for name in names:
+    if name != "":
+        loud.append(name.upper())
+# ["MAYA", "SAM", "KAI"]</code></pre>
   </div>
-  <div class="fb right"><p>Sharp catch! Passing <code>reverse=True</code> reverses the <em>entire</em> tuple comparison — putting higher penalties and <code>"z"</code> before <code>"a"</code>. Negating only descending numeric fields inside the key (<code>(-r[1], r[2], r[0])</code>) keeps every rule's direction independent.</p></div>
-  <div class="fb wrong"><p>Trace two tied records: <code>("a", 90, 2)</code> vs. <code>("b", 90, 5)</code>. Their keys are <code>(90, 2, "a")</code> and <code>(90, 5, "b")</code>. With <code>reverse=True</code>, Python puts the <em>larger</em> tuple first — ranking penalty <code>5</code> ahead of penalty <code>2</code>! Negate only score (<code>(-r[1], r[2], r[0])</code>) so penalty and name stay ascending.</p></div>
+  <div style="min-width:0">
+    <p class="small" style="color:var(--ok)"><b>List comprehension (same result!)</b></p>
+<pre><code>names = ["maya", "", "sam", "kai"]
+loud = [name.upper() for name in names if name != ""]
+# ["MAYA", "SAM", "KAI"]</code></pre>
+  </div>
 </div>
-
-<p>That shapes and ranks one flat list of records. What when your input arrives across <em>two</em> parallel lists — or as a 2D table of rows that you need to read column by column?</p>
-
-<!-- ============================================================ -->
-<h2 id="s3"><span class="sec-num">3</span>How do you walk multiple sequences — or flip rows into columns?</h2>
-
-<p>Manual index loops (<code>for i in range(len(arr)):</code>) are an off-by-one magnet in bare-editor rounds. Instead, pair parallel sequences directly:</p>
-<ul>
-  <li><b><code>enumerate(xs)</code>:</b> pairs each item with its index <code>(0, x0), (1, x1), …</code> without maintaining a counter.</li>
-  <li><b><code>zip(names, scores)</code>:</b> walks two or more sequences in lockstep, stopping at the shortest one (pass <code>strict=True</code> in Python 3.10+ if unequal lengths should raise an error).</li>
-  <li><b><code>zip(*matrix)</code>:</b> the <code>*</code> unpacks each row of a 2D matrix as a separate argument to <code>zip</code> — tipping rows sideways into columns in three tokens!</li>
-</ul>
-
-<p>Better yet, both <code>enumerate</code> and <code>zip</code> already return lazy iterators — they pull one paired tuple at a time, and wrapping them in <code>[...]</code> or <code>list(...)</code> packs the stream into a batch warehouse whenever you need a finished list.</p>
 
 <div class="figure">
-  <svg class="viz" viewBox="0 0 700 144" role="img" aria-label="Visualizing zip(*matrix) unpacking two rows [1,5,3] and [4,2,6] into three column tuples (1,4), (5,2), (3,6) and filtering values >= 3">
-    <rect x="14" y="20" width="166" height="96" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
-    <text x="97" y="42" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">ROWS (matrix)</text>
-    <text x="97" y="70" class="label" text-anchor="middle">[ 1,  5,  3 ]</text>
-    <text x="97" y="94" class="label" text-anchor="middle">[ 4,  2,  6 ]</text>
+  <svg class="viz" viewBox="0 0 720 128" role="img" aria-label="Anatomy of a Python list comprehension: output expression name.upper(), loop source for name in names, and optional filter if name != empty string">
+    <rect x="14" y="18" width="212" height="92" rx="8" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text x="120" y="42" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">1. Output value</text>
+    <text x="120" y="68" class="label" text-anchor="middle">name.upper()</text>
+    <text x="120" y="94" class="label" text-anchor="middle" fill="var(--muted)">what goes in new list</text>
 
-    <line x1="186" y1="68" x2="224" y2="68" stroke="var(--accent)" stroke-width="2"/>
-    <polygon points="224,63 234,68 224,73" fill="var(--accent)"/>
-    <text x="208" y="56" class="label" text-anchor="middle" fill="var(--muted)">zip(*m)</text>
+    <rect x="244" y="18" width="232" height="92" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+    <text x="360" y="42" class="label" text-anchor="middle" fill="var(--accent)" font-weight="700">2. Loop source</text>
+    <text x="360" y="68" class="label" text-anchor="middle">for name in names</text>
+    <text x="360" y="94" class="label" text-anchor="middle" fill="var(--muted)">walks each item</text>
 
-    <rect x="238" y="20" width="202" height="96" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
-    <text x="339" y="42" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">COLUMNS (tuples)</text>
-    <text x="339" y="64" class="label" text-anchor="middle">col 0: (1, 4)</text>
-    <text x="339" y="83" class="label" text-anchor="middle">col 1: (5, 2)</text>
-    <text x="339" y="102" class="label" text-anchor="middle">col 2: (3, 6)</text>
-
-    <line x1="446" y1="68" x2="484" y2="68" stroke="var(--ok)" stroke-width="2"/>
-    <polygon points="484,63 494,68 484,73" fill="var(--ok)"/>
-    <text x="468" y="56" class="label" text-anchor="middle" fill="var(--muted)">v &gt;= 3</text>
-
-    <rect x="498" y="20" width="188" height="96" rx="8" fill="color-mix(in srgb, var(--ok) 10%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
-    <text x="592" y="42" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">FILTERED OUTPUT</text>
-    <text x="592" y="76" class="label" text-anchor="middle" font-weight="700">[[4], [5], [3, 6]]</text>
-    <text x="592" y="102" class="label" text-anchor="middle" fill="var(--ok)">original matrix intact!</text>
+    <rect x="494" y="18" width="212" height="92" rx="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.6"/>
+    <text x="600" y="42" class="label" text-anchor="middle" fill="var(--warn)" font-weight="700">3. Optional filter</text>
+    <text x="600" y="68" class="label" text-anchor="middle">if name != ""</text>
+    <text x="600" y="94" class="label" text-anchor="middle" fill="var(--muted)">runs BEFORE step 1</text>
   </svg>
-  <div class="cap"><code>zip(*[[1, 5, 3], [4, 2, 6]])</code> is identical to <code>zip([1, 5, 3], [4, 2, 6])</code> — pairing slot 0 with slot 0, slot 1 with slot 1, and slot 2 with slot 2.</div>
+  <div class="cap">Read a list comprehension from the middle out: loop over <code>names</code>, keep items passing <code>if</code>, then compute <code>name.upper()</code> for each survivor.</div>
 </div>
 
-<p>Combine that with a 1-line comprehension and <code>transpose_and_filter</code> in <code>py_idioms.py</code> shrinks to two readable lines (and handles empty <code>[]</code> or <code>[[], []]</code> cleanly):</p>
-<pre><code>def transpose_and_filter(matrix, threshold):
-    if not matrix:
-        return []
-    return [[v for v in col if v &gt;= threshold] for col in zip(*matrix)]</code></pre>
+<p>Notice the exact pattern — it also works for <b>dictionaries</b> (<code>{key: val for ...}</code>) and <b>sets</b> (<code>{val for ...}</code>):</p>
 
-<div class="keyidea">Use <code>enumerate</code> for index + item, <code>zip</code> for lockstep traversal, and <code>zip(*matrix)</code> to transpose rows into columns without a single nested index loop.</div>
+<pre><code># Filter "if" goes at the END (keeps only matching items)
+evens = [n for n in range(10) if n % 2 == 0]         # [0, 2, 4, 6, 8]
+
+# Transform "a if cond else b" goes at the FRONT (keeps EVERY item, changes value)
+scores = [85, 42, 73]
+labels = ["pass" if s &gt;= 60 else "fail" for s in scores]  # ["pass", "fail", "pass"]
+
+# Dict comprehension &amp; set comprehension
+lengths = {w: len(w) for w in ["latte", "tea"]}      # {"latte": 5, "tea": 3}
+unique_lower = {w.lower() for w in ["Go", "go"]}     # {"go"}
+
+# Safe 2D board from Part 1 in one line!
+board = [["."] * 3 for _ in range(3)]</code></pre>
+
+<p class="small muted"><b>Readability rule:</b> comprehensions shine for 1 loop (or a tiny 2D board). If you find yourself cramming 3 nested loops or tricky logic onto one line, switch back to a plain <code>for</code> loop!</p>
+
+<div class="keyidea">Use <code>[result for x in items if keep]</code> to filter and transform in one clean line. Filter <code>if</code> goes at the end; value-picking <code>a if cond else b</code> goes at the front.</div>
+
+<div class="check" id="check-comp-filter">
+  <p class="q">What list does <code>[x * 10 for x in [1, 2, 3, 4] if x &gt; 2]</code> produce?</p>
+  <div class="opts">
+    <button><code>[10, 20, 30, 40]</code> — multiplies every number first, then checks if <code>&gt; 2</code></button>
+    <button data-correct><code>[30, 40]</code> — filters for <code>x &gt; 2</code> first (keeping <code>3</code> and <code>4</code>), then multiplies by <code>10</code></button>
+    <button><code>[3, 4]</code> — ignores <code>x * 10</code> whenever an <code>if</code> filter is present</button>
+  </div>
+  <div class="fb right"><p>Spot on! Read a comprehension like its matching <code>for</code> loop: for each <code>x</code>, check <code>if x &gt; 2</code> first; only <code>3</code> and <code>4</code> pass, producing <code>3 * 10 = 30</code> and <code>4 * 10 = 40</code>.</p></div>
+  <div class="fb wrong"><p>Unfold a smaller example into a plain loop: <code>[n + 1 for n in [0, 5, 10] if n &gt; 0]</code> means "for each <code>n</code>, if <code>n &gt; 0</code>, append <code>n + 1</code>" → <code>[6, 11]</code>. Same order here: only <code>3</code> and <code>4</code> pass <code>x &gt; 2</code>, giving <code>[30, 40]</code>.</p></div>
+</div>
+
+<p>Once you've filtered a list down to the items you want, the next everyday task is sorting them by a custom rule.</p>
+
+<!-- ============================================================ -->
+<h2 id="s2"><span class="sec-num">2</span>Custom sorting with sorted and key=lambda</h2>
+
+<p>Python gives you two ways to sort:</p>
+<ul>
+  <li><b><code>sorted(items)</code></b> returns a <b>brand-new sorted list</b> and leaves <code>items</code> untouched (works on any iterable — lists, tuples, sets!).</li>
+  <li><b><code>items.sort()</code></b> edits the list <b>in place</b> and returns <b><code>None</code></b> (never write <code>new_list = items.sort()</code> — you'll get <code>None</code>!).</li>
+</ul>
+
+<p>To sort records by a custom rule, pass <b><code>key=</code></b> with a tiny <code>lambda</code> function (from Part 1) that extracts the value Python should sort by. Even better, returning a <b>tuple</b> from <code>key=</code> lets you break ties cleanly across multiple fields — and putting a minus sign (<code>-</code>) in front of a number sorts that field highest-first:</p>
+
+<pre><code># Each player is (name, points, errors)
+# Sort by: 1. points HIGHEST first (-p[1])
+#          2. errors LOWEST first  (p[2])
+#          3. name A-to-Z          (p[0])
+players = [("Sam", 80, 2), ("Maya", 95, 1), ("Kai", 80, 0), ("Amy", 80, 2)]
+
+ranked = sorted(players, key=lambda p: (-p[1], p[2], p[0]))
+# [("Maya", 95, 1), ("Kai", 80, 0), ("Amy", 80, 2), ("Sam", 80, 2)]
+
+# Pull out just the sorted names with a comprehension!
+names_only = [p[0] for p in ranked]
+# ["Maya", "Kai", "Amy", "Sam"]</code></pre>
+
+<div class="keyidea">Use <code>sorted(items, key=lambda row: ...)</code> when you want a fresh sorted list without editing the original. Return a tuple from <code>key</code> to sort by multiple tie-breakers, negating numbers (<code>-score</code>) for highest-first order.</div>
+
+<div class="check" id="check-sort-key">
+  <p class="q">Given <code>items = [("tea", 3), ("latte", 5), ("bagel", 5)]</code>, what order does <code>sorted(items, key=lambda x: (-x[1], x[0]))</code> produce?</p>
+  <div class="opts">
+    <button data-correct><code>[("bagel", 5), ("latte", 5), ("tea", 3)]</code> — highest price first, then A–Z on ties</button>
+    <button><code>[("tea", 3), ("bagel", 5), ("latte", 5)]</code> — lowest price first</button>
+    <button><code>[("latte", 5), ("bagel", 5), ("tea", 3)]</code> — highest price first, keeping original tie order</button>
+  </div>
+  <div class="fb right"><p>Spot on! Negating the price turns <code>5</code> into <code>-5</code> (coming before <code>-3</code>), so the $5 items come first. On the tie between <code>"latte"</code> and <code>"bagel"</code>, the second tuple slot <code>x[0]</code> sorts alphabetically: <code>"bagel"</code> before <code>"latte"</code>.</p></div>
+  <div class="fb wrong"><p>Try a fresh pair with the same key rule: for <code>[("pear", 4), ("fig", 4), ("apple", 2)]</code>, the sort tuples are <code>(-4, "pear")</code>, <code>(-4, "fig")</code>, and <code>(-2, "apple")</code>. Because <code>-4 &lt; -2</code> and <code>"fig" &lt; "pear"</code>, highest number wins first and A–Z breaks the tie — putting <code>"bagel"</code> before <code>"latte"</code> and <code>"tea"</code> last!</p></div>
+</div>
+
+<p>Now let's look at two built-in helpers that eliminate manual index counters whenever you loop over positions or pair up lists.</p>
+
+<!-- ============================================================ -->
+<h2 id="s3"><span class="sec-num">3</span>Pairing items with enumerate and zip (plus flipping tables)</h2>
+
+<p>Instead of writing <code>for i in range(len(guests)):</code> just to get both the number and the item, Python gives you <b><code>enumerate</code></b> and <b><code>zip</code></b>:</p>
+
+<ul>
+  <li><b><code>enumerate(items, start=0)</code></b> yields <code>(index, value)</code> pairs cleanly:
+<pre><code>guests = ["Maya", "Sam", "Kai"]
+for num, name in enumerate(guests, start=1):
+    print(num, name)       # 1 Maya, 2 Sam, 3 Kai</code></pre>
+  </li>
+  <li><b><code>zip(list_a, list_b)</code></b> walks two (or more) lists side by side in lockstep, pairing matching positions together. By default <code>zip</code> stops at the shortest list — pass <code>strict=True</code> (Python 3.10+) if mismatched lengths should raise a <code>ValueError</code>!
+<pre><code>drinks = ["latte", "tea", "mocha"]
+prices = [5, 3, 6]
+for drink, price in zip(drinks, prices, strict=True):
+    print(drink, "costs $", price)</code></pre>
+  </li>
+</ul>
+
+<p><b>One super-handy trick — flipping rows into columns with <code>zip(*table)</code>:</b> putting a star (<code>*</code>) in front of a list inside a function call <em>unpacks</em> its items as separate arguments. So if <code>table = [[1, 2, 3], [4, 5, 6]]</code>, calling <code>zip(*table)</code> is identical to calling <code>zip([1, 2, 3], [4, 5, 6])</code> — pairing column 0 together <code>(1, 4)</code>, column 1 together <code>(2, 5)</code>, and column 2 together <code>(3, 6)</code>!</p>
+
+<pre><code>table = [
+    [1, 5, 3],
+    [4, 2, 6],
+]
+columns = [list(col) for col in zip(*table)]
+# [[1, 4], [5, 2], [3, 6]]</code></pre>
+
+<p>Step through <code>zip(*table)</code> below to watch rows peel cleanly into columns:</p>
+
+<div class="figure">
+  <div id="viz-zip-transpose"></div>
+  <div class="cap"><code>zip(*table)</code> unpacks each row as an argument to <code>zip</code>, pulling matching column positions together one column at a time.</div>
+</div>
+
+<div class="keyidea">Use <code>enumerate(items)</code> for index + value, <code>zip(a, b, strict=True)</code> to walk lists side by side, and <code>zip(*table)</code> to flip rows into columns cleanly.</div>
 
 <div class="check" id="check-zip-transpose">
-  <p class="q">What does <code>list(zip(*[[10, 20], [30, 40], [50, 60]]))</code> return?</p>
+  <p class="q">What does <code>list(zip(["a", "b"], [1, 2, 3]))</code> return?</p>
   <div class="opts">
-    <button><code>[(10, 20), (30, 40), (50, 60)]</code> — three pairs matching the original rows</button>
-    <button><code>[10, 20, 30, 40, 50, 60]</code> — a single flattened list of all six numbers</button>
-    <button data-correct><code>[(10, 30, 50), (20, 40, 60)]</code> — two column tuples grouping each slot</button>
+    <button data-correct><code>[("a", 1), ("b", 2)]</code> — by default, <code>zip</code> stops when the shorter list runs out</button>
+    <button><code>[("a", 1), ("b", 2), (None, 3)]</code> — pads missing slots with <code>None</code></button>
+    <button>Raises <code>ValueError</code> automatically whenever lengths differ</button>
   </div>
-  <div class="fb right"><p>Exact! The <code>*</code> unpacks all three rows as separate arguments — <code>zip([10, 20], [30, 40], [50, 60])</code> — grouping index 0 together as <code>(10, 30, 50)</code> and index 1 together as <code>(20, 40, 60)</code>.</p></div>
-  <div class="fb wrong"><p>Try tracing a smaller 2×3 table first: <code>zip(*[[1, 2, 3], [4, 5, 6]])</code> unpacks into <code>zip([1, 2, 3], [4, 5, 6])</code>, producing three column pairs <code>[(1, 4), (2, 5), (3, 6)]</code>. Flip the shape to 3 rows × 2 columns and <code>zip(*...)</code> produces 2 column triples: <code>[(10, 30, 50), (20, 40, 60)]</code>.</p></div>
+  <div class="fb right"><p>Exact! Plain <code>zip</code> stops as soon as the shortest sequence ends, quietly ignoring the extra <code>3</code>. Pass <code>strict=True</code> whenever you want mismatched lengths to raise a <code>ValueError</code> instead.</p></div>
+  <div class="fb wrong"><p>Picture zipping a jacket whose left side has 2 teeth and right side has 3 teeth: you can only pair up 2 matching teeth before the shorter side ends! Python's <code>zip</code> behaves the exact same way — returning <code>[("a", 1), ("b", 2)]</code> unless you explicitly pass <code>strict=True</code>.</p></div>
 </div>
 
-<p>Notice what Sections 2 and 3 had in common: square brackets <code>[...]</code> always filled the entire batch warehouse upfront. Now watch what happens when your input holds 50 million lines and you only care about the first match — or the running sum.</p>
+<p>Notice something subtle about everything we built in §1: square brackets <code>[...]</code> always build the <em>entire</em> list right away in memory. What if you're scanning a 5-million-line log file and only need the first matching line — or a running total?</p>
 
 <!-- ============================================================ -->
-<h2 id="s4"><span class="sec-num">4</span>How do you switch from a warehouse to a conveyor belt with two characters?</h2>
+<h2 id="s4"><span class="sec-num">4</span>Lazy streams: generator expressions, yield, and yield from</h2>
 
-<p>Take any list comprehension and swap the outer square brackets <code>[...]</code> for parentheses <code>(...)</code>. You just turned a batch warehouse into a <b>generator expression</b> — a pull-on-demand conveyor belt! Whenever values flow straight into <code>sum()</code>, <code>any()</code>, <code>all()</code>, <code>min()</code>, <code>max()</code>, or <code>next()</code>, drop the brackets completely:</p>
-
-<pre><code># Generator expressions: constant O(1) extra memory &amp; instant short-circuiting!
-total_bytes = sum(len(line) for line in log_stream)
-has_fatal   = any("FATAL" in line for line in log_stream)
-first_big   = next((x for x in nums if x &gt; 100), None)   # fallback None if none match</code></pre>
-
-<p>Step through the exact difference between <code>any([...])</code> and <code>any(...)</code> on a 6-line log where <code>"FATAL"</code> sits at line index 2 (the 3rd line):</p>
-
-<div class="figure">
-  <div id="viz-gen-vs-list"></div>
-  <div class="cap">Switch the dropdown between the batch warehouse <code>[...]</code> and the conveyor belt <code>(...)</code>. Notice how brackets force Python to finish reading every remaining line before <code>any()</code> even wakes up!</div>
-</div>
-
-<div class="keyidea">Swap <code>[...]</code> for <code>(...)</code> whenever a sequence feeds <code>sum</code>, <code>any</code>, <code>all</code>, <code>min</code>, <code>max</code>, or <code>next</code>. You keep the exact same readability while dropping memory from <code>O(n)</code> to constant <code>O(1)</code> and short-circuiting on the first match.</div>
-
-<div class="check" id="check-gen">
-  <p class="q">A streaming database cursor <code>rows</code> yields 10 million <code>(user_id, bytes_sent)</code> pairs, and you want the first <code>user_id</code> with <code>bytes_sent &gt; 1_000_000</code> (or <code>None</code>). Which expression runs in constant <code>O(1)</code> memory and stops on the first hit?</p>
-  <div class="opts">
-    <button><code>next(iter([u for u, b in rows if b &gt; 1_000_000]), None)</code></button>
-    <button><code>([u for u, b in rows if b &gt; 1_000_000] or [None])[0]</code></button>
-    <button data-correct><code>next((u for u, b in rows if b &gt; 1_000_000), None)</code></button>
-  </div>
-  <div class="fb right"><p>Spot on! The generator expression <code>(u for u, b in rows if b &gt; 1_000_000)</code> pulls one row at a time in constant <code>O(1)</code> memory, and <code>next(..., None)</code> halts the instant the first oversized transfer appears.</p></div>
-  <div class="fb wrong"><p>Trace a 3-row stream <code>[("u1", 50), ("u2", 2_000_000), ("u3", 10)]</code>: square brackets <code>[...]</code> force Python to pull all three rows (and all 10 million in production!) to finish building a list before <code>next(iter(...))</code> or <code>[0]</code> even looks at element 0. Swapping <code>[...]</code> for <code>(...)</code> lets <code>next()</code> return <code>"u2"</code> immediately without ever pulling <code>"u3"</code>.</p></div>
-</div>
-
-<p>Generator expressions handle simple 1-to-1 transforms on a belt. Next question: what when you want to take only the first <code>k</code> items from an endless belt, splice belts together, group runs, or compute running totals without Chapter 10.10's slow list-slicing loops?</p>
-
-<!-- ============================================================ -->
-<h2 id="s5"><span class="sec-num">5</span>How do prebuilt conveyor stations eliminate slow slicing loops?</h2>
-
-<p>Python's <code>itertools</code> module gives you four C-speed conveyor stations that snap onto any iterator without copying data into temporary lists:</p>
+<p>Compare two ways to hand items to Python:</p>
 <ul>
-  <li><b><code>islice(stream, start, stop)</code>:</b> skips ahead and pulls only a slice of a lazy or infinite belt — without allocating a list or exhausting the rest of the stream.</li>
-  <li><b><code>chain.from_iterable(groups)</code>:</b> splices a sequence of lists (one level deep) into one continuous belt in constant <code>O(1)</code> extra memory.</li>
-  <li><b><code>groupby(items, key=...)</code>:</b> bundles <em>consecutive</em> runs sharing the same key (always sort by that key first if matching items aren't already adjacent!).</li>
-  <li><b><code>accumulate(nums, initial=0)</code>:</b> emits running cumulative totals (prefix sums) in one pass: <code>[1, 2, 3, 4] → [0, 1, 3, 6, 10]</code>.</li>
+  <li><b>A <code>list</code> (<code>[...]</code>) is a full grocery cart:</b> it builds and stores every single item in memory up front. Great when you need <code>len()</code>, indexing (<code>items[0]</code>), or to loop over the data more than once.</li>
+  <li><b>A generator (<code>(...)</code>) is a conveyor belt:</b> it produces <b>one item at a time</b> only when asked (using <code>next(...)</code> or a <code>for</code> loop), keeping memory tiny and stopping the instant you have what you need!</li>
 </ul>
 
-<p>Remember Chapter 10.10 §4's hidden slicing trap? Computing every length-<code>k</code> window sum with <code>sum(nums[i:i+k])</code> copies and adds <code>k</code> items per window — <b>2.5 billion</b> steps for <code>n = 100,000, k = 50,000</code> (<code>O(n·k)</code>). Now align the prefix sums <code>pref</code> against themselves shifted forward by <code>k</code> with <code>islice(pref, k, None)</code> — every window sum pops out in <b>one subtraction</b>:</p>
+<p>Look how tiny the switch is — Python's built-in helpers like <code>any(...)</code> (returns <code>True</code> as soon as one item matches), <code>all(...)</code> (checks every item), <code>sum(...)</code>, <code>min(...)</code>, and <code>max(...)</code> accept a lazy generator directly if you just drop the square brackets:</p>
+
+<pre><code># Eager list: builds ALL 1,000,000 booleans in memory first!
+has_big = any([x &gt; 500 for x in range(1_000_000)])
+
+# Lazy generator: checks 0, 1, ..., 501 and STOPS IMMEDIATELY in tiny memory!
+has_big = any(x &gt; 500 for x in range(1_000_000))
+
+# Grab just the first match (or None if nothing matches — parentheses wrap the generator)
+first_long = next((w for w in ["hi", "cat", "coffee", "tea"] if len(w) &gt; 4), None)
+# "coffee" — never even checks "tea"!</code></pre>
+
+<p><b>One important catch with generators: they are single-use!</b> Once you walk a generator to the end (with <code>sum(g)</code>, <code>list(g)</code>, or a <code>for</code> loop), the conveyor belt is empty — looping over it a second time quietly yields zero items. Convert to a <code>list</code> first if you need two passes.</p>
+
+<h3>Writing your own generator with <code>yield</code> and <code>yield from</code></h3>
+
+<p>Any function that uses <b><code>yield</code></b> instead of <code>return</code> becomes a lazy generator! Calling it doesn't run the body right away — instead, each time the caller pulls the next item, Python runs until the next <code>yield</code>, hands that value out, and <b>freezes the function's local variables right there</b> until the next pull:</p>
+
+<pre><code>def count_up(start):
+    n = start
+    while True:             # infinite stream! Safe because it pauses at yield
+        yield n
+        n += 1
+
+stream = count_up(10)
+print(next(stream))         # 10
+print(next(stream))         # 11
+print(next(stream))         # 12</code></pre>
+
+<p>Step through a tiny generator below to watch execution pause at each <code>yield</code> and pick up right where it left off:</p>
 
 <div class="figure">
-  <svg class="viz" viewBox="0 0 720 132" role="img" aria-label="Aligning prefix sum list [0,1,3,6,10,15] with shifted islice(pref, 3, None) [6,10,15] to compute length-3 window sums 6, 9, 12 in one pass">
-    <text x="16" y="22" class="label" fill="var(--muted)" font-weight="700">nums = [1, 2, 3, 4, 5],  k = 3   →   pref = [0, 1, 3, 6, 10, 15]</text>
-    <text x="16" y="54" class="label" fill="var(--accent)" font-weight="700">lo (pref):</text>
-    <rect x="236" y="36" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--accent)"/><text x="262" y="53" class="label" text-anchor="middle">0</text>
-    <rect x="296" y="36" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--accent)"/><text x="322" y="53" class="label" text-anchor="middle">1</text>
-    <rect x="356" y="36" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--accent)"/><text x="382" y="53" class="label" text-anchor="middle">3</text>
-
-    <text x="16" y="88" class="label" fill="var(--warn)" font-weight="700">hi (islice(pref, 3, None)):</text>
-    <rect x="236" y="70" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--warn)"/><text x="262" y="87" class="label" text-anchor="middle">6</text>
-    <rect x="296" y="70" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--warn)"/><text x="322" y="87" class="label" text-anchor="middle">10</text>
-    <rect x="356" y="70" width="52" height="26" rx="5" fill="var(--surface)" stroke="var(--warn)"/><text x="382" y="87" class="label" text-anchor="middle">15</text>
-
-    <line x1="418" y1="68" x2="454" y2="68" stroke="var(--ok)" stroke-width="2"/>
-    <polygon points="454,63 464,68 454,73" fill="var(--ok)"/>
-    <text x="438" y="56" class="label" text-anchor="middle" fill="var(--muted)">hi - lo</text>
-
-    <rect x="470" y="42" width="236" height="52" rx="8" fill="color-mix(in srgb, var(--ok) 12%, var(--surface))" stroke="var(--ok)" stroke-width="1.8"/>
-    <text x="588" y="64" class="label" text-anchor="middle" fill="var(--ok)" font-weight="700">[6 - 0,  10 - 1,  15 - 3]</text>
-    <text x="588" y="84" class="label" text-anchor="middle" font-weight="700">= [6, 9, 12]   (1 pass, O(n)!)</text>
-    <text x="16" y="120" class="label" fill="var(--muted)">Zero repeated slices — works just as fast for k = 50,000 as for k = 3.</text>
-  </svg>
-  <div class="cap"><code>pref[i + k] - pref[i]</code> cancels everything before index <code>i</code>, leaving the exact sum of window <code>nums[i : i + k]</code> in 1 subtraction.</div>
+  <div id="viz-gen-pull"></div>
+  <div class="cap">A generator computes each value only when pulled — if you stop pulling after item 2, item 3 is never even computed!</div>
 </div>
 
-<p>That turns <code>window_sums</code> in <code>py_idioms.py</code> into four crystal-clear lines:</p>
-<pre><code>from itertools import accumulate, islice
-
-def window_sums(nums, k):
-    if k &lt;= 0:
-        raise ValueError("k must be positive")
-    if k &gt; len(nums):
-        return []
-    pref = list(accumulate(nums, initial=0))
-    return [hi - lo for lo, hi in zip(pref, islice(pref, k, None))]</code></pre>
-
-<p>Why materialize <code>pref</code> into a <code>list</code> instead of keeping <code>accumulate</code> lazy? Because <code>zip(pref, islice(pref, k, None))</code> reads <em>two</em> different offsets from <code>pref</code> at the same time — passing a single-use iterator to both slots would advance the same belt twice and corrupt every window! And since <code>window_sums</code> already returns an <code>O(n)</code> output list, one <code>O(n)</code> prefix list keeps total memory asymptotic at <code>O(n)</code>.</p>
-
-<details class="aside deeper">
-  <summary>Go deeper: O(k) streaming windows and the groupby sub-iterator trap</summary>
-  <p><b>True <code>O(k)</code> memory over an endless stream:</b> if <code>nums</code> arrives as a billion-item stream that doesn't fit in RAM, keep a fixed ring buffer <code>buf = collections.deque(maxlen=k)</code> (covered on Day 4) and a single integer <code>running = 0</code>. Each step, subtract <code>buf[0]</code> if <code>len(buf) == k</code>, append the new item, add it to <code>running</code>, and <code>yield running</code> once full — <code>O(k)</code> RAM and <code>O(1)</code> per item!</p>
-  <p><b>The <code>groupby</code> sub-iterator trap:</b> <code>groupby</code> shares its underlying conveyor belt with every group sub-iterator <code>g</code>. Writing <code>groups = [(k, g) for k, g in groupby(data)]</code> stores <em>exhausted</em> sub-iterators because advancing the outer loop drains earlier groups! Always materialize immediately — <code>[(k, list(g)) for k, g in groupby(data)]</code> — if you need the items later.</p>
-</details>
-
-<div class="keyidea">Reach for <code>itertools</code> before hand-rolling index arithmetic: <code>islice</code> slices any lazy stream, <code>chain.from_iterable</code> flattens one level lazily, <code>groupby</code> groups sorted runs, and <code>accumulate</code> + <code>islice</code> + <code>zip</code> computes sliding-window sums in one linear <code>O(n)</code> pass.</div>
-
-<div class="check" id="check-itertools">
-  <p class="q">You run <code>[k for k, _ in groupby(["cat", "dog", "cat"])]</code> without sorting first. What does it return?</p>
-  <div class="opts">
-    <button><code>["cat", "dog"]</code> — <code>groupby</code> hashes every key globally like a dictionary</button>
-    <button data-correct><code>["cat", "dog", "cat"]</code> — <code>groupby</code> only merges adjacent equal keys</button>
-    <button>Raises <code>ValueError</code> because Python refuses unsorted input inside <code>groupby</code></button>
-  </div>
-  <div class="fb right"><p>Spot on! Because <code>groupby</code> is a streaming conveyor station (constant <code>O(1)</code> memory, no global hash table), it only watches the key immediately beside it — splitting non-adjacent <code>"cat"</code> entries into two runs unless you sort first.</p></div>
-  <div class="fb wrong"><p>Walk the belt one item at a time: item 0 starts run <code>"cat"</code>; item 1 switches to run <code>"dog"</code> (closing the first <code>"cat"</code> run!); item 2 sees <code>"cat"</code> again and opens a brand-new <code>"cat"</code> run. That's why <code>groupby</code> never raises an error — and why you sort first (or use <code>defaultdict</code>) when matching items aren't consecutive.</p></div>
-</div>
-
-<p>Prebuilt <code>itertools</code> stations cover flat belts and single-level chains. Now ask the classic Google interview follow-up: what when items rolling down your belt contain <em>nested belts inside nested belts</em> to arbitrary depth — or an infinite stream of nested tuples?</p>
-
-<!-- ============================================================ -->
-<h2 id="s6"><span class="sec-num">6</span>How do you build your own pausing station for nested or infinite streams?</h2>
-
-<p>A one-line generator expression <code>(...)</code> cannot call itself recursively. To build a custom conveyor station with arbitrary logic, write a regular <code>def</code> containing <b><code>yield</code></b>.</p>
-
-<p>The moment Python sees <code>yield</code> inside a function, calling that function runs <b>zero lines of its body</b> — it hands back a paused generator object parked at line 1. Each time the caller pulls with <code>next(gen)</code>, execution advances only to the next <code>yield</code>, freezes every local variable right where it stands, and hands back one item.</p>
-
-<p>And when a station spots a nested container inside the stream, <b><code>yield from sub_gen</code></b> connects that sub-belt directly to the caller without writing a manual forwarding loop (this is <code>flatten_stream</code> in <code>py_idioms.py</code>):</p>
+<p>What if your generator wants to hand off all items from a sub-generator (for example, calling itself — called <b>recursion</b> — to walk lists nested inside lists)? Write <b><code>yield from sub_generator</code></b>! Below, <code>from collections.abc import Iterable</code> pulls one tool directly from a built-in module, and <code>isinstance(item, (str, bytes))</code> tests whether <code>item</code> matches any type in that tuple (<code>bytes</code> is Python's raw byte-text type, like <code>b"hi"</code>). Remember one essential guard: <b>strings (<code>str</code>) and <code>bytes</code> are iterable too!</b> Looping over <code>"hi"</code> gives <code>"h"</code>, and looping over <code>"h"</code> gives <code>"h"</code> forever — so always treat <code>(str, bytes)</code> as single leaves:</p>
 
 <pre><code>from collections.abc import Iterable
 
-def flatten_stream(nested):
+def walk_leaves(nested):
     for item in nested:
         if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
-            yield from flatten_stream(item)     # wire nested sub-belt straight to caller
+            yield from walk_leaves(item)   # delegate lazily to nested container!
         else:
-            yield item                          # pause right here until next() pulls!</code></pre>
+            yield item                     # plain value or string: hand it out</code></pre>
 
-<div class="figure">
-  <div id="viz-yield"></div>
-  <div class="cap">Step through pulling items one by one from <code>flatten_stream([1, (2, "hi"), 3])</code>. Notice how <code>"hi"</code> stays intact as an atomic leaf and <code>3</code> is never even visited until pull #4.</div>
-</div>
+<div class="keyidea">Drop <code>[...]</code> inside <code>sum</code>/<code>any</code>/<code>all</code> (or wrap with <code>(...)</code> inside <code>next((...), None)</code>) to stream lazily without building giant lists. Remember generators are single-use, and exclude <code>(str, bytes)</code> whenever recursively flattening <code>Iterable</code> values with <code>yield from</code>.</div>
 
-<p><b>Why excluding <code>(str, bytes)</code> is mandatory:</b> Python has no separate <code>char</code> type — iterating <code>"hi"</code> yields <code>"h"</code> (another <code>str</code>, which is still an <code>Iterable</code>!), and iterating <code>"h"</code> yields <code>"h"</code> forever until <code>RecursionError</code>. Always check <code>not isinstance(item, (str, bytes))</code> before recursing on an <code>Iterable</code>.</p>
-
-<div class="keyidea">A generator function returns a lazy iterator immediately without running its body until the first <code>next()</code>. That lets <code>islice(gen, 6)</code> pull six items from an infinite <code>flatten_stream</code> using only <code>O(d)</code> memory for nesting depth <code>d</code> — completely independent of stream length.</div>
-
-<details class="aside deeper">
-  <summary>Go deeper: flattening inputs nested deeper than Python's recursion limit</summary>
-  <p>Recursive <code>yield from</code> keeps one active generator frame per nesting level (<code>O(d)</code> call-stack space), so an adversarial input nested more than ~1,000 levels deep hits <code>RecursionError</code>. If an interviewer asks how to handle arbitrary depth, swap recursion for an explicit stack of iterators: push <code>iter(nested)</code>, pull with <code>next(stack[-1], sentinel)</code>, pop exhausted iterators, and push <code>iter(item)</code> whenever you hit a nested non-<code>(str, bytes)</code> iterable — still lazy and still <code>O(d)</code> heap memory, with no recursion limit.</p>
-</details>
-
-<div class="check" id="check-yield">
-  <p class="q">You call <code>gen = flatten_stream(infinite_nested())</code> and then <code>list(islice(gen, 5))</code>. What breaks if you write <code>return [...]</code> inside <code>flatten_stream</code> instead of <code>yield</code>?</p>
+<div class="check" id="check-gen-exhaust">
+  <p class="q">What does <code>second</code> equal after these three lines run?</p>
+<pre><code>nums = (n * 2 for n in [1, 2, 3])
+first = sum(nums)
+second = list(nums)</code></pre>
   <div class="opts">
-    <button data-correct><code>flatten_stream</code> tries to consume the entire infinite input and hangs</button>
-    <button><code>islice</code> raises <code>TypeError</code> because it rejects plain Python lists</button>
-    <button>It returns only 1 item instead of 5 because lists cannot be sliced lazily</button>
+    <button><code>[2, 4, 6]</code> — generators automatically rewind to the start after <code>sum()</code></button>
+    <button data-correct><code>[]</code> — <code>sum(nums)</code> drained the single-use generator, leaving nothing for <code>list(nums)</code></button>
+    <button><code>[12]</code> — holds the sum computed on line 2</button>
   </div>
-  <div class="fb right"><p>Spot on! Building a list eagerly forces Python to walk every element of <code>infinite_nested()</code> before returning — so <code>islice</code> never even gets a chance to stop at 5.</p></div>
-  <div class="fb wrong"><p>Compare warehouse vs. conveyor belt: <code>islice</code> works fine on finite lists, yet Python evaluates <code>flatten_stream(infinite_nested())</code> completely <em>before</em> passing the result into <code>islice</code>. With <code>return [...]</code>, that call loops forever trying to finish an infinite list; with <code>yield</code>, it pauses after item #5 and stops.</p></div>
+  <div class="fb right"><p>Spot on! A generator is single-use: once <code>sum(nums)</code> pulls <code>2, 4, 6</code> to compute <code>12</code>, the belt is empty, so <code>list(nums)</code> gets <code>[]</code>. If you need two passes, build a list first: <code>nums = [n * 2 for n in [1, 2, 3]]</code>.</p></div>
+  <div class="fb wrong"><p>Picture a paper ticket dispenser with 3 tickets (<code>2</code>, <code>4</code>, <code>6</code>): once <code>sum(nums)</code> pulls all 3 tickets out, the dispenser is empty! Calling <code>list(nums)</code> afterward tries to pull more tickets and gets an empty list <code>[]</code>.</p></div>
 </div>
 
-<p>Conveyor belts save hundreds of megabytes of RAM and unlock infinite streams — yet because they pull items one by one instead of storing them on shelves, they break in three ways that surprise engineers mid-interview.</p>
+<div class="check" id="check-yield-str">
+  <p class="q">In a recursive flattening generator, why must you check <code>not isinstance(item, (str, bytes))</code> before recursing into an <code>Iterable</code>?</p>
+  <div class="opts">
+    <button>Because strings raise a <code>TypeError</code> if you loop over them</button>
+    <button data-correct>Because a 1-letter string like <code>"a"</code> is still an <code>Iterable</code> whose first element is <code>"a"</code> again — recursing forever!</button>
+    <button>Because <code>yield from</code> does not work on strings</button>
+  </div>
+  <div class="fb right"><p>Caught it! Looping over <code>"hi"</code> gives <code>"h"</code> (a string!), and looping over <code>"h"</code> gives <code>"h"</code> again — hitting Python's recursion limit! Checking <code>not isinstance(item, (str, bytes))</code> treats strings as whole leaf values.</p></div>
+  <div class="fb wrong"><p>Picture opening a Russian nesting doll that contains an identical copy of itself: looping over <code>"ok"</code> unpacks <code>"o"</code>, and looping over <code>"o"</code> unpacks <code>"o"</code> again forever until Python crashes with <code>RecursionError</code>! Guarding against <code>(str, bytes)</code> stops recursion at whole strings.</p></div>
+</div>
+
+<p>Now let's meet four ready-made helpers in Python's <code>itertools</code> module that pair smoothly with lazy streams and clean up tricky loops.</p>
 
 <!-- ============================================================ -->
-<h2 id="s7"><span class="sec-num">7</span>How can lazy pipelines break — and when should you write a plain loop?</h2>
+<h2 id="s5"><span class="sec-num">5</span>Everyday stream helpers in itertools</h2>
 
-<p>Keep these three conveyor-belt limits front of mind:</p>
-<ol>
-  <li><b>Single-use exhaustion (the #1 generator bug):</b> once a generator runs to the end — even because you ran a quick debug <code>print(list(gen))</code> or called <code>max(gen)</code> before <code>min(gen)</code> — the belt is <b>empty forever</b>! A second loop over the same generator silently sees zero items. If you need two passes, materialize into a <code>list</code> or <code>tuple</code> once.</li>
-  <li><b>No <code>len()</code> and no random indexing:</b> calling <code>len(gen)</code> or <code>gen[0]</code> raises <code>TypeError</code> because a conveyor belt hasn't pulled future items yet.</li>
-  <li><b>When a plain <code>for</code> loop beats a clever comprehension:</b> if a pipeline needs side effects, multiple accumulators, or more than two nested <code>for</code>/<code>if</code> clauses, write a clean <code>for</code> loop. Interviewers reward readability over code golf.</li>
-</ol>
+<p>Python's built-in <code>itertools</code> module gives you fast building blocks that work on <em>any</em> list or lazy generator:</p>
 
-<p>See how these Day 2 pipeline idioms simplify real interview code:</p>
-<div class="cols">
-  <div style="min-width:0">
-    <p class="small muted"><b>Before: manual loops + slow window slice</b></p>
-<pre><code>cols = []
-for c in range(len(m[0])):
-    col = []
-    for r in range(len(m)):
-        if m[r][c] &gt;= t: col.append(m[r][c])
-    cols.append(col)
+<ul>
+  <li><b><code>islice(stream, stop)</code> / <code>islice(stream, start, stop)</code>:</b> slices a generator (since generators don't support <code>gen[:5]</code>!). Pass <code>islice(stream, 5)</code> to grab the first 5 items from even an infinite generator, or <code>islice(stream, 3, None)</code> to skip the first 3 items.</li>
+  <li><b><code>chain.from_iterable(groups)</code>:</b> walks a list of lists one level flat without copying them into a giant list.</li>
+  <li><b><code>groupby(items, key=...)</code>:</b> groups <em>consecutive</em> matching items together. <b>Two gotchas:</b> always sort by the same key first if matching items aren't already side by side, and turn each group into a <code>list(grp)</code> right away inside the loop!</li>
+  <li><b><code>accumulate(nums, initial=0)</code>:</b> builds running totals in one quick pass! For <code>[10, 20, 30]</code>, <code>list(accumulate(nums, initial=0))</code> gives <code>[0, 10, 30, 60]</code>.</li>
+</ul>
 
-# O(n·k) repeated list slicing
-ws = [sum(xs[i:i+k]) for i in range(n-k+1)]</code></pre>
-  </div>
-  <div style="min-width:0">
-    <p class="small" style="color:var(--ok)"><b>After: zip(*m) + accumulate/islice</b></p>
-<pre><code>cols = [
-    [v for v in col if v &gt;= t]
-    for col in zip(*m)
-]
+<pre><code>from itertools import islice, chain, groupby, accumulate
 
+# Grab the first 4 values from a lazy generator without building a giant list
+first_four = list(islice((n * 10 for n in range(1_000_000)), 4))  # [0, 10, 20, 30]
 
-# O(n) single pass, zero extra slices
-p = list(accumulate(xs, initial=0))
-ws = [b - a for a, b in zip(p, islice(p, k, None))]</code></pre>
-  </div>
-</div>
+# Flatten one level lazily
+flat = list(chain.from_iterable([[1, 2], [3], [4, 5]]))           # [1, 2, 3, 4, 5]
 
-<div class="check" id="check-exhausted">
-  <p class="q">You create <code>vals = (x * 2 for x in [1, 2, 3])</code>, print <code>sum(vals)</code> (which prints <code>12</code>), and on the very next line print <code>list(vals)</code>. What prints?</p>
+# Group consecutive matching items (save list(g) right inside the loop!)
+runs = [(k, list(g)) for k, g in groupby(["a", "a", "b", "a"])]
+# [("a", ["a", "a"]), ("b", ["b"]), ("a", ["a"])]
+
+# Running totals with accumulate
+steps = [100, 200, 150, 300]
+totals = list(accumulate(steps, initial=0))                       # [0, 100, 300, 450, 750]</code></pre>
+
+<p><b>Why running totals are so useful (consecutive window sums):</b> suppose you want the total steps for every 3-day stretch in a year of daily counts. Slicing and calling <code>sum(steps[i:i+3])</code> over and over re-adds the same middle days repeatedly (and on 100,000 days with a 50,000-day window, it slows to a crawl!). Instead, notice that the sum of days <code>i</code> through <code>i + k - 1</code> is just <b>one subtraction</b> between two running totals: <code>totals[i + k] - totals[i]</code> — which you can pair up cleanly with <code>zip(totals, islice(totals, k, None))</code> (where <code>islice(totals, k, None)</code> skips the first <code>k</code> entries without copying the list!):</p>
+
+<pre><code>from itertools import accumulate, islice
+
+steps = [100, 200, 150, 300]
+totals = list(accumulate(steps, initial=0))        # [0, 100, 300, 450, 750]
+
+# Consecutive 2-day totals: (0, 300) -&gt; 300, (100, 450) -&gt; 350, (300, 750) -&gt; 450
+k = 2
+two_day = [hi - lo for lo, hi in zip(totals, islice(totals, k, None))]
+# [300, 350, 450] — walks the list ONCE instead of re-summing every window!</code></pre>
+
+<div class="keyidea">Use <code>islice</code> to slice lazy streams, <code>chain.from_iterable</code> to flatten one level, <code>groupby</code> on already-sorted runs (saving <code>list(g)</code> inside the loop), and <code>accumulate</code> (or a sliding running sum) to avoid re-summing slices inside a loop.</div>
+
+<div class="check" id="check-groupby">
+  <p class="q">Why does calling <code>groupby(["cat", "dog", "cat"])</code> without sorting first produce <b>three</b> groups instead of two?</p>
   <div class="opts">
-    <button><code>[2, 4, 6]</code> — generator expressions rewind automatically after <code>sum()</code></button>
-    <button data-correct><code>[]</code> — <code>sum(vals)</code> already drained the single-use generator to the end</button>
-    <button>Raises <code>StopIteration</code> because calling <code>list()</code> twice on a stream fails</button>
+    <button data-correct>Because <code>groupby</code> only combines <em>adjacent</em> matching items — the two <code>"cat"</code> entries aren't next to each other</button>
+    <button>Because <code>groupby</code> ignores duplicate strings</button>
+    <button>Because <code>groupby</code> only works on numbers, not strings</button>
   </div>
-  <div class="fb right"><p>Caught it! Generators are one-way conveyor belts: once <code>sum(vals)</code> pulls all three items, <code>vals</code> is exhausted and every later consumer receives <code>[]</code>. Store <code>vals = [x * 2 for x in ...]</code> if you need multiple passes.</p></div>
-  <div class="fb wrong"><p>Follow the belt position: <code>sum(vals)</code> pulls <code>2</code>, then <code>4</code>, then <code>6</code>, until the generator hits the end and stops. There is no rewind button — so when <code>list(vals)</code> pulls from the same exhausted generator, zero items remain and it quietly returns <code>[]</code> (never raising <code>StopIteration</code>).</p></div>
+  <div class="fb right"><p>Spot on! <code>groupby</code> walks left to right and starts a new group every time the key changes — so <code>["cat", "dog", "cat"]</code> gives <code>"cat"</code>, then <code>"dog"</code>, then a second <code>"cat"</code> group. Sort first (<code>sorted(items)</code>) whenever matching items can be scattered!</p></div>
+  <div class="fb wrong"><p>Picture grouping beads on a string without re-threading them: <code>red, blue, red</code> has 3 separate runs of color even though only 2 colors exist! <code>itertools.groupby</code> works the exact same way — it only merges consecutive matching items, so sort the list first if you want all <code>"cat"</code> items in one group.</p></div>
 </div>
 
-<!-- ============================================================ -->
-<h2 id="s8"><span class="sec-num">8</span>What to say in the interview</h2>
-
-<p>Before coding <code>py_idioms.py</code> and moving to Day 3's building blocks (<a href="python-building-blocks.html">Chapter 10.12</a>), make sure you can explain these four ideas aloud in 45 seconds:</p>
-<ol>
-  <li><b>Batches vs. streams:</b> "I'll use a list comprehension when I need random access or sorting, and a generator expression <code>(...)</code> for single-pass reductions like <code>any</code>/<code>sum</code>/<code>next</code> so extra memory stays <code>O(1)</code> and it short-circuits on the first hit."</li>
-  <li><b>Ranking &amp; transposing:</b> "Tuple keys rank by multiple rules in one pass (negate numbers for descending, guard <code>is not None</code> to keep <code>0</code>), and <code>zip(*matrix)</code> transposes rows into columns cleanly."</li>
-  <li><b><code>itertools</code> &amp; sliding windows:</b> "Using <code>accumulate</code> with <code>islice</code> and <code>zip</code> computes every length-<code>k</code> window sum in one <code>O(n)</code> pass instead of <code>O(n·k)</code> repeated slicing."</li>
-  <li><b>Custom generators:</b> "<code>yield</code> and <code>yield from</code> flatten nested streams lazily in <code>O(d)</code> stack space for nesting depth <code>d</code>, excluding <code>(str, bytes)</code> so strings stay atomic leaves."</li>
-</ol>
+<p>You can now filter, sort, pair, transpose, and stream data cleanly in Python! Next on Day 3 (<a href="python-building-blocks.html">Classes, dataclasses, decorators, and with blocks</a>), we'll learn how to build clean custom data records, wrap functions with decorators, and guarantee cleanup using <code>with</code> blocks.</p>
 
 <!-- ============================================================ -->
 <h2 id="summary"><span class="sec-num">✓</span>What to remember</h2>
+<p class="small muted">Full syntax lookup: <a href="../../../python-cheatsheet.html#s8">Comprehensions &amp; zip (§8)</a> · <a href="../../../python-cheatsheet.html#s9">Generators &amp; itertools (§9)</a></p>
 <div class="table-wrap"><table>
-  <thead><tr><th>Pipeline need</th><th>Fragile / slow way</th><th>Clean interview way</th></tr></thead>
+  <thead><tr><th>Task</th><th>Clean Python</th><th>Watch out for</th></tr></thead>
   <tbody>
-    <tr><td>Filter &amp; rank records</td><td><code>if r[1]:</code> + mutating <code>.sort()</code></td><td><code>if r[1] is not None</code> + <code>sorted(..., key=lambda r: (-r[1], ...))</code></td></tr>
-    <tr><td>Transpose 2D matrix</td><td>Nested <code>range(len(...))</code> loops</td><td><code>zip(*matrix)</code> + comprehension</td></tr>
-    <tr><td>Single-pass <code>any/sum/next</code></td><td><code>any([p(x) for x in xs])</code> (<code>O(n)</code> RAM)</td><td><code>any(p(x) for x in xs)</code> (<code>O(1)</code> RAM)</td></tr>
-    <tr><td>Length-<code>k</code> window sums</td><td><code>sum(nums[i:i+k])</code> (<code>O(n·k)</code>)</td><td><code>accumulate</code> + <code>islice</code> + <code>zip</code> (<code>O(n)</code>)</td></tr>
-    <tr><td>Group by key</td><td><code>groupby(unsorted)</code></td><td><code>groupby(sorted(items, key=...))</code></td></tr>
-    <tr><td>Nested / infinite stream</td><td>Eager recursion returning <code>list</code></td><td><code>yield</code> / <code>yield from</code> + skip <code>(str, bytes)</code></td></tr>
-    <tr><td>Multi-pass over results</td><td>Re-iterating one generator</td><td>Materialize once into a <code>list</code></td></tr>
+    <tr><td>Filter &amp; transform a list</td><td><code>[f(x) for x in xs if keep(x)]</code></td><td>Filter <code>if</code> at end; <code>a if c else b</code> at front</td></tr>
+    <tr><td>Sort by multiple rules</td><td><code>sorted(xs, key=lambda r: (-r[1], r[0]))</code></td><td><code>xs.sort()</code> edits in place &amp; returns <code>None</code></td></tr>
+    <tr><td>Index + value / paired lists</td><td><code>enumerate(xs)</code> · <code>zip(a, b, strict=True)</code></td><td>Plain <code>zip</code> stops at shorter list</td></tr>
+    <tr><td>Flip rows into columns</td><td><code>[list(c) for c in zip(*table)]</code></td><td>Empty table gives <code>[]</code></td></tr>
+    <tr><td>Stream lazily (1 item at a time)</td><td><code>any(p(x) for x in xs)</code> · <code>yield</code></td><td>Generators are single-use!</td></tr>
+    <tr><td>Flatten arbitrarily nested data</td><td><code>yield from</code> + <code>isinstance(..., Iterable)</code></td><td>Exclude <code>(str, bytes)</code> so strings don't loop forever</td></tr>
+    <tr><td>Slice stream / running sums</td><td><code>islice(g, k)</code> · <code>accumulate(xs, initial=0)</code></td><td><code>groupby</code> only merges adjacent keys</td></tr>
   </tbody>
 </table></div>
 
@@ -397,119 +361,97 @@ ws = [b - a for a, b in zip(p, islice(p, k, None))]</code></pre>
 
 <!-- ============================================================ -->
 <h2 id="exercises"><span class="sec-num">✎</span>Exercises</h2>
-<p>Predict Warm-ups 1–2 on paper first, then complete all five drills in <a href="../exercises/py_idioms.py">py_idioms.py</a> (you now have every concept from Chapters 10.10 and 10.11!).</p>
+<p>Try Warm-ups 1 and 2 on paper first, then complete all five drills in <a href="../exercises/py_idioms.py">py_idioms.py</a> (Day 2 Parts 1 and 2 cover every single one!).</p>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>1. Predict the exact output (no Python!)</h4>
-  <p>Write what each snippet prints: (a) <code>print(next((x for x in [10, 20, 30] if x &gt; 50), -1))</code>; (b) <code>g = (x for x in [1, 2]); print(sum(g), sum(g))</code>; (c) <code>print([list(col) for col in zip(*[[1, 2], [3, 4]])])</code>; (d) <code>print([k for k, _ in groupby(["a", "b", "a"])])</code>.</p>
+  <h4>1. Predict the exact output</h4>
+  <p>Work out each one before peeking: (a) <code>[x * 2 for x in [1, 2, 3, 4] if x % 2 == 0]</code>; (b) <code>["big" if x &gt; 5 else "small" for x in [3, 8]]</code>; (c) <code>list(zip(*[[1, 2], [3, 4]]))</code>; (d) calling <code>list(g)</code> twice on <code>g = (x + 1 for x in [10, 20])</code>.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) <code>-1</code> (fallback returned when stream exhausts). (b) <code>3 0</code> (first <code>sum(g)</code> drains the single-use generator, so the second sees empty). (c) <code>[[1, 3], [2, 4]]</code> (transposed columns). (d) <code>['a', 'b', 'a']</code> (<code>groupby</code> only merges adjacent equal keys).</p>
+    <p>(a) <code>[4, 8]</code>. (b) <code>["small", "big"]</code>. (c) <code>[(1, 3), (2, 4)]</code>. (d) First call returns <code>[11, 21]</code>; second call returns <code>[]</code> (the generator is already drained).</p>
   </details>
 </div>
 
 <div class="exercise">
   <div class="tier warm">Warm-up · pen and paper</div>
-  <h4>2. Fix three pipeline bugs</h4>
-  <p>Name the bug and write the 1-line fix: (a) <code>any([is_bad(x) for x in stream_10m])</code>; (b) <code>if isinstance(x, Iterable): yield from flat(x)</code> on <code>["hi"]</code>; (c) <code>[sum(nums[i:i+k]) for i in range(len(nums) - k + 1)]</code>.</p>
+  <h4>2. Fix three stream &amp; sorting bugs</h4>
+  <p>Spot what is wrong and write the fix: (a) <code>ranked = scores.sort()</code> expecting <code>ranked</code> to be a sorted list; (b) <code>any([x &gt; 100 for x in huge_stream])</code> using tons of memory; (c) checking <code>if isinstance(x, Iterable):</code> inside a recursive flattener without checking for strings.</p>
   <details class="aside another"><summary>Answer</summary>
-    <p>(a) Square brackets materialize all 10M items upfront → drop them: <code>any(is_bad(x) for x in stream_10m)</code>. (b) Iterating <code>"hi"</code> yields <code>"h"</code> forever → add <code>and not isinstance(x, (str, bytes))</code>. (c) <code>O(n·k)</code> repeated slicing → use <code>pref = list(accumulate(nums, initial=0))</code> and <code>[b - a for a, b in zip(pref, islice(pref, k, None))]</code>.</p>
+    <p>(a) <code>.sort()</code> returns <code>None</code> → use <code>ranked = sorted(scores)</code>. (b) Drop the square brackets so it streams lazily: <code>any(x &gt; 100 for x in huge_stream)</code>. (c) Add <code>and not isinstance(x, (str, bytes))</code> so strings are yielded whole instead of recursing forever.</p>
   </details>
 </div>
 
 <div class="exercise">
-  <div class="tier core">Day 2 · Core code (all 5 functions)</div>
-  <h4>3. Complete the full idioms &amp; streams suite</h4>
-  <p>Implement <code>rank_candidates</code>, <code>transpose_and_filter</code>, <code>make_multipliers</code> (from Chapter 10.10), <code>flatten_stream</code>, and <code>window_sums</code> in <a href="../exercises/py_idioms.py">py_idioms.py</a>. Tests verify falsy <code>0</code> scores, closure snapshots, deterministic pull caps on infinite streams, and deterministic <code>O(n)</code> read counts on window sums.</p>
+  <div class="tier core">Day 2 · Hands-on coding (all 5 drills)</div>
+  <h4>3. Finish py_idioms.py</h4>
+  <p>Implement <code>rank_candidates</code>, <code>transpose_and_filter</code>, <code>make_multipliers</code> (from Part 1), <code>flatten_stream</code>, and <code>window_sums</code> in <a href="../exercises/py_idioms.py">py_idioms.py</a>, then run the full suite:</p>
 <pre class="plain"><code>python3 -m pytest -k py_idioms</code></pre>
 </div>
 
 <div class="exercise">
-  <div class="tier stretch">Stretch · iterative flattening</div>
-  <h4>4. Flatten without recursion</h4>
-  <p>After your recursive <code>flatten_stream</code> passes, open the "Go deeper" aside in Section 6 and write an iterative version using an explicit stack of iterators on paper (or in the <a href="../../../practice.html">Practice hub</a> bare editor) that handles 5,000 nested lists without hitting <code>RecursionError</code>.</p>
+  <div class="tier stretch">Fluency practice · optional</div>
+  <h4>4. Build a lazy log-line filter</h4>
+  <p>In a scratch file or the <a href="../../../practice.html">Practice hub</a>, write a generator function <code>error_messages(lines)</code> that loops lazily over strings, skips lines that don't start with <code>"ERROR:"</code> (tip: <code>line.startswith("ERROR:")</code> checks prefixes!), strips whitespace, and <code>yield</code>s the cleaned message. Pull just the first 2 matches using <code>itertools.islice</code> and verify the rest of the input never runs!</p>
 </div>
 
 <nav class="chapter-nav">
   <a href="python-memory-model.html"><small>← Previous</small>How Python holds data in memory</a>
-  <a class="next" href="python-building-blocks.html"><small>Next →</small>Python decorators and clean building blocks</a>
+  <a class="next" href="python-building-blocks.html"><small>Next →</small>Classes, dataclasses, decorators &amp; with blocks</a>
 </nav>
 
 </main>
 
 <script>
 (function () {
-  /* ---- Player 1: Batch warehouse [...] vs Pull conveyor belt (...) (section 4) ---- */
+  /* ---- Player 1: zip(*table) transposing rows into columns (section 3) ---- */
   (function () {
-    const lines = ["OK", "OK", "FATAL", "OK", "OK", "OK"];
-    const modes = {
-      list: {
-        frames: [
-          { read: -1, buf: [], done: false, msg: "<code>any([\"FATAL\" in ln for ln in lines])</code>: brackets force Python to fill a <b>list buffer</b> first!" },
-          { read: 0, buf: ["F"], msg: "Step 1: reads line 0 (<code>OK</code>) → stores <code>False</code> in list. <code>any()</code> has NOT started yet." },
-          { read: 1, buf: ["F", "F"], msg: "Step 2: reads line 1 (<code>OK</code>) → stores <code>False</code>." },
-          { read: 2, buf: ["F", "F", "T"], msg: "Step 3: sees <code>FATAL</code> at index 2 (3rd line) — yet <b>cannot stop!</b> Brackets force reading the rest." },
-          { read: 5, buf: ["F", "F", "T", "F", "F", "F"], bad: true, msg: "Finished reading ALL 6 lines (50M in prod!) into RAM, and only NOW passes the list to <code>any()</code> → <b>True</b>." }
-        ]
-      },
-      gen: {
-        frames: [
-          { read: -1, buf: [], done: false, msg: "<code>any(\"FATAL\" in ln for ln in lines)</code>: conveyor belt pulls <b>one line at a time</b>." },
-          { read: 0, buf: ["F"], msg: "Pull 1: reads line 0 (<code>OK</code>) → <code>False</code>. Discards it (constant <code>O(1)</code> RAM!)." },
-          { read: 1, buf: ["F"], msg: "Pull 2: reads line 1 (<code>OK</code>) → <code>False</code>. Still holding only 1 item." },
-          { read: 2, buf: ["T"], ok: true, msg: "Pull 3: reads index 2 (3rd line: <code>FATAL</code>) → <b>True!</b> <code>any()</code> halts immediately — lines 3, 4, 5 are NEVER touched!" }
-        ]
-      }
-    };
-    const sel = V.el("select", { "aria-label": "Choose warehouse or conveyor belt" },
-      V.el("option", { value: "list" }, "Warehouse: any([\"FATAL\" in ln for ln in lines])"),
-      V.el("option", { value: "gen" }, "Conveyor belt: any(\"FATAL\" in ln for ln in lines)"));
-    const api = V.player(document.getElementById("viz-gen-vs-list"), {
-      frames: modes.list.frames,
-      speed: 1050,
-      extraControls: [sel],
+    const r0 = ["1", "5", "3"];
+    const r1 = ["4", "2", "6"];
+    const frames = [
+      { col: -1, out: ["—"], msg: "<code>table = [[1, 5, 3], [4, 2, 6]]</code>. Calling <code>zip(*table)</code> passes row 0 and row 1 side by side." },
+      { col: 0, out: ["(1, 4)"], msg: "Pull 1: grabs index 0 from every row → column 0 is <code>(1, 4)</code>." },
+      { col: 1, out: ["(1, 4)", "(5, 2)"], msg: "Pull 2: grabs index 1 from every row → column 1 is <code>(5, 2)</code>." },
+      { col: 2, out: ["(1, 4)", "(5, 2)", "(3, 6)"], ok: true, msg: "Pull 3: grabs index 2 from every row → all 3 columns built cleanly!" }
+    ];
+    V.player(document.getElementById("viz-zip-transpose"), {
+      frames,
+      speed: 1000,
       draw(f, stage) {
-        const ptrs = f.read >= 0 ? { [f.read]: "read" } : {};
-        const inRow = V.el("div", { style: "margin-bottom:12px" },
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Log lines in file"),
-          V.cells(lines, { ptrs, idx: true, cls: (i) => i === f.read ? (f.ok ? "done" : f.bad ? "bad" : "hl") : (i < f.read ? "dim" : "") }));
-        const memLabel = sel.value === "list" ? "RAM buffer allocated by [...]" : "Single live value in RAM (O(1))";
-        const memRow = V.el("div", {},
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, memLabel),
-          f.buf.length
-            ? V.cells(f.buf, { idx: false, cls: () => f.ok ? "done" : f.bad ? "bad" : "warn" })
-            : V.el("div", { class: "small muted", style: "font-family:var(--mono);padding:4px 0" }, "(empty)"));
-        stage.append(inRow, memRow);
+        const ptrs = f.col >= 0 ? { [f.col]: "col" } : {};
+        const rowA = V.el("div", { style: "margin-bottom:6px" },
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Row 0 & Row 1"),
+          V.el("div", { style: "white-space:nowrap;" + (f.col < 0 ? "padding-top:22px" : "") },
+            V.cells(r0, { ptrs, idx: false, cls: (i) => i === f.col ? (f.ok ? "done" : "hl") : (i < f.col ? "dim" : "") })));
+        const rowB = V.el("div", { style: "margin-bottom:12px" },
+          V.el("div", { style: "white-space:nowrap" },
+            V.cells(r1, { idx: false, cls: (i) => i === f.col ? (f.ok ? "done" : "hl") : (i < f.col ? "dim" : "") })));
+        const outRow = V.el("div", {},
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Columns yielded by zip(*table)"),
+          V.el("div", { style: "white-space:nowrap" }, V.cells(f.out, { idx: false, cls: () => f.col < 0 ? "dim" : (f.ok ? "done" : "hl") })));
+        stage.append(rowA, rowB, outRow);
       }
     });
-    sel.onchange = () => api.load(modes[sel.value].frames);
   })();
 
-  /* ---- Player 2: Lazy yield / yield from flatten_stream (section 6) ---- */
+  /* ---- Player 2: Pulling items lazily from a yield generator (section 4) ---- */
   (function () {
-    const tokens = ["1", "(", "2", '"hi"', ")", "3"];
     const frames = [
-      { pos: -1, emitted: [], paused: "ready", msg: "Call <code>gen = flatten_stream([1, (2, \"hi\"), 3])</code>. <b>Zero work runs yet</b> — generator pauses at line 1." },
-      { pos: 0, emitted: ["1"], paused: "yield 1", msg: "1st <code>next(gen)</code>: <code>1</code> is not Iterable → <b>yield 1</b> and pause! Tuple and <code>3</code> untouched." },
-      { pos: 1, emitted: ["1"], paused: "enter (2, 'hi')", msg: "2nd <code>next(gen)</code>: sees tuple <code>(2, \"hi\")</code> → delegates with <code>yield from</code>." },
-      { pos: 2, emitted: ["1", "2"], paused: "yield 2", msg: "Inside tuple: <code>2</code> is a leaf → <b>yield 2</b> and pause right inside the inner frame." },
-      { pos: 3, emitted: ["1", "2", '"hi"'], paused: 'yield "hi"', msg: "3rd <code>next(gen)</code>: <code>\"hi\"</code> is a <code>str</code> → excluded from recursion → <b>yield \"hi\"</b> as one atomic leaf!" },
-      { pos: 5, emitted: ["1", "2", '"hi"', "3"], paused: "yield 3", done: true, msg: "4th <code>next(gen)</code>: tuple finishes, resumes outer loop → <b>yield 3</b>. (Had the caller stopped after 3 items, <code>3</code> would never have been touched.)" }
+      { n: "—", pulled: ["—"], status: "created (0 lines run yet!)", msg: "<code>g = count_up(10)</code> creates the paused generator — nothing runs until the first <code>next(g)</code>!" },
+      { n: "10", pulled: ["10"], status: "PAUSED at yield 10", msg: "Call 1: <code>next(g)</code> runs to <code>yield 10</code>, hands out <code>10</code>, and freezes <code>n = 10</code>." },
+      { n: "11", pulled: ["10", "11"], status: "PAUSED at yield 11", msg: "Call 2: resumes right after <code>yield</code>, bumps <code>n</code> to <code>11</code>, yields <code>11</code>, and freezes again." },
+      { n: "12", pulled: ["10", "11", "12"], status: "PAUSED at yield 12", ok: true, msg: "Call 3: hands out <code>12</code> and pauses! Items 13, 14, ... are never even computed unless asked." }
     ];
-    V.player(document.getElementById("viz-yield"), {
+    V.player(document.getElementById("viz-gen-pull"), {
       frames,
       speed: 1050,
       draw(f, stage) {
-        const ptrs = f.pos >= 0 ? { [f.pos]: "cur" } : {};
-        const inRow = V.el("div", { style: "margin-bottom:12px" },
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, `Input stream · generator state: ${f.paused}`),
-          V.cells(tokens, { ptrs, idx: false, cls: (idx) => idx === f.pos ? "hl" : idx < f.pos ? "dim" : "" }));
+        const stateRow = V.el("div", { style: "margin-bottom:12px" },
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Generator state (frozen between pulls)"),
+          V.el("div", { style: "white-space:nowrap" }, V.cells([`n = ${f.n}`, f.status], { idx: false, cls: () => f.ok ? "done" : (f.n === "—" ? "dim" : "hl") })));
         const outRow = V.el("div", {},
-          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Items yielded to caller so far"),
-          f.emitted.length
-            ? V.cells(f.emitted, { idx: false, cls: (idx) => f.done ? "done" : (idx === f.emitted.length - 1 ? "hl" : "done") })
-            : V.el("div", { class: "small muted", style: "font-family:var(--mono);padding:4px 0" }, "(nothing pulled yet)"));
-        stage.append(inRow, outRow);
+          V.el("div", { class: "small muted", style: "margin-bottom:4px" }, "Values handed out so far"),
+          V.el("div", { style: "white-space:nowrap" }, V.cells(f.pulled, { idx: false, cls: () => f.n === "—" ? "dim" : (f.ok ? "done" : "hl") })));
+        stage.append(stateRow, outRow);
       }
     });
   })();
