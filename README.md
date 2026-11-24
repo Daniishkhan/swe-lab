@@ -27,6 +27,7 @@ No `make`? Use `python3 -m pytest`, `python3 -m pytest -k hash_map`, and
 swe-prep/
 ├── index.html                 dashboard: 4-lane readiness, track, day plans, drills, deferred topics
 ├── practice.html              offline Practice Hub: bare editor, multi-mode timer, mock log, STAR matrix
+├── python-cheatsheet.html     searchable Python 3.10–3.12 quick-reference lookup (basics to advanced)
 ├── curriculum.json            source of truth: the track (learning order) and every topic
 ├── assets/
 │   ├── style.css              Ayu themes (Dark/Mirage/Light), boxes, viz

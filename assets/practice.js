@@ -157,6 +157,8 @@
 
   const editorRefs = h("p", { class: "small muted", style: "margin:10px 0 0" },
     "Phase 0 references: ",
+    h("a", { href: "python-cheatsheet.html" }, "Python cheatsheet"),
+    " · ",
     h("a", { href: "sections/15-interview-formats/concepts/algorithmic-round.html#s8" }, "Bare-editor playbook"),
     " · ",
     h("a", { href: "sections/10-code-quality-design-testing/concepts/python-control-flow.html#summary" }, "Control flow"),

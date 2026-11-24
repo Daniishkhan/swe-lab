@@ -1,6 +1,7 @@
-# Publish the lab's pages (index.html, practice.html, assets/, and every
-# sections/**/*.html) to GitHub Pages on each push to main. Python exercises,
-# notes, story bank, mock log, .claude/, tools and templates are left out on purpose.
+# Publish the lab's pages (index.html, practice.html, python-cheatsheet.html,
+# assets/, and every sections/**/*.html) to GitHub Pages on each push to main.
+# Python exercises, notes, story bank, mock log, .claude/, tools and templates
+# are left out on purpose.
 name: Publish site
 
 on:
@@ -30,7 +31,7 @@ jobs:
       - name: Collect the pages
         run: |
           mkdir -p _site
-          cp index.html practice.html _site/
+          cp index.html practice.html python-cheatsheet.html _site/
           cp -r assets _site/
           find sections -name '*.html' -exec cp --parents {} _site/ \;
           touch _site/.nojekyll

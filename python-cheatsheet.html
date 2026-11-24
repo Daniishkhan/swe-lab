@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Python Cheatsheet · Quick Lookup Reference</title>
+  <script>try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("swe-prep:theme")) || "dark"; } catch (e) {}</script>
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/curriculum.js"></script>
+  <script src="assets/shell.js"></script>
+  <style>
+    .cs-hero { margin-bottom: 14px; }
+    .cs-hero h1 { margin: 4px 0 8px; }
+    .cs-pills {
+      display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px;
+    }
+    .cs-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 9px; border-radius: 999px; font: 500 0.78rem/1.2 var(--ui);
+      color: var(--muted); background: var(--surface); border: 1px solid var(--border);
+      text-decoration: none; white-space: nowrap;
+      transition: border-color 0.12s, color 0.12s, background 0.12s, opacity 0.12s;
+    }
+    .cs-pill:hover { color: var(--text-strong); border-color: var(--accent); background: var(--surface-2); text-decoration: none; }
+    .cs-pill.dim { opacity: 0.38; }
+    .cs-bar {
+      position: sticky; top: var(--topbar-h); z-index: 25;
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--border-strong); border-radius: 12px;
+      padding: 10px 12px; margin: 0 0 22px;
+    }
+    .cs-search-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cs-input {
+      flex: 1 1 240px; min-width: 0; height: 38px; padding: 0 12px;
+      font: 0.92rem var(--ui); color: var(--text-strong);
+      background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px;
+    }
+    .cs-input:focus, .cs-jump:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+    .cs-jump {
+      flex: 0 1 205px; max-width: 100%; height: 38px; padding: 0 10px;
+      font: 500 0.84rem var(--ui); color: var(--text);
+      background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px;
+      cursor: pointer;
+    }
+    .cs-count { font: 500 0.82rem var(--mono); color: var(--muted); white-space: nowrap; }
+    .cs-sec { margin: 0 0 30px; }
+    .cs-sec h2 {
+      margin: 28px 0 6px; padding-top: 10px;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+      scroll-margin-top: var(--cs-bar-h, 76px);
+    }
+    .cs-sec h2 .sec-num {
+      flex: none; display: inline-grid; place-items: center;
+      min-width: 1.75em; height: 1.75em; padding: 0 0.35em; border-radius: 7px;
+      font: 650 0.74rem/1 var(--mono); color: var(--brand);
+      background: color-mix(in srgb, var(--brand) 12%, transparent);
+      font-variant-numeric: tabular-nums;
+    }
+    .cs-sec:first-of-type h2 { margin-top: 4px; border-top: 0; padding-top: 0; }
+    .cs-sub { margin: 0 0 12px; color: var(--muted); font-size: 0.9rem; }
+    .cs-table-wrap {
+      overflow-x: auto; border: 1px solid var(--border); border-radius: 10px;
+      background: var(--surface); margin-bottom: 12px;
+    }
+    table.cs-table {
+      width: 100%; border-collapse: collapse; margin: 0; font-size: 0.88rem;
+    }
+    table.cs-table th {
+      text-align: left; font: 650 0.74rem/1.2 var(--ui); text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted); background: var(--surface-2);
+      padding: 9px 12px; border-bottom: 1px solid var(--border-strong);
+    }
+    table.cs-table td {
+      padding: 9px 12px; vertical-align: top; border-bottom: 1px solid var(--border);
+      line-height: 1.5;
+    }
+    table.cs-table tr:last-child td { border-bottom: 0; }
+    table.cs-table td:first-child { width: 22%; color: var(--text-strong); font-weight: 600; }
+    table.cs-table td:nth-child(2) { width: 38%; }
+    table.cs-table td:nth-child(3) { width: 40%; color: var(--text); }
+    table.cs-table td code { font-size: 0.82rem; white-space: pre-wrap; word-break: break-word; }
+    table.cs-table:not(.cs-bigo) td:nth-child(2) > code:only-child {
+      display: block; padding: 7px 9px; border-radius: 7px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      font-family: var(--mono); font-size: 0.8rem; line-height: 1.5;
+    }
+    table.cs-table.cs-gotchas td:nth-child(3) > code:only-child {
+      display: block; padding: 7px 9px; border-radius: 7px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      font-family: var(--mono); font-size: 0.8rem; line-height: 1.5;
+    }
+    table.cs-table.cs-bigo td:nth-child(2),
+    table.cs-table.cs-bigo td:nth-child(3) { font-family: var(--ui); font-size: 0.86rem; }
+    .cs-tag {
+      display: inline-block; margin-top: 4px; padding: 1px 6px; border-radius: 5px;
+      font: 600 0.7rem/1.3 var(--mono); vertical-align: middle;
+      background: var(--surface-2); color: var(--muted); border: 1px solid var(--border);
+    }
+    .cs-tag.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 10%, var(--surface)); }
+    .cs-tag.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
+    .cs-tag.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+    .cs-tag.ver { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); }
+    .cs-recipes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 10px; }
+    .cs-recipe {
+      border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+      padding: 10px 12px; min-width: 0;
+    }
+    .cs-recipe-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      margin-bottom: 6px; font: 650 0.82rem var(--ui); color: var(--text-strong);
+    }
+    .cs-copy {
+      font: 500 0.72rem var(--ui); padding: 3px 8px; border-radius: 6px;
+      background: var(--surface-2); color: var(--muted); border: 1px solid var(--border-strong);
+      cursor: pointer;
+    }
+    .cs-copy:hover { color: var(--text-strong); border-color: var(--accent); }
+    .cs-recipe pre { margin: 0; font-size: 0.8rem; }
+    .cs-empty {
+      display: none; padding: 28px 18px; text-align: center;
+      border: 1px dashed var(--border-strong); border-radius: 10px; color: var(--muted);
+    }
+    .cs-empty.show { display: block; }
+    .cs-links {
+      display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; font-size: 0.84rem;
+    }
+    .cs-links a { color: var(--accent); }
+    table.cs-table tr[hidden],
+    .cs-table-wrap[hidden],
+    .cs-recipes[hidden],
+    .cs-recipe[hidden],
+    .cs-sec[hidden],
+    #cs-clear[hidden] { display: none !important; }
+    @media (max-width: 860px) {
+      .cs-bar { position: static; }
+      .cs-sec h2 { scroll-margin-top: 0; }
+    }
+    @media (max-width: 760px) {
+      table.cs-table thead { display: none; }
+      table.cs-table, table.cs-table tbody, table.cs-table tr, table.cs-table td { display: block; width: 100% !important; }
+      table.cs-table tr { padding: 10px 12px; border-bottom: 1px solid var(--border-strong); }
+      table.cs-table tr:last-child { border-bottom: 0; }
+      table.cs-table td { padding: 3px 0; border-bottom: 0; }
+      table.cs-table td:nth-child(2) { margin: 4px 0; }
+      table.cs-table.cs-bigo td:nth-child(2) {
+        padding: 6px 8px; border-radius: 6px;
+        background: var(--surface-2); border: 1px solid var(--border);
+      }
+      .cs-jump { flex: 1 1 160px; }
+      .cs-recipes { grid-template-columns: 1fr; }
+    }
+    @media print {
+      .cs-bar, .cs-pills, .cs-copy { display: none !important; }
+    }
+  </style>
+</head>
+<body data-root="." data-page="cheatsheet">
+<main class="content wide">
+
+<header class="cs-hero">
+  <div class="eyebrow">Quick-lookup reference · Python 3.10–3.12</div>
+  <h1>Python Cheatsheet</h1>
+  <p class="lede">
+    A fast, searchable lookup guide from variable declarations and loops all the way through
+    memory semantics, comprehensions, generators, OOP, decorators, typing, interview stdlib,
+    concurrency, and classic gotchas. Type any keyword below to filter instantly.
+  </p>
+  <div class="cs-links muted">
+    <span>Deep-dive Phase 0 chapters:</span>
+    <a href="sections/10-code-quality-design-testing/concepts/python-control-flow.html">Control flow</a> ·
+    <a href="sections/10-code-quality-design-testing/concepts/python-data-structures.html">Built-in structures</a> ·
+    <a href="sections/10-code-quality-design-testing/concepts/python-memory-model.html">Memory model</a> ·
+    <a href="sections/10-code-quality-design-testing/concepts/python-idioms.html">Streams &amp; idioms</a> ·
+    <a href="sections/10-code-quality-design-testing/concepts/python-building-blocks.html">Decorators &amp; @dataclass</a> ·
+    <a href="sections/10-code-quality-design-testing/concepts/python-toolkit.html">Stdlib toolkit</a>
+  </div>
+</header>
+
+<nav class="cs-pills" aria-label="Jump to section">
+  <a class="cs-pill" href="#s1">1. Basics</a>
+  <a class="cs-pill" href="#s2">2. Control Flow</a>
+  <a class="cs-pill" href="#s3">3. Strings</a>
+  <a class="cs-pill" href="#s4">4. Lists &amp; Tuples</a>
+  <a class="cs-pill" href="#s5">5. Dicts &amp; Sets</a>
+  <a class="cs-pill" href="#s6">6. Functions &amp; Scope</a>
+  <a class="cs-pill" href="#s7">7. Memory &amp; Copies</a>
+  <a class="cs-pill" href="#s8">8. Comprehensions</a>
+  <a class="cs-pill" href="#s9">9. Generators &amp; itertools</a>
+  <a class="cs-pill" href="#s10">10. OOP &amp; Dataclasses</a>
+  <a class="cs-pill" href="#s11">11. Decorators &amp; with</a>
+  <a class="cs-pill" href="#s12">12. Errors &amp; Typing</a>
+  <a class="cs-pill" href="#s13">13. Interview Stdlib</a>
+  <a class="cs-pill" href="#s14">14. Concurrency &amp; Async</a>
+  <a class="cs-pill" href="#s15">15. Files, JSON &amp; RegEx</a>
+  <a class="cs-pill" href="#s16">16. Advanced, Traps &amp; Big-O</a>
+</nav>
+
+<div class="cs-bar" role="search" aria-label="Filter Python cheatsheet">
+  <div class="cs-search-row">
+    <input id="cs-filter" class="cs-input" type="search" autocomplete="off" spellcheck="false"
+      aria-label="Filter Python cheatsheet"
+      placeholder='Filter lookup table… try "heap", "slice", "yield", "dataclass", "async", "O(1)", "trap"'>
+    <select id="cs-jump" class="cs-jump" aria-label="Jump to section">
+      <option value="">Jump to section…</option>
+      <option value="s1">1. Basics &amp; Truthiness</option>
+      <option value="s2">2. Control Flow &amp; Match</option>
+      <option value="s3">3. Strings &amp; Formatting</option>
+      <option value="s4">4. Lists &amp; Tuples</option>
+      <option value="s5">5. Dicts &amp; Sets</option>
+      <option value="s6">6. Functions &amp; Scope</option>
+      <option value="s7">7. Memory &amp; Copies</option>
+      <option value="s8">8. Comprehensions</option>
+      <option value="s9">9. Generators &amp; itertools</option>
+      <option value="s10">10. OOP &amp; Dataclasses</option>
+      <option value="s11">11. Decorators &amp; with</option>
+      <option value="s12">12. Errors &amp; Typing</option>
+      <option value="s13">13. Interview Stdlib</option>
+      <option value="s14">14. Concurrency &amp; Async</option>
+      <option value="s15">15. Files, JSON &amp; RegEx</option>
+      <option value="s16">16. Advanced, Traps &amp; Big-O</option>
+    </select>
+    <span id="cs-count" class="cs-count" aria-live="polite">Loading…</span>
+    <button id="cs-clear" class="btn" type="button" hidden>Clear</button>
+  </div>
+</div>
+
+<div id="cs-empty" class="cs-empty">
+  No entries matched your filter. Try a shorter keyword like <code>dict</code>, <code>heap</code>, <code>yield</code>, or <code>decorator</code>.
+</div>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s1"><span class="sec-num">1</span>Variables, Types, Operators &amp; Truthiness</h2>
+<p class="cs-sub">Declarations, unpacking, numeric edge cases, equality vs. identity, and what counts as falsy.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="basics variables types operators truthiness">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Bind, swap &amp; unpack</td>
+      <td><code>x = 42<br>a, b = b, a<br>head, *mid, tail = [1, 2, 3, 4]<br>name, _ = ("alice", 99)</code></td>
+      <td>Variables bind names to objects dynamically (no type keyword). Starred unpacking captures 0+ middle items as a <code>list</code>; <code>_</code> marks an intentionally ignored value.</td>
+    </tr>
+    <tr>
+      <td>Core primitives, casts &amp; <code>isinstance</code></td>
+      <td><code>n = 10_000_000   # int (unlimited)<br>f = 3.14         # float (64-bit)<br>ok = True        # bool (subclass of int!)<br>empty = None     # singleton absence<br>raw = b"utf8"    # bytes<br>int("ff", 16); isinstance(x, (int, float))</code></td>
+      <td>Python <code>int</code> never overflows (arbitrary precision). Test <code>None</code> with <code>is None</code>; compare floats with <code>math.isclose(a, b)</code>. <b>Catch:</b> <code>isinstance(True, int)</code> is <code>True</code> — check <code>bool</code> before <code>int</code>!</td>
+    </tr>
+    <tr>
+      <td>Division &amp; modulo<br><span class="cs-tag bad">Trap!</span></td>
+      <td><code>7 / 2 == 3.5      # true float div<br>7 // 2 == 3       # floor div<br>-7 // 2 == -4     # toward -inf!<br>int(-7 / 2) == -3 # toward zero<br>-7 % 2 == 1       # divisor sign<br>q, r = divmod(7, 2)  # (3, 1)</code></td>
+      <td><code>//</code> always floors toward <b>−∞</b> (unlike C++/Java truncation toward zero). <code>%</code> matches the divisor's sign — great for circular indices <code>(i - 1) % n</code>. Watch float precision on <code>int(a / b)</code> above 2⁵³.</td>
+    </tr>
+    <tr>
+      <td>Powers, infinity &amp; bitwise</td>
+      <td><code>2 ** 10 == 1024<br>pow(2, 100, 1_000_000_007)<br>hi = float("inf")<br>lo = float("-inf")<br>a &amp; b | c ^ d; x &lt;&lt; 1; x &gt;&gt; 1</code></td>
+      <td>3-arg <code>pow(base, exp, mod)</code> runs modular exponentiation in <code>O(log exp)</code>. Use <code>float("inf")</code> for DP/Dijkstra sentinels. Bitwise XOR <code>a ^ a == 0</code> cancels pairs.</td>
+    </tr>
+    <tr>
+      <td>Equality vs. identity</td>
+      <td><code>a == b    # same value<br>a is b    # exact same object in RAM<br>x is None # always use `is` for None</code></td>
+      <td>Never use <code>is</code> to compare integers or strings (small ints <code>-5..256</code> happen to be interned in CPython, fooling tiny tests while failing at <code>257</code>!). Reserve <code>is</code> for <code>None</code> and custom sentinels.</td>
+    </tr>
+    <tr>
+      <td>Truthiness (falsy values)<br><span class="cs-tag warn">Watch 0</span></td>
+      <td><code># Falsy: False, None, 0, 0.0,<br>#   "", b"", [], (), {}, set()<br>if items: ...             # non-empty<br>if score is not None: ... # keeps 0!</code></td>
+      <td>Any empty container or zero evaluates to <code>False</code> in <code>if</code>/<code>while</code>. When <code>0</code>, <code>""</code>, or <code>False</code> is a legal value, always test <code>is not None</code> instead of bare <code>if val:</code>.</td>
+    </tr>
+    <tr>
+      <td>Chained comparisons</td>
+      <td><code>if 0 &lt;= r &lt; rows and 0 &lt;= c &lt; cols:<br>    ...<br>if a == b == c: ...</code></td>
+      <td>Evaluates middle expressions only once and reads like math. Avoids repeating <code>r &gt;= 0 and r &lt; rows</code> in grid bounds checks.</td>
+    </tr>
+    <tr>
+      <td>Walrus operator<br><span class="cs-tag ver">3.8+</span></td>
+      <td><code>while (line := f.readline()):<br>    process(line)<br>if (m := pat.search(s)):<br>    return m.group(1)</code></td>
+      <td>Assigns and returns a value inside an expression — eliminates calling a helper twice or writing redundant setup lines before a <code>while</code> loop.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s2"><span class="sec-num">2</span>Control Flow, Loops &amp; Pattern Matching</h2>
+<p class="cs-sub">Branching, half-open ranges, loop exits, flag-free search, and structural <code>match</code>.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="control flow loops branching match">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Branching &amp; ternary</td>
+      <td><code>if x &gt; 0: ...<br>elif x == 0: ...<br>else: ...<br>sign = "neg" if x &lt; 0 else "non-neg"</code></td>
+      <td>Indentation (4 spaces) defines blocks. <code>elif</code> skips remaining branches once one matches; stacked <code>if</code>s test every gate independently. Keep ternaries unnested.</td>
+    </tr>
+    <tr>
+      <td>Short-circuit logic</td>
+      <td><code>if xs and xs[0] == target:<br>    ...<br>host = env_host or "localhost"</code></td>
+      <td><code>and</code> stops at the first falsy operand (preventing <code>IndexError</code> on empty <code>xs</code>); <code>or</code> returns the first truthy operand. Watch <code>val or default</code> if <code>val</code> can be <code>0</code> or <code>""</code>!</td>
+    </tr>
+    <tr>
+      <td><code>for</code> &amp; half-open <code>range</code><br><span class="cs-tag warn">Stop excl.</span></td>
+      <td><code>for x in items: ...<br>range(5)              # 0,1,2,3,4<br>range(2, 6)           # 2,3,4,5<br>range(n - 1, -1, -1)  # n-1..0!</code></td>
+      <td>Iterate values directly when you don't need indices. <code>range(start, stop, step)</code> is always half-open <code>[start, stop)</code> — counting down to <code>0</code> inclusive requires <code>stop = -1</code>.</td>
+    </tr>
+    <tr>
+      <td><code>while</code>, <code>continue</code>, <code>break</code></td>
+      <td><code>while lo &lt;= hi:<br>    if skip(lo):<br>        lo += 1; continue<br>    if found(lo): break<br>    lo += 1</code></td>
+      <td>Use <code>while</code> when pointers/state shift dynamically. Always advance the pointer <em>before</em> <code>continue</code> to avoid infinite loops. <code>break</code> only exits the <em>innermost</em> loop — extract a helper <code>def</code> + <code>return</code> to exit 2D loops!</td>
+    </tr>
+    <tr>
+      <td><code>for ... else</code> / <code>while ... else</code></td>
+      <td><code>for x in nums:<br>    if x == target: break<br>else:<br>    print("not found")</code></td>
+      <td>The <code>else:</code> block aligns with <code>for</code>/<code>while</code> and runs <b>only if the loop finished without hitting <code>break</code></b> (including on an empty iterable). Replaces <code>found = False</code> flags.</td>
+    </tr>
+    <tr>
+      <td>Structural <code>match / case</code><br><span class="cs-tag ver">3.10+</span></td>
+      <td><code>match cmd.split():<br>    case ["GET", key]: ...<br>    case ["SET", k, v] if v != "": ...<br>    case [Status.ERR, msg]: ...  # dotted!<br>    case _: raise ValueError("bad")</code></td>
+      <td>Matches shape, literals, types, dicts, and dataclass fields cleanly with optional <code>if</code> guards. <b>Catch:</b> a bare name like <code>case ERR:</code> captures into a variable — use dotted names (<code>Status.ERR</code>) to match constants. Cases never fall through.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s3"><span class="sec-num">3</span>Strings, Formatting &amp; Text Operations</h2>
+<p class="cs-sub">Immutable Unicode text ribbons, f-string formatting, parsing methods, and linear-time assembly.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="strings text formatting unicode">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Literals, raw &amp; bytes</td>
+      <td><code>s = "hello"<br>doc = """multi\nline"""<br>pat = r"\d+\s+\w+"      # raw<br>b = "café".encode("utf-8")<br>t = b.decode("utf-8")</code></td>
+      <td>Raw strings <code>r"..."</code> stop backslashes from escaping — always use them for regexes. <code>str</code> holds Unicode code points; <code>bytes</code> holds raw 0–255 octets for network/file I/O.</td>
+    </tr>
+    <tr>
+      <td>f-strings &amp; format specs</td>
+      <td><code>f"user={name}, n={n:,}"<br>f"{pi:.2f}"       # "3.14"<br>f"{n:04d}"        # "0007"<br>f"{n:b}"; f"{n:x}"  # bin; hex<br>f"{val=}"         # "val=42"</code></td>
+      <td>Fastest and cleanest formatting. <code>f"{expr=}"</code> prints both expression name and value (awesome for quick debugging!). Align with <code>&lt;</code>, <code>&gt;</code>, <code>^</code> (e.g. <code>f"{s:&gt;10}"</code>).</td>
+    </tr>
+    <tr>
+      <td>Linear string building<br><span class="cs-tag ok">O(n)</span></td>
+      <td><code>parts = []<br>for ch in chars:<br>    parts.append(ch)<br>out = "".join(parts)<br>csv = ", ".join(tags)</code></td>
+      <td>Strings are immutable: <code>out += ch</code> in a loop can copy <code>1+2+...+n = O(n²)</code> characters. Always append chunks to a <code>list</code> and join once with <code>sep.join(parts)</code>.</td>
+    </tr>
+    <tr>
+      <td>Split, strip &amp; prefix/suffix<br><span class="cs-tag ver">3.9+ prefix</span></td>
+      <td><code>s.strip()                # trim whitespace<br>s.removeprefix("pre_")   # exact prefix<br>s.removesuffix(".py")    # exact suffix<br>s.split()                # any whitespace<br>s.split(",", 1)          # max 1 split<br>s.splitlines(); s.replace("a", "b")</code></td>
+      <td><code>s.split()</code> collapses consecutive whitespace; <code>s.split(" ")</code> keeps empty tokens. <b>Trap:</b> <code>s.strip("ab")</code> strips <em>any</em> char in <code>{'a','b'}</code>, NOT the substring <code>"ab"</code> — use <code>removeprefix</code> / <code>removesuffix</code>!</td>
+    </tr>
+    <tr>
+      <td>Search, checks &amp; char codes</td>
+      <td><code>"sub" in s          # O(n) bool<br>s.find("x")         # -1 if absent<br>s.startswith(("http", "https"))<br>s.lower(); s.casefold()<br>s.isalnum(); s.isdigit()<br>ord("a") == 97; chr(97) == "a"</code></td>
+      <td><code>startswith</code> and <code>endswith</code> accept a tuple of prefixes/suffixes. <code>find</code> returns <code>-1</code> while <code>index</code> raises <code>ValueError</code>. Use <code>ord(c) - ord("a")</code> for 0..25 alphabet bucket arrays.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s4"><span class="sec-num">4</span>Lists &amp; Tuples — Sequences &amp; Slicing</h2>
+<p class="cs-sub">Dynamic arrays (<code>list</code>) vs. sealed records (<code>tuple</code>), half-open slicing, sorting, and exact costs.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="lists tuples sequences slicing sorting">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Create &amp; 2D grids<br><span class="cs-tag bad">Grid trap!</span></td>
+      <td><code>a = [0] * n                 # safe<br>g = [[0]*c for _ in range(r)] # safe<br># NEVER: [[0] * c] * r (aliases rows!)</code></td>
+      <td><code>*</code> repeats <em>references</em>. Fine for immutable ints/strings, catastrophic for nested mutable lists (writing <code>g[0][0] = 1</code> mutates every row!).</td>
+    </tr>
+    <tr>
+      <td>Indexing &amp; slicing<br><span class="cs-tag warn">a[-0:] trap</span></td>
+      <td><code>a[0], a[-1]       # first, last O(1)<br>a[1:4]            # idx 1, 2, 3<br>a[:k], a[-k:]     # first k, last k (k&gt;0)<br>a[::2], a[::-1]   # step 2, reverse<br>b = a[:]          # shallow copy O(n)</code></td>
+      <td>Slices are half-open <code>[start, stop)</code> and tolerate out-of-range bounds cleanly. <b>Catch:</b> when <code>k == 0</code>, <code>a[-0:]</code> is <code>a[0:]</code> (the entire list, not <code>[]</code>!). Every slice allocates a fresh list in <code>O(k)</code>.</td>
+    </tr>
+    <tr>
+      <td>Fast back vs. slow front<br><span class="cs-tag ok">O(1) back</span></td>
+      <td><code>a.append(x)       # O(1) amort<br>a.pop()           # O(1) amort<br>a.extend(ys)      # O(len(ys))<br># Slow O(n) shifts/scans:<br>a.insert(0, x); a.pop(0); x in a</code></td>
+      <td>A <code>list</code> is a ready-made LIFO stack (<code>append</code>/<code>pop()</code>). For FIFO queues or sliding windows, never use <code>pop(0)</code> — use <code>collections.deque.popleft()</code> (Section 13).</td>
+    </tr>
+    <tr>
+      <td>Sorting: in-place vs. copy<br><span class="cs-tag ok">O(n log n)</span></td>
+      <td><code>a.sort(key=lambda r: (-r[1], r[0]))<br>b = sorted(a, reverse=True)<br>a.reverse()      # in-place None<br>it = reversed(a) # O(1) lazy iter</code></td>
+      <td><code>a.sort()</code> and <code>a.reverse()</code> mutate in place and return <code>None</code> (never write <code>b = a.sort()</code>!). Python's Timsort is <b>stable</b> (preserves tie order) — great for two-pass sorting when descending strings can't be negated.</td>
+    </tr>
+    <tr>
+      <td>Tuples &amp; 1-tuple trap<br><span class="cs-tag warn">(x,) comma</span></td>
+      <td><code>pt = (2, 5)<br>r, c = pt<br>one = (42,)       # 1-tuple!<br>not_t = (42)      # plain int!<br>empty = ()</code></td>
+      <td>Immutable, ordered, compact, and <b>hashable</b> (when all elements are hashable) — ideal for <code>(r, c)</code> coordinates in <code>visited</code> sets, dict keys, and multi-value function returns.</td>
+    </tr>
+    <tr>
+      <td>Named tuples</td>
+      <td><code>from typing import NamedTuple<br>class Pt(NamedTuple):<br>    x: int; y: int</code></td>
+      <td>Tuple subclass with named attributes (<code>p.x</code>), zero per-instance dict overhead, immutable, unpackable (<code>x, y = p</code>), and natively sortable/hashable.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s5"><span class="sec-num">5</span>Dictionaries &amp; Sets — Hash Tables &amp; Set Algebra</h2>
+<p class="cs-sub">Average <code>O(1)</code> key-value maps (insertion-ordered since Python 3.7) and unique badge sets with math operators.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="dict dictionary set hash table">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Dict reads, writes &amp; pops<br><span class="cs-tag ok">O(1) avg</span></td>
+      <td><code>d = {"a": 1}<br>d["a"]                # KeyError if absent<br>d.get("b", 0)         # safe default<br>d["b"] = d.get("b", 0) + 1<br>d.setdefault("k", []).append(v)<br>val = d.pop("k", None)</code></td>
+      <td>Keys must be hashable (e.g. <code>int</code>, <code>str</code>, <code>tuple</code> of hashables, <code>frozenset</code> — never <code>list</code>/<code>dict</code>/<code>set</code>). <code>.get()</code> never mutates <code>d</code>; <code>.setdefault()</code> allocates <code>[]</code> even on hits — prefer <code>defaultdict(list)</code> in hot loops.</td>
+    </tr>
+    <tr>
+      <td>Dict views, order &amp; merge<br><span class="cs-tag ver">3.9+ |</span></td>
+      <td><code>for k in d: ...           # keys<br>for k, v in d.items(): ...<br>for v in d.values(): ...<br>merged = a | b            # new dict<br>a |= b                    # in-place<br>uniq = list(dict.fromkeys(xs))</code></td>
+      <td>Dictionaries preserve exact insertion order (<code>3.7+</code>). <code>a | b</code> gives <code>b</code> precedence on key collisions. <code>list(dict.fromkeys(xs))</code> deduplicates hashable items in <code>O(n)</code> while keeping first-seen order!</td>
+    </tr>
+    <tr>
+      <td>Set creation &amp; edits<br><span class="cs-tag bad">{} Trap!</span></td>
+      <td><code>s = set()         # empty set (NOT {}!)<br>s = {1, 2, 3}<br>s.add(4)<br>s.discard(99)     # safe if absent<br>s.remove(99)      # KeyError if absent<br>4 in s            # O(1) avg</code></td>
+      <td>Empty braces <code>{}</code> ALWAYS make an empty <code>dict</code>! Use <code>set()</code>. Sets are unordered and store only unique hashable items. Prefer <code>discard</code> unless missing items should error.</td>
+    </tr>
+    <tr>
+      <td>Set algebra operators</td>
+      <td><code>a | b   # union (in either)<br>a &amp; b   # intersection (in both)<br>a - b   # difference (in a only)<br>a ^ b   # sym diff (in exactly one)<br>a &lt;= b  # subset; a.isdisjoint(b)</code></td>
+      <td>Operators require both sides to be sets; method equivalents (<code>a.union(iterable)</code>, <code>a.intersection(iterable)</code>) accept any iterable. Wrap results in <code>sorted(...)</code> when output order matters.</td>
+    </tr>
+    <tr>
+      <td><code>frozenset</code></td>
+      <td><code>edge = frozenset({u, v})<br>seen_edges.add(edge)</code></td>
+      <td>Immutable, hashable set — use whenever you need a set inside another set or as a dictionary key (for example, undirected graph edges or unordered anagram/state keys).</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s6"><span class="sec-num">6</span>Functions, Parameters, Scope &amp; Closures</h2>
+<p class="cs-sub">Full parameter syntax, lambdas, LEGB name lookup, closures, and the two classic function traps.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="functions parameters args kwargs scope closures lambda">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Full parameter order<br><span class="cs-tag ver">3.8+ /</span></td>
+      <td><code>def fn(pos_only, /, std, b=1,<br>       *args, kw_only=True, **kwargs):<br>    return (pos_only, std, b)</code></td>
+      <td>Everything before <code>/</code> is positional-only; everything after <code>*</code> (or <code>*args</code>) is keyword-only. <code>*args</code> collects extra positionals as a <code>tuple</code>; <code>**kwargs</code> collects extra keywords as a <code>dict</code>. Missing <code>return</code> returns <code>None</code>.</td>
+    </tr>
+    <tr>
+      <td>Unpacking at call site</td>
+      <td><code>args = [1, 2]<br>opts = {"sep": "-", "end": "\n"}<br>print(*args, **opts)</code></td>
+      <td><code>*seq</code> unpacks any iterable into positional arguments; <code>**mapping</code> unpacks string keys into keyword arguments. Same <code>*</code> trick powers <code>zip(*matrix)</code>!</td>
+    </tr>
+    <tr>
+      <td><code>lambda</code> expressions</td>
+      <td><code>key = lambda r: (-r.score, r.name)<br>sorted(users, key=key)</code></td>
+      <td>Unnamed single-expression function (no statements). Ideal for 1-line sort/min/max keys; use a named <code>def</code> for anything longer or reused.</td>
+    </tr>
+    <tr>
+      <td>Scope: LEGB, <code>nonlocal</code>, <code>global</code></td>
+      <td><code>def outer():<br>    hits = 0<br>    def inner():<br>        nonlocal hits<br>        hits += 1<br>    return inner</code></td>
+      <td>Python looks up names in <b>L</b>ocal → <b>E</b>nclosing → <b>G</b>lobal → <b>B</b>uilt-in order. Rebinding an outer immutable name (like <code>hits += 1</code>) requires <code>nonlocal</code> (enclosing) or <code>global</code> (module); mutating an outer list/dict (<code>cache[k] = v</code>) does not.</td>
+    </tr>
+    <tr>
+      <td>Mutable default trap<br><span class="cs-tag bad">Trap!</span></td>
+      <td><code># BAD: def add(x, out=[]): ...<br>def add(x, out=None):<br>    if out is None:<br>        out = []<br>    out.append(x)<br>    return out</code></td>
+      <td>Default argument expressions run <b>once at <code>def</code> time</b>, not per call! Putting <code>out=[]</code> shares one list across every call. Guard with <code>if out is None:</code> (NOT <code>out = out or []</code>, which discards an empty caller list!).</td>
+    </tr>
+    <tr>
+      <td>Closure late-binding trap<br><span class="cs-tag bad">Trap!</span></td>
+      <td><code># BAD: [lambda x: x * f for f in fs]<br># FIX: snapshot via default arg!<br>fns = [lambda x, f=f: x * f for f in fs]</code></td>
+      <td>Inner functions look up loop variable <code>f</code> when <em>called</em>, not when created — so all lambdas read the final value of <code>f</code> unless you capture a snapshot via default argument <code>f=f</code> or a helper factory.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s7"><span class="sec-num">7</span>Memory Model, Mutability, Copies &amp; Safe Iteration</h2>
+<p class="cs-sub">Names are sticky notes stuck onto heap objects — one model explaining aliasing, copying, and call semantics.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="memory model mutability aliasing copy deepcopy iteration">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Aliasing &amp; call-by-sharing</td>
+      <td><code>a = [1, 2]<br>b = a          # zero copy! same box<br>b.append(3)    # a is now [1, 2, 3]!<br>b = [9]        # rebinds b only; a safe</code></td>
+      <td>Assignment and function argument passing NEVER copy objects — they attach another name to the same object. Rebinding moves one sticky note; mutating in place changes what every alias sees.</td>
+    </tr>
+    <tr>
+      <td><code>+=</code> vs. <code>= +</code> on lists<br><span class="cs-tag warn">Subtle</span></td>
+      <td><code>b = a<br>a += [3]       # mutates in place (b changes!)<br>a = a + [4]    # new list (b unchanged!)</code></td>
+      <td>On mutable lists, <code>+=</code> calls <code>__iadd__</code> (in-place <code>extend</code>), modifying aliases. On immutable tuples/ints/strings, <code>+=</code> creates a brand-new object and rebinds only <code>a</code>.</td>
+    </tr>
+    <tr>
+      <td>Shallow vs. deep copy</td>
+      <td><code>import copy<br>s = grid.copy()            # shallow!<br>g2 = [r[:] for r in grid]  # 2D clone<br>d = copy.deepcopy(nested)  # full clone</code></td>
+      <td><code>.copy()</code>, <code>[:]</code>, and <code>list(x)</code> copy only the outer container — nested lists/dicts inside stay shared! Use <code>[r[:] for r in grid]</code> for 2D boards and <code>copy.deepcopy</code> for arbitrary graphs/trees.</td>
+    </tr>
+    <tr>
+      <td>Mutating while iterating<br><span class="cs-tag bad">Trap!</span></td>
+      <td><code># BAD: for k in d: del d[k] (RuntimeError)<br>for k in list(d):<br>    if drop(k): del d[k]<br>nums = [x for x in nums if keep(x)]</code></td>
+      <td>Adding/deleting dict or set entries during iteration raises <code>RuntimeError</code> on the next step; removing list items shifts indices and silently skips neighbors. Iterate a snapshot <code>list(d)</code> or rebuild cleanly.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s8"><span class="sec-num">8</span>Comprehensions &amp; Built-in Functional Tools</h2>
+<p class="cs-sub">Declarative one-pass transformations, lockstep traversal, matrix transpose, and reductions.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="comprehensions enumerate zip transpose functional any all sum min max">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>List / dict / set comprehensions</td>
+      <td><code>[x * x for x in xs if x &gt; 0]<br>{u.id: u.name for u in users}<br>{w.lower() for w in words}<br>[x if x &gt; 0 else 0 for x in xs]</code></td>
+      <td>Filter <code>if</code> goes at the <b>end</b>; transform <code>a if c else b</code> goes at the <b>front</b>. Avoid nesting more than 2 loops — switch to a plain <code>for</code> loop if readability drops.</td>
+    </tr>
+    <tr>
+      <td>Nested 2D flattening</td>
+      <td><code>flat = [v for row in grid for v in row]</code></td>
+      <td>Clauses read left to right in the exact same nesting order as outer <code>for row in grid:</code> → inner <code>for v in row:</code>.</td>
+    </tr>
+    <tr>
+      <td><code>enumerate</code>, <code>zip</code>, transpose<br><span class="cs-tag ver">3.10+ strict</span></td>
+      <td><code>for i, val in enumerate(xs, start=0): ...<br>for a, b in zip(xs, ys, strict=True): ...<br>cols = list(zip(*matrix))</code></td>
+      <td>Both <code>enumerate</code> and <code>zip</code> are lazy iterators. <code>zip</code> stops at the shortest iterable unless you pass <code>strict=True</code> (raises <code>ValueError</code> on mismatch). <code>zip(*matrix)</code> transposes rows into columns.</td>
+    </tr>
+    <tr>
+      <td>Reductions &amp; short-circuiting</td>
+      <td><code>any(p(x) for x in xs)<br>all(p(x) for x in xs)<br>sum(x for x in xs)<br>min(xs, key=len, default="")<br>max(counts, key=counts.get)</code></td>
+      <td>Drop square brackets <code>[...]</code> inside reductions so Python streams in <code>O(1)</code> extra RAM and short-circuits on the first hit! <code>any([]) == False</code>; <code>all([]) == True</code> (vacuously true). Always pass <code>default=</code> to <code>min</code>/<code>max</code> if input can be empty.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s9"><span class="sec-num">9</span>Iterators, Generators, yield &amp; itertools</h2>
+<p class="cs-sub">Pull-on-demand lazy streams, constant-memory pipelines, recursive delegation, and C-speed combinators.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="iterators generators yield lazy streams itertools">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Iterator protocol &amp; <code>next</code></td>
+      <td><code>it = iter(xs)<br>first = next(it, None)  # fallback None</code></td>
+      <td>An iterable implements <code>__iter__</code>; an iterator implements <b>both</b> <code>__iter__</code> (returning <code>self</code>) and <code>__next__</code> (raising <code>StopIteration</code> at end). Passing a fallback to <code>next(it, default)</code> avoids <code>StopIteration</code>.</td>
+    </tr>
+    <tr>
+      <td>Generator expressions<br><span class="cs-tag warn">Single-use!</span></td>
+      <td><code>gen = (x * 2 for x in big_stream)<br>first = next((x for x in xs if x &gt; 9), None)</code></td>
+      <td>Lazy pull-based iterator in <code>O(1)</code> extra RAM. <b>Single-use:</b> once exhausted (even by <code>sum(gen)</code> or debug <code>list(gen)</code>), every later loop silently sees empty <code>[]</code>! No <code>len()</code> or indexing.</td>
+    </tr>
+    <tr>
+      <td><code>yield</code> &amp; <code>yield from</code></td>
+      <td><code>from collections.abc import Iterable<br>def flatten(xs):<br>    for x in xs:<br>        if (isinstance(x, Iterable) and<br>                not isinstance(x, (str, bytes))):<br>            yield from flatten(x)<br>        else:<br>            yield x</code></td>
+      <td>Calling a generator function runs 0 lines until the first <code>next()</code>. Each <code>yield</code> freezes local state and hands back one item. Always exclude <code>(str, bytes)</code> when recursing on <code>Iterable</code> (iterating <code>"a"</code> yields <code>"a"</code> forever!).</td>
+    </tr>
+    <tr>
+      <td><code>itertools</code> slicing &amp; chaining</td>
+      <td><code>from itertools import islice, chain, accumulate<br>list(islice(inf_gen, 0, 5))<br>chain.from_iterable(groups)  # 1-level flat<br>pref = list(accumulate(nums, initial=0))</code></td>
+      <td><code>islice(it, start, stop)</code> slices any lazy/infinite stream (careful: 1-arg <code>islice(it, k)</code> sets <code>stop=k</code>, NOT <code>start=k</code> — use <code>islice(it, k, None)</code> to skip <code>k</code>!). <code>accumulate</code> builds prefix sums in one <code>O(n)</code> pass.</td>
+    </tr>
+    <tr>
+      <td><code>groupby</code><br><span class="cs-tag bad">Sort first!</span></td>
+      <td><code>from itertools import groupby<br>data = sorted(items, key=kfn)<br>groups = [(k, list(g)) for k, g in groupby(data, kfn)]</code></td>
+      <td><code>groupby</code> ONLY merges <em>consecutive</em> equal keys! Always sort by the same key first if identical keys aren't adjacent, and materialize <code>list(g)</code> immediately before advancing the outer loop.</td>
+    </tr>
+    <tr>
+      <td>Combinatorics &amp; infinite helpers<br><span class="cs-tag ver">3.10–3.12</span></td>
+      <td><code>from itertools import (<br>    count, cycle, product,<br>    permutations, combinations, pairwise, batched,<br>)<br>seq = count(0)          # 0, 1, 2, ...<br>pairwise([1, 2, 3])     # (1,2), (2,3)<br>batched(xs, 3)          # chunks of 3 (3.12+)</code></td>
+      <td><code>product(a, b)</code> = Cartesian product (replaces nested loops); <code>permutations(xs, r)</code> = ordered; <code>combinations(xs, r)</code> = unordered without replacement; <code>count()</code> = tie-breaker counter for heaps.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s10"><span class="sec-num">10</span>Classes, OOP, Dunder Methods &amp; Dataclasses</h2>
+<p class="cs-sub">Clean Python objects, properties, special methods, memory-saving slots, dataclasses, ABCs, and enums.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="classes oop dunder methods slots dataclass abc enum">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Class, inheritance &amp; <code>super()</code></td>
+      <td><code>class Node:<br>    kind = "base"        # shared class attr<br>    def __init__(self, val):<br>        self.val = val   # instance attr<br>class Leaf(Node):<br>    def __init__(self, val, tag):<br>        super().__init__(val)<br>        self.tag = tag</code></td>
+      <td>Never put mutable objects (like <code>items = []</code>) as class attributes — every instance would share one list! Always initialize per-instance mutable state inside <code>__init__</code>. Inspect method resolution order via <code>Cls.__mro__</code>.</td>
+    </tr>
+    <tr>
+      <td><code>@property</code>, <code>@classmethod</code>, <code>@staticmethod</code></td>
+      <td><code>@property<br>def area(self): return self.w * self.h<br>@classmethod<br>def from_dict(cls, d): return cls(**d)<br>@staticmethod<br>def valid(x): return x &gt; 0</code></td>
+      <td><code>@property</code> exposes a computed or validated field with attribute syntax (add <code>@area.setter</code> to allow writes). <code>@classmethod</code> receives <code>cls</code> (supports subclasses for alternate constructors). <code>@staticmethod</code> is just a namespaced helper.</td>
+    </tr>
+    <tr>
+      <td>Core dunder methods</td>
+      <td><code>__repr__(self)   # debug string<br>__str__(self)    # user string<br>__eq__ / __hash__ # dict/set key contract<br>__lt__(self, o)  # sorting &amp; heapq<br>__len__ / __getitem__ / __contains__<br>__call__(self, *args)</code></td>
+      <td>Defining <code>__eq__</code> without <code>__hash__</code> sets <code>__hash__ = None</code> (making instances unhashable). Contract: if <code>a == b</code>, then <code>hash(a) == hash(b)</code> MUST hold! Pair <code>__lt__</code> + <code>__eq__</code> with <code>@functools.total_ordering</code> for all 6 comparisons.</td>
+    </tr>
+    <tr>
+      <td><code>__slots__</code></td>
+      <td><code>class Point:<br>    __slots__ = ("x", "y")<br>    def __init__(self, x, y):<br>        self.x, self.y = x, y</code></td>
+      <td>Replaces the dynamic per-instance <code>__dict__</code> with a fixed C struct layout — cutting RAM by ~40–60% for millions of small nodes and catching misspelled attribute writes (<code>p.z = 1</code> raises <code>AttributeError</code>).</td>
+    </tr>
+    <tr>
+      <td><code>@dataclass</code><br><span class="cs-tag ver">3.10+ slots/kw</span></td>
+      <td><code>from dataclasses import dataclass, field, replace<br>@dataclass(frozen=True, order=True, slots=True, kw_only=True)<br>class Task:<br>    prio: int<br>    seq: int<br>    tags: tuple[str, ...] = ()<br>    meta: dict = field(default_factory=dict, compare=False)<br>    def __post_init__(self): ...  # validate</code></td>
+      <td>Generates <code>__init__</code>, <code>__repr__</code>, <code>__eq__</code> automatically. <code>frozen=True</code> blocks writes &amp; enables <code>__hash__</code>; <code>order=True</code> compares fields top-to-bottom; <code>kw_only=True</code> (3.10+) prevents positional mix-ups. Use <code>field(default_factory=list)</code> for mutable defaults, <code>__post_init__</code> for invariants, and <code>replace(t, prio=1)</code> to clone &amp; tweak.</td>
+    </tr>
+    <tr>
+      <td><code>ABC</code> &amp; <code>Enum</code></td>
+      <td><code>from abc import ABC, abstractmethod<br>from enum import Enum, auto<br>class Store(ABC):<br>    @abstractmethod<br>    def get(self, k: str): ...<br>class State(Enum):<br>    OPEN = auto(); CLOSED = auto()</code></td>
+      <td>Instantiating a subclass that forgot an <code>@abstractmethod</code> raises <code>TypeError</code> right away. Use <code>Enum</code> (or <code>StrEnum</code> in 3.11+) instead of raw magic strings for finite state machines.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s11"><span class="sec-num">11</span>Decorators, functools &amp; Context Managers</h2>
+<p class="cs-sub">How <code>@</code> rebinds targets at definition time, caching safely, and exception-proof <code>with</code> guards.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="decorators functools cache lru_cache context manager with">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>How <code>@</code> syntax works</td>
+      <td><code>@dec                # runs once at def time:<br>def f(x): ...       # f = dec(f)<br><br>@factory(retries=3) # g = factory(retries=3)(g)<br>def g(x): ...</code></td>
+      <td>Zero compiler magic — decorators just take a function or class and return an upgraded one. Stacked decorators apply <b>bottom-up</b> (<code>@a</code> above <code>@b</code> runs <code>f = a(b(f))</code>). Always put <code>@functools.wraps(fn)</code> on the inner <code>wrapper</code>!</td>
+    </tr>
+    <tr>
+      <td><code>functools</code> caches &amp; helpers<br><span class="cs-tag ok">DP speed</span></td>
+      <td><code>from functools import (<br>    cache, lru_cache, cached_property,<br>    partial, singledispatch,<br>)<br>@cache                    # unbounded DP (3.9+)<br>def dp(i, j): ...<br>@lru_cache(maxsize=1024)  # bounded prod!<br>def fetch(k): ...<br>base2 = partial(int, base=2)</code></td>
+      <td>Use <code>@cache</code> for recursive DP (hashable args only!). Set a finite <code>maxsize</code> in servers, and <b>never</b> put <code>@lru_cache</code> on instance methods (pins <code>self</code> forever — use <code>@cached_property</code> for per-instance lazy values). Use <code>@singledispatch</code> for type-based function overloading; inspect caches via <code>cache_info()</code> / <code>cache_clear()</code>.</td>
+    </tr>
+    <tr>
+      <td><code>@contextmanager</code><br><span class="cs-tag bad">finally!</span></td>
+      <td><code>from contextlib import contextmanager<br>@contextmanager<br>def guard(res):<br>    acquire(res)<br>    try: yield res<br>    finally: release(res)</code></td>
+      <td>Put setup <em>above</em> <code>try:</code> (so failed setup doesn't trigger teardown), <code>yield</code> inside <code>try:</code>, and cleanup inside <code>finally:</code> (exceptions from the <code>with</code> body are thrown straight into <code>yield</code>!). Single-use: call the helper fresh on every <code>with</code>.</td>
+    </tr>
+    <tr>
+      <td>Class context manager &amp; <code>ExitStack</code></td>
+      <td><code>from contextlib import ExitStack<br>class Timer:<br>    def __enter__(self): ...; return self<br>    def __exit__(self, et, ev, tb): return False<br>with ExitStack() as st:<br>    fs = [st.enter_context(open(p)) for p in paths]</code></td>
+      <td>Use a class when you need a reusable guard or exposed state. Returning <code>False</code>/<code>None</code> from <code>__exit__</code> propagates exceptions (safe default); returning <code>True</code> suppresses them. Use <code>contextlib.suppress(FileNotFoundError)</code> for intentional ignores, and <code>ExitStack</code> for dynamic lists of resources.</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<div class="cs-recipes">
+  <div class="cs-recipe" data-recipe data-scope="decorators memoize cache wraps recipe">
+    <div class="cs-recipe-head"><span>Recipe: custom @memoize (falsy-safe)</span><button class="cs-copy" type="button" aria-label="Copy @memoize recipe">Copy</button></div>
+<pre><code>from functools import wraps
+
+def memoize(fn):
+    cache = {}
+    @wraps(fn)
+    def wrapper(*args):           # positional hashable args
+        if args not in cache:     # caches 0, False, None!
+            cache[args] = fn(*args)
+        return cache[args]
+    return wrapper</code></pre>
+  </div>
+  <div class="cs-recipe" data-recipe data-scope="decorators retry parameterized factory wraps recipe">
+    <div class="cs-recipe-head"><span>Recipe: parameterized @retry(times=3)</span><button class="cs-copy" type="button" aria-label="Copy @retry recipe">Copy</button></div>
+<pre><code>from functools import wraps
+
+def retry(times=3, exc=(Exception,)):
+    if times &lt; 1:
+        raise ValueError("times must be &gt;= 1")
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            for attempt in range(times):
+                try:
+                    return fn(*args, **kwargs)
+                except exc:
+                    if attempt == times - 1:
+                        raise
+        return wrapper
+    return decorator</code></pre>
+  </div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s12"><span class="sec-num">12</span>Exceptions, Assertions &amp; Modern Type Hints</h2>
+<p class="cs-sub">Precise error handling without swallowing typos, plus Python 3.10–3.12 typing vocabulary.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="exceptions errors try except assert type hints typing generics">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>try / except / else / finally</code><br><span class="cs-tag ver">3.11+ except*</span></td>
+      <td><code>try:<br>    val = int(raw)<br>except (ValueError, TypeError) as e:<br>    raise BadInput("bad int") from e<br>else:<br>    use(val)     # runs iff NO error<br>finally:<br>    cleanup()    # ALWAYS runs</code></td>
+      <td>Keep <code>try</code> blocks tight. Never write bare <code>except:</code> (catches <code>KeyboardInterrupt</code> and hides typos!). Use <code>raise ... from e</code> to chain root causes, bare <code>raise</code> to re-throw, and <code>except* ValueError:</code> (3.11+) for <code>ExceptionGroup</code>s (e.g. from <code>asyncio.TaskGroup</code>).</td>
+    </tr>
+    <tr>
+      <td>Custom errors &amp; <code>assert</code></td>
+      <td><code>class RateLimitError(Exception): pass<br>if k &lt;= 0: raise ValueError("k &gt; 0")<br>assert lo &lt;= hi, f"bad: {lo}&gt;{hi}"</code></td>
+      <td>Validate public API inputs with <code>raise ValueError</code>. Reserve <code>assert</code> for internal invariants and tests — running <code>python -O</code> strips every <code>assert</code>!</td>
+    </tr>
+    <tr>
+      <td>Modern built-in generics<br><span class="cs-tag ver">3.10+</span></td>
+      <td><code>nums: list[int] = []<br>ages: dict[str, int] = {}<br>pair: tuple[int, str] = (1, "a")<br>var_t: tuple[int, ...] = (1, 2, 3)<br>maybe: int | None = None</code></td>
+      <td>Since Python 3.9/3.10, use lowercase built-ins (<code>list[int]</code>, <code>dict[str, int]</code>) and union pipes (<code>int | None</code>) instead of legacy <code>typing.List</code>/<code>Optional</code>. Types are not enforced at runtime (checked by mypy/pyright).</td>
+    </tr>
+    <tr>
+      <td><code>Callable</code>, <code>Protocol</code>, <code>TypedDict</code>, <code>ParamSpec</code><br><span class="cs-tag ver">3.10–3.11</span></td>
+      <td><code>from collections.abc import Callable, Iterable<br>from typing import Literal, ParamSpec, Protocol, Self, TypedDict<br>Fn = Callable[[int, str], bool]<br>Mode = Literal["r", "w"]<br>class User(TypedDict): id: int; name: str<br>class Closable(Protocol):<br>    def close(self) -&gt; None: ...</code></td>
+      <td>Accept abstract ABCs (<code>Iterable</code>, <code>Sequence</code>, <code>Mapping</code>) in parameters and return concrete types (<code>list</code>, <code>dict</code>). <code>Protocol</code> gives structural duck typing; <code>TypedDict</code> types JSON-like dicts; <code>ParamSpec</code> (3.10+) preserves decorator signatures (<code>Callable[P, R]</code>); <code>Self</code> (3.11+) types fluent/factory return types.</td>
+    </tr>
+    <tr>
+      <td>PEP 695 Generics<br><span class="cs-tag ver">3.12+</span></td>
+      <td><code>def first[T](xs: list[T]) -&gt; T:<br>    return xs[0]<br>type Point = tuple[float, float]</code></td>
+      <td>Python 3.12 lets you declare type parameters inline (<code>[T]</code>) and type aliases (<code>type ... = ...</code>) without boilerplate <code>TypeVar("T")</code>.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s13"><span class="sec-num">13</span>Interview Standard Library Power Tools</h2>
+<p class="cs-sub">C-backed collections, queues, heaps, binary search, math, and randomness that eliminate 20-line loops.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="stdlib collections interview">
+  <thead><tr><th>Tool</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>collections.Counter</code><br><span class="cs-tag warn">Zero ghosts!</span></td>
+      <td><code>from collections import Counter<br>c = Counter(words)<br>c.most_common(k)       # arrival ties<br>c["x"] -= 1<br>if c["x"] &lt;= 0: del c["x"]<br>a + b; a - b; a &amp; b; a | b</code></td>
+      <td>Counts any hashable iterable in <code>O(n)</code>. Missing keys return <code>0</code> without inserting. <b>Trap:</b> decrementing to <code>0</code> leaves <code>"x": 0</code> in <code>c</code> (so <code>len(c)</code> stays inflated!) until you <code>del c["x"]</code> (or run unary <code>+c</code> to strip all <code>&lt;= 0</code> entries).</td>
+    </tr>
+    <tr>
+      <td><code>collections.defaultdict</code><br><span class="cs-tag warn">Read mutates!</span></td>
+      <td><code>from collections import defaultdict<br>adj = defaultdict(list)<br>adj[u].append(v)<br># Safe read without inserting:<br>if u in adj: ...  # NOT `if adj[u]:`!</code></td>
+      <td>Auto-creates a fresh factory value (<code>list</code>, <code>int</code>, <code>set</code>) on missing key access. <b>Trap:</b> reading <code>d[missing]</code> inserts an empty entry into <code>d</code>! Check <code>k in d</code> or <code>d.get(k)</code> for pure reads.</td>
+    </tr>
+    <tr>
+      <td><code>collections.deque</code><br><span class="cs-tag ok">O(1) ends</span></td>
+      <td><code>from collections import deque<br>q = deque([start])<br>q.append(x); q.appendleft(x)<br>q.pop(); q.popleft()<br>ring = deque(maxlen=k) # auto-evict!</code></td>
+      <td>True <code>O(1)</code> FIFO queues, BFS frontiers, and monotonic deques. <code>maxlen=k</code> makes a 1-line fixed ring buffer. <b>Catch:</b> middle indexing <code>q[i]</code> is <code>O(n)</code>, not <code>O(1)</code>.</td>
+    </tr>
+    <tr>
+      <td><code>collections.OrderedDict</code></td>
+      <td><code>from collections import OrderedDict<br>od = OrderedDict()<br>od.move_to_end(k)           # O(1)<br>od.popitem(last=False)      # pop oldest</code></td>
+      <td>Doubly-linked hash map giving <code>O(1)</code> LRU cache eviction (<code>move_to_end</code> on hit, <code>popitem(last=False)</code> when over capacity) in ~12 lines!</td>
+    </tr>
+    <tr>
+      <td><code>heapq</code> (min-heap)<br><span class="cs-tag warn">Min only!</span></td>
+      <td><code>import heapq<br>heapq.heapify(xs)          # O(n)!<br>heapq.heappush(h, x)       # O(log n)<br>lo = heapq.heappop(h)      # O(log n)<br>heapq.nlargest(k, xs); heapq.merge(*iters)<br># Max-heap: push -val; tie: (p, next(seq), obj)</code></td>
+      <td>Python only ships a <b>min-heap</b> — negate numeric priorities for a max-heap. Insert a monotonic <code>next(itertools.count())</code> in slot 1 so ties never compare unorderable objects. Use <code>nlargest</code>/<code>nsmallest</code> for top-<code>k</code> (<code>O(n log k)</code>) and <code>heapq.merge</code> to merge sorted streams lazily.</td>
+    </tr>
+    <tr>
+      <td><code>bisect</code> (binary search)<br><span class="cs-tag ok">O(log n)</span></td>
+      <td><code>from bisect import bisect_left, bisect_right<br>i = bisect_left(a, x)   # first &gt;= x<br>j = bisect_right(a, x)  # first &gt; x<br>cnt = bisect_right(a, hi) - bisect_left(a, lo)</code></td>
+      <td>Requires <code>a</code> to be sorted! <code>bisect_right(a, hi) - bisect_left(a, lo)</code> counts elements in <code>[lo, hi]</code> in <code>O(log n)</code> (guard <code>lo &gt; hi</code>). Supports <code>key=</code> in 3.10+. Warning: <code>bisect.insort</code> shifts the list in <code>O(n)</code>!</td>
+    </tr>
+    <tr>
+      <td><code>math</code> &amp; <code>random</code></td>
+      <td><code>import math, random<br>math.gcd(a, b); math.lcm(a, b)<br>math.isqrt(n); math.comb(n, k)<br>random.randint(1, 6)    # 1..6 INCL.<br>random.randrange(0, n)  # 0..n-1<br>random.sample(xs, k)    # w/o replacement</code></td>
+      <td><code>math.isqrt(n)</code> is exact integer square root (no float precision bugs on huge ints). <code>randint(a, b)</code> includes <code>b</code>! <code>random.shuffle(xs)</code> shuffles in place and returns <code>None</code>.</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s14"><span class="sec-num">14</span>Concurrency, Threading, Multiprocessing &amp; asyncio</h2>
+<p class="cs-sub">Choosing threads vs. processes vs. async event loops, safe locks, thread pools, and structured concurrency.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="concurrency parallel">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Picking the right model</td>
+      <td><code># High-concurrency I/O → asyncio<br># Blocking sync I/O    → ThreadPoolExecutor<br># CPU-heavy crunching  → ProcessPoolExecutor</code></td>
+      <td>CPython's GIL lets one thread run Python bytecode at a time (releasing on I/O &amp; C extensions; experimental free-threaded builds landed in 3.13, PEP 703). <b>Catch:</b> the GIL does <em>not</em> make compound ops like <code>shared += 1</code> thread-safe — you still need locks!</td>
+    </tr>
+    <tr>
+      <td>Locks, events &amp; queues</td>
+      <td><code>import threading, queue<br>lock = threading.Lock()<br>with lock: shared += 1<br>ev = threading.Event(); ev.set(); ev.wait()<br>q = queue.Queue(maxsize=100)<br>q.put(job); item = q.get(); q.task_done()</code></td>
+      <td>Always acquire locks with <code>with lock:</code> so exceptions never deadlock. <b>Golden rule:</b> never hold a lock across blocking I/O! Use <code>Event</code> for one-shot signals, <code>RLock</code> only for same-thread re-entry, and a fixed lock order to prevent deadlocks.</td>
+    </tr>
+    <tr>
+      <td><code>concurrent.futures</code> pools</td>
+      <td><code>from concurrent.futures import ThreadPoolExecutor, as_completed<br>with ThreadPoolExecutor(max_workers=8) as ex:<br>    futs = [ex.submit(fetch, u) for u in urls]<br>    for f in as_completed(futs):<br>        handle(f.result())</code></td>
+      <td>Cleanest high-level API for bounded parallel work. Swap <code>ThreadPoolExecutor</code> for <code>ProcessPoolExecutor</code> on CPU-bound tasks (functions &amp; args must be picklable, guarded by <code>if __name__ == "__main__":</code>).</td>
+    </tr>
+    <tr>
+      <td><code>asyncio</code> basics &amp; concurrency<br><span class="cs-tag ver">3.11+ TaskGroup</span></td>
+      <td><code>import asyncio<br>asyncio.run(main())  # sync entry point<br>res = await asyncio.gather(f1(), f2())<br>async with asyncio.TaskGroup() as tg:<br>    t1 = tg.create_task(f1())<br>    t2 = tg.create_task(f2())<br>out = (t1.result(), t2.result())</code></td>
+      <td><code>await</code> yields control back to the event loop. <code>TaskGroup</code> (3.11+) cancels siblings on failure and raises an <code>ExceptionGroup</code> (catch with <code>except*</code>, NOT plain <code>except</code>!). Never run blocking calls like <code>time.sleep</code> in <code>async def</code> — use <code>await asyncio.to_thread(fn)</code>.</td>
+    </tr>
+    <tr>
+      <td>Async limits &amp; timeouts<br><span class="cs-tag ver">3.11+ timeout</span></td>
+      <td><code>sem = asyncio.Semaphore(10)<br>async with sem:<br>    async with asyncio.timeout(5.0):<br>        data = await fetch(url)</code></td>
+      <td>Bound fan-out concurrency with <code>asyncio.Semaphore(limit)</code> so you don't overwhelm downstream servers or exhaust file descriptors, and wrap every external call in <code>asyncio.timeout(...)</code> (or <code>asyncio.wait_for</code> on 3.10).</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s15"><span class="sec-num">15</span>Files, Paths, JSON, Time &amp; Regular Expressions</h2>
+<p class="cs-sub">Everyday practical-round utilities: streaming files, safe paths, JSON serialization, monotonic clocks, and regex.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="files io pathlib json datetime time regex">
+  <thead><tr><th>Concept</th><th>Syntax</th><th>Mini-explanation &amp; catch</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>pathlib.Path</code> &amp; streaming I/O</td>
+      <td><code>from pathlib import Path<br>p = Path("data") / "logs.txt"<br>txt = p.read_text(encoding="utf-8")<br>with p.open(encoding="utf-8") as f:<br>    for line in f: process(line)</code></td>
+      <td>Use <code>/</code> to join paths cleanly across OSes. Iterating <code>for line in f:</code> streams 1 line at a time in <code>O(1)</code> RAM (unlike <code>f.readlines()</code> which loads the whole file into memory!). Create dirs with <code>p.mkdir(parents=True, exist_ok=True)</code>.</td>
+    </tr>
+    <tr>
+      <td><code>json</code> load / dump</td>
+      <td><code>import json<br>obj = json.loads(json_str)<br>s = json.dumps(obj, indent=2, sort_keys=True)<br>with open("a.json") as f: data = json.load(f)</code></td>
+      <td>Mnemonic: <code>load<b>s</b></code> / <code>dump<b>s</b></code> = <b>s</b>tring; <code>load</code> / <code>dump</code> = file object. JSON only supports string keys (int keys convert to strings on round-trip!).</td>
+    </tr>
+    <tr>
+      <td>Time, UTC &amp; monotonic clocks<br><span class="cs-tag warn">TTLs!</span></td>
+      <td><code>from datetime import datetime, timezone, timedelta<br>import time<br>now = datetime.now(timezone.utc)<br>t0 = time.monotonic()  # for TTLs/elapsed!</code></td>
+      <td>Always use timezone-aware UTC timestamps (<code>timezone.utc</code>) — never naive <code>datetime.utcnow()</code> (deprecated in 3.12!). For durations, rate limiters, and cache TTLs, use <code>time.monotonic()</code> (never jumps backwards on NTP sync!).</td>
+    </tr>
+    <tr>
+      <td><code>re</code> regular expressions</td>
+      <td><code>import re<br>pat = re.compile(r"(\w+)=(\d+)", re.I | re.M)<br>m = pat.search(text)        # anywhere<br>m2 = pat.fullmatch(tok)     # entire string<br>for m in pat.finditer(text): ...<br>clean = pat.sub(r"\1=X", text)</code></td>
+      <td><code>re.match</code> anchors ONLY at start; <code>re.search</code> scans anywhere; <code>re.fullmatch</code> matches the whole string. Prefer lazy <code>pat.finditer()</code> over <code>findall()</code> on big logs. Flags: <code>re.I</code> (ignore case), <code>re.M</code> (<code>^/$</code> per line), <code>re.S</code> (<code>.</code> matches <code>\n</code>). Always use raw <code>r"..."</code>!</td>
+    </tr>
+  </tbody>
+</table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="cs-sec" data-sec>
+<h2 id="s16"><span class="sec-num">16</span>Advanced Internals, Top Gotchas &amp; Big-O Master Table</h2>
+<p class="cs-sub">Senior Python internals, the 12 classic pitfalls in one glance, and the master Big-O complexity lookup.</p>
+<div class="cs-table-wrap"><table class="cs-table" data-scope="advanced internals dunder protocol">
+  <thead><tr><th>Advanced topic</th><th>Syntax / hook</th><th>Mini-explanation &amp; when to use it</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>__new__</code> vs. <code>__init__</code></td>
+      <td><code>def __new__(cls, *a):<br>    obj = super().__new__(cls)<br>    return obj</code></td>
+      <td><code>__new__</code> allocates and returns the instance (runs first); <code>__init__</code> initializes it. Only override <code>__new__</code> when subclassing immutable built-ins (<code>tuple</code>, <code>str</code>, <code>int</code>) or implementing singletons/interning.</td>
+    </tr>
+    <tr>
+      <td>Descriptors (<code>__get__</code>/<code>__set__</code>)</td>
+      <td><code>class Positive:<br>    def __set_name__(self, owner, name): self.n = "_" + name<br>    def __get__(self, obj, t=None):<br>        return self if obj is None else getattr(obj, self.n)<br>    def __set__(self, obj, v): ...</code></td>
+      <td>Powers <code>@property</code>, bound methods, <code>@classmethod</code>, and ORM fields. Return <code>self</code> when <code>obj is None</code> (class access). <b>Data descriptors</b> (defining <code>__set__</code>/<code>__delete__</code>) take priority over instance <code>__dict__</code>; <b>non-data descriptors</b> (<code>__get__</code> only, like methods) can be shadowed by instance attributes.</td>
+    </tr>
+    <tr>
+      <td><code>__init_subclass__</code> vs. Metaclasses</td>
+      <td><code>class Plugin:<br>    registry = {}<br>    def __init_subclass__(cls, name, **kw):<br>        super().__init_subclass__(**kw)<br>        Plugin.registry[name] = cls</code></td>
+      <td>A metaclass (<code>class M(type):</code>) controls class creation itself — almost always overkill! Reach for <code>__init_subclass__</code> (auto-registering subclasses/validation) or a class decorator 99% of the time.</td>
+    </tr>
+    <tr>
+      <td><code>__getattr__</code> vs. <code>__getattribute__</code></td>
+      <td><code>def __getattr__(self, name): ...</code></td>
+      <td><code>__getattr__</code> runs <em>only</em> as a fallback when normal attribute lookup fails (great for proxies/lazy delegation). <code>__getattribute__</code> intercepts EVERY lookup (easy to cause infinite recursion unless calling <code>super().__getattribute__</code>!).</td>
+    </tr>
+    <tr>
+      <td><code>weakref</code> &amp; recursion limit</td>
+      <td><code>import weakref, sys<br>cache = weakref.WeakValueDictionary()<br>sys.setrecursionlimit(20_000)</code></td>
+      <td>Weak references let caches track objects without blocking garbage collection. Python's default recursion depth is ~1,000 frames — prefer an explicit iterative stack for deep DFS/trees in production.</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<div class="cs-table-wrap"><table class="cs-table cs-gotchas" data-scope="gotchas traps pitfalls bugs">
+  <thead><tr><th>Top 12 Python Gotchas</th><th>Buggy code</th><th>Safe fix</th></tr></thead>
+  <tbody>
+    <tr><td>1. Shared 2D grid rows</td><td><code>g = [[0] * c] * r</code></td><td><code>g = [[0] * c for _ in range(r)]</code></td></tr>
+    <tr><td>2. Mutable default arg</td><td><code>def f(x, out=[]): ...</code></td><td><code>def f(x, out=None):<br>    if out is None: out = []</code></td></tr>
+    <tr><td>3. Late-binding closure</td><td><code>[lambda x: x*f for f in fs]</code></td><td><code>[lambda x, f=f: x*f for f in fs]</code></td></tr>
+    <tr><td>4. Falsy <code>0</code> / <code>""</code> dropped</td><td><code>if val:</code> / <code>if cache.get(k):</code></td><td><code>if val is not None:</code> / <code>if k in cache:</code></td></tr>
+    <tr><td>5. Empty braces = dict</td><td><code>seen = {}; seen.add(x)</code></td><td><code>seen = set()</code></td></tr>
+    <tr><td>6. Missing 1-tuple comma</td><td><code>t = (42)</code> (an <code>int</code>!)</td><td><code>t = (42,)</code></td></tr>
+    <tr><td>7. In-place returns <code>None</code></td><td><code>a = nums.sort()</code></td><td><code>a = sorted(nums)</code> (or <code>nums.sort()</code> alone)</td></tr>
+    <tr><td>8. <code>Counter</code> zero ghosts</td><td><code>c[k] -= 1; len(c)</code></td><td><code>if c[k] &lt;= 0: del c[k]</code> (or unary <code>+c</code>)</td></tr>
+    <tr><td>9. <code>defaultdict</code> read insert</td><td><code>if adj[node]:</code></td><td><code>if node in adj:</code> / <code>adj.get(node)</code></td></tr>
+    <tr><td>10. Unsorted / drained <code>groupby</code></td><td><code>[(k, g) for k, g in groupby(xs)]</code></td><td>Sort first + materialize <code>list(g)</code> inside loop</td></tr>
+    <tr><td>11. Exhausted generator</td><td><code>sum(g); list(g)</code> → <code>[]</code></td><td>Materialize into a <code>list</code> if 2+ passes needed</td></tr>
+    <tr><td>12. Negative floor division</td><td><code>-7 // 2</code> → <code>-4</code> (not <code>-3</code>!)</td><td>Use <code>int(a / b)</code> (for small ints) when truncating to 0</td></tr>
+  </tbody>
+</table></div>
+
+<div class="cs-table-wrap"><table class="cs-table cs-bigo" data-scope="big-o complexity time space">
+  <thead><tr><th>Master Big-O Table</th><th>Fast ops</th><th>Slow ops &amp; notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>list</code></td><td><code>a[i]</code>, <code>len</code>: <code>O(1)</code> · <code>append</code>, <code>pop()</code>: <code>O(1)</code> amort</td><td><code>insert(0)</code>, <code>pop(0)</code>, <code>remove</code>, <code>x in a</code>, <code>copy()</code>: <code>O(n)</code> · slice <code>a[i:j]</code>: <code>O(j - i)</code> · Timsort <code>sort()</code>: <code>O(n log n)</code> avg/worst, <code>O(n)</code> nearly sorted, <code>O(n)</code> space (stable)</td></tr>
+    <tr><td><code>tuple</code> / <code>str</code></td><td><code>t[i]</code>, <code>len</code>: <code>O(1)</code> · <code>"".join(parts)</code>: <code>O(total chars)</code></td><td>Immutable · <code>x in t</code>: <code>O(n)</code> · <code>sub in s</code>: <code>O(n)</code> avg / <code>O(nm)</code> worst · repeated <code>s += ch</code>: <code>O(n²)</code></td></tr>
+    <tr><td><code>dict</code> / <code>set</code></td><td><code>d[k]</code>, <code>k in d</code>, <code>x in s</code>, <code>pop</code>: <code>O(1)</code> avg · writes (<code>d[k]=v</code>, <code>add</code>): <code>O(1)</code> amort avg</td><td>Worst-case collision: <code>O(n)</code> · <code>copy()</code>: <code>O(n)</code> · set ops: <code>a &amp; b</code> <code>O(min(|a|,|b|))</code> · <code>a - b</code> <code>O(|a|)</code> (<code>a -= b</code> <code>O(|b|)</code>) · <code>a | b</code> / <code>a ^ b</code> <code>O(|a| + |b|)</code></td></tr>
+    <tr><td><code>collections.deque</code></td><td><code>append</code>, <code>appendleft</code>, <code>pop</code>, <code>popleft</code>, <code>q[0]</code>, <code>q[-1]</code>, <code>len</code>: <code>O(1)</code></td><td>Middle indexing <code>q[i]</code> and <code>x in q</code>: <code>O(n)</code></td></tr>
+    <tr><td><code>heapq</code></td><td><code>heapify</code>: <code>O(n)</code> · <code>heappush</code>, <code>heappop</code>: <code>O(log n)</code> · peek <code>h[0]</code>: <code>O(1)</code></td><td><code>nlargest(k)</code> / <code>nsmallest(k)</code>: <code>O(n log k)</code> · arbitrary search/delete: <code>O(n)</code> (use lazy deletion + hash map)</td></tr>
+    <tr><td><code>bisect</code></td><td><code>bisect_left</code>, <code>bisect_right</code>: <code>O(log n)</code> on sorted list</td><td><code>bisect.insort</code> shifts array: <code>O(n)</code>!</td></tr>
+  </tbody>
+</table></div>
+</section>
+
+</main>
+
+<script>
+(function () {
+  const bar = document.querySelector(".cs-bar");
+  const input = document.getElementById("cs-filter");
+  const jump = document.getElementById("cs-jump");
+  const countEl = document.getElementById("cs-count");
+  const clearBtn = document.getElementById("cs-clear");
+  const emptyEl = document.getElementById("cs-empty");
+  const sections = [...document.querySelectorAll("[data-sec]")];
+  const pills = [...document.querySelectorAll(".cs-pill")];
+  const entries = [];
+
+  function syncBarOffset() {
+    if (!bar) return;
+    const isSticky = getComputedStyle(bar).position === "sticky";
+    const h = isSticky ? Math.ceil(bar.getBoundingClientRect().height + 12) : 0;
+    document.documentElement.style.setProperty("--cs-bar-h", h + "px");
+  }
+  syncBarOffset();
+  if (bar && typeof ResizeObserver !== "undefined") new ResizeObserver(syncBarOffset).observe(bar);
+  window.addEventListener("resize", syncBarOffset);
+  document.addEventListener("swe-prefs", syncBarOffset);
+
+  sections.forEach((sec) => {
+    sec.querySelectorAll("table.cs-table").forEach((tbl) => {
+      const scope = tbl.dataset.scope || "";
+      tbl.querySelectorAll("tbody tr").forEach((tr) => {
+        entries.push({ el: tr, sec, hay: (scope + " " + tr.textContent).toLowerCase() });
+      });
+    });
+    sec.querySelectorAll("[data-recipe]").forEach((card) => {
+      const scope = card.dataset.scope || "";
+      const clone = card.cloneNode(true);
+      clone.querySelectorAll(".cs-copy").forEach((b) => b.remove());
+      entries.push({ el: card, sec, hay: (scope + " " + clone.textContent).toLowerCase() });
+    });
+  });
+
+  const total = entries.length;
+  function applyFilter() {
+    const terms = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    clearBtn.hidden = terms.length === 0;
+    let shown = 0;
+    entries.forEach((e) => {
+      const ok = !terms.length || terms.every((w) => e.hay.includes(w));
+      e.el.hidden = !ok;
+      if (ok) shown++;
+    });
+    sections.forEach((sec) => {
+      sec.querySelectorAll(".cs-table-wrap").forEach((wrap) => {
+        const hasVisibleRow = [...wrap.querySelectorAll("tbody tr")].some((tr) => !tr.hidden);
+        wrap.hidden = !hasVisibleRow;
+      });
+      sec.querySelectorAll(".cs-recipes").forEach((wrap) => {
+        const hasVisibleCard = [...wrap.querySelectorAll("[data-recipe]")].some((c) => !c.hidden);
+        wrap.hidden = !hasVisibleCard;
+      });
+      const hasAny = [...sec.querySelectorAll("tbody tr, [data-recipe]")].some((el) => !el.hidden);
+      sec.hidden = !hasAny;
+    });
+    pills.forEach((pill) => {
+      const id = pill.getAttribute("href")?.slice(1);
+      const targetSec = id ? document.getElementById(id)?.closest("[data-sec]") : null;
+      pill.classList.toggle("dim", Boolean(targetSec && targetSec.hidden));
+    });
+    countEl.textContent = terms.length ? `${shown} / ${total} matches` : `${total} entries`;
+    emptyEl.classList.toggle("show", shown === 0);
+  }
+
+  function revealTarget(id) {
+    const target = id ? document.getElementById(id) : null;
+    if (!target) return false;
+    const sec = target.closest("[data-sec]");
+    if (sec && sec.hidden) {
+      input.value = "";
+      applyFilter();
+    }
+    return true;
+  }
+
+  pills.forEach((pill) => {
+    pill.addEventListener("click", () => {
+      const id = pill.getAttribute("href")?.slice(1);
+      revealTarget(id);
+    });
+  });
+
+  if (jump) {
+    jump.addEventListener("change", () => {
+      const id = jump.value;
+      if (!id) return;
+      if (revealTarget(id)) {
+        location.hash = "#" + id;
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      jump.value = "";
+    });
+  }
+
+  window.addEventListener("hashchange", () => {
+    const id = location.hash.slice(1);
+    if (revealTarget(id)) {
+      document.getElementById(id)?.scrollIntoView({ block: "start" });
+    }
+  });
+
+  input.addEventListener("input", applyFilter);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (input.value) {
+        e.preventDefault(); e.stopPropagation();
+        input.value = ""; applyFilter();
+      } else {
+        input.blur();
+      }
+    }
+  });
+  clearBtn.addEventListener("click", () => { input.value = ""; applyFilter(); input.focus(); });
+  applyFilter();
+
+  document.querySelectorAll(".cs-copy").forEach((btn) => {
+    let timer = null;
+    btn.addEventListener("click", () => {
+      const code = btn.closest(".cs-recipe")?.querySelector("pre code")?.textContent || "";
+      const done = () => {
+        btn.textContent = "Copied";
+        clearTimeout(timer);
+        timer = setTimeout(() => { btn.textContent = "Copy"; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(done, fallback);
+      } else fallback();
+      function fallback() {
+        const ta = document.createElement("textarea");
+        ta.setAttribute("readonly", "");
+        ta.value = code; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.append(ta); ta.select();
+        try { document.execCommand("copy"); } catch (_) {}
+        ta.remove(); done();
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

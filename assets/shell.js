@@ -260,6 +260,8 @@
       if (PAGE === "concept") crumbs.append(h("span", { class: "sep" }, "/"), h("span", { class: "cur" }, document.title));
     } else if (PAGE === "practice") {
       crumbs.append(h("span", { class: "sep" }, "/"), h("span", { class: "cur" }, "Practice hub"));
+    } else if (PAGE === "cheatsheet") {
+      crumbs.append(h("span", { class: "sep" }, "/"), h("span", { class: "cur" }, "Python cheatsheet"));
     }
     const sideBtn = iconButton("panelL", "Toggle sidebar  [", toggleSidebar);
     toggles.side.push(sideBtn);
@@ -344,7 +346,8 @@
     const nav = h("nav", { class: "nav", "aria-label": "Track and chapters" });
     nav.append(
       h("a", { class: "nav-link" + (PAGE === "home" ? " active" : ""), href: `${ROOT}/index.html` }, icon("home"), "Home"),
-      h("a", { class: "nav-link" + (PAGE === "practice" ? " active" : ""), href: `${ROOT}/practice.html` }, icon("play"), "Practice hub"));
+      h("a", { class: "nav-link" + (PAGE === "practice" ? " active" : ""), href: `${ROOT}/practice.html` }, icon("play"), "Practice hub"),
+      h("a", { class: "nav-link" + (PAGE === "cheatsheet" ? " active" : ""), href: `${ROOT}/python-cheatsheet.html` }, icon("hash"), "Python cheatsheet"));
     const chapters = buildChapterNav();
     if (window.SWETrack) {
       const track = buildTrackNav();
@@ -575,10 +578,12 @@
   let palette = null;
   function paletteItems() {
     const items = [];
-    heads.forEach((hd) => { const { num, text } = headParts(hd); items.push({ grp: "On this page", icon: "hash", title: (num ? num + ". " : "") + text, href: "#" + hd.id, where: "" }); });
+    const pageHeads = heads.length ? heads : [...document.querySelectorAll("main.content h2[id]")];
+    pageHeads.forEach((hd) => { const { num, text } = headParts(hd); items.push({ grp: "On this page", icon: "hash", title: (num ? num + ". " : "") + text, href: "#" + hd.id, where: "" }); });
     items.push(
       { grp: "Workspace", icon: "home", title: "Home · Track dashboard", href: `${ROOT}/index.html`, where: "" },
-      { grp: "Workspace", icon: "play", title: "Practice hub · Bare editor, Mock log & STAR matrix", href: `${ROOT}/practice.html`, where: "" });
+      { grp: "Workspace", icon: "play", title: "Practice hub · Bare editor, Mock log & STAR matrix", href: `${ROOT}/practice.html`, where: "" },
+      { grp: "Workspace", icon: "hash", title: "Python cheatsheet · Quick lookup from basics to advanced", href: `${ROOT}/python-cheatsheet.html`, where: "" });
     for (const s of C.sections) {
       const written = s.concepts.filter((c) => c.status !== "outline");
       const outlines = s.concepts.filter((c) => c.status === "outline");
