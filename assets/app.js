@@ -503,7 +503,7 @@
         h("pre", { class: "plain" }, h("code", {}, `python3 -m pytest sections/${s.slug}/exercises   # whole section\nmake one K=py_idioms                            # one exercise\nmake progress                                   # run all + update badges`)),
         h("div", { class: "table-wrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Module"), h("th", {}, "Exercise"), h("th", {}, "Status"), h("th", {}, "Run"))),
           h("tbody", {}, s.exercises.map((e) => h("tr", {},
-            h("td", {}, h("code", {}, e.file)),
+            h("td", {}, h("a", { href: `exercises/${e.file}` }, h("code", {}, e.file))),
             h("td", {}, e.title),
             h("td", {}, testLabel(e)),
             h("td", {}, copyButton("Copy pytest", `python3 -m pytest -k ${e.module}`))))))));

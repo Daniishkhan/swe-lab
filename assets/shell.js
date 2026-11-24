@@ -691,6 +691,24 @@
     scrollSpy();
     trackReading();
     highlightAll();
+    // On GitHub Pages, .py/.md/.json repo files aren't copied into _site/ — open them on GitHub instead of 404ing
+    if (location.hostname.endsWith(".github.io")) {
+      const owner = location.hostname.slice(0, -".github.io".length);
+      const siteRoot = new URL(ROOT + "/", location.href).pathname;
+      const repo = siteRoot.split("/").filter(Boolean)[0] || `${owner}.github.io`;
+      document.querySelectorAll("a[href]").forEach((a) => {
+        const raw = a.getAttribute("href");
+        if (!raw || /^(?:https?:|mailto:|#)/i.test(raw)) return;
+        if (!/\.(?:py|md|json|txt|sh|ya?ml|toml)(?:#.*)?$/i.test(raw)) return;
+        const resolved = new URL(raw, location.href);
+        if (resolved.origin !== location.origin || !resolved.pathname.startsWith(siteRoot)) return;
+        const rel = resolved.pathname.slice(siteRoot.length);
+        a.href = `https://github.com/${owner}/${repo}/blob/main/${rel}${resolved.hash}`;
+        a.target = "_blank";
+        a.rel = "noopener";
+        if (!a.title) a.title = "View in GitHub repo (edit locally & run pytest)";
+      });
+    }
     document.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); return; }
       if (e.key === "Escape") { closeModals(); togglePop(false); if (mobile()) setSidebar(true); return; }
